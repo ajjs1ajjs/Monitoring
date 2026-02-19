@@ -29,12 +29,31 @@ class SecurityModel(BaseModel):
     https_redirect: bool
     listen_port: int
 
-// --- UTILITIES & DB ---
+class AlertModel(BaseModel):
+    name: str
+    metric: str
+    condition: str
+    threshold: int
+    duration: int = 0
+    severity: str = "warning"
+    server_id: Optional[int] = None
+    notify_telegram: bool = False
+    notify_discord: bool = False
+    notify_slack: bool = False
+    notify_email: bool = False
+    description: Optional[str] = None
+    enabled: bool = True
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+class ServerModel(BaseModel):
+    name: str
+    host: str
+    os_type: str = "linux"
+    agent_port: int = 9100
+    check_interval: int = 15
+    notify_telegram: bool = False
+    notify_discord: bool = False
+    notify_slack: bool = False
+    notify_email: bool = False
 
 def init_web_tables():
     try:
@@ -359,8 +378,6 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                     <button class="nav-item active" data-section="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button>
                     <button class="nav-item" data-section="servers"><i class="fas fa-server"></i> Servers</button>
                     <button class="nav-item" data-section="alerts"><i class="fas fa-bell"></i> Alerts</button>
-                    <button class="nav-item" data-section="users"><i class="fas fa-users"></i> Users</button>
-                    <button class="nav-item" data-section="backups"><i class="fas fa-database"></i> Backups</button>
                     <button class="nav-item" data-section="settings"><i class="fas fa-cog"></i> Config</button>
                 </div>
         </div>
@@ -474,104 +491,56 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
             </div>
         </div>
         
-            <div class="tab-menu">
-                <div class="tab-item active" data-set-tab="notif">Notifications</div>
-                <div class="tab-item" data-set-tab="security">Security (SSL/Port)</div>
-            </div>
-            
-            <div id="settings-notif" class="section-content active">
+        <!-- Settings -->
+        <div id="section-settings" class="section-content">
+            <div class="card">
+                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fas fa-bell"></i> Notification Settings</h3>
+                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div>
                         <h4 style="font-size: 12px; color: #0088cc; margin-bottom: 10px;"><i class="fab fa-telegram"></i> TELEGRAM</h4>
-                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="tg-enabled" style="width: auto;"> Enabled</label></div>
-                        <div class="form-group"><label>Bot Token</label><input type="text" id="tg-token" placeholder="12345:ABC..."></div>
-                        <div class="form-group"><label>Chat ID</label><input type="text" id="tg-chat" placeholder="-100..."></div>
+                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="telegram-enabled" style="width: auto;"> Enabled</label></div>
+                        <div id="telegram-config" style="display: none;">
+                            <div class="form-group"><label>Bot Token</label><input type="text" id="telegram-token" placeholder="123456789:ABCdef..."></div>
+                            <div class="form-group"><label>Chat ID</label><input type="text" id="telegram-chat" placeholder="-1001234567890"></div>
+                            <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Get token from @BotFather, chat ID from @userinfobot</p>
+                        </div>
                     </div>
                     <div>
-                        <h4 style="font-size: 12px; color: #5865F2; margin-bottom: 10px;"><i class="fab fa-discord"></i> DISCORD / MS TEAMS</h4>
-                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="ds-enabled" style="width: auto;"> Enable Discord</label></div>
-                        <div class="form-group"><label>Discord Webhook</label><input type="text" id="ds-webhook" placeholder="https://discord.com/api/webhooks/..."></div>
-                        
-                        <div class="form-group" style="margin-top: 15px;"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="teams-enabled" style="width: auto;"> Enable MS Teams</label></div>
-                        <div class="form-group"><label>Teams Webhook</label><input type="text" id="teams-webhook" placeholder="https://outlook.office.com/webhook/..."></div>
+                        <h4 style="font-size: 12px; color: #5865F2; margin-bottom: 10px;"><i class="fab fa-discord"></i> DISCORD</h4>
+                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="discord-enabled" style="width: auto;"> Enable Discord</label></div>
+                        <div id="discord-config" style="display: none;">
+                            <div class="form-group"><label>Webhook URL</label><input type="text" id="discord-webhook" placeholder="https://discord.com/api/webhooks/..."></div>
+                            <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Create webhook in Discord channel settings</p>
+                        </div>
                     </div>
                 </div>
+                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
                     <div>
                         <h4 style="font-size: 12px; color: #4A154B; margin-bottom: 10px;"><i class="fab fa-slack"></i> SLACK</h4>
                         <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="slack-enabled" style="width: auto;"> Enabled</label></div>
-                        <div class="form-group"><label>Webhook URL</label><input type="text" id="slack-webhook" placeholder="https://hooks.slack.com/services/..."></div>
+                        <div id="slack-config" style="display: none;">
+                            <div class="form-group"><label>Webhook URL</label><input type="text" id="slack-webhook" placeholder="https://hooks.slack.com/services/..."></div>
+                            <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Create incoming webhook in Slack app settings</p>
+                        </div>
                     </div>
                     <div>
                         <h4 style="font-size: 12px; color: var(--red); margin-bottom: 10px;"><i class="fas fa-envelope"></i> SMTP (EMAIL)</h4>
-                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="mail-enabled" style="width: auto;"> Enabled</label></div>
-                        <div class="form-row"><div class="form-group"><label>Host</label><input type="text" id="mail-host" placeholder="smtp.gmail.com"></div><div class="form-group"><label>Port</label><input type="number" id="mail-port" value="587"></div></div>
-                        <div class="form-group"><label>User</label><input type="text" id="mail-user" placeholder="user@gmail.com"></div>
+                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="email-enabled" style="width: auto;"> Enabled</label></div>
+                        <div id="email-config" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-group"><label>Host</label><input type="text" id="email-host" placeholder="smtp.gmail.com"></div>
+                                <div class="form-group"><label>Port</label><input type="number" id="email-port" value="587"></div>
+                            </div>
+                            <div class="form-group"><label>User</label><input type="text" id="email-user" placeholder="user@gmail.com"></div>
+                            <div class="form-group"><label>Password / App Password</label><input type="password" id="email-pass" placeholder="app password"></div>
+                        </div>
                     </div>
                 </div>
+                
+                <button class="btn btn-primary" id="saveNotifyBtn" style="margin-top: 20px;"><i class="fas fa-save"></i> Save All Settings</button>
             </div>
-            
-            <div id="settings-security" class="section-content">
-                <h4 style="font-size: 12px; color: var(--green); margin-bottom: 10px;"><i class="fas fa-lock"></i> HTTPS & PORT</h4>
-                <div class="form-row">
-                    <div class="form-group"><label>SSL Certificate Path</label><input type="text" id="ssl-cert" placeholder="/path/to/fullchain.pem"></div>
-                    <div class="form-group"><label>SSL Private Key Path</label><input type="text" id="ssl-key" placeholder="/path/to/privkey.pem"></div>
-                </div>
-                <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="https-redirect" style="width: auto;"> Redirect HTTP (8090) to HTTPS (443)</label></div>
-                <div class="form-group"><label>Listen Port (Default: 8090)</label><input type="number" id="listen-port" value="8090"></div>
-            </div>
-            
-            <button class="btn btn-primary" id="saveAllSettingsBtn" style="margin-top: 10px;"><i class="fas fa-save"></i> Apply Changes</button>
-        </div>
-                <div id="telegram-config" style="display: none;">
-                    <div class="form-group"><label>Bot Token</label><input type="text" id="telegram-token" placeholder="123456789:ABCdef..."></div>
-                    <div class="form-group"><label>Chat ID</label><input type="text" id="telegram-chat" placeholder="-1001234567890"></div>
-                    <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Get token from @BotFather, chat ID from @userinfobot</p>
-                </div>
-            </div>
-            
-            <div class="card">
-                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fab fa-discord" style="color: #5865F2;"></i> Discord Notifications</h3>
-                <div class="form-group">
-                    <label style="display: flex; align-items: center; gap: 10px;"><input type="checkbox" id="discord-enabled" style="width: auto;"> Enable Discord</label>
-                </div>
-                <div id="discord-config" style="display: none;">
-                    <div class="form-group"><label>Webhook URL</label><input type="text" id="discord-webhook" placeholder="https://discord.com/api/webhooks/..."></div>
-                    <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Create webhook in Discord channel settings</p>
-                </div>
-            </div>
-            
-            <div class="card">
-                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fab fa-slack" style="color: #4A154B;"></i> Slack Notifications</h3>
-                <div class="form-group">
-                    <label style="display: flex; align-items: center; gap: 10px;"><input type="checkbox" id="slack-enabled" style="width: auto;"> Enable Slack</label>
-                </div>
-                <div id="slack-config" style="display: none;">
-                    <div class="form-group"><label>Webhook URL</label><input type="text" id="slack-webhook" placeholder="https://hooks.slack.com/services/..."></div>
-                    <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Create incoming webhook in Slack app settings</p>
-                </div>
-            </div>
-            
-            <div class="card">
-                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fas fa-envelope" style="color: var(--red);"></i> Email Notifications</h3>
-                <div class="form-group">
-                    <label style="display: flex; align-items: center; gap: 10px;"><input type="checkbox" id="email-enabled" style="width: auto;"> Enable Email</label>
-                </div>
-                <div id="email-config" style="display: none;">
-                    <div class="form-row">
-                        <div class="form-group"><label>SMTP Host</label><input type="text" id="email-host" placeholder="smtp.gmail.com"></div>
-                        <div class="form-group"><label>SMTP Port</label><input type="number" id="email-port" value="587"></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label>Username</label><input type="text" id="email-user" placeholder="your@email.com"></div>
-                        <div class="form-group"><label>Password / App Password</label><input type="password" id="email-pass" placeholder="app password"></div>
-                    </div>
-                    <div class="form-group"><label>From Address</label><input type="text" id="email-from" placeholder="noreply@example.com"></div>
-                    <div class="form-group"><label>To Addresses (comma separated)</label><input type="text" id="email-to" placeholder="admin@example.com, team@example.com"></div>
-                </div>
-            </div>
-            
-            <button class="btn btn-primary" id="saveNotifyBtn" style="margin-top: 10px;"><i class="fas fa-save"></i> Save All Settings</button>
         </div>
     </main>
     
@@ -665,14 +634,14 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
     let charts = {};
     let currentRange = '1h';
     const grafanaColors = ["#73bf69", "#f2cc0c", "#5794f2", "#b877d9", "#ff780a", "#00d8d8", "#f2495c", "#9673b5"];
+    const colors = grafanaColors;
     
     // Navigation
-document.querySelectorAll(".nav-item").forEach(btn => {
+    document.querySelectorAll(".nav-item").forEach(btn => {
         btn.addEventListener("click", function() {
             const section = this.dataset.section;
             if (section) showSection(section);
         });
-    });
     });
     
     // Logout
@@ -754,6 +723,30 @@ document.querySelectorAll(".nav-item").forEach(btn => {
             await fetch('/api/servers/' + id, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
             loadServers();
         }
+    }
+    
+    // Navigation functions
+    function showSection(section) {
+        document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        
+        const sectionEl = document.getElementById('section-' + section);
+        if (sectionEl) sectionEl.classList.add('active');
+        
+        document.querySelectorAll('.nav-item').forEach(el => {
+            if (el.dataset.section === section) el.classList.add('active');
+        });
+        
+        if (section === 'dashboard') {
+            setTimeout(initCharts, 100);
+        }
+    }
+    
+    function setTimeRange(range) {
+        currentRange = range;
+        document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector('.time-btn[data-range="' + range + '"]').classList.add('active');
+        initCharts();
     }
     
     // Charts
@@ -933,16 +926,6 @@ document.getElementById('alertForm').addEventListener('submit', async function(e
             headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
             body: JSON.stringify(alertData)
         });
-        closeModal('alertModal');
-        loadAlerts();
-    });
-        } else {
-            await fetch('/api/alerts', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-                body: JSON.stringify(alertData)
-            });
-        }
         document.getElementById('alertModal').classList.remove('active');
         loadAlerts();
     });
@@ -1105,6 +1088,10 @@ document.getElementById('alertForm').addEventListener('submit', async function(e
 async def dashboard():
     return DASHBOARD_HTML
 
+@router.get("/api/servers")
+async def list_servers():
+    conn = get_db()
+    servers = conn.execute("SELECT * FROM servers ORDER BY name").fetchall()
     conn.close()
     return {"servers": [dict(s) for s in servers]}
 
@@ -1148,29 +1135,6 @@ async def update_server(server_id: int, server: ServerModel):
 async def delete_server(server_id: int):
     conn = get_db()
     conn.execute("DELETE FROM servers WHERE id=?", (server_id,))
-    conn.commit()
-    conn.close()
-    return {"status": "ok"}
-
-@router.get("/api/servers/{server_id}")
-async def get_server(server_id: int):
-    conn = get_db()
-    server = conn.execute("SELECT * FROM servers WHERE id=?", (server_id,)).fetchone()
-    conn.close()
-    if server:
-        return {"server": dict(server)}
-    raise HTTPException(status_code=404, detail="Server not found")
-
-@router.put("/api/servers/{server_id}")
-async def update_server(server_id: int, server: ServerModel):
-    conn = get_db()
-    conn.execute('''UPDATE servers 
-        SET name=?, host=?, os_type=?, agent_port=?, check_interval=?,
-            notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?
-        WHERE id=?''',
-        (server.name, server.host, server.os_type, server.agent_port, server.check_interval,
-         int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email),
-         server_id))
     conn.commit()
     conn.close()
     return {"status": "ok"}
@@ -1260,9 +1224,6 @@ async def delete_alert(alert_id: int):
     conn.commit()
     conn.close()
     return {"status": "ok"}
-    except sqlite3.IntegrityError:
-        raise HTTPException(status_code=400, detail="User already exists")
-    finally: conn.close()
 
 @router.delete("/api/users/{user_id}")
 async def delete_user(user_id: int):
@@ -1298,65 +1259,3 @@ async def list_backups():
     backups = conn.execute("SELECT * FROM backups ORDER BY created_at DESC").fetchall()
     conn.close()
     return {"backups": [dict(b) for b in backups]}
-
-
-@router.post("/api/alerts")
-async def create_alert(alert: AlertModel):
-    conn = get_db()
-    try:
-        conn.execute('''INSERT INTO alerts 
-            (name, metric, condition, threshold, duration, severity, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity,
-             int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
-             alert.description, int(alert.enabled), datetime.utcnow().isoformat()))
-        conn.commit()
-    except Exception as e:
-        # Create table if not exists
-        conn.execute('''CREATE TABLE IF NOT EXISTS alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            metric TEXT NOT NULL,
-            condition TEXT NOT NULL,
-            threshold INTEGER NOT NULL,
-            duration INTEGER DEFAULT 0,
-            severity TEXT DEFAULT 'warning',
-            notify_telegram BOOLEAN DEFAULT 0,
-            notify_discord BOOLEAN DEFAULT 0,
-            notify_slack BOOLEAN DEFAULT 0,
-            notify_email BOOLEAN DEFAULT 0,
-            description TEXT,
-            enabled BOOLEAN DEFAULT 1,
-            created_at TEXT
-        )''')
-        conn.execute('''INSERT INTO alerts 
-            (name, metric, condition, threshold, duration, severity, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity,
-             int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
-             alert.description, int(alert.enabled), datetime.utcnow().isoformat()))
-        conn.commit()
-    conn.close()
-    return {"status": "ok"}
-
-@router.put("/api/alerts/{alert_id}")
-async def update_alert(alert_id: int, alert: AlertModel):
-    conn = get_db()
-    conn.execute('''UPDATE alerts 
-        SET name=?, metric=?, condition=?, threshold=?, duration=?, severity=?,
-            notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?, description=?, enabled=?
-        WHERE id=?''',
-        (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity,
-         int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
-         alert.description, int(alert.enabled), alert_id))
-    conn.commit()
-    conn.close()
-    return {"status": "ok"}
-
-@router.delete("/api/alerts/{alert_id}")
-async def delete_alert(alert_id: int):
-    conn = get_db()
-    conn.execute("DELETE FROM alerts WHERE id=?", (alert_id,))
-    conn.commit()
-    conn.close()
-    return {"status": "ok"}
