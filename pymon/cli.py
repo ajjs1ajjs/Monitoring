@@ -46,9 +46,23 @@ def main():
             from pymon.storage import init_storage
 
             init_storage(backend=storage, db_path=db_path)
+            
+            print(f"Setting auth_config.db_path to: {db_path}", file=sys.stderr)
             auth_cfg.db_path = db_path
             auth_cfg.admin_username = config.auth.admin_username
             auth_cfg.admin_password = config.auth.admin_password
+            
+            # Ensure DB directory exists
+            db_dir = os.path.dirname(db_path)
+            if db_dir and not os.path.exists(db_dir):
+                print(f"Creating DB directory: {db_dir}", file=sys.stderr)
+                os.makedirs(db_dir, exist_ok=True)
+                # Set proper permissions for pymon user
+                import stat
+                os.chmod(db_dir, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
+            
+            print(f"DB Path in auth_config: {auth_cfg.db_path}", file=sys.stderr)
+            print(f"DB directory exists: {os.path.exists(os.path.dirname(db_path))}", file=sys.stderr)
             
             print(f"Initializing auth tables...", file=sys.stderr)
             init_auth_tables()
