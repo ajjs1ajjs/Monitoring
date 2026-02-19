@@ -791,18 +791,87 @@ DASHBOARD_HTML = """
             font-size: 13px;
             font-weight: 600;
         }
-        .install-box code {
+        .code-block {
+            position: relative;
             background: #111217;
-            padding: 12px;
+            border: 1px solid var(--border);
             border-radius: 4px;
+            margin: 10px 0;
+        }
+        .code-block code {
             display: block;
+            padding: 12px 40px 12px 12px;
             font-family: 'Monaco', 'Consolas', monospace;
             font-size: 12px;
             overflow-x: auto;
             white-space: pre-wrap;
             word-break: break-all;
             color: var(--text);
-            border: 1px solid var(--border);
+            background: transparent;
+            border: none;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 8px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 3px;
+            color: var(--muted);
+            font-size: 11px;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+        }
+        .code-block:hover .copy-btn {
+            opacity: 1;
+        }
+        .copy-btn:hover {
+            background: rgba(255,255,255,0.2);
+            color: var(--text);
+        }
+        .copy-btn.copied {
+            background: var(--green);
+            color: white;
+            opacity: 1;
+        }
+        .install-steps {
+            margin-top: 16px;
+        }
+        .install-step {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+            border-left: 3px solid var(--blue);
+        }
+        .step-number {
+            width: 24px;
+            height: 24px;
+            background: var(--blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .step-content {
+            flex: 1;
+        }
+        .step-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+        .step-desc {
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 8px;
         }
         .os-tabs {
             display: flex;
@@ -1511,16 +1580,143 @@ DASHBOARD_HTML = """
                 </div>
                 
                 <div id="install-linux" class="install-box">
-                    <h4><i class="fab fa-linux"></i> Linux Installation</h4>
-                    <code>curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</code>
-                    <p style="margin-top: 12px; color: var(--muted); font-size: 13px;">Supports: Ubuntu, Debian, CentOS, RHEL, Fedora</p>
+                    <h4><i class="fab fa-linux"></i> Linux Agent Installation</h4>
+                    <p style="color: var(--muted); margin-bottom: 12px;">Supports: Ubuntu, Debian, CentOS, RHEL, Fedora, AlmaLinux, Rocky Linux</p>
+                    
+                    <div class="install-steps">
+                        <div class="install-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">Download and run installer</div>
+                                <div class="step-desc">Run this command on your Linux server:</div>
+                                <div class="code-block">
+                                    <code id="linux-install-cmd">curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('linux-install-cmd', this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Configure agent</div>
+                                <div class="step-desc">Edit configuration file:</div>
+                                <div class="code-block">
+                                    <code id="linux-config-cmd">sudo nano /etc/systemd/system/pymon-agent.service</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('linux-config-cmd', this)">Copy</button>
+                                </div>
+                                <div class="step-desc" style="margin-top: 8px;">Set your PyMon server URL:</div>
+                                <div class="code-block">
+                                    <code id="linux-env-cmd">Environment="PYMON_SERVER=http://YOUR_SERVER_IP:8090"</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('linux-env-cmd', this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Start the service</div>
+                                <div class="step-desc">Start and enable the agent:</div>
+                                <div class="code-block">
+                                    <code id="linux-start-cmd">sudo systemctl start pymon-agent && sudo systemctl enable pymon-agent</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('linux-start-cmd', this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <div class="step-title">Check status</div>
+                                <div class="step-desc">Verify agent is running:</div>
+                                <div class="code-block">
+                                    <code id="linux-status-cmd">sudo systemctl status pymon-agent</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('linux-status-cmd', this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 16px; padding: 12px; background: rgba(242, 204, 12, 0.1); border-radius: 4px; border-left: 3px solid var(--yellow);">
+                        <p style="color: var(--yellow); font-size: 12px; margin: 0;">
+                            <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> The agent collects CPU, Memory, Disk, Network metrics and supports RAID monitoring via mdadm, MegaRAID, HP Smart Array.
+                        </p>
+                    </div>
                 </div>
                 
                 <div id="install-windows" class="install-box" style="display:none;">
-                    <h4><i class="fab fa-windows"></i> Windows Installation</h4>
-                    <p style="margin-bottom: 12px; color: var(--muted);">Run in PowerShell as Administrator:</p>
-                    <code>Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-windows.ps1" -OutFile "install.ps1"; .\install.ps1</code>
-                    <p style="margin-top: 12px; color: var(--muted); font-size: 13px;">Or download MSI: <a href="#" style="color: var(--blue);">pymon-agent.msi</a></p>
+                    <h4><i class="fab fa-windows"></i> Windows Agent Installation</h4>
+                    <p style="color: var(--muted); margin-bottom: 12px;">Requires: Windows Server 2016+ or Windows 10/11, PowerShell 5.1+</p>
+                    
+                    <div class="install-steps">
+                        <div class="install-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">Open PowerShell as Administrator</div>
+                                <div class="step-desc">Right-click PowerShell and select "Run as Administrator"</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Download and install</div>
+                                <div class="step-desc">Run installation command:</div>
+                                <div class="code-block">
+                                    <code id="windows-install-cmd">Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-windows.ps1" -OutFile "install.ps1"; Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force; .\install.ps1</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('windows-install-cmd', this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Configure agent</div>
+                                <div class="step-desc">Edit config file at:</div>
+                                <div class="code-block">
+                                    <code id="windows-config-path">C:\Program Files\PyMonAgent\config.env</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('windows-config-path', this)">Copy</button>
+                                </div>
+                                <div class="step-desc" style="margin-top: 8px;">Set your PyMon server URL:</div>
+                                <div class="code-block">
+                                    <code id="windows-env-cmd">SERVER_URL=http://YOUR_SERVER_IP:8090</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('windows-env-cmd', this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <div class="step-title">Start the service</div>
+                                <div class="step-desc">Start Windows service:</div>
+                                <div class="code-block">
+                                    <code id="windows-start-cmd">Start-Service PyMonAgent</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('windows-start-cmd', this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">5</div>
+                            <div class="step-content">
+                                <div class="step-title">Check status</div>
+                                <div class="step-desc">Verify service is running:</div>
+                                <div class="code-block">
+                                    <code id="windows-status-cmd">Get-Service PyMonAgent</code>
+                                    <button class="copy-btn" onclick="copyToClipboard('windows-status-cmd', this)">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 16px; padding: 12px; background: rgba(242, 204, 12, 0.1); border-radius: 4px; border-left: 3px solid var(--yellow);">
+                        <p style="color: var(--yellow); font-size: 12px; margin: 0;">
+                            <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> If service creation fails, you can run agent in console mode: <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 3px;">& 'C:\Program Files\PyMonAgent\pymon-agent.bat'</code>
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1779,6 +1975,64 @@ DASHBOARD_HTML = """
         </div>
     </div>
     
+    <!-- Edit Server Modal -->
+    <div class="modal" id="editServerModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Server</h3>
+                <button class="modal-close" onclick="closeModal('editServerModal')">&times;</button>
+            </div>
+            <form onsubmit="updateServer(event)">
+                <input type="hidden" id="edit-server-id">
+                <div class="form-group">
+                    <label>Server Name</label>
+                    <input type="text" id="edit-server-name" required>
+                </div>
+                <div class="form-group">
+                    <label>Hostname or IP Address</label>
+                    <input type="text" id="edit-server-host" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Operating System</label>
+                        <select id="edit-server-os">
+                            <option value="linux">Linux</option>
+                            <option value="windows">Windows</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Check Interval (seconds)</label>
+                        <input type="number" id="edit-server-interval" value="15">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notification Channels</label>
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="edit-server-notify-telegram">
+                            <span>Telegram</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="edit-server-notify-discord">
+                            <span>Discord</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="edit-server-notify-slack">
+                            <span>Slack</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="edit-server-notify-email">
+                            <span>Email</span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </form>
+        </div>
+    </div>
+    
     <!-- Add Alert Modal -->
     <div class="modal" id="addAlertModal">
         <div class="modal-content">
@@ -1938,6 +2192,9 @@ DASHBOARD_HTML = """
                         <td>${s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-'}</td>
                         <td>${s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-'}</td>
                         <td>
+                            <button class="btn btn-secondary btn-sm" onclick="editServer(${s.id})" style="margin-right: 8px;">
+                                <i class="fas fa-edit"></i>
+                            </button>
                             <button class="btn btn-danger btn-sm" onclick="deleteServer(${s.id})">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -2400,6 +2657,62 @@ DASHBOARD_HTML = """
             loadServers();
         }
         
+        async function editServer(id) {
+            try {
+                const resp = await fetch('/api/servers/' + id, { headers: { 'Authorization': `Bearer ${token}` }});
+                const data = await resp.json();
+                const server = data.server;
+                
+                document.getElementById('edit-server-id').value = server.id;
+                document.getElementById('edit-server-name').value = server.name;
+                document.getElementById('edit-server-host').value = server.host;
+                document.getElementById('edit-server-os').value = server.os_type;
+                document.getElementById('edit-server-interval').value = server.check_interval;
+                document.getElementById('edit-server-notify-telegram').checked = server.notify_telegram;
+                document.getElementById('edit-server-notify-discord').checked = server.notify_discord;
+                document.getElementById('edit-server-notify-slack').checked = server.notify_slack;
+                document.getElementById('edit-server-notify-email').checked = server.notify_email;
+                
+                openModal('editServerModal');
+            } catch (e) {
+                console.error('Error loading server:', e);
+                alert('Failed to load server data');
+            }
+        }
+        
+        async function updateServer(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-server-id').value;
+            const data = {
+                name: document.getElementById('edit-server-name').value,
+                host: document.getElementById('edit-server-host').value,
+                os_type: document.getElementById('edit-server-os').value,
+                check_interval: parseInt(document.getElementById('edit-server-interval').value),
+                notify_telegram: document.getElementById('edit-server-notify-telegram').checked,
+                notify_discord: document.getElementById('edit-server-notify-discord').checked,
+                notify_slack: document.getElementById('edit-server-notify-slack').checked,
+                notify_email: document.getElementById('edit-server-notify-email').checked
+            };
+            
+            try {
+                const resp = await fetch('/api/servers/' + id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                
+                if (resp.ok) {
+                    closeModal('editServerModal');
+                    loadServers();
+                } else {
+                    alert('Failed to update server');
+                }
+            } catch (e) {
+                console.error('Error updating server:', e);
+                alert('Failed to update server');
+            }
+        }
+        
         function addAlertRule(e) {
             e.preventDefault();
             alert('Alert rule created! (Demo functionality)');
@@ -2434,6 +2747,36 @@ DASHBOARD_HTML = """
         }
         
         function logout() { localStorage.removeItem('token'); window.location.href = '/login'; }
+        
+        function copyToClipboard(elementId, btn) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                }, 2000);
+            });
+        }
         
         // Initialize
         loadServers();
@@ -2473,6 +2816,29 @@ async def create_server(server: ServerModel):
 async def delete_server(server_id: int):
     conn = get_db()
     conn.execute("DELETE FROM servers WHERE id=?", (server_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+@router.get("/api/servers/{server_id}")
+async def get_server(server_id: int):
+    conn = get_db()
+    server = conn.execute("SELECT * FROM servers WHERE id=?", (server_id,)).fetchone()
+    conn.close()
+    if server:
+        return {"server": dict(server)}
+    raise HTTPException(status_code=404, detail="Server not found")
+
+@router.put("/api/servers/{server_id}")
+async def update_server(server_id: int, server: ServerModel):
+    conn = get_db()
+    conn.execute('''UPDATE servers 
+        SET name=?, host=?, os_type=?, agent_port=?, check_interval=?,
+            notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?
+        WHERE id=?''',
+        (server.name, server.host, server.os_type, server.agent_port, server.check_interval,
+         int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email),
+         server_id))
     conn.commit()
     conn.close()
     return {"status": "ok"}
