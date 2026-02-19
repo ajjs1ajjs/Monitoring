@@ -1293,16 +1293,16 @@ DASHBOARD_HTML = """
                 <h1>PyMon</h1>
             </div>
             <div class="nav-menu">
-                <button class="nav-item active" onclick="showSection('dashboard')">
+                <button class="nav-item active" data-section="dashboard">
                     <i class="fas fa-chart-line"></i> Dashboard
                 </button>
-                <button class="nav-item" onclick="showSection('servers')">
+                <button class="nav-item" data-section="servers">
                     <i class="fas fa-server"></i> Servers
                 </button>
-                <button class="nav-item" onclick="showSection('alerts')">
+                <button class="nav-item" data-section="alerts">
                     <i class="fas fa-bell"></i> Alerts
                 </button>
-                <button class="nav-item" onclick="showSection('notifications')">
+                <button class="nav-item" data-section="notifications">
                     <i class="fas fa-cog"></i> Settings
                 </button>
             </div>
@@ -1369,12 +1369,12 @@ DASHBOARD_HTML = """
                 </div>
                 <div class="toolbar-right">
                     <div class="time-range">
-                        <button class="time-btn" onclick="setTimeRange('5m')">5m</button>
-                        <button class="time-btn" onclick="setTimeRange('15m')">15m</button>
-                        <button class="time-btn" onclick="setTimeRange('30m')">30m</button>
-                        <button class="time-btn active" onclick="setTimeRange('1h')">1h</button>
-                        <button class="time-btn" onclick="setTimeRange('6h')">6h</button>
-                        <button class="time-btn" onclick="setTimeRange('24h')">24h</button>
+                        <button class="time-btn" data-range="5m">5m</button>
+                        <button class="time-btn" data-range="15m">15m</button>
+                        <button class="time-btn" data-range="30m">30m</button>
+                        <button class="time-btn active" data-range="1h">1h</button>
+                        <button class="time-btn" data-range="6h">6h</button>
+                        <button class="time-btn" data-range="24h">24h</button>
                     </div>
                     <div class="refresh-controls">
                         <button class="refresh-btn" onclick="refreshDashboard()">
@@ -2121,18 +2121,32 @@ DASHBOARD_HTML = """
         
         function showSection(section) {
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            event.target.closest('.nav-item').classList.add('active');
             document.querySelectorAll('.section-content').forEach(el => {
                 el.classList.remove('active');
                 el.style.display = 'none';
             });
+            
+            // Find and activate the clicked button
+            const clickedBtn = document.querySelector(`.nav-item[data-section="${section}"]`);
+            if (clickedBtn) clickedBtn.classList.add('active');
+            
             const sectionEl = document.getElementById('section-' + section);
-            sectionEl.style.display = 'block';
-            setTimeout(() => sectionEl.classList.add('active'), 10);
+            if (sectionEl) {
+                sectionEl.style.display = 'block';
+                setTimeout(() => sectionEl.classList.add('active'), 10);
+            }
             
             if (section === 'servers') loadServers();
             if (section === 'dashboard') initCharts();
         }
+        
+        // Setup navigation event listeners
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const section = this.getAttribute('data-section');
+                if (section) showSection(section);
+            });
+        });
         
         function showOsTab(os) {
             document.querySelectorAll('.os-tab').forEach(t => t.classList.remove('active'));
@@ -2627,15 +2641,32 @@ DASHBOARD_HTML = """
         function setTimeRange(range) {
             currentTimeRange = range;
             document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
-            // Find and activate the clicked button
-            const buttons = document.querySelectorAll('.time-btn');
-            buttons.forEach(btn => {
-                if (btn.textContent === range || btn.getAttribute('onclick')?.includes(range)) {
-                    btn.classList.add('active');
-                }
-            });
+            const clickedBtn = document.querySelector(`.time-btn[data-range="${range}"]`);
+            if (clickedBtn) clickedBtn.classList.add('active');
             initCharts();
         }
+        
+        // Setup time range button listeners
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const range = this.getAttribute('data-range');
+                if (range) setTimeRange(range);
+            });
+        });
+        
+        // Setup refresh button
+        document.querySelector('.refresh-btn')?.addEventListener('click', function() {
+            this.querySelector('i')?.classList.add('fa-spin');
+            setTimeout(() => {
+                this.querySelector('i')?.classList.remove('fa-spin');
+                initCharts();
+            }, 1000);
+        });
+        
+        // Setup logout button
+        document.querySelector('.btn-secondary')?.addEventListener('click', function() {
+            logout();
+        });
         
         async function addServer(e) {
             e.preventDefault();
@@ -2785,9 +2816,48 @@ DASHBOARD_HTML = """
             });
         }
         
-        // Initialize
-        loadServers();
-        setTimeout(initCharts, 100);
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('PyMon dashboard initializing...');
+            
+            // Setup nav buttons
+            document.querySelectorAll('.nav-item').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const section = this.getAttribute('data-section');
+                    if (section) showSection(section);
+                });
+            });
+            
+            // Setup time buttons
+            document.querySelectorAll('.time-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const range = this.getAttribute('data-range');
+                    if (range) setTimeRange(range);
+                });
+            });
+            
+            // Setup refresh button
+            const refreshBtn = document.querySelector('.refresh-btn');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', function() {
+                    const icon = this.querySelector('i');
+                    if (icon) icon.classList.add('fa-spin');
+                    setTimeout(() => {
+                        if (icon) icon.classList.remove('fa-spin');
+                        initCharts();
+                    }, 1000);
+                });
+            }
+            
+            // Setup logout button
+            const logoutBtn = document.querySelector('.btn-secondary');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', logout);
+            }
+            
+            loadServers();
+            setTimeout(initCharts, 100);
+        });
     </script>
 </body>
 </html>
