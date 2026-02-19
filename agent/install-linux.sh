@@ -228,8 +228,20 @@ PYTHON_SCRIPT
 
 chmod +x "$INSTALL_DIR/agent.py"
 
-# Install psutil
-pip3 install psutil requests -q
+# Install psutil - handle Ubuntu 24.04+ externally-managed-environment
+echo -e "${BLUE}Installing Python dependencies...${NC}"
+if [[ "$OS_NAME" == *"Ubuntu"* ]] || [[ "$OS_NAME" == *"Debian"* ]]; then
+    # Try apt first (preferred on Ubuntu 24.04+)
+    apt-get update -qq
+    apt-get install -y -qq python3-psutil python3-requests 2>/dev/null || true
+fi
+
+# Fallback: install in user space if apt packages not available
+if ! python3 -c "import psutil" 2>/dev/null; then
+    echo -e "${YELLOW}Installing psutil via pip with --break-system-packages...${NC}"
+    pip3 install psutil requests --break-system-packages -q 2>/dev/null || \
+    pip3 install psutil requests --user -q
+fi
 
 # Create systemd service
 cat > "/etc/systemd/system/$SERVICE_NAME.service" << EOF
