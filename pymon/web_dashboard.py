@@ -219,14 +219,15 @@ DASHBOARD_HTML = """
             color: var(--text);
             min-height: 100vh;
         }
-        .layout { display: grid; grid-template-columns: 280px 1fr; }
+        .layout { display: grid; grid-template-columns: 260px 1fr; }
         .sidebar {
             background: var(--card);
             border-right: 1px solid var(--border);
             height: 100vh;
             position: fixed;
-            width: 280px;
-            padding: 32px 24px;
+            width: 260px;
+            padding: 24px 20px;
+            box-sizing: border-box;
         }
         .logo { margin-bottom: 40px; }
         .logo h1 {
@@ -253,7 +254,7 @@ DASHBOARD_HTML = """
             color: var(--text);
         }
         .nav-item i { width: 24px; font-size: 18px; }
-        .main { margin-left: 280px; padding: 40px; min-height: 100vh; width: calc(100% - 280px); box-sizing: border-box; }
+        .main { margin-left: 260px; padding: 32px; min-height: 100vh; width: calc(100% - 260px); box-sizing: border-box; overflow-x: hidden; }
         .header {
             display: flex;
             justify-content: space-between;
@@ -314,8 +315,8 @@ DASHBOARD_HTML = """
             margin-bottom: 24px;
         }
         .card-title { font-size: 20px; font-weight: 700; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 18px; text-align: left; border-bottom: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; display: block; overflow-x: auto; white-space: nowrap; }
+        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
         th { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
         .badge {
             padding: 8px 16px;
