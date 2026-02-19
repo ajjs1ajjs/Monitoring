@@ -1,16 +1,20 @@
-# This is a sample Python script.
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+import platform
+import psutil  # Можливо, знадобиться встановити: pip install psutil
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+def get_system_info():
+    print("=== System Information ===")
+    print(f"OS: {platform.system()} {platform.release()}")
+    print(f"Processor: {platform.processor()}")
+
+    # Оперативна пам'ять
+    mem = psutil.virtual_memory()
+    print(f"Memory: {mem.total // (1024 ** 3)} GB (Used: {mem.percent}%)")
+
+    # Дисковий простір
+    disk = psutil.disk_usage('/')
+    print(f"Disk Space: {disk.total // (1024 ** 3)} GB (Free: {disk.free // (1024 ** 3)} GB)")
 
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+if __name__ == "__main__":
+    get_system_info()
