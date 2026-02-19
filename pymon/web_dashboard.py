@@ -16,6 +16,8 @@ security = HTTPBearer(auto_error=False)
 DB_PATH = os.getenv("DB_PATH", "/var/lib/pymon/pymon.db")
 
 def get_db():
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn

@@ -47,6 +47,10 @@ class PasswordChange(BaseModel):
     new_password: str
 
 
+class APIKeyCreate(BaseModel):
+    name: str
+
+
 @dataclass
 class AuthConfig:
     db_path: str = "pymon.db"
