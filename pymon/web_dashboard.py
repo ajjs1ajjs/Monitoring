@@ -408,27 +408,67 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
         <div id="section-alerts" class="section-content">
             <div class="card">
                 <div class="card-header"><h3 class="card-title">Alert Rules</h3><button class="btn btn-primary" id="addAlertBtn"><i class="fas fa-plus"></i> New Alert</button></div>
-                <div class="alert-rule">
-                    <div class="alert-rule-header"><div class="alert-rule-title"><i class="fas fa-microchip" style="color: var(--blue);"></i> High CPU Usage</div></div>
-                    <div class="alert-conditions"><div class="condition-box"><div class="condition-label">Metric</div><div class="condition-value">CPU > 80%</div></div><div class="condition-box"><div class="condition-label">Duration</div><div class="condition-value">5 min</div></div><div class="condition-box"><div class="condition-label">Notify</div><div class="condition-value">Telegram</div></div></div>
-                </div>
-                <div class="alert-rule">
-                    <div class="alert-rule-header"><div class="alert-rule-title"><i class="fas fa-memory" style="color: var(--green);"></i> High Memory</div></div>
-                    <div class="alert-conditions"><div class="condition-box"><div class="condition-label">Metric</div><div class="condition-value">Memory > 85%</div></div><div class="condition-box"><div class="condition-label">Duration</div><div class="condition-value">3 min</div></div><div class="condition-box"><div class="condition-label">Notify</div><div class="condition-value">Discord</div></div></div>
-                </div>
+                <p style="color: var(--muted); margin-bottom: 20px;">Configure alerts to receive notifications when metrics exceed thresholds.</p>
+                <div id="alertsList"></div>
             </div>
         </div>
         
         <!-- Settings -->
         <div id="section-settings" class="section-content">
             <div class="card">
-                <h3 class="card-title" style="margin-bottom: 20px;">Notification Channels</h3>
-                <div class="form-group"><label><input type="checkbox" id="notify-telegram"> Telegram</label></div>
-                <div class="form-group"><label><input type="checkbox" id="notify-discord"> Discord</label></div>
-                <div class="form-group"><label><input type="checkbox" id="notify-slack"> Slack</label></div>
-                <div class="form-group"><label><input type="checkbox" id="notify-email"> Email</label></div>
-                <button class="btn btn-primary" id="saveNotifyBtn">Save Configuration</button>
+                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fab fa-telegram" style="color: #0088cc;"></i> Telegram Notifications</h3>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px;"><input type="checkbox" id="telegram-enabled" style="width: auto;"> Enable Telegram</label>
+                </div>
+                <div id="telegram-config" style="display: none;">
+                    <div class="form-group"><label>Bot Token</label><input type="text" id="telegram-token" placeholder="123456789:ABCdef..."></div>
+                    <div class="form-group"><label>Chat ID</label><input type="text" id="telegram-chat" placeholder="-1001234567890"></div>
+                    <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Get token from @BotFather, chat ID from @userinfobot</p>
+                </div>
             </div>
+            
+            <div class="card">
+                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fab fa-discord" style="color: #5865F2;"></i> Discord Notifications</h3>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px;"><input type="checkbox" id="discord-enabled" style="width: auto;"> Enable Discord</label>
+                </div>
+                <div id="discord-config" style="display: none;">
+                    <div class="form-group"><label>Webhook URL</label><input type="text" id="discord-webhook" placeholder="https://discord.com/api/webhooks/..."></div>
+                    <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Create webhook in Discord channel settings</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fab fa-slack" style="color: #4A154B;"></i> Slack Notifications</h3>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px;"><input type="checkbox" id="slack-enabled" style="width: auto;"> Enable Slack</label>
+                </div>
+                <div id="slack-config" style="display: none;">
+                    <div class="form-group"><label>Webhook URL</label><input type="text" id="slack-webhook" placeholder="https://hooks.slack.com/services/..."></div>
+                    <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Create incoming webhook in Slack app settings</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fas fa-envelope" style="color: var(--red);"></i> Email Notifications</h3>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 10px;"><input type="checkbox" id="email-enabled" style="width: auto;"> Enable Email</label>
+                </div>
+                <div id="email-config" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group"><label>SMTP Host</label><input type="text" id="email-host" placeholder="smtp.gmail.com"></div>
+                        <div class="form-group"><label>SMTP Port</label><input type="number" id="email-port" value="587"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Username</label><input type="text" id="email-user" placeholder="your@email.com"></div>
+                        <div class="form-group"><label>Password / App Password</label><input type="password" id="email-pass" placeholder="app password"></div>
+                    </div>
+                    <div class="form-group"><label>From Address</label><input type="text" id="email-from" placeholder="noreply@example.com"></div>
+                    <div class="form-group"><label>To Addresses (comma separated)</label><input type="text" id="email-to" placeholder="admin@example.com, team@example.com"></div>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" id="saveNotifyBtn" style="margin-top: 10px;"><i class="fas fa-save"></i> Save All Settings</button>
         </div>
     </main>
     
@@ -437,13 +477,79 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
         <div class="modal-content">
             <div class="modal-header"><h3>Add Server</h3><button class="modal-close" id="closeServerModal">&times;</button></div>
             <form id="addServerForm">
-                <div class="form-group"><label>Server Name</label><input type="text" id="server-name" required></div>
-                <div class="form-group"><label>Host</label><input type="text" id="server-host" required></div>
+                <div class="form-group"><label>Server Name</label><input type="text" id="server-name" required placeholder="Production Server"></div>
+                <div class="form-group"><label>Host / IP Address</label><input type="text" id="server-host" required placeholder="192.168.1.100"></div>
                 <div class="form-row">
-                    <div class="form-group"><label>OS</label><select id="server-os"><option value="linux">Linux</option><option value="windows">Windows</option></select></div>
-                    <div class="form-group"><label>Interval (sec)</label><input type="number" id="server-interval" value="15"></div>
+                    <div class="form-group"><label>Operating System</label><select id="server-os"><option value="linux">Linux</option><option value="windows">Windows</option></select></div>
+                    <div class="form-group"><label>Check Interval (sec)</label><input type="number" id="server-interval" value="15"></div>
+                </div>
+                <div class="form-group">
+                    <label>Notification Channels</label>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 8px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="server-notify-telegram"> Telegram</label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="server-notify-discord"> Discord</label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="server-notify-slack"> Slack</label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="server-notify-email"> Email</label>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width:100%">Add Server</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Edit Server Modal -->
+    <div class="modal" id="editServerModal">
+        <div class="modal-content">
+            <div class="modal-header"><h3>Edit Server</h3><button class="modal-close" id="closeEditServerModal">&times;</button></div>
+            <form id="editServerForm">
+                <input type="hidden" id="edit-server-id">
+                <div class="form-group"><label>Server Name</label><input type="text" id="edit-server-name" required></div>
+                <div class="form-group"><label>Host / IP Address</label><input type="text" id="edit-server-host" required></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Operating System</label><select id="edit-server-os"><option value="linux">Linux</option><option value="windows">Windows</option></select></div>
+                    <div class="form-group"><label>Check Interval (sec)</label><input type="number" id="edit-server-interval" value="15"></div>
+                </div>
+                <div class="form-group">
+                    <label>Notification Channels</label>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 8px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="edit-server-notify-telegram"> Telegram</label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="edit-server-notify-discord"> Discord</label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="edit-server-notify-slack"> Slack</label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="edit-server-notify-email"> Email</label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Save Changes</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Add/Edit Alert Modal -->
+    <div class="modal" id="alertModal">
+        <div class="modal-content">
+            <div class="modal-header"><h3 id="alertModalTitle">Add Alert Rule</h3><button class="modal-close" id="closeAlertModal">&times;</button></div>
+            <form id="alertForm">
+                <input type="hidden" id="alert-id">
+                <div class="form-group"><label>Alert Name</label><input type="text" id="alert-name" required placeholder="High CPU Alert"></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Metric</label><select id="alert-metric"><option value="cpu">CPU Usage</option><option value="memory">Memory Usage</option><option value="disk">Disk Usage</option><option value="network">Network I/O</option></select></div>
+                    <div class="form-group"><label>Condition</label><select id="alert-condition"><option value=">">Greater than (&gt;)</option><option value="<">Less than (&lt;)</option><option value="=">Equal to (=)</option></select></div>
+                    <div class="form-group"><label>Threshold (%)</label><input type="number" id="alert-threshold" value="80" min="0" max="100"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Duration</label><select id="alert-duration"><option value="0">Immediate</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>
+                    <div class="form-group"><label>Severity</label><select id="alert-severity"><option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Info</option></select></div>
+                </div>
+                <div class="form-group">
+                    <label>Notification Channels</label>
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 8px;">
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="alert-notify-telegram"> Telegram</label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="alert-notify-discord"> Discord</label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="alert-notify-slack"> Slack</label>
+                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="alert-notify-email"> Email</label>
+                    </div>
+                </div>
+                <div class="form-group"><label>Description (optional)</label><textarea id="alert-description" rows="2" style="width:100%;padding:10px;background:#111217;border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;" placeholder="Alert when CPU usage is high..."></textarea></div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Save Alert</button>
             </form>
         </div>
     </div>
@@ -623,8 +729,264 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
         }).join('');
     }
     
+    // Edit Server
+    document.getElementById('closeEditServerModal').addEventListener('click', function() {
+        document.getElementById('editServerModal').classList.remove('active');
+    });
+    document.getElementById('editServerForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const id = document.getElementById('edit-server-id').value;
+        await fetch('/api/servers/' + id, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+            body: JSON.stringify({
+                name: document.getElementById('edit-server-name').value,
+                host: document.getElementById('edit-server-host').value,
+                os_type: document.getElementById('edit-server-os').value,
+                check_interval: parseInt(document.getElementById('edit-server-interval').value),
+                notify_telegram: document.getElementById('edit-server-notify-telegram').checked,
+                notify_discord: document.getElementById('edit-server-notify-discord').checked,
+                notify_slack: document.getElementById('edit-server-notify-slack').checked,
+                notify_email: document.getElementById('edit-server-notify-email').checked
+            })
+        });
+        document.getElementById('editServerModal').classList.remove('active');
+        loadServers();
+    });
+    
+    async function editServer(id) {
+        const resp = await fetch('/api/servers/' + id, {headers: {'Authorization': 'Bearer ' + token}});
+        const data = await resp.json();
+        const s = data.server;
+        document.getElementById('edit-server-id').value = s.id;
+        document.getElementById('edit-server-name').value = s.name;
+        document.getElementById('edit-server-host').value = s.host;
+        document.getElementById('edit-server-os').value = s.os_type;
+        document.getElementById('edit-server-interval').value = s.check_interval;
+        document.getElementById('edit-server-notify-telegram').checked = s.notify_telegram;
+        document.getElementById('edit-server-notify-discord').checked = s.notify_discord;
+        document.getElementById('edit-server-notify-slack').checked = s.notify_slack;
+        document.getElementById('edit-server-notify-email').checked = s.notify_email;
+        document.getElementById('editServerModal').classList.add('active');
+    }
+    
+    // Update servers table with edit button
+    async function loadServersWithEdit() {
+        try {
+            const resp = await fetch('/api/servers', {headers: {'Authorization': 'Bearer ' + token}});
+            const data = await resp.json();
+            servers = data.servers || [];
+            let online = 0, offline = 0, linux = 0, windows = 0;
+            
+            document.getElementById('serverSelector').innerHTML = '<option value="">All Servers</option>' + 
+                servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
+            
+            document.getElementById('servers-tbody').innerHTML = servers.map(s => {
+                if (s.last_status === 'up') online++;
+                else if (s.last_status === 'down') offline++;
+                if (s.os_type === 'linux') linux++;
+                else if (s.os_type === 'windows') windows++;
+                const statusColor = s.last_status === 'up' ? 'rgba(115,191,105,0.15);color:#73bf69' : 'rgba(242,73,92,0.15);color:#f2495c';
+                return '<tr><td><span style="padding:4px 8px;background:' + statusColor + ';border-radius:12px;font-size:11px;">' + (s.last_status || 'pending') + '</span></td><td><strong>' + s.name + '</strong></td><td>' + s.host + '</td><td>' + s.os_type + '</td><td>' + (s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-') + '</td><td><button class="btn btn-secondary btn-sm" onclick="editServer(' + s.id + ')" style="margin-right:5px;">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')">Delete</button></td></tr>';
+            }).join('') || '<tr><td colspan="8" style="text-align:center;padding:40px;color:#999;">No servers</td></tr>';
+            
+            document.getElementById('stat-online').textContent = online;
+            document.getElementById('stat-offline').textContent = offline;
+            document.getElementById('stat-linux').textContent = linux;
+            document.getElementById('stat-windows').textContent = windows;
+        } catch(e) { console.error(e); }
+    }
+    
+    // Alerts
+    let alerts = [];
+    
+    document.getElementById('addAlertBtn').addEventListener('click', function() {
+        document.getElementById('alert-id').value = '';
+        document.getElementById('alertForm').reset();
+        document.getElementById('alertModalTitle').textContent = 'Add Alert Rule';
+        document.getElementById('alertModal').classList.add('active');
+    });
+    
+    document.getElementById('closeAlertModal').addEventListener('click', function() {
+        document.getElementById('alertModal').classList.remove('active');
+    });
+    
+    document.getElementById('alertForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const id = document.getElementById('alert-id').value;
+        const alertData = {
+            name: document.getElementById('alert-name').value,
+            metric: document.getElementById('alert-metric').value,
+            condition: document.getElementById('alert-condition').value,
+            threshold: parseInt(document.getElementById('alert-threshold').value),
+            duration: parseInt(document.getElementById('alert-duration').value),
+            severity: document.getElementById('alert-severity').value,
+            notify_telegram: document.getElementById('alert-notify-telegram').checked,
+            notify_discord: document.getElementById('alert-notify-discord').checked,
+            notify_slack: document.getElementById('alert-notify-slack').checked,
+            notify_email: document.getElementById('alert-notify-email').checked,
+            description: document.getElementById('alert-description').value,
+            enabled: true
+        };
+        
+        if (id) {
+            await fetch('/api/alerts/' + id, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                body: JSON.stringify(alertData)
+            });
+        } else {
+            await fetch('/api/alerts', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                body: JSON.stringify(alertData)
+            });
+        }
+        document.getElementById('alertModal').classList.remove('active');
+        loadAlerts();
+    });
+    
+    async function loadAlerts() {
+        try {
+            const resp = await fetch('/api/alerts', {headers: {'Authorization': 'Bearer ' + token}});
+            const data = await resp.json();
+            alerts = data.alerts || [];
+            
+            const metricIcons = {cpu: 'fa-microchip', memory: 'fa-memory', disk: 'fa-hdd', network: 'fa-network-wired'};
+            const metricColors = {cpu: 'var(--blue)', memory: 'var(--green)', disk: 'var(--yellow)', network: 'var(--purple)'};
+            
+            document.getElementById('alertsList').innerHTML = alerts.map(a => {
+                const notifyTags = [];
+                if (a.notify_telegram) notifyTags.push('<span class="notification-tag"><i class="fab fa-telegram"></i> Telegram</span>');
+                if (a.notify_discord) notifyTags.push('<span class="notification-tag"><i class="fab fa-discord"></i> Discord</span>');
+                if (a.notify_slack) notifyTags.push('<span class="notification-tag"><i class="fab fa-slack"></i> Slack</span>');
+                if (a.notify_email) notifyTags.push('<span class="notification-tag"><i class="fas fa-envelope"></i> Email</span>');
+                
+                const durationText = a.duration === 0 ? 'Immediate' : a.duration + ' min';
+                
+                return '<div class="alert-rule">' +
+                    '<div class="alert-rule-header">' +
+                    '<div class="alert-rule-title"><i class="fas ' + (metricIcons[a.metric] || 'fa-bell') + '" style="color: ' + (metricColors[a.metric] || 'var(--blue)') + ';"></i> ' + a.name + '</div>' +
+                    '<div>' +
+                    '<button class="btn btn-secondary btn-sm" onclick="editAlert(' + a.id + ')" style="margin-right:5px;">Edit</button>' +
+                    '<button class="btn btn-danger btn-sm" onclick="deleteAlert(' + a.id + ')">Delete</button>' +
+                    '</div></div>' +
+                    '<div class="alert-conditions">' +
+                    '<div class="condition-box"><div class="condition-label">Metric</div><div class="condition-value">' + a.metric.toUpperCase() + ' ' + a.condition + ' ' + a.threshold + '%</div></div>' +
+                    '<div class="condition-box"><div class="condition-label">Duration</div><div class="condition-value">' + durationText + '</div></div>' +
+                    '<div class="condition-box"><div class="condition-label">Severity</div><div class="condition-value">' + a.severity + '</div></div>' +
+                    '</div>' +
+                    '<div class="alert-notifications">' + (notifyTags.length ? notifyTags.join('') : '<span style="color: var(--muted);">No notifications configured</span>') + '</div>' +
+                    '</div>';
+            }).join('') || '<p style="color: var(--muted); text-align: center; padding: 40px;">No alert rules configured. Click "New Alert" to create one.</p>';
+        } catch(e) { console.error(e); }
+    }
+    
+    async function editAlert(id) {
+        const resp = await fetch('/api/alerts/' + id, {headers: {'Authorization': 'Bearer ' + token}});
+        const data = await resp.json();
+        const a = data.alert;
+        
+        document.getElementById('alert-id').value = a.id;
+        document.getElementById('alert-name').value = a.name;
+        document.getElementById('alert-metric').value = a.metric;
+        document.getElementById('alert-condition').value = a.condition;
+        document.getElementById('alert-threshold').value = a.threshold;
+        document.getElementById('alert-duration').value = a.duration;
+        document.getElementById('alert-severity').value = a.severity;
+        document.getElementById('alert-notify-telegram').checked = a.notify_telegram;
+        document.getElementById('alert-notify-discord').checked = a.notify_discord;
+        document.getElementById('alert-notify-slack').checked = a.notify_slack;
+        document.getElementById('alert-notify-email').checked = a.notify_email;
+        document.getElementById('alert-description').value = a.description || '';
+        document.getElementById('alertModalTitle').textContent = 'Edit Alert Rule';
+        document.getElementById('alertModal').classList.add('active');
+    }
+    
+    async function deleteAlert(id) {
+        if (confirm('Delete this alert rule?')) {
+            await fetch('/api/alerts/' + id, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
+            loadAlerts();
+        }
+    }
+    
+    // Settings - toggle config visibility
+    ['telegram', 'discord', 'slack', 'email'].forEach(ch => {
+        document.getElementById(ch + '-enabled').addEventListener('change', function() {
+            document.getElementById(ch + '-config').style.display = this.checked ? 'block' : 'none';
+        });
+    });
+    
+    // Load notification settings
+    async function loadNotifications() {
+        try {
+            const resp = await fetch('/api/notifications', {headers: {'Authorization': 'Bearer ' + token}});
+            const data = await resp.json();
+            data.notifications.forEach(n => {
+                const enabled = document.getElementById(n.channel + '-enabled');
+                if (enabled) {
+                    enabled.checked = n.enabled;
+                    document.getElementById(n.channel + '-config').style.display = n.enabled ? 'block' : 'none';
+                }
+                if (n.channel === 'telegram' && n.telegram_bot_token) {
+                    document.getElementById('telegram-token').value = n.telegram_bot_token || '';
+                    document.getElementById('telegram-chat').value = n.telegram_chat_id || '';
+                }
+                if (n.channel === 'discord' && n.discord_webhook) {
+                    document.getElementById('discord-webhook').value = n.discord_webhook || '';
+                }
+                if (n.channel === 'slack' && n.slack_webhook) {
+                    document.getElementById('slack-webhook').value = n.slack_webhook || '';
+                }
+                if (n.channel === 'email') {
+                    document.getElementById('email-host').value = n.email_smtp_host || '';
+                    document.getElementById('email-port').value = n.email_smtp_port || 587;
+                    document.getElementById('email-user').value = n.email_user || '';
+                    document.getElementById('email-pass').value = n.email_pass || '';
+                }
+            });
+        } catch(e) { console.error(e); }
+    }
+    
+    // Save notifications
+    document.getElementById('saveNotifyBtn').addEventListener('click', async function() {
+        const channels = {
+            telegram: {
+                enabled: document.getElementById('telegram-enabled').checked,
+                telegram_bot_token: document.getElementById('telegram-token').value,
+                telegram_chat_id: document.getElementById('telegram-chat').value
+            },
+            discord: {
+                enabled: document.getElementById('discord-enabled').checked,
+                discord_webhook: document.getElementById('discord-webhook').value
+            },
+            slack: {
+                enabled: document.getElementById('slack-enabled').checked,
+                slack_webhook: document.getElementById('slack-webhook').value
+            },
+            email: {
+                enabled: document.getElementById('email-enabled').checked,
+                email_smtp_host: document.getElementById('email-host').value,
+                email_smtp_port: parseInt(document.getElementById('email-port').value) || 587,
+                email_user: document.getElementById('email-user').value,
+                email_pass: document.getElementById('email-pass').value
+            }
+        };
+        
+        for (const [channel, config] of Object.entries(channels)) {
+            await fetch('/api/notifications/' + channel, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                body: JSON.stringify(config)
+            });
+        }
+        alert('Settings saved successfully!');
+    });
+    
     // Init
-    loadServers();
+    loadServersWithEdit();
+    loadAlerts();
+    loadNotifications();
     setTimeout(initCharts, 100);
     </script>
 </body>
@@ -662,6 +1024,29 @@ async def delete_server(server_id: int):
     conn.close()
     return {"status": "ok"}
 
+@router.get("/api/servers/{server_id}")
+async def get_server(server_id: int):
+    conn = get_db()
+    server = conn.execute("SELECT * FROM servers WHERE id=?", (server_id,)).fetchone()
+    conn.close()
+    if server:
+        return {"server": dict(server)}
+    raise HTTPException(status_code=404, detail="Server not found")
+
+@router.put("/api/servers/{server_id}")
+async def update_server(server_id: int, server: ServerModel):
+    conn = get_db()
+    conn.execute('''UPDATE servers 
+        SET name=?, host=?, os_type=?, agent_port=?, check_interval=?,
+            notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?
+        WHERE id=?''',
+        (server.name, server.host, server.os_type, server.agent_port, server.check_interval,
+         int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email),
+         server_id))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
 @router.get("/api/notifications")
 async def get_notifications():
     conn = get_db()
@@ -679,6 +1064,119 @@ async def update_notification(channel: str, config: dict):
     conn = get_db()
     conn.execute("UPDATE notifications SET enabled=?, config=? WHERE channel=?",
                  (int(config.get('enabled', False)), json.dumps(config), channel))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+# Alert endpoints
+@router.get("/api/alerts")
+async def list_alerts():
+    conn = get_db()
+    try:
+        alerts = conn.execute("SELECT * FROM alerts ORDER BY created_at DESC").fetchall()
+    except:
+        # Create alerts table if not exists
+        conn.execute('''CREATE TABLE IF NOT EXISTS alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            metric TEXT NOT NULL,
+            condition TEXT NOT NULL,
+            threshold INTEGER NOT NULL,
+            duration INTEGER DEFAULT 0,
+            severity TEXT DEFAULT 'warning',
+            notify_telegram BOOLEAN DEFAULT 0,
+            notify_discord BOOLEAN DEFAULT 0,
+            notify_slack BOOLEAN DEFAULT 0,
+            notify_email BOOLEAN DEFAULT 0,
+            description TEXT,
+            enabled BOOLEAN DEFAULT 1,
+            created_at TEXT
+        )''')
+        conn.commit()
+        alerts = []
+    conn.close()
+    return {"alerts": [dict(a) for a in alerts]}
+
+@router.get("/api/alerts/{alert_id}")
+async def get_alert(alert_id: int):
+    conn = get_db()
+    alert = conn.execute("SELECT * FROM alerts WHERE id=?", (alert_id,)).fetchone()
+    conn.close()
+    if alert:
+        return {"alert": dict(alert)}
+    raise HTTPException(status_code=404, detail="Alert not found")
+
+class AlertModel(BaseModel):
+    name: str
+    metric: str
+    condition: str
+    threshold: int
+    duration: int = 0
+    severity: str = "warning"
+    notify_telegram: bool = False
+    notify_discord: bool = False
+    notify_slack: bool = False
+    notify_email: bool = False
+    description: Optional[str] = ""
+    enabled: bool = True
+
+@router.post("/api/alerts")
+async def create_alert(alert: AlertModel):
+    conn = get_db()
+    try:
+        conn.execute('''INSERT INTO alerts 
+            (name, metric, condition, threshold, duration, severity, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity,
+             int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
+             alert.description, int(alert.enabled), datetime.utcnow().isoformat()))
+        conn.commit()
+    except Exception as e:
+        # Create table if not exists
+        conn.execute('''CREATE TABLE IF NOT EXISTS alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            metric TEXT NOT NULL,
+            condition TEXT NOT NULL,
+            threshold INTEGER NOT NULL,
+            duration INTEGER DEFAULT 0,
+            severity TEXT DEFAULT 'warning',
+            notify_telegram BOOLEAN DEFAULT 0,
+            notify_discord BOOLEAN DEFAULT 0,
+            notify_slack BOOLEAN DEFAULT 0,
+            notify_email BOOLEAN DEFAULT 0,
+            description TEXT,
+            enabled BOOLEAN DEFAULT 1,
+            created_at TEXT
+        )''')
+        conn.execute('''INSERT INTO alerts 
+            (name, metric, condition, threshold, duration, severity, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity,
+             int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
+             alert.description, int(alert.enabled), datetime.utcnow().isoformat()))
+        conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+@router.put("/api/alerts/{alert_id}")
+async def update_alert(alert_id: int, alert: AlertModel):
+    conn = get_db()
+    conn.execute('''UPDATE alerts 
+        SET name=?, metric=?, condition=?, threshold=?, duration=?, severity=?,
+            notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?, description=?, enabled=?
+        WHERE id=?''',
+        (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity,
+         int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
+         alert.description, int(alert.enabled), alert_id))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+@router.delete("/api/alerts/{alert_id}")
+async def delete_alert(alert_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM alerts WHERE id=?", (alert_id,))
     conn.commit()
     conn.close()
     return {"status": "ok"}
