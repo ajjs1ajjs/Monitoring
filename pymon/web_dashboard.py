@@ -33,46 +33,59 @@ class SiteModel(BaseModel):
     notify_email: bool = False
 
 def init_web_tables():
-    conn = get_db()
-    c = conn.cursor()
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS sites (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        url TEXT NOT NULL,
-        check_interval INTEGER DEFAULT 60,
-        timeout INTEGER DEFAULT 10,
-        enabled BOOLEAN DEFAULT 1,
-        notify_telegram BOOLEAN DEFAULT 0,
-        notify_discord BOOLEAN DEFAULT 0,
-        notify_slack BOOLEAN DEFAULT 0,
-        notify_email BOOLEAN DEFAULT 0,
-        created_at TEXT,
-        last_check TEXT,
-        last_status TEXT,
-        last_response_time REAL
-    )''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS notifications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        channel TEXT UNIQUE NOT NULL,
-        enabled BOOLEAN DEFAULT 0,
-        config TEXT
-    )''')
-    
-    c.execute('''CREATE TABLE IF NOT EXISTS check_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        site_id INTEGER,
-        status TEXT,
-        response_time REAL,
-        checked_at TEXT
-    )''')
-    
-    for channel in ['telegram', 'discord', 'slack', 'email']:
-        c.execute("INSERT OR IGNORE INTO notifications (channel, enabled, config) VALUES (?, 0, '{}')", (channel,))
-    
-    conn.commit()
-    conn.close()
+    try:
+        # Ensure directory exists with proper permissions
+        db_dir = os.path.dirname(DB_PATH)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"Created database directory: {db_dir}")
+        
+        conn = get_db()
+        c = conn.cursor()
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS sites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            check_interval INTEGER DEFAULT 60,
+            timeout INTEGER DEFAULT 10,
+            enabled BOOLEAN DEFAULT 1,
+            notify_telegram BOOLEAN DEFAULT 0,
+            notify_discord BOOLEAN DEFAULT 0,
+            notify_slack BOOLEAN DEFAULT 0,
+            notify_email BOOLEAN DEFAULT 0,
+            created_at TEXT,
+            last_check TEXT,
+            last_status TEXT,
+            last_response_time REAL
+        )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel TEXT UNIQUE NOT NULL,
+            enabled BOOLEAN DEFAULT 0,
+            config TEXT
+        )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS check_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            site_id INTEGER,
+            status TEXT,
+            response_time REAL,
+            checked_at TEXT
+        )''')
+        
+        for channel in ['telegram', 'discord', 'slack', 'email']:
+            c.execute("INSERT OR IGNORE INTO notifications (channel, enabled, config) VALUES (?, 0, '{}')", (channel,))
+        
+        conn.commit()
+        conn.close()
+        print("Web tables initialized successfully")
+    except Exception as e:
+        print(f"Error initializing web tables: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 LOGIN_HTML = """
 <!DOCTYPE html>
