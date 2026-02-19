@@ -95,20 +95,25 @@ def init_web_tables():
             config TEXT
         )''')
         
-        for channel in ['telegram', 'discord', 'slack', 'email']:
-            c.execute("INSERT OR IGNORE INTO notifications (channel, enabled, config) VALUES (?, 0, '{}')", (channel,))
+        try:
+            for channel in ['telegram', 'discord', 'slack', 'email']:
+                c.execute("INSERT OR IGNORE INTO notifications (channel, enabled, config) VALUES (?, 0, '{}')", (channel,))
+        except sqlite3.OperationalError:
+            pass
         
         # 3. Users Table
-        c.execute('''CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT DEFAULT 'viewer', -- admin or viewer
-            is_active BOOLEAN DEFAULT 1,
-            last_login TEXT
-        )''')
-        # Add default admin user if not present (using hardcoded hash is insecure, this is for demo only)
-        c.execute("INSERT OR IGNORE INTO users (username, password_hash, role) VALUES ('admin', 'pbkdf2:sha256:admin', 'admin')")
+        try:
+            c.execute('''CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT DEFAULT 'viewer',
+                is_active BOOLEAN DEFAULT 1,
+                last_login TEXT
+            )''')
+            c.execute("INSERT OR IGNORE INTO users (username, password_hash, role) VALUES ('admin', 'pbkdf2:sha256:admin', 'admin')")
+        except sqlite3.OperationalError:
+            pass
         
         # 4. Alerts Table
         c.execute('''CREATE TABLE IF NOT EXISTS alerts (
