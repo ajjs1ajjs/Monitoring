@@ -308,7 +308,7 @@ if systemctl is-active --quiet $SERVICE_NAME; then
     echo "  curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPO/main/update.sh | sudo bash"
     echo ""
     echo "Configuration:"
-    echo "  Config: $CONFIG_DIR/config.json"
+    echo "  Config: $CONFIG_DIR/config.yml"
     echo "  Logs:   $LOG_DIR/"
     echo "  Data:   $DATA_DIR/"
     echo ""
