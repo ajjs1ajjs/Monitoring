@@ -150,7 +150,7 @@ def init_web_tables():
         print(f"Error initializing web tables: {e}")
         raise
 
-LOGIN_HTML = '''<!DOCTYPE html>
+LOGIN_HTML = r'''<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -201,7 +201,7 @@ LOGIN_HTML = '''<!DOCTYPE html>
 </body>
 </html>'''
 
-DASHBOARD_HTML = '''<!DOCTYPE html>
+DASHBOARD_HTML = r'''<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
