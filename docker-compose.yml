@@ -2,10 +2,10 @@ version: '3.8'
 
 services:
   pymon:
-    image: ghcr.io/ajjs1ajjs/Project2:latest
+    image: ghcr.io/ajjs1ajjs/Monitoring:latest
     build: .
     ports:
-      - "8000:8000"
+      - "8090:8090"
     volumes:
       - pymon-data:/data
       - pymon-config:/config
@@ -15,7 +15,7 @@ services:
       - DATA_DIR=/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/api/v1/health')"]
       interval: 30s
       timeout: 3s
       retries: 3

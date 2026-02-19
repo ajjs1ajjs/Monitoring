@@ -126,7 +126,7 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run -d --name pymon-test -p 8000:8000 pymon:dev
+          docker run -d --name pymon-test -p 8090:8090 pymon:dev
           sleep 5
-          curl -f http://localhost:8000/api/v1/health || exit 1
+          curl -f http://localhost:8090/api/v1/health || exit 1
           docker stop pymon-test

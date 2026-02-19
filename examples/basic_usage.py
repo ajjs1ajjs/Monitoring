@@ -34,7 +34,7 @@ async def example_local():
 async def example_client():
     print("\n=== Remote client example ===")
 
-    async with PyMonClient("http://localhost:8000") as client:
+    async with PyMonClient("http://localhost:8090") as client:
         await client.push("custom_metric", 42.5, "gauge", {"host": "server1", "region": "us-east"})
         print("Pushed metric to server")
 

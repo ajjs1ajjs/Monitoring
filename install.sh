@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-GITHUB_REPO="ajjs1ajjs/Project2"
+GITHUB_REPO="ajjs1ajjs/Monitoring"
 INSTALL_DIR="/opt/pymon"
 CONFIG_DIR="/etc/pymon"
 DATA_DIR="/var/lib/pymon"
@@ -29,7 +29,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-PORT=8000
+PORT=8090
 VERSION="main"
 STORAGE="sqlite"
 
@@ -51,7 +51,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --port PORT       Set port (default: 8000)"
+            echo "  --port PORT       Set port (default: 8090)"
             echo "  --version VERSION Install specific version (e.g., v0.1.0 or main)"
             echo "  --storage TYPE    Storage backend: memory or sqlite (default: sqlite)"
             echo "  --help            Show this help message"
@@ -212,7 +212,7 @@ Environment="PATH=$INSTALL_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="CONFIG_PATH=$CONFIG_DIR/config.json"
 Environment="JWT_SECRET=$JWT_SECRET"
 Environment="APP_VERSION=$APP_VERSION"
-ExecStart=$INSTALL_DIR/venv/bin/pymon server --port $PORT --storage $STORAGE
+ExecStart=$INSTALL_DIR/venv/bin/pymon server --config $CONFIG_DIR/config.json
 Restart=always
 RestartSec=10
 StandardOutput=append:$LOG_DIR/pymon.log

@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-GITHUB_REPO="ajjs1ajjs/Project2"
+GITHUB_REPO="ajjs1ajjs/Monitoring"
 INSTALL_DIR="/opt/pymon"
 CONFIG_DIR="/etc/pymon"
 SERVICE_NAME="pymon"

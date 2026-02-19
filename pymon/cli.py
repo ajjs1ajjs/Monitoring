@@ -1,12 +1,20 @@
 """CLI entry point"""
 
 import argparse
+import json
 import os
 import sys
 
 import uvicorn
 
 from pymon import __version__
+
+
+def load_config(config_path: str) -> dict:
+    if os.path.exists(config_path):
+        with open(config_path) as f:
+            return json.load(f)
+    return {}
 
 
 def main():
@@ -16,42 +24,60 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     server_parser = subparsers.add_parser("server", help="Start the monitoring server")
-    server_parser.add_argument("--host", default="0.0.0.0", help="Host to bind (default: 0.0.0.0)")
-    server_parser.add_argument("--port", type=int, default=8000, help="Port to bind (default: 8000)")
-    server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite"], help="Storage backend")
-    server_parser.add_argument("--db", default="pymon.db", help="Database path (for sqlite)")
+    server_parser.add_argument("--host", default=None, help="Host to bind (default: 0.0.0.0)")
+    server_parser.add_argument("--port", type=int, default=None, help="Port to bind (default: 8090)")
+    server_parser.add_argument("--config", default=None, help="Path to config file")
+    server_parser.add_argument("--storage", default=None, choices=["memory", "sqlite"], help="Storage backend")
+    server_parser.add_argument("--db", default=None, help="Database path (for sqlite)")
     server_parser.add_argument("--workers", type=int, default=1, help="Number of workers")
     server_parser.add_argument("--reload", action="store_true", help="Enable auto-reload (dev mode)")
 
     args = parser.parse_args()
 
     if args.command == "server":
-        os.environ.setdefault("STORAGE_BACKEND", args.storage)
-        os.environ.setdefault("DB_PATH", args.db)
+        config_path = args.config or os.getenv("CONFIG_PATH", "config.json")
+        config = load_config(config_path)
+        
+        server_config = config.get("server", {})
+        storage_config = config.get("storage", {})
+        auth_config_data = config.get("auth", {})
+        
+        host = args.host or server_config.get("host", "0.0.0.0")
+        port = args.port or server_config.get("port", 8090)
+        storage = args.storage or storage_config.get("backend", "sqlite")
+        db_path = args.db or storage_config.get("path", "pymon.db")
+
+        os.environ.setdefault("STORAGE_BACKEND", storage)
+        os.environ.setdefault("DB_PATH", db_path)
 
         from pymon.auth import init_auth_tables, auth_config
         from pymon.storage import init_storage
 
-        init_storage(backend=args.storage, db_path=args.db)
-        auth_config.db_path = args.db
+        init_storage(backend=storage, db_path=db_path)
+        auth_config.db_path = db_path
+        if auth_config_data.get("admin_username"):
+            auth_config.admin_username = auth_config_data["admin_username"]
+        if auth_config_data.get("admin_password"):
+            auth_config.admin_password = auth_config_data["admin_password"]
         init_auth_tables()
 
-        print(f"Starting PyMon server on {args.host}:{args.port}")
-        print(f"Storage: {args.storage}")
-        print(f"Dashboard: http://{args.host}:{args.port}/dashboard/")
-        print(f"API Docs: http://{args.host}:{args.port}/api/docs")
+        print(f"Starting PyMon server on {host}:{port}")
+        print(f"Storage: {storage}")
+        print(f"Config: {config_path}")
+        print(f"Dashboard: http://{host}:{port}/dashboard/")
+        print(f"API Docs: http://{host}:{port}/docs")
 
         if args.reload or args.workers > 1:
             uvicorn.run(
                 "pymon.cli:create_app",
-                host=args.host,
-                port=args.port,
+                host=host,
+                port=port,
                 workers=args.workers,
                 reload=args.reload,
             )
         else:
             app = create_app()
-            uvicorn.run(app, host=args.host, port=args.port)
+            uvicorn.run(app, host=host, port=port)
     else:
         parser.print_help()
 

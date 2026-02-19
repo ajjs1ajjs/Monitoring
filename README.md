@@ -11,41 +11,87 @@
 - **Алертинг** - Правила та сповіщення
 - **Авторизація** - JWT + API Keys
 - **Prometheus-сумісність** - Експорт у форматі Prometheus
+- **Гнучка конфігурація** - JSON конфіг з можливістю змін
 
 ## Швидкий старт
 
 ### Linux (curl)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Project2/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
 ```
 
 ### Docker
 
 ```bash
-docker run -d -p 8000:8000 \
+docker run -d -p 8090:8090 \
   -v pymon-data:/data \
   -v pymon-config:/config \
   -e JWT_SECRET=your-secret-key \
-  ghcr.io/ajjs1ajjs/Project2:latest
+  ghcr.io/ajjs1ajjs/Monitoring:latest
 ```
 
 ### pip
 
 ```bash
 pip install pymon
-pymon server --port 8000
+pymon server --port 8090
 ```
 
 ## Доступ
 
 Після встановлення:
-- **URL**: http://your-server:8000
-- **Dashboard**: http://your-server:8000/dashboard/
-- **API**: http://your-server:8000/api/v1/
-- **Prometheus Export**: http://your-server:8000/metrics
+- **URL**: http://your-server:8090
+- **Dashboard**: http://your-server:8090/dashboard/
+- **API**: http://your-server:8090/api/v1/
+- **Prometheus Export**: http://your-server:8090/metrics
 
 **Default credentials**: `admin` / `admin` (змініть після першого входу!)
+
+## Конфігурація
+
+Файл: `/etc/pymon/config.json`
+
+```json
+{
+  "server": {
+    "port": 8090,
+    "host": "0.0.0.0",
+    "domain": "your-server"
+  },
+  "storage": {
+    "backend": "sqlite",
+    "path": "/var/lib/pymon/pymon.db"
+  },
+  "auth": {
+    "admin_username": "admin",
+    "admin_password": "admin",
+    "jwt_expire_hours": 24
+  },
+  "retention_hours": 168,
+  "check_interval": 60,
+  "backup": {
+    "enabled": true,
+    "max_backups": 10,
+    "backup_dir": "/etc/pymon/backups"
+  }
+}
+```
+
+### Зміна конфігурації
+
+```bash
+# Редагування конфігу
+sudo nano /etc/pymon/config.json
+
+# Перезапуск після змін
+sudo systemctl restart pymon
+
+# Або використання скрипта
+sudo /opt/pymon/scripts/config.sh --set server.port 9000
+sudo /opt/pymon/scripts/config.sh --get server.port
+sudo /opt/pymon/scripts/config.sh --list
+```
 
 ## API
 
@@ -53,12 +99,12 @@ pymon server --port 8000
 
 ```bash
 # Отримати токен
-curl -X POST http://localhost:8000/api/v1/auth/login \
+curl -X POST http://localhost:8090/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "admin"}'
 
 # Використання токену
-curl http://localhost:8000/api/v1/metrics \
+curl http://localhost:8090/api/v1/metrics \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -66,7 +112,7 @@ curl http://localhost:8000/api/v1/metrics \
 
 ```bash
 # Надіслати метрику
-curl -X POST http://localhost:8000/api/v1/metrics \
+curl -X POST http://localhost:8090/api/v1/metrics \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -78,7 +124,7 @@ curl -X POST http://localhost:8000/api/v1/metrics \
   }'
 
 # Запит даних
-curl "http://localhost:8000/api/v1/query?query=http_requests_total" \
+curl "http://localhost:8090/api/v1/query?query=http_requests_total" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -86,13 +132,13 @@ curl "http://localhost:8000/api/v1/query?query=http_requests_total" \
 
 ```bash
 # Створити API ключ
-curl -X POST http://localhost:8000/api/v1/auth/api-keys \
+curl -X POST http://localhost:8090/api/v1/auth/api-keys \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "my-app"}'
 
 # Використання API ключа
-curl http://localhost:8000/api/v1/metrics \
+curl http://localhost:8090/api/v1/metrics \
   -H "X-API-Key: pymon_YOUR_API_KEY"
 ```
 
@@ -101,7 +147,7 @@ curl http://localhost:8000/api/v1/metrics \
 ```python
 from pymon.client import PyMonClient
 
-async with PyMonClient("http://localhost:8000") as client:
+async with PyMonClient("http://localhost:8090") as client:
     # Авторизація
     await client.login("admin", "admin")
     
@@ -153,34 +199,14 @@ sudo systemctl status pymon
 # Перезапуск
 sudo systemctl restart pymon
 
+# Зупинка
+sudo systemctl stop pymon
+
 # Логи
 sudo journalctl -u pymon -f
 
 # Оновлення
-curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Project2/main/update.sh | sudo bash
-```
-
-## Конфігурація
-
-Файл: `/etc/pymon/config.json`
-
-```json
-{
-  "server": {
-    "port": 8000,
-    "host": "0.0.0.0"
-  },
-  "storage": {
-    "backend": "sqlite",
-    "path": "/var/lib/pymon/pymon.db"
-  },
-  "auth": {
-    "admin_username": "admin",
-    "admin_password": "admin",
-    "jwt_expire_hours": 24
-  },
-  "retention_hours": 168
-}
+curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/update.sh | sudo bash
 ```
 
 ## Docker Compose
@@ -189,9 +215,9 @@ curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Project2/main/update.sh |
 version: '3.8'
 services:
   pymon:
-    image: ghcr.io/ajjs1ajjs/Project2:latest
+    image: ghcr.io/ajjs1ajjs/Monitoring:latest
     ports:
-      - "8000:8000"
+      - "8090:8090"
     volumes:
       - pymon-data:/data
       - pymon-config:/config
