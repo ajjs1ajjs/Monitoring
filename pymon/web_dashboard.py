@@ -219,15 +219,16 @@ DASHBOARD_HTML = """
             color: var(--text);
             min-height: 100vh;
         }
-        .layout { display: grid; grid-template-columns: 260px 1fr; }
+        .layout { display: grid; grid-template-columns: 240px 1fr; min-width: 100vw; }
         .sidebar {
             background: var(--card);
             border-right: 1px solid var(--border);
             height: 100vh;
             position: fixed;
-            width: 260px;
-            padding: 24px 20px;
+            width: 240px;
+            padding: 20px 16px;
             box-sizing: border-box;
+            overflow-y: auto;
         }
         .logo { margin-bottom: 40px; }
         .logo h1 {
@@ -254,7 +255,7 @@ DASHBOARD_HTML = """
             color: var(--text);
         }
         .nav-item i { width: 24px; font-size: 18px; }
-        .main { margin-left: 260px; padding: 32px; min-height: 100vh; width: calc(100% - 260px); box-sizing: border-box; overflow-x: hidden; }
+        .main { margin-left: 240px; padding: 24px; min-height: 100vh; width: calc(100% - 240px); box-sizing: border-box; min-width: 800px; overflow-x: auto; }
         .header {
             display: flex;
             justify-content: space-between;
