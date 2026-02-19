@@ -811,7 +811,7 @@ document.querySelectorAll(".nav-item").forEach(btn => {
         document.getElementById('alertModal').classList.remove('active');
     });
     
-    document.getElementById('alertForm').addEventListener('submit', async function(e) {
+document.getElementById('alertForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const id = document.getElementById('alert-id').value;
         const alertData = {
@@ -821,6 +821,7 @@ document.querySelectorAll(".nav-item").forEach(btn => {
             threshold: parseInt(document.getElementById('alert-threshold').value),
             duration: parseInt(document.getElementById('alert-duration').value),
             severity: document.getElementById('alert-severity').value,
+            server_id: document.getElementById('alert-server-id').value || null, // Server-specific alert
             notify_telegram: document.getElementById('alert-notify-telegram').checked,
             notify_discord: document.getElementById('alert-notify-discord').checked,
             notify_slack: document.getElementById('alert-notify-slack').checked,
@@ -829,12 +830,16 @@ document.querySelectorAll(".nav-item").forEach(btn => {
             enabled: true
         };
         
-        if (id) {
-            await fetch('/api/alerts/' + id, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-                body: JSON.stringify(alertData)
-            });
+        const url = id ? '/api/alerts/' + id : '/api/alerts';
+        const method = id ? 'PUT' : 'POST';
+        await fetch(url, {
+            method,
+            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+            body: JSON.stringify(alertData)
+        });
+        closeModal('alertModal');
+        loadAlerts();
+    });
         } else {
             await fetch('/api/alerts', {
                 method: 'POST',
