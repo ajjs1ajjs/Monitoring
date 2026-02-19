@@ -129,20 +129,33 @@ echo -e "${BLUE}Creating directories...${NC}"
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
 
 echo -e "${BLUE}Downloading version $VERSION from GitHub...${NC}"
+echo -e "${YELLOW}URL: $DOWNLOAD_URL${NC}"
 cd /tmp
 
-if ! curl -fsSL "$DOWNLOAD_URL" -o pymon.tar.gz 2>/dev/null; then
+if ! curl -fsSL "$DOWNLOAD_URL" -o pymon.tar.gz; then
     echo -e "${RED}Error: Failed to download from GitHub${NC}"
+    echo "URL: $DOWNLOAD_URL"
     exit 1
 fi
+
+# Verify download
+if [ ! -f pymon.tar.gz ] || [ ! -s pymon.tar.gz ]; then
+    echo -e "${RED}Error: Downloaded file is empty or missing${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Downloaded: $(du -h pymon.tar.gz | cut -f1)${NC}"
 
 echo -e "${BLUE}Extracting...${NC}"
 tar -xzf pymon.tar.gz
 
-EXTRACT_DIR=$(find . -maxdepth 1 -type d -name "pymon*" | head -1)
+# Find extracted directory (could be Monitoring-main, Project2-main, etc.)
+EXTRACT_DIR=$(find . -maxdepth 1 -type d \( -name "Monitoring*" -o -name "Project2*" -o -name "pymon*" \) | head -1)
 
 if [ -z "$EXTRACT_DIR" ]; then
     echo -e "${RED}Error: Could not find extracted files${NC}"
+    echo "Looking for extracted directories:"
+    ls -la
     exit 1
 fi
 
