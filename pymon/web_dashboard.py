@@ -197,137 +197,925 @@ DASHBOARD_HTML = """
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>PyMon - Server Monitoring</title>
+    <title>PyMon - Grafana Style Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --bg: #0a0e1a;
-            --card: #111827;
-            --border: #1f2937;
-            --text: #f9fafb;
-            --muted: #9ca3af;
-            --blue: #3b82f6;
-            --green: #10b981;
-            --red: #ef4444;
-            --yellow: #f59e0b;
+            --bg: #0d0f14;
+            --card: #181b1f;
+            --border: #2c3235;
+            --text: #e0e0e0;
+            --muted: #999;
+            --blue: #5794f2;
+            --green: #73bf69;
+            --red: #f2495c;
+            --yellow: #f2cc0c;
+            --orange: #ff780a;
+            --purple: #b877d9;
+            --cyan: #00d8d8;
         }
         body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
+            font-size: 13px;
         }
-        .layout { display: grid; grid-template-columns: 240px 1fr; min-width: 100vw; }
-        .sidebar {
-            background: var(--card);
-            border-right: 1px solid var(--border);
-            height: 100vh;
-            position: fixed;
-            width: 240px;
-            padding: 20px 16px;
-            box-sizing: border-box;
-            overflow-y: auto;
-        }
-        .logo { margin-bottom: 40px; }
-        .logo h1 {
-            background: linear-gradient(135deg, var(--blue), #06b6d4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-size: 32px;
-        }
-        .nav-item {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            padding: 14px 18px;
-            margin-bottom: 6px;
-            border-radius: 12px;
-            cursor: pointer;
-            color: var(--muted);
-            font-weight: 500;
-            transition: all 0.2s;
-            text-decoration: none;
-        }
-        .nav-item:hover, .nav-item.active {
-            background: rgba(59, 130, 246, 0.15);
-            color: var(--text);
-        }
-        .nav-item i { width: 24px; font-size: 18px; }
-        .main { margin-left: 240px; padding: 24px; min-height: 100vh; width: calc(100% - 240px); box-sizing: border-box; min-width: 800px; overflow-x: auto; }
-        .header {
+        /* Top Navigation - Grafana Style */
+        .top-nav {
+            background: linear-gradient(90deg, #161719 0%, #1f2326 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 0 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 32px;
+            height: 48px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .header h2 { font-size: 32px; }
-        .btn {
-            padding: 12px 24px;
+        .nav-left { display: flex; align-items: center; gap: 24px; }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo h1 {
+            color: var(--blue);
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, var(--blue), #2c7bd9);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+        }
+        .nav-menu { display: flex; gap: 4px; }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--muted);
+            font-weight: 500;
+            font-size: 13px;
+            transition: all 0.15s;
+            text-decoration: none;
+            border: none;
+            background: transparent;
+        }
+        .nav-item:hover {
+            color: var(--text);
+            background: rgba(255,255,255,0.05);
+        }
+        .nav-item.active {
+            background: rgba(87, 148, 242, 0.15);
+            color: var(--blue);
+        }
+        .nav-right { display: flex; align-items: center; gap: 12px; }
+        .server-selector {
+            padding: 6px 10px;
+            background: #111217;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 13px;
+            min-width: 160px;
+            cursor: pointer;
+        }
+        .server-selector:focus { outline: none; border-color: var(--blue); }
+        .main { padding: 16px; min-height: calc(100vh - 48px); }
+        
+        /* Dashboard Toolbar - Grafana Style */
+        .dashboard-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding: 8px 12px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        .toolbar-left { display: flex; align-items: center; gap: 16px; }
+        .toolbar-right { display: flex; align-items: center; gap: 8px; }
+        .breadcrumb {
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .breadcrumb span { color: var(--text); }
+        .time-range {
+            display: flex;
+            gap: 2px;
+            background: #111217;
+            border-radius: 4px;
+            padding: 2px;
+            border: 1px solid var(--border);
+        }
+        .time-btn {
+            padding: 4px 10px;
+            background: transparent;
+            border: none;
+            border-radius: 3px;
+            color: var(--muted);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .time-btn:hover { color: var(--text); }
+        .time-btn.active {
+            background: #2c3235;
+            color: var(--text);
+        }
+        .refresh-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #111217;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 4px 8px;
+        }
+        .refresh-btn {
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .refresh-btn:hover { color: var(--text); }
+        .refresh-interval {
+            color: var(--muted);
+            font-size: 12px;
+        }
+        
+        /* Panels Grid - Grafana Style */
+        .panels-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+        }
+        .panel-title {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .status-dot.warning {
+            background: var(--yellow);
+            box-shadow: 0 0 8px var(--yellow);
+        }
+        .status-dot.error {
+            background: var(--red);
+            box-shadow: 0 0 8px var(--red);
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+        }
+        .panel-actions {
+            display: flex;
+            gap: 4px;
+        }
+        .panel-btn {
+            padding: 4px 8px;
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .panel-btn:hover { 
+            color: var(--text); 
+            background: rgba(255,255,255,0.05);
+        }
+        .panel-body {
+            display: flex;
+            height: 280px;
+        }
+        .panel-chart {
+            flex: 1;
+            padding: 12px;
+            position: relative;
+            min-width: 0;
+        }
+        .panel-legend {
+            width: 140px;
+            border-left: 1px solid var(--border);
+            background: rgba(0,0,0,0.2);
+            overflow-y: auto;
+            font-size: 11px;
+        }
+        .legend-header {
+            display: grid;
+            grid-template-columns: 1fr 45px 45px;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            font-weight: 600;
+        }
+        .legend-item {
+            display: grid;
+            grid-template-columns: 12px 1fr 45px 45px;
+            align-items: center;
+            padding: 6px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .legend-item:hover { background: rgba(255,255,255,0.03); }
+        .legend-item.hidden { opacity: 0.3; }
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 8px;
+        }
+        .legend-name {
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 11px;
+        }
+        .legend-value {
+            color: var(--muted);
+            text-align: right;
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+        }
+        
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .stat-content { flex: 1; }
+        .stat-value { 
+            font-size: 24px; 
+            font-weight: 600; 
+            margin-bottom: 2px;
+            font-variant-numeric: tabular-nums;
+        }
+        .stat-label { color: var(--muted); font-size: 12px; }
+        
+        /* Tables */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .card-title { 
+            font-size: 14px; 
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th, td { 
+            padding: 10px 12px; 
+            text-align: left; 
+            border-bottom: 1px solid var(--border); 
+        }
+        th { 
+            color: var(--muted); 
+            font-size: 11px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            background: rgba(0,0,0,0.2);
+        }
+        tr:hover { background: rgba(255,255,255,0.02); }
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-success { background: rgba(115, 191, 105, 0.15); color: var(--green); }
+        .badge-danger { background: rgba(242, 73, 92, 0.15); color: var(--red); }
+        .badge-warning { background: rgba(242, 204, 12, 0.15); color: var(--yellow); }
+        
+        /* Alerts Section */
+        .alert-rule {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .alert-rule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .alert-rule-title {
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .alert-toggle {
+            width: 36px;
+            height: 20px;
+            background: var(--green);
             border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .alert-toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        .alert-toggle.disabled {
+            background: #444;
+        }
+        .alert-toggle.disabled::after { right: auto; left: 2px; }
+        .alert-conditions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .condition-box {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .condition-label { 
+            color: var(--muted); 
+            margin-bottom: 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        .condition-value { 
+            font-weight: 600; 
+            color: var(--text);
+            font-size: 13px;
+        }
+        .alert-notifications {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .notification-tag {
+            padding: 4px 10px;
+            background: rgba(87, 148, 242, 0.15);
+            border-radius: 3px;
+            font-size: 11px;
+            color: var(--blue);
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 24px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-close {
+            background: none; 
+            border: none; 
+            color: var(--muted);
+            font-size: 20px; 
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .modal-close:hover { 
+            color: var(--text);
+            background: rgba(255,255,255,0.05);
+        }
+        .form-group { margin-bottom: 16px; }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-weight: 500;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            background: #111217;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 13px;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--blue);
+        }
+        .form-row { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 12px; 
+        }
+        .form-row-3 { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 12px; 
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+        .btn-primary {
+            background: linear-gradient(180deg, #2c7bd9 0%, #1a5fb4 100%);
+            color: white;
+            border: 1px solid #1a5fb4;
+        }
+        .btn-primary:hover { 
+            background: linear-gradient(180deg, #3d8bea 0%, #2c7bd9 100%);
+        }
+        .btn-danger { 
+            background: rgba(242, 73, 92, 0.15); 
+            color: var(--red);
+            border: 1px solid rgba(242, 73, 92, 0.3);
+        }
+        .btn-danger:hover { 
+            background: rgba(242, 73, 92, 0.25); 
+        }
+        .btn-secondary { 
+            background: rgba(255,255,255,0.05); 
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { 
+            background: rgba(255,255,255,0.1); 
+        }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        
+        /* Install Box */
+        .install-box {
+            background: rgba(87, 148, 242, 0.05);
+            border: 1px solid rgba(87, 148, 242, 0.2);
+            border-radius: 4px;
+            padding: 16px;
+            margin-top: 12px;
+        }
+        .install-box h4 { 
+            margin-bottom: 10px; 
+            color: var(--blue); 
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .install-box code {
+            background: #111217;
+            padding: 12px;
+            border-radius: 4px;
+            display: block;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .os-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .os-tab {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .os-tab.active {
+            background: var(--blue);
+            color: white;
+            border-color: var(--blue);
+        }
+        
+        /* Section display */
+        .section-content { display: none; }
+        .section-content.active { display: block; }
+        
+        /* Chart Customization */
+        canvas {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+        }
+        .time-btn {
+            padding: 8px 16px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--muted);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .time-btn:hover, .time-btn.active {
+            background: var(--blue);
+            border-color: var(--blue);
+            color: white;
+        }
+        .refresh-btn {
+            padding: 8px 16px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 6px;
+            color: var(--green);
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .refresh-btn:hover { background: rgba(16, 185, 129, 0.2); }
+        
+        /* Panel Grid */
+        .panels-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .panel {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(0,0,0,0.2);
+        }
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .panel-title .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .panel-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .panel-btn {
+            padding: 6px 10px;
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .panel-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+        .panel-body {
+            display: flex;
+            height: 320px;
+        }
+        .panel-chart {
+            flex: 1;
+            padding: 16px;
+            position: relative;
+        }
+        .panel-legend {
+            width: 180px;
+            border-left: 1px solid var(--border);
+            background: rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        .legend-header {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .legend-item:hover { background: rgba(255,255,255,0.03); }
+        .legend-item.hidden { opacity: 0.4; }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+        .legend-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .legend-name {
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .legend-value {
+            color: var(--muted);
+            font-size: 11px;
+            margin-top: 2px;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
             border: none;
             font-weight: 600;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            font-size: 15px;
+            gap: 8px;
+            font-size: 14px;
             transition: all 0.2s;
         }
         .btn-primary {
             background: linear-gradient(135deg, var(--blue), #06b6d4);
             color: white;
         }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
         .btn-danger { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.3); }
         .btn-secondary { background: rgba(75, 85, 99, 0.3); color: var(--text); }
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 32px; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        
+        /* Stats Cards */
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
         .stat-card {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 28px;
-            transition: transform 0.2s;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
-        .stat-card:hover { transform: translateY(-4px); }
         .stat-icon {
-            width: 56px; height: 56px;
-            border-radius: 14px;
+            width: 48px; height: 48px;
+            border-radius: 10px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 26px;
-            margin-bottom: 18px;
+            font-size: 22px;
         }
-        .stat-value { font-size: 38px; font-weight: 800; margin-bottom: 6px; }
-        .stat-label { color: var(--muted); font-size: 15px; }
+        .stat-content { flex: 1; }
+        .stat-value { font-size: 28px; font-weight: 700; margin-bottom: 2px; }
+        .stat-label { color: var(--muted); font-size: 13px; }
+        
+        /* Tables */
         .card {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 32px;
+            border-radius: 12px;
+            padding: 24px;
             margin-bottom: 24px;
-            width: 100%;
-            box-sizing: border-box;
-            overflow-wrap: break-word;
         }
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
-        .card-title { font-size: 20px; font-weight: 700; }
-        table { width: 100%; border-collapse: collapse; display: block; overflow-x: auto; white-space: nowrap; }
+        .card-title { font-size: 18px; font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; }
         th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 14px; }
-        th { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+        th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        tr:hover { background: rgba(255,255,255,0.02); }
         .badge {
-            padding: 8px 16px;
+            padding: 6px 12px;
             border-radius: 20px;
-            font-size: 13px;
-            font-weight: 700;
+            font-size: 12px;
+            font-weight: 600;
         }
-        .badge-success { background: rgba(16, 185, 129, 0.2); color: var(--green); }
-        .badge-danger { background: rgba(239, 68, 68, 0.2); color: var(--red); }
-        .badge-warning { background: rgba(245, 158, 11, 0.2); color: var(--yellow); }
+        .badge-success { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+        .badge-danger { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+        .badge-warning { background: rgba(245, 158, 11, 0.15); color: var(--yellow); }
+        
+        /* Alerts Section */
+        .alert-rule {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        .alert-rule-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .alert-rule-title {
+            font-weight: 600;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .alert-enabled {
+            width: 40px;
+            height: 22px;
+            background: var(--green);
+            border-radius: 11px;
+            position: relative;
+            cursor: pointer;
+        }
+        .alert-enabled::after {
+            content: '';
+            position: absolute;
+            top: 2px; right: 2px;
+            width: 18px; height: 18px;
+            background: white;
+            border-radius: 50%;
+        }
+        .alert-enabled.disabled {
+            background: rgba(75, 85, 99, 0.5);
+        }
+        .alert-enabled.disabled::after { right: auto; left: 2px; }
+        .alert-conditions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .condition-box {
+            background: rgba(0,0,0,0.3);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .condition-label { color: var(--muted); margin-bottom: 4px; }
+        .condition-value { font-weight: 600; color: var(--text); }
+        .alert-notifications {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .notification-tag {
+            padding: 6px 12px;
+            background: rgba(59, 130, 246, 0.15);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--blue);
+        }
+        
+        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -341,8 +1129,8 @@ DASHBOARD_HTML = """
         .modal-content {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 40px;
+            border-radius: 16px;
+            padding: 32px;
             width: 90%;
             max-width: 600px;
             max-height: 90vh;
@@ -352,85 +1140,60 @@ DASHBOARD_HTML = """
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 32px;
+            margin-bottom: 24px;
         }
         .modal-close {
             background: none; border: none; color: var(--muted);
-            font-size: 28px; cursor: pointer;
+            font-size: 24px; cursor: pointer;
         }
-        .form-group { margin-bottom: 24px; }
+        .form-group { margin-bottom: 20px; }
         label {
             display: block;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             color: var(--muted);
-            font-weight: 600;
-            font-size: 15px;
+            font-weight: 500;
+            font-size: 14px;
         }
-        input, select {
+        input, select, textarea {
             width: 100%;
-            padding: 16px;
+            padding: 12px 16px;
             background: rgba(0,0,0,0.3);
-            border: 2px solid var(--border);
-            border-radius: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
             color: var(--text);
-            font-size: 16px;
-            transition: all 0.2s;
+            font-size: 14px;
         }
-        input:focus, select:focus {
+        input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: var(--blue);
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
         }
-        input::placeholder { color: #4b5563; }
-        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .toggle { display: flex; align-items: center; gap: 14px; cursor: pointer; }
-        .toggle input { display: none; }
-        .toggle-slider {
-            width: 52px; height: 28px;
-            background: rgba(75, 85, 99, 0.5);
-            border-radius: 14px;
-            position: relative;
-            transition: all 0.3s;
-        }
-        .toggle-slider::after {
-            content: '';
-            position: absolute;
-            top: 2px; left: 2px;
-            width: 24px; height: 24px;
-            background: white;
-            border-radius: 50%;
-            transition: all 0.3s;
-        }
-        .toggle input:checked + .toggle-slider { background: var(--blue); }
-        .toggle input:checked + .toggle-slider::after { transform: translateX(24px); }
-        .toggles { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 8px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-row-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        
+        /* Install Box */
         .install-box {
-            background: rgba(59, 130, 246, 0.1);
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            border-radius: 12px;
-            padding: 24px;
-            margin-top: 24px;
-            width: 100%;
-            box-sizing: border-box;
-            word-wrap: break-word;
+            background: rgba(59, 130, 246, 0.05);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 16px;
         }
-        .install-box h4 { margin-bottom: 12px; color: var(--blue); word-wrap: break-word; }
+        .install-box h4 { margin-bottom: 12px; color: var(--blue); font-size: 14px; }
         .install-box code {
             background: rgba(0,0,0,0.4);
-            padding: 16px;
-            border-radius: 8px;
+            padding: 12px;
+            border-radius: 6px;
             display: block;
             font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 14px;
+            font-size: 13px;
             overflow-x: auto;
             white-space: pre-wrap;
-            word-wrap: break-word;
-            line-height: 1.5;
+            word-break: break-all;
         }
         .os-tabs {
             display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
+            gap: 8px;
+            margin-bottom: 16px;
         }
         .os-tab {
             padding: 10px 20px;
@@ -439,188 +1202,496 @@ DASHBOARD_HTML = """
             border-radius: 8px;
             cursor: pointer;
             color: var(--muted);
+            font-size: 14px;
         }
         .os-tab.active {
             background: var(--blue);
             color: white;
             border-color: var(--blue);
         }
+        
+        /* Section display */
+        .section-content { display: none; }
+        .section-content.active { display: block; }
     </style>
 </head>
 <body>
-    <div class="layout">
-        <aside class="sidebar">
+    <!-- Top Navigation Bar - Grafana Style -->
+    <nav class="top-nav">
+        <div class="nav-left">
             <div class="logo">
+                <div class="logo-icon">P</div>
                 <h1>PyMon</h1>
             </div>
-            <nav>
-                <a href="#" class="nav-item active" onclick="showSection('dashboard')">
-                    <i class="fas fa-home"></i> Dashboard
-                </a>
-                <a href="#" class="nav-item" onclick="showSection('servers')">
+            <div class="nav-menu">
+                <button class="nav-item active" onclick="showSection('dashboard')">
+                    <i class="fas fa-chart-line"></i> Dashboard
+                </button>
+                <button class="nav-item" onclick="showSection('servers')">
                     <i class="fas fa-server"></i> Servers
-                </a>
-                <a href="#" class="nav-item" onclick="showSection('alerts')">
+                </button>
+                <button class="nav-item" onclick="showSection('alerts')">
                     <i class="fas fa-bell"></i> Alerts
-                </a>
-                <a href="#" class="nav-item" onclick="showSection('notifications')">
-                    <i class="fas fa-broadcast-tower"></i> Notifications
-                </a>
-            </nav>
-        </aside>
-        
-        <main class="main">
-            <div class="header">
-                <h2 id="page-title">Dashboard</h2>
-                <button class="btn btn-primary" onclick="logout()">
-                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+                <button class="nav-item" onclick="showSection('notifications')">
+                    <i class="fas fa-cog"></i> Settings
                 </button>
             </div>
-            
-            <!-- Dashboard Section -->
-            <div id="section-dashboard" class="section-content">
-                <div class="stats">
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.2); color: var(--green);">
-                            <i class="fas fa-server"></i>
-                        </div>
+        </div>
+        <div class="nav-right">
+            <select class="server-selector" id="serverSelector" onchange="changeServer()">
+                <option value="">All Servers</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
+        </div>
+    </nav>
+    
+    <main class="main">
+        <!-- Dashboard Section -->
+        <div id="section-dashboard" class="section-content active">
+            <!-- Stats Row -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(115, 191, 105, 0.15); color: var(--green);">
+                        <i class="fas fa-server"></i>
+                    </div>
+                    <div class="stat-content">
                         <div class="stat-value" id="stat-online" style="color: var(--green);">0</div>
-                        <div class="stat-label">Servers Online</div>
+                        <div class="stat-label">Online</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.2); color: var(--red);">
-                            <i class="fas fa-exclamation-triangle"></i>
-                        </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(242, 73, 92, 0.15); color: var(--red);">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-content">
                         <div class="stat-value" id="stat-offline" style="color: var(--red);">0</div>
-                        <div class="stat-label">Servers Offline</div>
+                        <div class="stat-label">Offline</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.2); color: var(--blue);">
-                            <i class="fab fa-linux"></i>
-                        </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(87, 148, 242, 0.15); color: var(--blue);">
+                        <i class="fab fa-linux"></i>
+                    </div>
+                    <div class="stat-content">
                         <div class="stat-value" id="stat-linux" style="color: var(--blue);">0</div>
-                        <div class="stat-label">Linux Servers</div>
+                        <div class="stat-label">Linux</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.2); color: var(--yellow);">
-                            <i class="fab fa-windows"></i>
-                        </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(242, 204, 12, 0.15); color: var(--yellow);">
+                        <i class="fab fa-windows"></i>
+                    </div>
+                    <div class="stat-content">
                         <div class="stat-value" id="stat-windows" style="color: var(--yellow);">0</div>
-                        <div class="stat-label">Windows Servers</div>
+                        <div class="stat-label">Windows</div>
                     </div>
-                </div>
-                
-                <div class="card">
-                    <h3 style="margin-bottom: 20px;">System Overview</h3>
-                    <canvas id="overviewChart" height="100"></canvas>
                 </div>
             </div>
             
-            <!-- Servers Section -->
-            <div id="section-servers" class="section-content" style="display:none">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Monitored Servers</h3>
-                        <button class="btn btn-primary" onclick="openModal('addServerModal')">
-                            <i class="fas fa-plus"></i> Add Server
+            <!-- Dashboard Toolbar - Grafana Style -->
+            <div class="dashboard-toolbar">
+                <div class="toolbar-left">
+                    <span class="breadcrumb">
+                        <i class="fas fa-home"></i> Home <span style="margin: 0 8px; color: var(--border);">/</span> <span>Dashboard</span>
+                    </span>
+                </div>
+                <div class="toolbar-right">
+                    <div class="time-range">
+                        <button class="time-btn" onclick="setTimeRange('5m')">5m</button>
+                        <button class="time-btn" onclick="setTimeRange('15m')">15m</button>
+                        <button class="time-btn" onclick="setTimeRange('30m')">30m</button>
+                        <button class="time-btn active" onclick="setTimeRange('1h')">1h</button>
+                        <button class="time-btn" onclick="setTimeRange('6h')">6h</button>
+                        <button class="time-btn" onclick="setTimeRange('24h')">24h</button>
+                    </div>
+                    <div class="refresh-controls">
+                        <button class="refresh-btn" onclick="refreshDashboard()">
+                            <i class="fas fa-sync-alt"></i>
                         </button>
-                    </div>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Status</th>
-                                <th>Name</th>
-                                <th>Host</th>
-                                <th>OS</th>
-                                <th>CPU</th>
-                                <th>Memory</th>
-                                <th>Disk</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="servers-tbody"></tbody>
-                    </table>
-                </div>
-                
-                <div class="card">
-                    <h3 style="margin-bottom: 20px;"><i class="fas fa-download"></i> Agent Installation</h3>
-                    <p style="color: var(--muted); margin-bottom: 20px;">Install the PyMon agent on your servers to start collecting metrics.</p>
-                    
-                    <div class="os-tabs">
-                        <div class="os-tab active" onclick="showOsTab('linux')">Linux</div>
-                        <div class="os-tab" onclick="showOsTab('windows')">Windows</div>
-                    </div>
-                    
-                    <div id="install-linux" class="install-box">
-                        <h4><i class="fab fa-linux"></i> Linux Installation (systemd)</h4>
-                        <code>curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</code>
-                        <p style="margin-top: 12px; color: var(--muted); font-size: 14px;">Supports: Ubuntu, Debian, CentOS, RHEL, Fedora</p>
-                    </div>
-                    
-                    <div id="install-windows" class="install-box" style="display:none;">
-                        <h4><i class="fab fa-windows"></i> Windows Installation</h4>
-                        <p style="margin-bottom: 12px;">Download and run the installer:</p>
-                        <code>Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-windows.ps1" -OutFile "install.ps1"; .\install.ps1</code>
-                        <p style="margin-top: 12px; color: var(--muted); font-size: 14px;">Or download MSI: <a href="#" style="color: var(--blue);">pymon-agent.msi</a></p>
+                        <span class="refresh-interval">5s</span>
                     </div>
                 </div>
             </div>
             
-            <!-- Notifications Section -->
-            <div id="section-notifications" class="section-content" style="display:none">
-                <div class="card">
-                    <h3 class="card-title">Notification Channels</h3>
-                    <p style="color: var(--muted); margin-bottom: 24px;">Configure where to receive alerts when servers go down.</p>
-                    
-                    <div class="toggles" style="margin-bottom: 32px;">
-                        <label class="toggle">
-                            <input type="checkbox" id="notify-telegram">
-                            <div class="toggle-slider"></div>
-                            <span><i class="fab fa-telegram"></i> Telegram</span>
-                        </label>
-                        <label class="toggle">
-                            <input type="checkbox" id="notify-discord">
-                            <div class="toggle-slider"></div>
-                            <span><i class="fab fa-discord"></i> Discord</span>
-                        </label>
-                        <label class="toggle">
-                            <input type="checkbox" id="notify-slack">
-                            <div class="toggle-slider"></div>
-                            <span><i class="fab fa-slack"></i> Slack</span>
-                        </label>
-                        <label class="toggle">
-                            <input type="checkbox" id="notify-email">
-                            <div class="toggle-slider"></div>
-                            <span><i class="fas fa-envelope"></i> Email</span>
-                        </label>
-                    </div>
-                    
-                    <div id="config-telegram" style="display:none;">
-                        <div class="form-group">
-                            <label>Bot Token</label>
-                            <input type="text" id="telegram-token" placeholder="123456789:ABCdef...">
+            <!-- Charts Grid - Grafana Style -->
+            <div class="panels-grid">
+                <!-- CPU Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span class="status-dot"></span>
+                            CPU
                         </div>
-                        <div class="form-group">
-                            <label>Chat ID</label>
-                            <input type="text" id="telegram-chat" placeholder="-1001234567890">
+                        <div class="panel-actions">
+                            <button class="panel-btn"><i class="fas fa-ellipsis-v"></i></button>
                         </div>
                     </div>
+                    <div class="panel-body">
+                        <div class="panel-chart">
+                            <canvas id="cpuChart"></canvas>
+                        </div>
+                        <div class="panel-legend">
+                            <div class="legend-header">
+                                <span style="grid-column: 2;">Name</span>
+                                <span>Last</span>
+                                <span>Max</span>
+                            </div>
+                            <div id="cpuLegend"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Memory Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span class="status-dot"></span>
+                            Memory
+                        </div>
+                        <div class="panel-actions">
+                            <button class="panel-btn"><i class="fas fa-ellipsis-v"></i></button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-chart">
+                            <canvas id="memoryChart"></canvas>
+                        </div>
+                        <div class="panel-legend">
+                            <div class="legend-header">
+                                <span style="grid-column: 2;">Name</span>
+                                <span>Last</span>
+                                <span>Max</span>
+                            </div>
+                            <div id="memoryLegend"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Disk Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span class="status-dot"></span>
+                            Disk Usage
+                        </div>
+                        <div class="panel-actions">
+                            <button class="panel-btn"><i class="fas fa-ellipsis-v"></i></button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-chart">
+                            <canvas id="diskChart"></canvas>
+                        </div>
+                        <div class="panel-legend">
+                            <div class="legend-header">
+                                <span style="grid-column: 2;">Name</span>
+                                <span>Last</span>
+                                <span>Max</span>
+                            </div>
+                            <div id="diskLegend"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Network Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span class="status-dot"></span>
+                            Network I/O
+                        </div>
+                        <div class="panel-actions">
+                            <button class="panel-btn"><i class="fas fa-ellipsis-v"></i></button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-chart">
+                            <canvas id="networkChart"></canvas>
+                        </div>
+                        <div class="panel-legend">
+                            <div class="legend-header">
+                                <span style="grid-column: 2;">Name</span>
+                                <span>Last</span>
+                                <span>Max</span>
+                            </div>
+                            <div id="networkLegend"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Disk Queue Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span class="status-dot"></span>
+                            Disk Queue
+                        </div>
+                        <div class="panel-actions">
+                            <button class="panel-btn"><i class="fas fa-ellipsis-v"></i></button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-chart">
+                            <canvas id="diskQueueChart"></canvas>
+                        </div>
+                        <div class="panel-legend">
+                            <div class="legend-header">
+                                <span style="grid-column: 2;">Name</span>
+                                <span>Last</span>
+                                <span>Max</span>
+                            </div>
+                            <div id="diskQueueLegend"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exporter Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <span class="status-dot"></span>
+                            Exporter
+                        </div>
+                        <div class="panel-actions">
+                            <button class="panel-btn"><i class="fas fa-ellipsis-v"></i></button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="panel-chart">
+                            <canvas id="exporterChart"></canvas>
+                        </div>
+                        <div class="panel-legend">
+                            <div class="legend-header">
+                                <span style="grid-column: 2;">Name</span>
+                                <span>Last</span>
+                            </div>
+                            <div id="exporterLegend"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Servers Section -->
+        <div id="section-servers" class="section-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-server"></i> Monitored Servers</h3>
+                    <button class="btn btn-primary" onclick="openModal('addServerModal')">
+                        <i class="fas fa-plus"></i> Add Server
+                    </button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Name</th>
+                            <th>Host</th>
+                            <th>OS</th>
+                            <th>CPU</th>
+                            <th>Memory</th>
+                            <th>Disk</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="servers-tbody"></tbody>
+                </table>
+            </div>
+            
+            <div class="card">
+                <h3 class="card-title" style="margin-bottom: 16px;"><i class="fas fa-download"></i> Agent Installation</h3>
+                <p style="color: var(--muted); margin-bottom: 16px;">Install the PyMon agent on your servers to start collecting metrics.</p>
+                
+                <div class="os-tabs">
+                    <div class="os-tab active" onclick="showOsTab('linux')">Linux</div>
+                    <div class="os-tab" onclick="showOsTab('windows')">Windows</div>
+                </div>
+                
+                <div id="install-linux" class="install-box">
+                    <h4><i class="fab fa-linux"></i> Linux Installation</h4>
+                    <code>curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</code>
+                    <p style="margin-top: 12px; color: var(--muted); font-size: 13px;">Supports: Ubuntu, Debian, CentOS, RHEL, Fedora</p>
+                </div>
+                
+                <div id="install-windows" class="install-box" style="display:none;">
+                    <h4><i class="fab fa-windows"></i> Windows Installation</h4>
+                    <p style="margin-bottom: 12px; color: var(--muted);">Run in PowerShell as Administrator:</p>
+                    <code>Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-windows.ps1" -OutFile "install.ps1"; .\install.ps1</code>
+                    <p style="margin-top: 12px; color: var(--muted); font-size: 13px;">Or download MSI: <a href="#" style="color: var(--blue);">pymon-agent.msi</a></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Alerts Section -->
+        <div id="section-alerts" class="section-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-bell"></i> Alert Rules</h3>
+                    <button class="btn btn-primary" onclick="openModal('addAlertModal')">
+                        <i class="fas fa-plus"></i> New Alert Rule
+                    </button>
+                </div>
+                <p style="color: var(--muted); margin-bottom: 20px;">Configure alert rules to receive notifications when metrics exceed thresholds.</p>
+                
+                <div id="alertRules">
+                    <!-- CPU Alert Rule -->
+                    <div class="alert-rule">
+                        <div class="alert-rule-header">
+                            <div class="alert-rule-title">
+                                <i class="fas fa-microchip" style="color: var(--blue);"></i>
+                                High CPU Usage
+                            </div>
+                            <div class="alert-enabled" onclick="this.classList.toggle('disabled')"></div>
+                        </div>
+                        <div class="alert-conditions">
+                            <div class="condition-box">
+                                <div class="condition-label">Metric</div>
+                                <div class="condition-value">CPU Usage %</div>
+                            </div>
+                            <div class="condition-box">
+                                <div class="condition-label">Condition</div>
+                                <div class="condition-value">> 80%</div>
+                            </div>
+                            <div class="condition-box">
+                                <div class="condition-label">Duration</div>
+                                <div class="condition-value">5 minutes</div>
+                            </div>
+                        </div>
+                        <div class="alert-notifications">
+                            <span class="notification-tag"><i class="fab fa-telegram"></i> Telegram</span>
+                            <span class="notification-tag"><i class="fas fa-envelope"></i> Email</span>
+                        </div>
+                    </div>
                     
-                    <div id="config-discord" style="display:none;">
+                    <!-- Memory Alert Rule -->
+                    <div class="alert-rule">
+                        <div class="alert-rule-header">
+                            <div class="alert-rule-title">
+                                <i class="fas fa-memory" style="color: var(--green);"></i>
+                                High Memory Usage
+                            </div>
+                            <div class="alert-enabled" onclick="this.classList.toggle('disabled')"></div>
+                        </div>
+                        <div class="alert-conditions">
+                            <div class="condition-box">
+                                <div class="condition-label">Metric</div>
+                                <div class="condition-value">Memory Usage %</div>
+                            </div>
+                            <div class="condition-box">
+                                <div class="condition-label">Condition</div>
+                                <div class="condition-value">> 85%</div>
+                            </div>
+                            <div class="condition-box">
+                                <div class="condition-label">Duration</div>
+                                <div class="condition-value">3 minutes</div>
+                            </div>
+                        </div>
+                        <div class="alert-notifications">
+                            <span class="notification-tag"><i class="fab fa-discord"></i> Discord</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Disk Alert Rule -->
+                    <div class="alert-rule">
+                        <div class="alert-rule-header">
+                            <div class="alert-rule-title">
+                                <i class="fas fa-hdd" style="color: var(--yellow);"></i>
+                                Disk Space Low
+                            </div>
+                            <div class="alert-enabled disabled" onclick="this.classList.toggle('disabled')"></div>
+                        </div>
+                        <div class="alert-conditions">
+                            <div class="condition-box">
+                                <div class="condition-label">Metric</div>
+                                <div class="condition-value">Disk Usage %</div>
+                            </div>
+                            <div class="condition-box">
+                                <div class="condition-label">Condition</div>
+                                <div class="condition-value">> 90%</div>
+                            </div>
+                            <div class="condition-box">
+                                <div class="condition-label">Duration</div>
+                                <div class="condition-value">Immediate</div>
+                            </div>
+                        </div>
+                        <div class="alert-notifications">
+                            <span class="notification-tag"><i class="fab fa-telegram"></i> Telegram</span>
+                            <span class="notification-tag"><i class="fab fa-slack"></i> Slack</span>
+                            <span class="notification-tag"><i class="fas fa-envelope"></i> Email</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Section -->
+        <div id="section-notifications" class="section-content">
+            <div class="card">
+                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fas fa-broadcast-tower"></i> Notification Channels</h3>
+                <p style="color: var(--muted); margin-bottom: 24px;">Configure where to receive alerts when servers go down.</p>
+                
+                <div style="margin-bottom: 32px;">
+                    <div class="form-group">
+                        <label class="toggle-label" style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                            <input type="checkbox" id="notify-telegram" style="width: auto;" onchange="toggleConfig('telegram')">
+                            <span><i class="fab fa-telegram" style="color: #0088cc;"></i> Telegram</span>
+                        </label>
+                    </div>
+                    <div id="config-telegram" style="display:none; padding-left: 28px;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Bot Token</label>
+                                <input type="text" id="telegram-token" placeholder="123456789:ABCdef...">
+                            </div>
+                            <div class="form-group">
+                                <label>Chat ID</label>
+                                <input type="text" id="telegram-chat" placeholder="-1001234567890">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 32px;">
+                    <div class="form-group">
+                        <label class="toggle-label" style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                            <input type="checkbox" id="notify-discord" style="width: auto;" onchange="toggleConfig('discord')">
+                            <span><i class="fab fa-discord" style="color: #7289da;"></i> Discord</span>
+                        </label>
+                    </div>
+                    <div id="config-discord" style="display:none; padding-left: 28px;">
                         <div class="form-group">
                             <label>Webhook URL</label>
                             <input type="text" id="discord-webhook" placeholder="https://discord.com/api/webhooks/...">
                         </div>
                     </div>
-                    
-                    <div id="config-slack" style="display:none;">
+                </div>
+                
+                <div style="margin-bottom: 32px;">
+                    <div class="form-group">
+                        <label class="toggle-label" style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                            <input type="checkbox" id="notify-slack" style="width: auto;" onchange="toggleConfig('slack')">
+                            <span><i class="fab fa-slack" style="color: #4a154b;"></i> Slack</span>
+                        </label>
+                    </div>
+                    <div id="config-slack" style="display:none; padding-left: 28px;">
                         <div class="form-group">
                             <label>Webhook URL</label>
                             <input type="text" id="slack-webhook" placeholder="https://hooks.slack.com/services/...">
                         </div>
                     </div>
-                    
-                    <div id="config-email" style="display:none;">
+                </div>
+                
+                <div style="margin-bottom: 32px;">
+                    <div class="form-group">
+                        <label class="toggle-label" style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                            <input type="checkbox" id="notify-email" style="width: auto;" onchange="toggleConfig('email')">
+                            <span><i class="fas fa-envelope" style="color: var(--red);"></i> Email (SMTP)</span>
+                        </label>
+                    </div>
+                    <div id="config-email" style="display:none; padding-left: 28px;">
                         <div class="form-row">
                             <div class="form-group">
                                 <label>SMTP Host</label>
@@ -631,23 +1702,25 @@ DASHBOARD_HTML = """
                                 <input type="number" id="email-port" value="587">
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Username</label>
-                            <input type="text" id="email-user" placeholder="your@email.com">
-                        </div>
-                        <div class="form-group">
-                            <label>Password / App Token</label>
-                            <input type="password" id="email-pass" placeholder="••••••••">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="email-user" placeholder="your@email.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <input type="password" id="email-pass" placeholder="App password">
+                            </div>
                         </div>
                     </div>
-                    
-                    <button class="btn btn-primary" onclick="saveNotifications()">
-                        <i class="fas fa-save"></i> Save Configuration
-                    </button>
                 </div>
+                
+                <button class="btn btn-primary" onclick="saveNotifications()">
+                    <i class="fas fa-save"></i> Save Configuration
+                </button>
             </div>
-        </main>
-    </div>
+        </div>
+    </main>
     
     <!-- Add Server Modal -->
     <div class="modal" id="addServerModal">
@@ -680,25 +1753,21 @@ DASHBOARD_HTML = """
                 </div>
                 <div class="form-group">
                     <label>Notification Channels</label>
-                    <div class="toggles">
-                        <label class="toggle">
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="server-notify-telegram">
-                            <div class="toggle-slider"></div>
                             <span>Telegram</span>
                         </label>
-                        <label class="toggle">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="server-notify-discord">
-                            <div class="toggle-slider"></div>
                             <span>Discord</span>
                         </label>
-                        <label class="toggle">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="server-notify-slack">
-                            <div class="toggle-slider"></div>
                             <span>Slack</span>
                         </label>
-                        <label class="toggle">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="server-notify-email">
-                            <div class="toggle-slider"></div>
                             <span>Email</span>
                         </label>
                     </div>
@@ -710,20 +1779,105 @@ DASHBOARD_HTML = """
         </div>
     </div>
     
+    <!-- Add Alert Modal -->
+    <div class="modal" id="addAlertModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create Alert Rule</h3>
+                <button class="modal-close" onclick="closeModal('addAlertModal')">&times;</button>
+            </div>
+            <form onsubmit="addAlertRule(event)">
+                <div class="form-group">
+                    <label>Rule Name</label>
+                    <input type="text" id="alert-name" placeholder="e.g., High CPU Alert" required>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Metric</label>
+                        <select id="alert-metric">
+                            <option value="cpu">CPU Usage %</option>
+                            <option value="memory">Memory Usage %</option>
+                            <option value="disk">Disk Usage %</option>
+                            <option value="network">Network I/O</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Condition</label>
+                        <select id="alert-condition">
+                            <option value=">">Greater than (&gt;)</option>
+                            <option value="<">Less than (&lt;)</option>
+                            <option value="=">Equal to (=)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Threshold</label>
+                        <input type="number" id="alert-threshold" placeholder="80" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Duration</label>
+                    <select id="alert-duration">
+                        <option value="0">Immediate</option>
+                        <option value="1">1 minute</option>
+                        <option value="5" selected>5 minutes</option>
+                        <option value="15">15 minutes</option>
+                        <option value="30">30 minutes</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notification Channels</label>
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="alert-notify-telegram" checked>
+                            <span>Telegram</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="alert-notify-discord">
+                            <span>Discord</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="alert-notify-slack">
+                            <span>Slack</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="alert-notify-email">
+                            <span>Email</span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fas fa-save"></i> Create Alert Rule
+                </button>
+            </form>
+        </div>
+    </div>
+    
     <script>
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/login';
         
-        let currentOsTab = 'linux';
+        let servers = [];
+        let charts = {};
+        
+        // Chart colors
+        const chartColors = [
+            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', 
+            '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'
+        ];
         
         function showSection(section) {
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
             event.target.closest('.nav-item').classList.add('active');
-            document.querySelectorAll('.section-content').forEach(el => el.style.display = 'none');
-            document.getElementById('section-' + section).style.display = 'block';
-            const titles = { dashboard: 'Dashboard', servers: 'Servers', alerts: 'Alerts', notifications: 'Notifications' };
-            document.getElementById('page-title').textContent = titles[section];
+            document.querySelectorAll('.section-content').forEach(el => {
+                el.classList.remove('active');
+                el.style.display = 'none';
+            });
+            const sectionEl = document.getElementById('section-' + section);
+            sectionEl.style.display = 'block';
+            setTimeout(() => sectionEl.classList.add('active'), 10);
+            
             if (section === 'servers') loadServers();
+            if (section === 'dashboard') initCharts();
         }
         
         function showOsTab(os) {
@@ -733,15 +1887,44 @@ DASHBOARD_HTML = """
             document.getElementById('install-windows').style.display = os === 'windows' ? 'block' : 'none';
         }
         
+        function toggleConfig(channel) {
+            const checkbox = document.getElementById('notify-' + channel);
+            document.getElementById('config-' + channel).style.display = checkbox.checked ? 'block' : 'none';
+        }
+        
         function openModal(id) { document.getElementById(id).classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        
+        function changeServer() {
+            const serverId = document.getElementById('serverSelector').value;
+            console.log('Selected server:', serverId);
+            // Reload charts for selected server
+            initCharts();
+        }
+        
+        function refreshDashboard() {
+            const btn = document.querySelector('.refresh-btn i');
+            btn.classList.add('fa-spin');
+            setTimeout(() => {
+                btn.classList.remove('fa-spin');
+                initCharts();
+            }, 1000);
+        }
         
         async function loadServers() {
             try {
                 const resp = await fetch('/api/servers', { headers: { 'Authorization': `Bearer ${token}` }});
                 const data = await resp.json();
+                servers = data.servers || [];
+                
                 let online = 0, offline = 0, linux = 0, windows = 0;
-                document.getElementById('servers-tbody').innerHTML = data.servers.map(s => {
+                
+                // Update server selector
+                const selector = document.getElementById('serverSelector');
+                selector.innerHTML = '<option value="">All Servers</option>' + 
+                    servers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                
+                document.getElementById('servers-tbody').innerHTML = servers.map(s => {
                     if (s.last_status === 'up') online++;
                     else if (s.last_status === 'down') offline++;
                     if (s.os_type === 'linux') linux++;
@@ -755,17 +1938,439 @@ DASHBOARD_HTML = """
                         <td>${s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-'}</td>
                         <td>${s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-'}</td>
                         <td>
-                            <button class="btn btn-danger" onclick="deleteServer(${s.id})" style="padding: 8px 16px; font-size: 13px;">
+                            <button class="btn btn-danger btn-sm" onclick="deleteServer(${s.id})">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </td>
                     </tr>`;
                 }).join('') || '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)"><i class="fas fa-server" style="font-size:48px;display:block;margin-bottom:16px;"></i>No servers configured</td></tr>';
+                
                 document.getElementById('stat-online').textContent = online;
                 document.getElementById('stat-offline').textContent = offline;
                 document.getElementById('stat-linux').textContent = linux;
                 document.getElementById('stat-windows').textContent = windows;
             } catch (e) { console.error(e); }
+        }
+        
+        // Grafana-style colors
+        const grafanaColors = [
+            '#73bf69', '#f2cc0c', '#5794f2', '#b877d9', 
+            '#ff780a', '#00d8d8', '#f2495c', '#9673b5'
+        ];
+        
+        function initCharts() {
+            // Destroy existing charts
+            Object.values(charts).forEach(c => c && c.destroy());
+            charts = {};
+            
+            // Generate time labels based on selected range
+            const timeLabels = generateTimeLabels(currentTimeRange);
+            const dataPoints = timeLabels.length;
+            
+            // CPU Chart
+            const cpuData = servers.length > 0 ? servers.map((s, i) => ({
+                label: s.name,
+                data: Array(dataPoints).fill(0).map(() => 30 + Math.random() * 60),
+                borderColor: grafanaColors[i % grafanaColors.length],
+                backgroundColor: grafanaColors[i % grafanaColors.length] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0,
+                pointHoverRadius: 4
+            })) : [{
+                label: 'APPSRV1',
+                data: generateRandomData(dataPoints, 30, 90),
+                borderColor: grafanaColors[0],
+                backgroundColor: grafanaColors[0] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0,
+                pointHoverRadius: 4
+            }, {
+                label: 'HIAS-01',
+                data: generateRandomData(dataPoints, 20, 80),
+                borderColor: grafanaColors[1],
+                backgroundColor: grafanaColors[1] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0,
+                pointHoverRadius: 4
+            }, {
+                label: 'APPSRV2',
+                data: generateRandomData(dataPoints, 40, 95),
+                borderColor: grafanaColors[2],
+                backgroundColor: grafanaColors[2] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0,
+                pointHoverRadius: 4
+            }];
+            
+            charts.cpu = new Chart(document.getElementById('cpuChart'), {
+                type: 'line',
+                data: { labels: timeLabels, datasets: cpuData },
+                options: getChartOptions('%', 0, 100)
+            });
+            updateLegend('cpuLegend', cpuData, '%');
+            
+            // Memory Chart
+            const memoryData = servers.length > 0 ? servers.map((s, i) => ({
+                label: s.name,
+                data: Array(dataPoints).fill(0).map(() => 40 + Math.random() * 40),
+                borderColor: grafanaColors[i % grafanaColors.length],
+                backgroundColor: grafanaColors[i % grafanaColors.length] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0,
+                pointHoverRadius: 4
+            })) : [{
+                label: 'HIAS-01',
+                data: generateRandomData(dataPoints, 60, 90),
+                borderColor: grafanaColors[0],
+                backgroundColor: grafanaColors[0] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }, {
+                label: 'APPSRV6',
+                data: generateRandomData(dataPoints, 55, 85),
+                borderColor: grafanaColors[1],
+                backgroundColor: grafanaColors[1] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }, {
+                label: 'APPSRV2',
+                data: generateRandomData(dataPoints, 50, 75),
+                borderColor: grafanaColors[2],
+                backgroundColor: grafanaColors[2] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }];
+            
+            charts.memory = new Chart(document.getElementById('memoryChart'), {
+                type: 'line',
+                data: { labels: timeLabels, datasets: memoryData },
+                options: getChartOptions('%', 0, 100)
+            });
+            updateLegend('memoryLegend', memoryData, '%');
+            
+            // Disk Chart
+            const diskData = servers.length > 0 ? servers.map((s, i) => ({
+                label: s.name,
+                data: Array(dataPoints).fill(0).map(() => 50 + Math.random() * 40),
+                borderColor: grafanaColors[i % grafanaColors.length],
+                backgroundColor: grafanaColors[i % grafanaColors.length] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            })) : [{
+                label: 'APPSRV11 [C:]',
+                data: generateRandomData(dataPoints, 75, 90),
+                borderColor: grafanaColors[0],
+                backgroundColor: grafanaColors[0] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }, {
+                label: 'APPSRV10 [D:]',
+                data: generateRandomData(dataPoints, 70, 88),
+                borderColor: grafanaColors[1],
+                backgroundColor: grafanaColors[1] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }, {
+                label: 'HIAS-01 [T:]',
+                data: generateRandomData(dataPoints, 80, 92),
+                borderColor: grafanaColors[2],
+                backgroundColor: grafanaColors[2] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }];
+            
+            charts.disk = new Chart(document.getElementById('diskChart'), {
+                type: 'line',
+                data: { labels: timeLabels, datasets: diskData },
+                options: getChartOptions('%', 0, 100)
+            });
+            updateLegend('diskLegend', diskData, '%');
+            
+            // Network Chart
+            const networkData = servers.length > 0 ? servers.map((s, i) => ({
+                label: s.name,
+                data: Array(dataPoints).fill(0).map(() => Math.random() * 50),
+                borderColor: grafanaColors[i % grafanaColors.length],
+                backgroundColor: grafanaColors[i % grafanaColors.length] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            })) : [{
+                label: 'APPSRV1',
+                data: generateRandomData(dataPoints, 10, 45),
+                borderColor: grafanaColors[0],
+                backgroundColor: grafanaColors[0] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }, {
+                label: 'APPSRV2',
+                data: generateRandomData(dataPoints, 15, 50),
+                borderColor: grafanaColors[1],
+                backgroundColor: grafanaColors[1] + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }];
+            
+            charts.network = new Chart(document.getElementById('networkChart'), {
+                type: 'line',
+                data: { labels: timeLabels, datasets: networkData },
+                options: getChartOptions(' MB/s', 0, 60)
+            });
+            updateLegend('networkLegend', networkData, ' MB/s');
+            
+            // Disk Queue Chart
+            const diskQueueData = [{
+                label: 'APPSRV10 [C:]',
+                data: generateRandomData(dataPoints, 0, 0.15),
+                borderColor: grafanaColors[0],
+                backgroundColor: grafanaColors[0] + '20',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }, {
+                label: 'APPSRV7 [C:]',
+                data: generateRandomData(dataPoints, 0, 0.25),
+                borderColor: grafanaColors[1],
+                backgroundColor: grafanaColors[1] + '20',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }, {
+                label: 'APPSRV [D:]',
+                data: generateRandomData(dataPoints, 0, 0.05),
+                borderColor: grafanaColors[2],
+                backgroundColor: grafanaColors[2] + '20',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }];
+            
+            charts.diskQueue = new Chart(document.getElementById('diskQueueChart'), {
+                type: 'line',
+                data: { labels: timeLabels, datasets: diskQueueData },
+                options: getChartOptions('', 0, 1.5)
+            });
+            updateLegend('diskQueueLegend', diskQueueData, '');
+            
+            // Exporter Chart
+            const exporterData = [{
+                label: 'APPSRV',
+                data: Array(dataPoints).fill(1),
+                borderColor: grafanaColors[0],
+                backgroundColor: grafanaColors[0] + '30',
+                fill: true,
+                tension: 0,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }, {
+                label: 'APPSRV10',
+                data: Array(dataPoints).fill(1),
+                borderColor: grafanaColors[1],
+                backgroundColor: grafanaColors[1] + '30',
+                fill: true,
+                tension: 0,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }, {
+                label: 'APPSRV11',
+                data: Array(dataPoints).fill(1),
+                borderColor: grafanaColors[2],
+                backgroundColor: grafanaColors[2] + '30',
+                fill: true,
+                tension: 0,
+                borderWidth: 1.5,
+                pointRadius: 0
+            }];
+            
+            charts.exporter = new Chart(document.getElementById('exporterChart'), {
+                type: 'line',
+                data: { labels: timeLabels, datasets: exporterData },
+                options: getChartOptions('', 0, 2, false)
+            });
+            updateLegend('exporterLegend', exporterData, '', false);
+        }
+        
+        function generateTimeLabels(range) {
+            const labels = [];
+            const now = new Date();
+            let points = 12;
+            let interval = 5; // minutes
+            
+            switch(range) {
+                case '5m': points = 10; interval = 0.5; break;
+                case '15m': points = 15; interval = 1; break;
+                case '30m': points = 15; interval = 2; break;
+                case '1h': points = 12; interval = 5; break;
+                case '6h': points = 12; interval = 30; break;
+                case '24h': points = 12; interval = 120; break;
+            }
+            
+            for (let i = points - 1; i >= 0; i--) {
+                const time = new Date(now.getTime() - i * interval * 60000);
+                labels.push(time.getHours().toString().padStart(2, '0') + ':' + time.getMinutes().toString().padStart(2, '0'));
+            }
+            return labels;
+        }
+        
+        function generateRandomData(points, min, max) {
+            return Array(points).fill(0).map(() => min + Math.random() * (max - min));
+        }
+        
+        function getChartOptions(suffix, min, max, showLegend = false) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { 
+                    intersect: false, 
+                    mode: 'index' 
+                },
+                scales: {
+                    y: { 
+                        min: min, 
+                        max: max,
+                        grid: { 
+                            color: 'rgba(255,255,255,0.03)',
+                            drawBorder: false
+                        }, 
+                        ticks: { 
+                            color: '#666',
+                            font: { size: 10 },
+                            callback: v => v + suffix
+                        } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { 
+                            color: '#666',
+                            font: { size: 10 }
+                        } 
+                    }
+                },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(24, 27, 31, 0.95)',
+                        borderColor: '#2c3235',
+                        borderWidth: 1,
+                        titleColor: '#e0e0e0',
+                        bodyColor: '#e0e0e0',
+                        padding: 10,
+                        displayColors: true,
+                        boxPadding: 4
+                    }
+                }
+            };
+        }
+                type: 'line',
+                data: { labels: timeLabels, datasets: networkData },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { intersect: false, mode: 'index' },
+                    scales: {
+                        y: { 
+                            grid: { color: 'rgba(255,255,255,0.05)' }, 
+                            ticks: { color: '#9ca3af', callback: v => v + ' MB/s' } 
+                        },
+                        x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+            updateLegend('networkLegend', networkData, ' MB/s');
+        }
+        
+        function updateLegend(elementId, datasets, suffix, showMinMax = true) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = datasets.map((ds, i) => {
+                const lastValue = ds.data[ds.data.length - 1];
+                const maxValue = Math.max(...ds.data);
+                const minValue = Math.min(...ds.data);
+                
+                if (showMinMax) {
+                    return `
+                        <div class="legend-item" onclick="toggleDataset('${elementId}', ${i}, '${suffix}')">
+                            <div class="legend-color" style="background: ${ds.borderColor}"></div>
+                            <div class="legend-name" title="${ds.label}">${ds.label}</div>
+                            <div class="legend-value">${lastValue.toFixed(1)}${suffix}</div>
+                            <div class="legend-value" style="color: var(--muted);">${maxValue.toFixed(1)}${suffix}</div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="legend-item" onclick="toggleDataset('${elementId}', ${i}, '${suffix}')">
+                            <div class="legend-color" style="background: ${ds.borderColor}"></div>
+                            <div class="legend-name" title="${ds.label}">${ds.label}</div>
+                            <div class="legend-value">${lastValue.toFixed(1)}${suffix}</div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+        
+        function toggleDataset(elementId, index, suffix) {
+            // Toggle dataset visibility in chart
+            const chartMap = {
+                'cpuLegend': charts.cpu,
+                'memoryLegend': charts.memory,
+                'diskLegend': charts.disk,
+                'networkLegend': charts.network,
+                'diskQueueLegend': charts.diskQueue,
+                'exporterLegend': charts.exporter
+            };
+            
+            const chart = chartMap[elementId.replace('Legend', '') + 'Chart'] || chartMap[elementId];
+            if (chart && chart.data.datasets[index]) {
+                const meta = chart.getDatasetMeta(index);
+                meta.hidden = meta.hidden === null ? !chart.data.datasets[index].hidden : null;
+                chart.update();
+                
+                // Update legend item style
+                const legendItems = document.getElementById(elementId).querySelectorAll('.legend-item');
+                if (legendItems[index]) {
+                    legendItems[index].classList.toggle('hidden');
+                }
+            }
+        }
+        
+        let currentTimeRange = '1h';
+        function setTimeRange(range) {
+            currentTimeRange = range;
+            document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            initCharts();
         }
         
         async function addServer(e) {
@@ -795,13 +2400,11 @@ DASHBOARD_HTML = """
             loadServers();
         }
         
-        // Toggle notification configs
-        document.querySelectorAll('input[id^="notify-"]').forEach(toggle => {
-            toggle.addEventListener('change', (e) => {
-                const channel = e.target.id.replace('notify-', '');
-                document.getElementById('config-' + channel).style.display = e.target.checked ? 'block' : 'none';
-            });
-        });
+        function addAlertRule(e) {
+            e.preventDefault();
+            alert('Alert rule created! (Demo functionality)');
+            closeModal('addAlertModal');
+        }
         
         async function saveNotifications() {
             const channels = ['telegram', 'discord', 'slack', 'email'];
@@ -827,43 +2430,14 @@ DASHBOARD_HTML = """
                     body: JSON.stringify(config)
                 });
             }
-            alert('Saved!');
+            alert('Configuration saved!');
         }
         
         function logout() { localStorage.removeItem('token'); window.location.href = '/login'; }
         
-        // Chart
-        new Chart(document.getElementById('overviewChart'), {
-            type: 'line',
-            data: {
-                labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
-                datasets: [{
-                    label: 'CPU Usage %',
-                    data: [25, 30, 45, 60, 40, 35],
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }, {
-                    label: 'Memory %',
-                    data: [40, 42, 55, 65, 50, 48],
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
-                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
-                },
-                plugins: { legend: { labels: { color: '#9ca3af' } } }
-            }
-        });
-        
+        // Initialize
         loadServers();
+        setTimeout(initCharts, 100);
     </script>
 </body>
 </html>
