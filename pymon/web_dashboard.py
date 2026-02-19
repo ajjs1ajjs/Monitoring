@@ -163,8 +163,12 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
             justify-content: space-between;
             align-items: center;
             height: 48px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
-        .logo { display: flex; align-items: center; gap: 10px; }
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .logo { display: flex; align-items: center; gap: 8px; }
         .logo-icon {
             width: 24px; height: 24px;
             background: linear-gradient(135deg, var(--blue), #2c7bd9);
@@ -173,19 +177,20 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
             font-size: 12px; color: white; font-weight: bold;
         }
         .logo h1 { color: var(--blue); font-size: 18px; font-weight: 600; }
-        .nav-menu { display: flex; gap: 4px; }
+        .nav-menu { display: flex; gap: 2px; }
         .nav-item {
             display: flex; align-items: center; gap: 6px;
-            padding: 8px 12px; border-radius: 4px;
-            cursor: pointer; color: var(--muted); font-weight: 500; font-size: 13px;
+            padding: 8px 10px; border-radius: 4px;
+            cursor: pointer; color: var(--muted); font-weight: 500; font-size: 12px;
             border: none; background: transparent;
+            transition: all 0.2s;
         }
         .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.05); }
         .nav-item.active { background: rgba(87,148,242,0.15); color: var(--blue); }
         .nav-right { display: flex; align-items: center; gap: 12px; }
         .server-selector {
-            padding: 6px 10px; background: #111217; border: 1px solid var(--border);
-            border-radius: 4px; color: var(--text); font-size: 13px; min-width: 160px;
+            padding: 5px 10px; background: #111217; border: 1px solid var(--border);
+            border-radius: 4px; color: var(--text); font-size: 12px; min-width: 150px;
         }
         .main { padding: 16px; }
         
@@ -296,12 +301,14 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
                 <div class="logo-icon">P</div>
                 <h1>PyMon</h1>
             </div>
-            <div class="nav-menu">
-                <button class="nav-item active" data-section="dashboard">Dashboard</button>
-                <button class="nav-item" data-section="servers">Servers</button>
-                <button class="nav-item" data-section="alerts">Alerts</button>
-                <button class="nav-item" data-section="settings">Settings</button>
-            </div>
+                <div class="nav-menu">
+                    <button class="nav-item active" data-section="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button>
+                    <button class="nav-item" data-section="servers"><i class="fas fa-server"></i> Servers</button>
+                    <button class="nav-item" data-section="alerts"><i class="fas fa-bell"></i> Alerts</button>
+                    <button class="nav-item" data-section="users"><i class="fas fa-users"></i> Users</button>
+                    <button class="nav-item" data-section="backups"><i class="fas fa-database"></i> Backups</button>
+                    <button class="nav-item" data-section="settings"><i class="fas fa-cog"></i> Config</button>
+                </div>
         </div>
         <div class="nav-right">
             <select class="server-selector" id="serverSelector">
@@ -561,20 +568,15 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
     let servers = [];
     let charts = {};
     let currentRange = '1h';
-    const colors = ['#73bf69','#f2cc0c','#5794f2','#b877d9','#ff780a','#00d8d8','#f2495c'];
+    const grafanaColors = ["#73bf69", "#f2cc0c", "#5794f2", "#b877d9", "#ff780a", "#00d8d8", "#f2495c", "#9673b5"];
     
     // Navigation
-    document.querySelectorAll('.nav-item').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const section = this.getAttribute('data-section');
-            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            document.querySelectorAll('.section-content').forEach(el => { el.classList.remove('active'); el.style.display = 'none'; });
-            const el = document.getElementById('section-' + section);
-            if (el) { el.style.display = 'block'; el.classList.add('active'); }
-            if (section === 'servers') loadServers();
-            if (section === 'dashboard') initCharts();
+document.querySelectorAll(".nav-item").forEach(btn => {
+        btn.addEventListener("click", function() {
+            const section = this.dataset.section;
+            if (section) showSection(section);
         });
+    });
     });
     
     // Logout
@@ -584,12 +586,10 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
     });
     
     // Time range
-    document.querySelectorAll('.time-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            currentRange = this.getAttribute('data-range');
-            document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            initCharts();
+    document.querySelectorAll(".time-btn").forEach(btn => {
+        btn.addEventListener("click", function() {
+            const range = this.dataset.range;
+            if (range) setTimeRange(range);
         });
     });
     
@@ -1113,12 +1113,79 @@ class AlertModel(BaseModel):
     threshold: int
     duration: int = 0
     severity: str = "warning"
+    server_id: Optional[int] = None # Support per-server alert
     notify_telegram: bool = False
     notify_discord: bool = False
     notify_slack: bool = False
     notify_email: bool = False
     description: Optional[str] = ""
     enabled: bool = True
+
+class UserModel(BaseModel):
+    username: str
+    password: Optional[str] = None
+    role: str = "viewer"
+
+class SecurityModel(BaseModel):
+    ssl_cert_path: str
+    ssl_key_path: str
+    https_redirect: bool
+    listen_port: int
+
+@router.get("/api/users")
+async def list_users():
+    conn = get_db()
+    users = conn.execute("SELECT id, username, role, is_active, last_login FROM users").fetchall()
+    conn.close()
+    return {"users": [dict(u) for u in users]}
+
+@router.post("/api/users")
+async def create_user(user: UserModel):
+    conn = get_db()
+    try:
+        conn.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+                     (user.username, f"hash:{user.password}", user.role))
+        conn.commit()
+        return {"status": "ok"}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="User already exists")
+    finally: conn.close()
+
+@router.delete("/api/users/{user_id}")
+async def delete_user(user_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+@router.post("/api/backups")
+async def create_backup():
+    try:
+        BACKUP_DIR = "/var/lib/pymon/backups"
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        filename = f"pymon_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sqlite"
+        dest = os.path.join(BACKUP_DIR, filename)
+        import shutil
+        shutil.copy2(DB_PATH, dest)
+        size = os.path.getsize(dest)
+        
+        conn = get_db()
+        conn.execute("INSERT INTO backups (filename, size_bytes, created_at) VALUES (?, ?, ?)",
+                     (filename, size, datetime.utcnow().isoformat()))
+        conn.commit()
+        conn.close()
+        return {"status": "ok", "filename": filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/api/backups")
+async def list_backups():
+    conn = get_db()
+    backups = conn.execute("SELECT * FROM backups ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return {"backups": [dict(b) for b in backups]}
+
 
 @router.post("/api/alerts")
 async def create_alert(alert: AlertModel):
