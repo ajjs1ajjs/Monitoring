@@ -1,7 +1,6 @@
 """CLI entry point"""
 
 import argparse
-import asyncio
 import os
 
 import uvicorn
@@ -16,14 +15,13 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     server_parser = subparsers.add_parser("server", help="Start the monitoring server")
-    server_parser.add_argument("--host", default=None, help="Host to bind (default: 0.0.0.0)")
-    server_parser.add_argument("--port", type=int, default=None, help="Port to bind (default: 8090)")
-    server_parser.add_argument("--config", "-c", default=None, help="Path to config file (YAML or JSON)")
-    server_parser.add_argument("--storage", default=None, choices=["memory", "sqlite"], help="Storage backend")
-    server_parser.add_argument("--db", default=None, help="Database path (for sqlite)")
+    server_parser.add_argument("--host", default="0.0.0.0", help="Host to bind (default: 0.0.0.0)")
+    server_parser.add_argument("--port", type=int, default=8090, help="Port to bind (default: 8090)")
+    server_parser.add_argument("--config", "-c", default=None, help="Path to config file")
+    server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite"], help="Storage backend")
+    server_parser.add_argument("--db", default="pymon.db", help="Database path (for sqlite)")
     server_parser.add_argument("--workers", type=int, default=1, help="Number of workers")
     server_parser.add_argument("--reload", action="store_true", help="Enable auto-reload (dev mode)")
-    server_parser.add_argument("--no-scrape", action="store_true", help="Disable scrape manager")
 
     args = parser.parse_args()
 
@@ -54,7 +52,6 @@ def main():
         print(f"Starting PyMon server on {host}:{port}")
         print(f"Storage: {storage}")
         print(f"Config: {config_path}")
-        print(f"Scrape targets: {len(config.scrape_configs)}")
         print(f"Dashboard: http://{host}:{port}/dashboard/")
         print(f"API Docs: http://{host}:{port}/docs")
 
@@ -67,22 +64,18 @@ def main():
                 reload=args.reload,
             )
         else:
-            app = create_app(config, enable_scrape=not args.no_scrape)
+            app = create_app()
             uvicorn.run(app, host=host, port=port)
     else:
         parser.print_help()
 
 
-def create_app(config=None, enable_scrape=True):
+def create_app():
     from fastapi import FastAPI
     from fastapi.responses import HTMLResponse
     from pymon.api.endpoints import api
     from pymon.web.dashboard import web
     from pymon.auth import init_auth_tables
-    
-    if config is None:
-        from pymon.config import load_config
-        config = load_config()
 
     app = FastAPI(title="PyMon", version=__version__, docs_url="/docs", redoc_url="/redoc")
     
@@ -90,23 +83,6 @@ def create_app(config=None, enable_scrape=True):
     app.mount("/dashboard", web)
 
     init_auth_tables()
-
-    scrape_manager = None
-    
-    @app.on_event("startup")
-    async def startup():
-        nonlocal scrape_manager
-        
-        if enable_scrape and config.scrape_configs:
-            from pymon.scrape import ScrapeManager
-            scrape_manager = ScrapeManager(config)
-            scrape_manager.start()
-            print(f"ScrapeManager started with {len(scrape_manager.targets)} targets")
-    
-    @app.on_event("shutdown")
-    async def shutdown():
-        if scrape_manager:
-            await scrape_manager.close()
 
     @app.get("/", response_class=HTMLResponse)
     async def root():
