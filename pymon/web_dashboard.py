@@ -1,8 +1,7 @@
-"""Enterprise Web Dashboard for PyMon"""
+"""Enterprise Server Monitoring Dashboard"""
 
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
-from fastapi.security import HTTPBearer
 from pydantic import BaseModel
 from typing import Optional
 import json
@@ -11,22 +10,20 @@ import os
 from datetime import datetime
 
 router = APIRouter()
-security = HTTPBearer(auto_error=False)
 
 DB_PATH = os.getenv("DB_PATH", "/var/lib/pymon/pymon.db")
 
 def get_db():
-    # Ensure directory exists
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-class SiteModel(BaseModel):
+class ServerModel(BaseModel):
     name: str
-    url: str
-    check_interval: int = 60
-    timeout: int = 10
+    host: str
+    os_type: str = "linux"  # linux or windows
+    agent_port: int = 9100
+    check_interval: int = 15
     notify_telegram: bool = False
     notify_discord: bool = False
     notify_slack: bool = False
@@ -34,21 +31,21 @@ class SiteModel(BaseModel):
 
 def init_web_tables():
     try:
-        # Ensure directory exists with proper permissions
         db_dir = os.path.dirname(DB_PATH)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
-            print(f"Created database directory: {db_dir}")
         
         conn = get_db()
         c = conn.cursor()
         
-        c.execute('''CREATE TABLE IF NOT EXISTS sites (
+        # Servers table for system monitoring
+        c.execute('''CREATE TABLE IF NOT EXISTS servers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            url TEXT NOT NULL,
-            check_interval INTEGER DEFAULT 60,
-            timeout INTEGER DEFAULT 10,
+            host TEXT NOT NULL,
+            os_type TEXT DEFAULT 'linux',
+            agent_port INTEGER DEFAULT 9100,
+            check_interval INTEGER DEFAULT 15,
             enabled BOOLEAN DEFAULT 1,
             notify_telegram BOOLEAN DEFAULT 0,
             notify_discord BOOLEAN DEFAULT 0,
@@ -57,7 +54,12 @@ def init_web_tables():
             created_at TEXT,
             last_check TEXT,
             last_status TEXT,
-            last_response_time REAL
+            cpu_percent REAL,
+            memory_percent REAL,
+            disk_percent REAL,
+            network_rx REAL,
+            network_tx REAL,
+            agent_version TEXT
         )''')
         
         c.execute('''CREATE TABLE IF NOT EXISTS notifications (
@@ -67,12 +69,13 @@ def init_web_tables():
             config TEXT
         )''')
         
-        c.execute('''CREATE TABLE IF NOT EXISTS check_history (
+        c.execute('''CREATE TABLE IF NOT EXISTS metrics_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            site_id INTEGER,
-            status TEXT,
-            response_time REAL,
-            checked_at TEXT
+            server_id INTEGER,
+            cpu_percent REAL,
+            memory_percent REAL,
+            disk_percent REAL,
+            recorded_at TEXT
         )''')
         
         for channel in ['telegram', 'discord', 'slack', 'email']:
@@ -80,11 +83,8 @@ def init_web_tables():
         
         conn.commit()
         conn.close()
-        print("Web tables initialized successfully")
     except Exception as e:
         print(f"Error initializing web tables: {e}")
-        import traceback
-        traceback.print_exc()
         raise
 
 LOGIN_HTML = """
@@ -92,12 +92,12 @@ LOGIN_HTML = """
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>PyMon Login</title>
+    <title>PyMon - Server Monitoring</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
-            font-family: 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #0a0e1a 0%, #1a1f2e 100%);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -106,60 +106,64 @@ LOGIN_HTML = """
         .login-box {
             background: rgba(255,255,255,0.05);
             backdrop-filter: blur(10px);
-            padding: 40px;
-            border-radius: 20px;
+            padding: 48px;
+            border-radius: 24px;
             border: 1px solid rgba(255,255,255,0.1);
             width: 100%;
-            max-width: 400px;
+            max-width: 440px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
         }
-        .logo { text-align: center; margin-bottom: 30px; }
+        .logo { text-align: center; margin-bottom: 40px; }
         .logo h1 { 
             background: linear-gradient(135deg, #3b82f6, #06b6d4);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            font-size: 36px;
+            font-size: 42px;
+            font-weight: 800;
         }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; color: #9ca3af; margin-bottom: 8px; }
+        .form-group { margin-bottom: 24px; }
+        label { display: block; color: #94a3af; margin-bottom: 10px; font-size: 15px; font-weight: 500; }
         input {
             width: 100%;
-            padding: 12px 16px;
+            padding: 16px;
             background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 10px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
             color: #fff;
             font-size: 16px;
+            transition: all 0.3s;
         }
-        input:focus { outline: none; border-color: #3b82f6; }
+        input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
         button {
             width: 100%;
-            padding: 14px;
+            padding: 18px;
             background: linear-gradient(135deg, #3b82f6, #06b6d4);
             color: #fff;
             border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 700;
             cursor: pointer;
-            transition: transform 0.3s;
+            transition: all 0.3s;
+            margin-top: 16px;
         }
-        button:hover { transform: translateY(-2px); }
+        button:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4); }
     </style>
 </head>
 <body>
     <div class="login-box">
         <div class="logo">
             <h1>PyMon</h1>
-            <p style="color: #9ca3af;">Enterprise Monitoring</p>
+            <p style="color: #64748b; margin-top: 8px;">Server Monitoring</p>
         </div>
         <form id="loginForm">
             <div class="form-group">
                 <label>Username</label>
-                <input type="text" id="username" required>
+                <input type="text" id="username" required placeholder="admin">
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" id="password" required>
+                <input type="password" id="password" required placeholder="••••••">
             </div>
             <button type="submit">Sign In</button>
         </form>
@@ -193,104 +197,132 @@ DASHBOARD_HTML = """
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>PyMon Dashboard</title>
+    <title>PyMon - Server Monitoring</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --bg-primary: #0a0e1a;
-            --bg-card: rgba(17, 24, 39, 0.8);
-            --accent-blue: #3b82f6;
-            --text-primary: #f9fafb;
-            --text-secondary: #9ca3af;
+            --bg: #0a0e1a;
+            --card: #111827;
+            --border: #1f2937;
+            --text: #f9fafb;
+            --muted: #9ca3af;
+            --blue: #3b82f6;
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #f59e0b;
         }
         body {
-            font-family: 'Segoe UI', sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
             min-height: 100vh;
         }
-        .container { display: grid; grid-template-columns: 260px 1fr; }
+        .layout { display: grid; grid-template-columns: 280px 1fr; }
         .sidebar {
-            background: rgba(17, 24, 39, 0.9);
-            border-right: 1px solid rgba(255,255,255,0.1);
-            padding: 24px;
+            background: var(--card);
+            border-right: 1px solid var(--border);
             height: 100vh;
             position: fixed;
-            width: 260px;
+            width: 280px;
+            padding: 32px 24px;
         }
-        .logo { text-align: center; margin-bottom: 32px; }
+        .logo { margin-bottom: 40px; }
         .logo h1 {
-            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            background: linear-gradient(135deg, var(--blue), #06b6d4);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            font-size: 28px;
+            font-size: 32px;
         }
         .nav-item {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            margin-bottom: 8px;
-            border-radius: 10px;
+            gap: 14px;
+            padding: 14px 18px;
+            margin-bottom: 6px;
+            border-radius: 12px;
             cursor: pointer;
-            color: var(--text-secondary);
+            color: var(--muted);
+            font-weight: 500;
+            transition: all 0.2s;
             text-decoration: none;
-            transition: all 0.3s;
         }
         .nav-item:hover, .nav-item.active {
-            background: rgba(59, 130, 246, 0.2);
-            color: var(--text-primary);
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--text);
         }
-        .main { margin-left: 260px; padding: 32px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+        .nav-item i { width: 24px; font-size: 18px; }
+        .main { margin-left: 280px; padding: 40px; min-height: 100vh; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        .header h2 { font-size: 32px; }
         .btn {
-            padding: 10px 20px;
-            border-radius: 8px;
+            padding: 12px 24px;
+            border-radius: 10px;
             border: none;
-            cursor: pointer;
             font-weight: 600;
-            transition: all 0.3s;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            transition: all 0.2s;
         }
         .btn-primary {
-            background: linear-gradient(135deg, var(--accent-blue), #06b6d4);
+            background: linear-gradient(135deg, var(--blue), #06b6d4);
             color: white;
         }
-        .btn-danger { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
-        .card {
-            background: var(--bg-card);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
+        .btn-danger { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+        .btn-secondary { background: rgba(75, 85, 99, 0.3); color: var(--text); }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 32px; }
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
             border-radius: 16px;
-            padding: 24px;
+            padding: 28px;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-4px); }
+        .stat-icon {
+            width: 56px; height: 56px;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px;
+            margin-bottom: 18px;
+        }
+        .stat-value { font-size: 38px; font-weight: 800; margin-bottom: 6px; }
+        .stat-label { color: var(--muted); font-size: 15px; }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
             margin-bottom: 24px;
         }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; margin-bottom: 32px; }
-        .stat-card {
-            background: var(--bg-card);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 16px;
-            padding: 24px;
-            text-align: center;
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
         }
-        .stat-value { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
-        .stat-label { color: var(--text-secondary); font-size: 14px; }
-        .success { color: #10b981; }
-        .danger { color: #ef4444; }
-        .warning { color: #f59e0b; }
+        .card-title { font-size: 20px; font-weight: 700; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 16px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        th { color: var(--text-secondary); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+        th, td { padding: 18px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
         .badge {
-            padding: 6px 12px;
+            padding: 8px 16px;
             border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 13px;
+            font-weight: 700;
         }
-        .badge-success { background: rgba(16, 185, 129, 0.2); color: #10b981; }
-        .badge-danger { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .badge-success { background: rgba(16, 185, 129, 0.2); color: var(--green); }
+        .badge-danger { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+        .badge-warning { background: rgba(245, 158, 11, 0.2); color: var(--yellow); }
         .modal {
             display: none;
             position: fixed;
@@ -302,52 +334,110 @@ DASHBOARD_HTML = """
         }
         .modal.active { display: flex; }
         .modal-content {
-            background: var(--bg-card);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 16px;
-            padding: 32px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
             width: 90%;
-            max-width: 500px;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
-        .form-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; color: var(--text-secondary); }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+        .modal-close {
+            background: none; border: none; color: var(--muted);
+            font-size: 28px; cursor: pointer;
+        }
+        .form-group { margin-bottom: 24px; }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: var(--muted);
+            font-weight: 600;
+            font-size: 15px;
+        }
         input, select {
             width: 100%;
-            padding: 12px;
+            padding: 16px;
             background: rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 8px;
-            color: #fff;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 16px;
+            transition: all 0.2s;
         }
-        .tabs { display: flex; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .tab { padding: 12px 20px; cursor: pointer; color: var(--text-secondary); border-bottom: 2px solid transparent; }
-        .tab.active { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .toggle { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+        input::placeholder { color: #4b5563; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .toggle { display: flex; align-items: center; gap: 14px; cursor: pointer; }
         .toggle input { display: none; }
         .toggle-slider {
-            width: 48px; height: 24px;
-            background: rgba(75,85,99,0.5);
-            border-radius: 12px;
+            width: 52px; height: 28px;
+            background: rgba(75, 85, 99, 0.5);
+            border-radius: 14px;
             position: relative;
-            transition: background 0.3s;
+            transition: all 0.3s;
         }
         .toggle-slider::after {
             content: '';
             position: absolute;
             top: 2px; left: 2px;
-            width: 20px; height: 20px;
+            width: 24px; height: 24px;
             background: white;
             border-radius: 50%;
-            transition: transform 0.3s;
+            transition: all 0.3s;
         }
-        .toggle input:checked + .toggle-slider { background: var(--accent-blue); }
+        .toggle input:checked + .toggle-slider { background: var(--blue); }
         .toggle input:checked + .toggle-slider::after { transform: translateX(24px); }
+        .toggles { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 8px; }
+        .install-box {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 24px;
+        }
+        .install-box h4 { margin-bottom: 12px; color: var(--blue); }
+        .install-box code {
+            background: rgba(0,0,0,0.4);
+            padding: 16px;
+            border-radius: 8px;
+            display: block;
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+        .os-tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .os-tab {
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--muted);
+        }
+        .os-tab.active {
+            background: var(--blue);
+            color: white;
+            border-color: var(--blue);
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="layout">
         <aside class="sidebar">
             <div class="logo">
                 <h1>PyMon</h1>
@@ -356,8 +446,8 @@ DASHBOARD_HTML = """
                 <a href="#" class="nav-item active" onclick="showSection('dashboard')">
                     <i class="fas fa-home"></i> Dashboard
                 </a>
-                <a href="#" class="nav-item" onclick="showSection('sites')">
-                    <i class="fas fa-globe"></i> Websites
+                <a href="#" class="nav-item" onclick="showSection('servers')">
+                    <i class="fas fa-server"></i> Servers
                 </a>
                 <a href="#" class="nav-item" onclick="showSection('alerts')">
                     <i class="fas fa-bell"></i> Alerts
@@ -365,147 +455,247 @@ DASHBOARD_HTML = """
                 <a href="#" class="nav-item" onclick="showSection('notifications')">
                     <i class="fas fa-broadcast-tower"></i> Notifications
                 </a>
-                <a href="#" class="nav-item" onclick="showSection('apikeys')">
-                    <i class="fas fa-key"></i> API Keys
-                </a>
             </nav>
         </aside>
         
         <main class="main">
             <div class="header">
                 <h2 id="page-title">Dashboard</h2>
-                <button class="btn btn-primary" onclick="logout()">Logout</button>
+                <button class="btn btn-primary" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
             </div>
             
+            <!-- Dashboard Section -->
             <div id="section-dashboard" class="section-content">
-                <div class="stats-grid">
+                <div class="stats">
                     <div class="stat-card">
-                        <div class="stat-value success" id="stat-online">0</div>
-                        <div class="stat-label">Sites Online</div>
+                        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.2); color: var(--green);">
+                            <i class="fas fa-server"></i>
+                        </div>
+                        <div class="stat-value" id="stat-online" style="color: var(--green);">0</div>
+                        <div class="stat-label">Servers Online</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value danger" id="stat-offline">0</div>
-                        <div class="stat-label">Sites Offline</div>
+                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.2); color: var(--red);">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="stat-value" id="stat-offline" style="color: var(--red);">0</div>
+                        <div class="stat-label">Servers Offline</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-value warning" id="stat-alerts">0</div>
-                        <div class="stat-label">Active Alerts</div>
+                        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.2); color: var(--blue);">
+                            <i class="fab fa-linux"></i>
+                        </div>
+                        <div class="stat-value" id="stat-linux" style="color: var(--blue);">0</div>
+                        <div class="stat-label">Linux Servers</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.2); color: var(--yellow);">
+                            <i class="fab fa-windows"></i>
+                        </div>
+                        <div class="stat-value" id="stat-windows" style="color: var(--yellow);">0</div>
+                        <div class="stat-label">Windows Servers</div>
                     </div>
                 </div>
+                
                 <div class="card">
-                    <h3 style="margin-bottom: 16px;">Response Times</h3>
-                    <canvas id="chart" height="100"></canvas>
+                    <h3 style="margin-bottom: 20px;">System Overview</h3>
+                    <canvas id="overviewChart" height="100"></canvas>
                 </div>
             </div>
             
-            <div id="section-sites" class="section-content" style="display:none">
+            <!-- Servers Section -->
+            <div id="section-servers" class="section-content" style="display:none">
                 <div class="card">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 24px;">
-                        <h3>Monitored Websites</h3>
-                        <button class="btn btn-primary" onclick="openModal('siteModal')">Add Website</button>
+                    <div class="card-header">
+                        <h3 class="card-title">Monitored Servers</h3>
+                        <button class="btn btn-primary" onclick="openModal('addServerModal')">
+                            <i class="fas fa-plus"></i> Add Server
+                        </button>
                     </div>
                     <table>
                         <thead>
-                            <tr><th>Status</th><th>Name</th><th>URL</th><th>Response</th><th>Actions</th></tr>
+                            <tr>
+                                <th>Status</th>
+                                <th>Name</th>
+                                <th>Host</th>
+                                <th>OS</th>
+                                <th>CPU</th>
+                                <th>Memory</th>
+                                <th>Disk</th>
+                                <th>Actions</th>
+                            </tr>
                         </thead>
-                        <tbody id="sites-tbody"></tbody>
+                        <tbody id="servers-tbody"></tbody>
                     </table>
+                </div>
+                
+                <div class="card">
+                    <h3 style="margin-bottom: 20px;"><i class="fas fa-download"></i> Agent Installation</h3>
+                    <p style="color: var(--muted); margin-bottom: 20px;">Install the PyMon agent on your servers to start collecting metrics.</p>
+                    
+                    <div class="os-tabs">
+                        <div class="os-tab active" onclick="showOsTab('linux')">Linux</div>
+                        <div class="os-tab" onclick="showOsTab('windows')">Windows</div>
+                    </div>
+                    
+                    <div id="install-linux" class="install-box">
+                        <h4><i class="fab fa-linux"></i> Linux Installation (systemd)</h4>
+                        <code>curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</code>
+                        <p style="margin-top: 12px; color: var(--muted); font-size: 14px;">Supports: Ubuntu, Debian, CentOS, RHEL, Fedora</p>
+                    </div>
+                    
+                    <div id="install-windows" class="install-box" style="display:none;">
+                        <h4><i class="fab fa-windows"></i> Windows Installation</h4>
+                        <p style="margin-bottom: 12px;">Download and run the installer:</p>
+                        <code>Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-windows.ps1" -OutFile "install.ps1"; .\install.ps1</code>
+                        <p style="margin-top: 12px; color: var(--muted); font-size: 14px;">Or download MSI: <a href="#" style="color: var(--blue);">pymon-agent.msi</a></p>
+                    </div>
                 </div>
             </div>
             
+            <!-- Notifications Section -->
             <div id="section-notifications" class="section-content" style="display:none">
                 <div class="card">
-                    <h3 style="margin-bottom: 24px;">Notification Channels</h3>
-                    <div class="tabs">
-                        <div class="tab active" onclick="showTab('telegram')">Telegram</div>
-                        <div class="tab" onclick="showTab('discord')">Discord</div>
-                        <div class="tab" onclick="showTab('slack')">Slack</div>
-                        <div class="tab" onclick="showTab('email')">Email</div>
-                    </div>
-                    <div id="tab-telegram" class="tab-content active">
+                    <h3 class="card-title">Notification Channels</h3>
+                    <p style="color: var(--muted); margin-bottom: 24px;">Configure where to receive alerts when servers go down.</p>
+                    
+                    <div class="toggles" style="margin-bottom: 32px;">
                         <label class="toggle">
-                            <input type="checkbox" id="telegram-enabled">
+                            <input type="checkbox" id="notify-telegram">
                             <div class="toggle-slider"></div>
-                            <span>Enable Telegram</span>
+                            <span><i class="fab fa-telegram"></i> Telegram</span>
                         </label>
-                        <div class="form-group" style="margin-top: 16px;">
+                        <label class="toggle">
+                            <input type="checkbox" id="notify-discord">
+                            <div class="toggle-slider"></div>
+                            <span><i class="fab fa-discord"></i> Discord</span>
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="notify-slack">
+                            <div class="toggle-slider"></div>
+                            <span><i class="fab fa-slack"></i> Slack</span>
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="notify-email">
+                            <div class="toggle-slider"></div>
+                            <span><i class="fas fa-envelope"></i> Email</span>
+                        </label>
+                    </div>
+                    
+                    <div id="config-telegram" style="display:none;">
+                        <div class="form-group">
                             <label>Bot Token</label>
-                            <input type="text" id="telegram-token" placeholder="Your bot token">
+                            <input type="text" id="telegram-token" placeholder="123456789:ABCdef...">
                         </div>
                         <div class="form-group">
                             <label>Chat ID</label>
-                            <input type="text" id="telegram-chat" placeholder="Chat ID">
+                            <input type="text" id="telegram-chat" placeholder="-1001234567890">
                         </div>
-                        <button class="btn btn-primary" onclick="saveNotification('telegram')">Save</button>
                     </div>
-                    <div id="tab-discord" class="tab-content">
-                        <label class="toggle">
-                            <input type="checkbox" id="discord-enabled">
-                            <div class="toggle-slider"></div>
-                            <span>Enable Discord</span>
-                        </label>
-                        <div class="form-group" style="margin-top: 16px;">
+                    
+                    <div id="config-discord" style="display:none;">
+                        <div class="form-group">
                             <label>Webhook URL</label>
-                            <input type="text" id="discord-webhook" placeholder="Discord webhook URL">
+                            <input type="text" id="discord-webhook" placeholder="https://discord.com/api/webhooks/...">
                         </div>
-                        <button class="btn btn-primary" onclick="saveNotification('discord')">Save</button>
                     </div>
-                    <div id="tab-slack" class="tab-content">
-                        <label class="toggle">
-                            <input type="checkbox" id="slack-enabled">
-                            <div class="toggle-slider"></div>
-                            <span>Enable Slack</span>
-                        </label>
-                        <div class="form-group" style="margin-top: 16px;">
+                    
+                    <div id="config-slack" style="display:none;">
+                        <div class="form-group">
                             <label>Webhook URL</label>
-                            <input type="text" id="slack-webhook" placeholder="Slack webhook URL">
+                            <input type="text" id="slack-webhook" placeholder="https://hooks.slack.com/services/...">
                         </div>
-                        <button class="btn btn-primary" onclick="saveNotification('slack')">Save</button>
                     </div>
-                    <div id="tab-email" class="tab-content">
-                        <label class="toggle">
-                            <input type="checkbox" id="email-enabled">
-                            <div class="toggle-slider"></div>
-                            <span>Enable Email</span>
-                        </label>
-                        <div class="form-group" style="margin-top: 16px;">
-                            <label>SMTP Host</label>
-                            <input type="text" id="email-host" placeholder="smtp.gmail.com">
+                    
+                    <div id="config-email" style="display:none;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>SMTP Host</label>
+                                <input type="text" id="email-host" placeholder="smtp.gmail.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Port</label>
+                                <input type="number" id="email-port" value="587">
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>Username</label>
                             <input type="text" id="email-user" placeholder="your@email.com">
                         </div>
                         <div class="form-group">
-                            <label>Password</label>
-                            <input type="password" id="email-pass" placeholder="App password">
+                            <label>Password / App Token</label>
+                            <input type="password" id="email-pass" placeholder="••••••••">
                         </div>
-                        <button class="btn btn-primary" onclick="saveNotification('email')">Save</button>
                     </div>
+                    
+                    <button class="btn btn-primary" onclick="saveNotifications()">
+                        <i class="fas fa-save"></i> Save Configuration
+                    </button>
                 </div>
             </div>
         </main>
     </div>
     
-    <div class="modal" id="siteModal">
+    <!-- Add Server Modal -->
+    <div class="modal" id="addServerModal">
         <div class="modal-content">
-            <h3 style="margin-bottom: 24px;">Add Website</h3>
-            <div class="form-group">
-                <label>Name</label>
-                <input type="text" id="site-name" placeholder="My Website">
+            <div class="modal-header">
+                <h3>Add Server to Monitor</h3>
+                <button class="modal-close" onclick="closeModal('addServerModal')">&times;</button>
             </div>
-            <div class="form-group">
-                <label>URL</label>
-                <input type="url" id="site-url" placeholder="https://example.com">
-            </div>
-            <div class="form-group">
-                <label>Check Interval (seconds)</label>
-                <input type="number" id="site-interval" value="60">
-            </div>
-            <div style="display: flex; gap: 12px; margin-top: 24px;">
-                <button class="btn btn-primary" onclick="addSite()">Add</button>
-                <button class="btn btn-danger" onclick="closeModal('siteModal')">Cancel</button>
-            </div>
+            <form onsubmit="addServer(event)">
+                <div class="form-group">
+                    <label>Server Name</label>
+                    <input type="text" id="server-name" placeholder="Production DB Server" required>
+                </div>
+                <div class="form-group">
+                    <label>Hostname or IP Address</label>
+                    <input type="text" id="server-host" placeholder="192.168.1.100 or server.company.com" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Operating System</label>
+                        <select id="server-os">
+                            <option value="linux">Linux</option>
+                            <option value="windows">Windows</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Check Interval (seconds)</label>
+                        <input type="number" id="server-interval" value="15">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notification Channels</label>
+                    <div class="toggles">
+                        <label class="toggle">
+                            <input type="checkbox" id="server-notify-telegram">
+                            <div class="toggle-slider"></div>
+                            <span>Telegram</span>
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="server-notify-discord">
+                            <div class="toggle-slider"></div>
+                            <span>Discord</span>
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="server-notify-slack">
+                            <div class="toggle-slider"></div>
+                            <span>Slack</span>
+                        </label>
+                        <label class="toggle">
+                            <input type="checkbox" id="server-notify-email">
+                            <div class="toggle-slider"></div>
+                            <span>Email</span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    <i class="fas fa-plus"></i> Add Server
+                </button>
+            </form>
         </div>
     </div>
     
@@ -513,151 +703,191 @@ DASHBOARD_HTML = """
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/login';
         
+        let currentOsTab = 'linux';
+        
         function showSection(section) {
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
             event.target.closest('.nav-item').classList.add('active');
             document.querySelectorAll('.section-content').forEach(el => el.style.display = 'none');
             document.getElementById('section-' + section).style.display = 'block';
-            document.getElementById('page-title').textContent = section.charAt(0).toUpperCase() + section.slice(1);
-            if (section === 'sites') loadSites();
+            const titles = { dashboard: 'Dashboard', servers: 'Servers', alerts: 'Alerts', notifications: 'Notifications' };
+            document.getElementById('page-title').textContent = titles[section];
+            if (section === 'servers') loadServers();
         }
         
-        function showTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        function showOsTab(os) {
+            document.querySelectorAll('.os-tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
-            document.getElementById('tab-' + tab).classList.add('active');
+            document.getElementById('install-linux').style.display = os === 'linux' ? 'block' : 'none';
+            document.getElementById('install-windows').style.display = os === 'windows' ? 'block' : 'none';
         }
         
         function openModal(id) { document.getElementById(id).classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
         
-        async function loadSites() {
-            const resp = await fetch('/api/sites', { headers: { 'Authorization': `Bearer ${token}` }});
-            const data = await resp.json();
-            let online = 0, offline = 0;
-            document.getElementById('sites-tbody').innerHTML = data.sites.map(s => {
-                if (s.last_status === 'up') online++;
-                else if (s.last_status === 'down') offline++;
-                return `<tr>
-                    <td><span class="badge badge-${s.last_status === 'up' ? 'success' : 'danger'}">${s.last_status || 'pending'}</span></td>
-                    <td>${s.name}</td>
-                    <td>${s.url}</td>
-                    <td>${s.last_response_time ? Math.round(s.last_response_time) + 'ms' : '-'}</td>
-                    <td>
-                        <button class="btn btn-danger" onclick="deleteSite(${s.id})">Delete</button>
-                    </td>
-                </tr>`;
-            }).join('');
-            document.getElementById('stat-online').textContent = online;
-            document.getElementById('stat-offline').textContent = offline;
+        async function loadServers() {
+            try {
+                const resp = await fetch('/api/servers', { headers: { 'Authorization': `Bearer ${token}` }});
+                const data = await resp.json();
+                let online = 0, offline = 0, linux = 0, windows = 0;
+                document.getElementById('servers-tbody').innerHTML = data.servers.map(s => {
+                    if (s.last_status === 'up') online++;
+                    else if (s.last_status === 'down') offline++;
+                    if (s.os_type === 'linux') linux++;
+                    else if (s.os_type === 'windows') windows++;
+                    return `<tr>
+                        <td><span class="badge badge-${s.last_status === 'up' ? 'success' : s.last_status === 'down' ? 'danger' : 'warning'}">${s.last_status || 'pending'}</span></td>
+                        <td><strong>${s.name}</strong></td>
+                        <td>${s.host}</td>
+                        <td><i class="fab fa-${s.os_type === 'linux' ? 'linux' : 'windows'}"></i> ${s.os_type}</td>
+                        <td>${s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-'}</td>
+                        <td>${s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-'}</td>
+                        <td>${s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-'}</td>
+                        <td>
+                            <button class="btn btn-danger" onclick="deleteServer(${s.id})" style="padding: 8px 16px; font-size: 13px;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>`;
+                }).join('') || '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)"><i class="fas fa-server" style="font-size:48px;display:block;margin-bottom:16px;"></i>No servers configured</td></tr>';
+                document.getElementById('stat-online').textContent = online;
+                document.getElementById('stat-offline').textContent = offline;
+                document.getElementById('stat-linux').textContent = linux;
+                document.getElementById('stat-windows').textContent = windows;
+            } catch (e) { console.error(e); }
         }
         
-        async function addSite() {
+        async function addServer(e) {
+            e.preventDefault();
             const data = {
-                name: document.getElementById('site-name').value,
-                url: document.getElementById('site-url').value,
-                check_interval: parseInt(document.getElementById('site-interval').value),
-                timeout: 10,
-                notify_telegram: false, notify_discord: false, notify_slack: false, notify_email: false
+                name: document.getElementById('server-name').value,
+                host: document.getElementById('server-host').value,
+                os_type: document.getElementById('server-os').value,
+                check_interval: parseInt(document.getElementById('server-interval').value),
+                notify_telegram: document.getElementById('server-notify-telegram').checked,
+                notify_discord: document.getElementById('server-notify-discord').checked,
+                notify_slack: document.getElementById('server-notify-slack').checked,
+                notify_email: document.getElementById('server-notify-email').checked
             };
-            await fetch('/api/sites', {
+            await fetch('/api/servers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(data)
             });
-            closeModal('siteModal');
-            loadSites();
+            closeModal('addServerModal');
+            loadServers();
         }
         
-        async function deleteSite(id) {
-            if (!confirm('Delete this site?')) return;
-            await fetch('/api/sites/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
-            loadSites();
+        async function deleteServer(id) {
+            if (!confirm('Delete this server?')) return;
+            await fetch('/api/servers/' + id, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
+            loadServers();
         }
         
-        async function saveNotification(channel) {
-            const config = { enabled: document.getElementById(channel + '-enabled').checked };
-            if (channel === 'telegram') {
-                config.telegram_bot_token = document.getElementById('telegram-token').value;
-                config.telegram_chat_id = document.getElementById('telegram-chat').value;
-            } else if (channel === 'discord') {
-                config.discord_webhook = document.getElementById('discord-webhook').value;
-            } else if (channel === 'slack') {
-                config.slack_webhook = document.getElementById('slack-webhook').value;
-            } else if (channel === 'email') {
-                config.email_smtp_host = document.getElementById('email-host').value;
-                config.email_user = document.getElementById('email-user').value;
-                config.email_pass = document.getElementById('email-pass').value;
-            }
-            await fetch('/api/notifications/' + channel, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(config)
+        // Toggle notification configs
+        document.querySelectorAll('input[id^="notify-"]').forEach(toggle => {
+            toggle.addEventListener('change', (e) => {
+                const channel = e.target.id.replace('notify-', '');
+                document.getElementById('config-' + channel).style.display = e.target.checked ? 'block' : 'none';
             });
+        });
+        
+        async function saveNotifications() {
+            const channels = ['telegram', 'discord', 'slack', 'email'];
+            for (const channel of channels) {
+                const enabled = document.getElementById('notify-' + channel).checked;
+                const config = { enabled };
+                if (channel === 'telegram') {
+                    config.telegram_bot_token = document.getElementById('telegram-token').value;
+                    config.telegram_chat_id = document.getElementById('telegram-chat').value;
+                } else if (channel === 'discord') {
+                    config.discord_webhook = document.getElementById('discord-webhook').value;
+                } else if (channel === 'slack') {
+                    config.slack_webhook = document.getElementById('slack-webhook').value;
+                } else if (channel === 'email') {
+                    config.email_smtp_host = document.getElementById('email-host').value;
+                    config.email_smtp_port = parseInt(document.getElementById('email-port').value);
+                    config.email_user = document.getElementById('email-user').value;
+                    config.email_pass = document.getElementById('email-pass').value;
+                }
+                await fetch('/api/notifications/' + channel, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(config)
+                });
+            }
             alert('Saved!');
         }
         
         function logout() { localStorage.removeItem('token'); window.location.href = '/login'; }
         
-        // Init chart
-        new Chart(document.getElementById('chart'), {
+        // Chart
+        new Chart(document.getElementById('overviewChart'), {
             type: 'line',
             data: {
                 labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
                 datasets: [{
-                    label: 'Response Time (ms)',
-                    data: [120, 150, 110, 180, 140, 130],
+                    label: 'CPU Usage %',
+                    data: [25, 30, 45, 60, 40, 35],
                     borderColor: '#3b82f6',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    fill: true
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Memory %',
+                    data: [40, 42, 55, 65, 50, 48],
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true,
+                    tension: 0.4
                 }]
             },
             options: {
+                responsive: true,
                 scales: {
-                    y: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9ca3af' } },
-                    x: { grid: { color: 'rgba(255,255,255,0.1)' }, ticks: { color: '#9ca3af' } }
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
+                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } }
                 },
                 plugins: { legend: { labels: { color: '#9ca3af' } } }
             }
         });
         
-        loadSites();
+        loadServers();
     </script>
 </body>
 </html>
 """
 
+# API Routes
 @router.get("/dashboard/", response_class=HTMLResponse)
 async def dashboard():
     return DASHBOARD_HTML
 
-@router.get("/api/sites")
-async def list_sites():
+@router.get("/api/servers")
+async def list_servers():
     conn = get_db()
-    sites = conn.execute("SELECT * FROM sites ORDER BY created_at DESC").fetchall()
+    servers = conn.execute("SELECT * FROM servers ORDER BY created_at DESC").fetchall()
     conn.close()
-    return {"sites": [dict(s) for s in sites]}
+    return {"servers": [dict(s) for s in servers]}
 
-@router.post("/api/sites")
-async def create_site(site: SiteModel):
+@router.post("/api/servers")
+async def create_server(server: ServerModel):
     conn = get_db()
     c = conn.cursor()
-    c.execute('''INSERT INTO sites 
-        (name, url, check_interval, timeout, enabled, notify_telegram, notify_discord, notify_slack, notify_email, created_at)
-        VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)''',
-        (site.name, site.url, site.check_interval, site.timeout,
-         int(site.notify_telegram), int(site.notify_discord), int(site.notify_slack), int(site.notify_email),
+    c.execute('''INSERT INTO servers 
+        (name, host, os_type, agent_port, check_interval, enabled, notify_telegram, notify_discord, notify_slack, notify_email, created_at)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)''',
+        (server.name, server.host, server.os_type, server.agent_port, server.check_interval,
+         int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email),
          datetime.utcnow().isoformat()))
-    site_id = c.lastrowid
     conn.commit()
     conn.close()
-    return {"id": site_id, "status": "ok"}
+    return {"status": "ok"}
 
-@router.delete("/api/sites/{site_id}")
-async def delete_site(site_id: int):
+@router.delete("/api/servers/{server_id}")
+async def delete_server(server_id: int):
     conn = get_db()
-    conn.execute("DELETE FROM sites WHERE id=?", (site_id,))
+    conn.execute("DELETE FROM servers WHERE id=?", (server_id,))
     conn.commit()
     conn.close()
     return {"status": "ok"}
