@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  pymon:
+    image: ghcr.io/ajjs1ajjs/Project2:latest
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - pymon-data:/data
+      - pymon-config:/config
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - CONFIG_PATH=/config/config.json
+      - DATA_DIR=/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  pymon-data:
+  pymon-config:
