@@ -18,16 +18,23 @@ def get_db():
     conn.row_factory = sqlite3.Row
     return conn
 
-class ServerModel(BaseModel):
-    name: str
-    host: str
-    os_type: str = "linux"
-    agent_port: int = 9100
-    check_interval: int = 15
-    notify_telegram: bool = False
-    notify_discord: bool = False
-    notify_slack: bool = False
-    notify_email: bool = False
+class UserModel(BaseModel):
+    username: str
+    password: Optional[str] = None
+    role: str = "viewer"
+
+class SecurityModel(BaseModel):
+    ssl_cert_path: str
+    ssl_key_path: str
+    https_redirect: bool
+    listen_port: int
+
+// --- UTILITIES & DB ---
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def init_web_tables():
     try:
@@ -38,6 +45,7 @@ def init_web_tables():
         conn = get_db()
         c = conn.cursor()
         
+        # 1. Servers Table
         c.execute('''CREATE TABLE IF NOT EXISTS servers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -58,11 +66,11 @@ def init_web_tables():
             disk_percent REAL,
             network_rx REAL,
             network_tx REAL,
-            agent_version TEXT
+            uptime TEXT
         )''')
         
+        # 2. Notifications Table
         c.execute('''CREATE TABLE IF NOT EXISTS notifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
             channel TEXT UNIQUE NOT NULL,
             enabled BOOLEAN DEFAULT 0,
             config TEXT
@@ -71,6 +79,52 @@ def init_web_tables():
         for channel in ['telegram', 'discord', 'slack', 'email']:
             c.execute("INSERT OR IGNORE INTO notifications (channel, enabled, config) VALUES (?, 0, '{}')", (channel,))
         
+        # 3. Users Table
+        c.execute('''CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT DEFAULT 'viewer', -- admin or viewer
+            is_active BOOLEAN DEFAULT 1,
+            last_login TEXT
+        )''')
+        # Add default admin user if not present (using hardcoded hash is insecure, this is for demo only)
+        c.execute("INSERT OR IGNORE INTO users (username, password_hash, role) VALUES ('admin', 'pbkdf2:sha256:admin', 'admin')")
+        
+        # 4. Alerts Table
+        c.execute('''CREATE TABLE IF NOT EXISTS alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            metric TEXT NOT NULL,
+            condition TEXT NOT NULL,
+            threshold INTEGER NOT NULL,
+            duration INTEGER DEFAULT 0,
+            severity TEXT DEFAULT 'warning',
+            server_id INTEGER, -- NULL for global alerts
+            notify_telegram BOOLEAN DEFAULT 0,
+            notify_discord BOOLEAN DEFAULT 0,
+            notify_slack BOOLEAN DEFAULT 0,
+            notify_email BOOLEAN DEFAULT 0,
+            description TEXT,
+            enabled BOOLEAN DEFAULT 1,
+            created_at TEXT
+        )''')
+        
+        # 5. Security/Settings Table
+        c.execute('''CREATE TABLE IF NOT EXISTS security (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )''')
+        c.execute("INSERT OR IGNORE INTO security (key) VALUES ('ssl_cert_path'), ('ssl_key_path'), ('https_redirect'), ('listen_port')")
+        
+        # 6. Backups Table
+        c.execute('''CREATE TABLE IF NOT EXISTS backups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            size_bytes INTEGER,
+            created_at TEXT
+        )''')
+
         conn.commit()
         conn.close()
     except Exception as e:
@@ -420,13 +474,55 @@ DASHBOARD_HTML = '''<!DOCTYPE html>
             </div>
         </div>
         
-        <!-- Settings -->
-        <div id="section-settings" class="section-content">
-            <div class="card">
-                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fab fa-telegram" style="color: #0088cc;"></i> Telegram Notifications</h3>
-                <div class="form-group">
-                    <label style="display: flex; align-items: center; gap: 10px;"><input type="checkbox" id="telegram-enabled" style="width: auto;"> Enable Telegram</label>
+            <div class="tab-menu">
+                <div class="tab-item active" data-set-tab="notif">Notifications</div>
+                <div class="tab-item" data-set-tab="security">Security (SSL/Port)</div>
+            </div>
+            
+            <div id="settings-notif" class="section-content active">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h4 style="font-size: 12px; color: #0088cc; margin-bottom: 10px;"><i class="fab fa-telegram"></i> TELEGRAM</h4>
+                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="tg-enabled" style="width: auto;"> Enabled</label></div>
+                        <div class="form-group"><label>Bot Token</label><input type="text" id="tg-token" placeholder="12345:ABC..."></div>
+                        <div class="form-group"><label>Chat ID</label><input type="text" id="tg-chat" placeholder="-100..."></div>
+                    </div>
+                    <div>
+                        <h4 style="font-size: 12px; color: #5865F2; margin-bottom: 10px;"><i class="fab fa-discord"></i> DISCORD / MS TEAMS</h4>
+                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="ds-enabled" style="width: auto;"> Enable Discord</label></div>
+                        <div class="form-group"><label>Discord Webhook</label><input type="text" id="ds-webhook" placeholder="https://discord.com/api/webhooks/..."></div>
+                        
+                        <div class="form-group" style="margin-top: 15px;"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="teams-enabled" style="width: auto;"> Enable MS Teams</label></div>
+                        <div class="form-group"><label>Teams Webhook</label><input type="text" id="teams-webhook" placeholder="https://outlook.office.com/webhook/..."></div>
+                    </div>
                 </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                    <div>
+                        <h4 style="font-size: 12px; color: #4A154B; margin-bottom: 10px;"><i class="fab fa-slack"></i> SLACK</h4>
+                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="slack-enabled" style="width: auto;"> Enabled</label></div>
+                        <div class="form-group"><label>Webhook URL</label><input type="text" id="slack-webhook" placeholder="https://hooks.slack.com/services/..."></div>
+                    </div>
+                    <div>
+                        <h4 style="font-size: 12px; color: var(--red); margin-bottom: 10px;"><i class="fas fa-envelope"></i> SMTP (EMAIL)</h4>
+                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="mail-enabled" style="width: auto;"> Enabled</label></div>
+                        <div class="form-row"><div class="form-group"><label>Host</label><input type="text" id="mail-host" placeholder="smtp.gmail.com"></div><div class="form-group"><label>Port</label><input type="number" id="mail-port" value="587"></div></div>
+                        <div class="form-group"><label>User</label><input type="text" id="mail-user" placeholder="user@gmail.com"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="settings-security" class="section-content">
+                <h4 style="font-size: 12px; color: var(--green); margin-bottom: 10px;"><i class="fas fa-lock"></i> HTTPS & PORT</h4>
+                <div class="form-row">
+                    <div class="form-group"><label>SSL Certificate Path</label><input type="text" id="ssl-cert" placeholder="/path/to/fullchain.pem"></div>
+                    <div class="form-group"><label>SSL Private Key Path</label><input type="text" id="ssl-key" placeholder="/path/to/privkey.pem"></div>
+                </div>
+                <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="https-redirect" style="width: auto;"> Redirect HTTP (8090) to HTTPS (443)</label></div>
+                <div class="form-group"><label>Listen Port (Default: 8090)</label><input type="number" id="listen-port" value="8090"></div>
+            </div>
+            
+            <button class="btn btn-primary" id="saveAllSettingsBtn" style="margin-top: 10px;"><i class="fas fa-save"></i> Apply Changes</button>
+        </div>
                 <div id="telegram-config" style="display: none;">
                     <div class="form-group"><label>Bot Token</label><input type="text" id="telegram-token" placeholder="123456789:ABCdef..."></div>
                     <div class="form-group"><label>Chat ID</label><input type="text" id="telegram-chat" placeholder="-1001234567890"></div>
@@ -857,10 +953,16 @@ document.getElementById('alertForm').addEventListener('submit', async function(e
             const data = await resp.json();
             alerts = data.alerts || [];
             
-            const metricIcons = {cpu: 'fa-microchip', memory: 'fa-memory', disk: 'fa-hdd', network: 'fa-network-wired'};
-            const metricColors = {cpu: 'var(--blue)', memory: 'var(--green)', disk: 'var(--yellow)', network: 'var(--purple)'};
+            const metricIcons = {cpu: 'fa-microchip', memory: 'fa-memory', disk: 'fa-hdd', network: 'fa-network-wired', raid: 'fa-layer-group', exporter: 'fa-sync-alt'};
+            const metricColors = {cpu: 'var(--blue)', memory: 'var(--green)', disk: 'var(--yellow)', network: 'var(--purple)', raid: 'var(--orange)', exporter: 'var(--red)'};
             
-            document.getElementById('alertsList').innerHTML = alerts.map(a => {
+            const activeTab = document.querySelector('#section-alerts .tab-menu .tab-item.active')?.dataset.tab || 'all-alerts';
+            
+            document.getElementById('alertsList').innerHTML = alerts.filter(a => {
+                if (activeTab === 'all-alerts') return a.server_id === null;
+                if (activeTab === 'server-alerts') return a.server_id !== null;
+                return true;
+            }).map(a => {
                 const notifyTags = [];
                 if (a.notify_telegram) notifyTags.push('<span class="notification-tag"><i class="fab fa-telegram"></i> Telegram</span>');
                 if (a.notify_discord) notifyTags.push('<span class="notification-tag"><i class="fab fa-discord"></i> Discord</span>');
@@ -868,6 +970,7 @@ document.getElementById('alertForm').addEventListener('submit', async function(e
                 if (a.notify_email) notifyTags.push('<span class="notification-tag"><i class="fas fa-envelope"></i> Email</span>');
                 
                 const durationText = a.duration === 0 ? 'Immediate' : a.duration + ' min';
+                const serverIdText = a.server_id ? `ID:${a.server_id}` : 'GLOBAL';
                 
                 return '<div class="alert-rule">' +
                     '<div class="alert-rule-header">' +
@@ -877,13 +980,14 @@ document.getElementById('alertForm').addEventListener('submit', async function(e
                     '<button class="btn btn-danger btn-sm" onclick="deleteAlert(' + a.id + ')">Delete</button>' +
                     '</div></div>' +
                     '<div class="alert-conditions">' +
-                    '<div class="condition-box"><div class="condition-label">Metric</div><div class="condition-value">' + a.metric.toUpperCase() + ' ' + a.condition + ' ' + a.threshold + '%</div></div>' +
+                    '<div class="condition-box"><div class="condition-label">Scope</div><div class="condition-value">' + serverIdText + '</div></div>' +
+                    '<div class="condition-box"><div class="condition-label">Metric</div><div class="condition-value">' + a.metric.toUpperCase() + '</div></div>' +
+                    '<div class="condition-box"><div class="condition-label">Condition</div><div class="condition-value">' + a.condition + ' ' + a.threshold + '%</div></div>' +
                     '<div class="condition-box"><div class="condition-label">Duration</div><div class="condition-value">' + durationText + '</div></div>' +
-                    '<div class="condition-box"><div class="condition-label">Severity</div><div class="condition-value">' + a.severity + '</div></div>' +
                     '</div>' +
                     '<div class="alert-notifications">' + (notifyTags.length ? notifyTags.join('') : '<span style="color: var(--muted);">No notifications configured</span>') + '</div>' +
                     '</div>';
-            }).join('') || '<p style="color: var(--muted); text-align: center; padding: 40px;">No alert rules configured. Click "New Alert" to create one.</p>';
+            }).join('') || '<p style="color: var(--muted); text-align: center; padding: 40px;">No alert rules configured. Click "New Alert Rule" to create one.</p>';
         } catch(e) { console.error(e); }
     }
     
@@ -1001,10 +1105,6 @@ document.getElementById('alertForm').addEventListener('submit', async function(e
 async def dashboard():
     return DASHBOARD_HTML
 
-@router.get("/api/servers")
-async def list_servers():
-    conn = get_db()
-    servers = conn.execute("SELECT * FROM servers ORDER BY created_at DESC").fetchall()
     conn.close()
     return {"servers": [dict(s) for s in servers]}
 
@@ -1017,6 +1117,29 @@ async def create_server(server: ServerModel):
         (server.name, server.host, server.os_type, server.agent_port, server.check_interval,
          int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email),
          datetime.utcnow().isoformat()))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+@router.get("/api/servers/{server_id}")
+async def get_server(server_id: int):
+    conn = get_db()
+    server = conn.execute("SELECT * FROM servers WHERE id=?", (server_id,)).fetchone()
+    conn.close()
+    if server:
+        return {"server": dict(server)}
+    raise HTTPException(status_code=404, detail="Server not found")
+
+@router.put("/api/servers/{server_id}")
+async def update_server(server_id: int, server: ServerModel):
+    conn = get_db()
+    conn.execute('''UPDATE servers 
+        SET name=?, host=?, os_type=?, agent_port=?, check_interval=?,
+            notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?
+        WHERE id=?''',
+        (server.name, server.host, server.os_type, server.agent_port, server.check_interval,
+         int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email),
+         server_id))
     conn.commit()
     conn.close()
     return {"status": "ok"}
@@ -1079,25 +1202,8 @@ async def list_alerts():
     conn = get_db()
     try:
         alerts = conn.execute("SELECT * FROM alerts ORDER BY created_at DESC").fetchall()
-    except:
-        # Create alerts table if not exists
-        conn.execute('''CREATE TABLE IF NOT EXISTS alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            metric TEXT NOT NULL,
-            condition TEXT NOT NULL,
-            threshold INTEGER NOT NULL,
-            duration INTEGER DEFAULT 0,
-            severity TEXT DEFAULT 'warning',
-            notify_telegram BOOLEAN DEFAULT 0,
-            notify_discord BOOLEAN DEFAULT 0,
-            notify_slack BOOLEAN DEFAULT 0,
-            notify_email BOOLEAN DEFAULT 0,
-            description TEXT,
-            enabled BOOLEAN DEFAULT 1,
-            created_at TEXT
-        )''')
-        conn.commit()
+    except sqlite3.OperationalError:
+        init_web_tables() 
         alerts = []
     conn.close()
     return {"alerts": [dict(a) for a in alerts]}
@@ -1111,47 +1217,49 @@ async def get_alert(alert_id: int):
         return {"alert": dict(alert)}
     raise HTTPException(status_code=404, detail="Alert not found")
 
-class AlertModel(BaseModel):
-    name: str
-    metric: str
-    condition: str
-    threshold: int
-    duration: int = 0
-    severity: str = "warning"
-    server_id: Optional[int] = None # Support per-server alert
-    notify_telegram: bool = False
-    notify_discord: bool = False
-    notify_slack: bool = False
-    notify_email: bool = False
-    description: Optional[str] = ""
-    enabled: bool = True
-
-class UserModel(BaseModel):
-    username: str
-    password: Optional[str] = None
-    role: str = "viewer"
-
-class SecurityModel(BaseModel):
-    ssl_cert_path: str
-    ssl_key_path: str
-    https_redirect: bool
-    listen_port: int
-
-@router.get("/api/users")
-async def list_users():
+@router.post("/api/alerts")
+async def create_alert(alert: AlertModel):
     conn = get_db()
-    users = conn.execute("SELECT id, username, role, is_active, last_login FROM users").fetchall()
-    conn.close()
-    return {"users": [dict(u) for u in users]}
-
-@router.post("/api/users")
-async def create_user(user: UserModel):
-    conn = get_db()
+    c = conn.cursor()
     try:
-        conn.execute("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
-                     (user.username, f"hash:{user.password}", user.role))
+        c.execute('''INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity, alert.server_id,
+             int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
+             alert.description, int(alert.enabled), datetime.utcnow().isoformat()))
         conn.commit()
-        return {"status": "ok"}
+    except sqlite3.OperationalError:
+        init_web_tables() 
+        conn.execute('''INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity, alert.server_id,
+             int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
+             alert.description, int(alert.enabled), datetime.utcnow().isoformat()))
+        conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+@router.put("/api/alerts/{alert_id}")
+async def update_alert(alert_id: int, alert: AlertModel):
+    conn = get_db()
+    conn.execute('''UPDATE alerts 
+        SET name=?, metric=?, condition=?, threshold=?, duration=?, severity=?, server_id=?,
+            notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?, description=?, enabled=?
+        WHERE id=?''',
+        (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity, alert.server_id,
+         int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
+         alert.description, int(alert.enabled), alert_id))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+@router.delete("/api/alerts/{alert_id}")
+async def delete_alert(alert_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM alerts WHERE id=?", (alert_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=400, detail="User already exists")
     finally: conn.close()
