@@ -1,0 +1,105 @@
+# PyMon Configuration
+
+# Server settings
+server:
+  port: 8090
+  host: 0.0.0.0
+  domain: localhost
+
+# Storage backend
+storage:
+  backend: sqlite  # memory or sqlite
+  path: /var/lib/pymon/pymon.db
+  retention_hours: 168
+
+# Authentication
+auth:
+  admin_username: admin
+  admin_password: admin
+  jwt_expire_hours: 24
+
+# Scrape configuration (Prometheus-style)
+scrape_configs:
+  # Monitor local services
+  - job_name: pymon_self
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - localhost:8090
+        labels:
+          env: production
+          service: pymon
+
+  # HTTP endpoints monitoring
+  - job_name: http_endpoints
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    static_configs:
+      - targets:
+          - https://example.com
+          - https://api.example.com/health
+        labels:
+          type: http
+
+  # Custom metrics push
+  - job_name: push_metrics
+    honor_labels: true
+    static_configs:
+      - targets:
+          - localhost:9091
+
+# Alerting rules
+alerting:
+  enabled: true
+  evaluation_interval: 30s
+  rules:
+    - name: HighCPU
+      expr: system_cpu_usage_percent
+      threshold: 80
+      duration: 60s
+      severity: warning
+      message: "CPU usage is {{ value }}%"
+
+    - name: HighMemory
+      expr: system_memory_usage_percent
+      threshold: 90
+      duration: 30s
+      severity: critical
+      message: "Memory usage is {{ value }}%"
+
+# Notifications
+notifications:
+  email:
+    enabled: false
+    smtp_server: smtp.example.com
+    smtp_port: 587
+    smtp_user: ""
+    smtp_pass: ""
+    to: ""
+
+  telegram:
+    enabled: false
+    bot_token: ""
+    chat_id: ""
+
+  slack:
+    enabled: false
+    webhook_url: ""
+
+  discord:
+    enabled: false
+    webhook_url: ""
+
+  webhook:
+    enabled: false
+    url: ""
+    headers: {}
+
+# Backup settings
+backup:
+  enabled: true
+  max_backups: 10
+  backup_dir: /etc/pymon/backups
+  schedule: "0 2 * * *"  # Daily at 2 AM

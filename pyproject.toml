@@ -36,6 +36,7 @@ dependencies = [
     "bcrypt>=4.1.0",
     "pyjwt>=2.8.0",
     "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.0",
 ]
 
 [project.optional-dependencies]
@@ -53,10 +54,10 @@ psutil = ["psutil>=5.9.0"]
 pymon = "pymon.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/pymon/pymon"
-Documentation = "https://github.com/pymon/pymon#readme"
-Repository = "https://github.com/pymon/pymon"
-Issues = "https://github.com/pymon/pymon/issues"
+Homepage = "https://github.com/ajjs1ajjs/Monitoring"
+Documentation = "https://github.com/ajjs1ajjs/Monitoring#readme"
+Repository = "https://github.com/ajjs1ajjs/Monitoring"
+Issues = "https://github.com/ajjs1ajjs/Monitoring/issues"
 
 [build-system]
 requires = ["hatchling"]

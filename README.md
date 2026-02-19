@@ -5,13 +5,13 @@
 ## Можливості
 
 - **Збір метрик** - Counter, Gauge, Histogram (як Prometheus)
+- **Scrape Manager** - Автоматичний збір з targets (Prometheus-style YAML config)
 - **Часові ряди** - In-memory та SQLite зберігання
 - **Візуалізація** - Web Dashboard з графіками (як Grafana)
 - **REST API** - Повний API для інтеграції
 - **Алертинг** - Правила та сповіщення
 - **Авторизація** - JWT + API Keys
 - **Prometheus-сумісність** - Експорт у форматі Prometheus
-- **Гнучка конфігурація** - JSON конфіг з можливістю змін
 
 ## Швидкий старт
 
@@ -50,47 +50,80 @@ pymon server --port 8090
 
 ## Конфігурація
 
-Файл: `/etc/pymon/config.json`
+Файл: `/etc/pymon/config.yml`
 
-```json
-{
-  "server": {
-    "port": 8090,
-    "host": "0.0.0.0",
-    "domain": "your-server"
-  },
-  "storage": {
-    "backend": "sqlite",
-    "path": "/var/lib/pymon/pymon.db"
-  },
-  "auth": {
-    "admin_username": "admin",
-    "admin_password": "admin",
-    "jwt_expire_hours": 24
-  },
-  "retention_hours": 168,
-  "check_interval": 60,
-  "backup": {
-    "enabled": true,
-    "max_backups": 10,
-    "backup_dir": "/etc/pymon/backups"
-  }
-}
+```yaml
+# Server settings
+server:
+  port: 8090
+  host: 0.0.0.0
+  domain: your-server
+
+# Storage
+storage:
+  backend: sqlite
+  path: /var/lib/pymon/pymon.db
+  retention_hours: 168
+
+# Authentication
+auth:
+  admin_username: admin
+  admin_password: admin
+  jwt_expire_hours: 24
+
+# Scrape configuration (Prometheus-style)
+scrape_configs:
+  - job_name: pymon_self
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - localhost:8090
+        labels:
+          env: production
+
+  - job_name: web_services
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - https://example.com
+          - https://api.example.com/health
+        labels:
+          type: http
+
+# Alerting rules
+alerting:
+  enabled: true
+  evaluation_interval: 30s
+  rules:
+    - name: HighCPU
+      expr: system_cpu_usage_percent
+      threshold: 80
+      duration: 60s
+      severity: warning
+      message: "CPU usage is {{ value }}%"
+
+# Backup
+backup:
+  enabled: true
+  max_backups: 10
+  backup_dir: /etc/pymon/backups
 ```
 
 ### Зміна конфігурації
 
 ```bash
 # Редагування конфігу
-sudo nano /etc/pymon/config.json
+sudo nano /etc/pymon/config.yml
 
 # Перезапуск після змін
 sudo systemctl restart pymon
 
 # Або використання скрипта
-sudo /opt/pymon/scripts/config.sh --set server.port 9000
-sudo /opt/pymon/scripts/config.sh --get server.port
 sudo /opt/pymon/scripts/config.sh --list
+sudo /opt/pymon/scripts/config.sh --get server.port
+sudo /opt/pymon/scripts/config.sh --set server.port 9000
 ```
 
 ## API

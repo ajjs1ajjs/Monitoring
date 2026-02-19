@@ -156,31 +156,46 @@ cp "$EXTRACT_DIR/README.md" "$INSTALL_DIR/" 2>/dev/null || true
 SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "0.0.0.0")
 
 echo -e "${BLUE}Creating configuration...${NC}"
-if [ ! -f "$CONFIG_DIR/config.json" ]; then
-    cat > "$CONFIG_DIR/config.json" << EOF
-{
-    "server": {
-        "port": $PORT,
-        "host": "0.0.0.0",
-        "domain": "$SERVER_IP"
-    },
-    "storage": {
-        "backend": "$STORAGE",
-        "path": "$DATA_DIR/pymon.db"
-    },
-    "auth": {
-        "admin_username": "admin",
-        "admin_password": "admin",
-        "jwt_expire_hours": 24
-    },
-    "retention_hours": 168,
-    "check_interval": 60,
-    "backup": {
-        "enabled": true,
-        "max_backups": 10,
-        "backup_dir": "$CONFIG_DIR/backups"
-    }
-}
+if [ ! -f "$CONFIG_DIR/config.yml" ]; then
+    cat > "$CONFIG_DIR/config.yml" << EOF
+# PyMon Configuration
+server:
+  port: $PORT
+  host: 0.0.0.0
+  domain: $SERVER_IP
+
+storage:
+  backend: $STORAGE
+  path: $DATA_DIR/pymon.db
+  retention_hours: 168
+
+auth:
+  admin_username: admin
+  admin_password: admin
+  jwt_expire_hours: 24
+
+# Scrape configuration (Prometheus-style)
+scrape_configs:
+  - job_name: pymon_self
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - localhost:$PORT
+        labels:
+          env: production
+          service: pymon
+
+alerting:
+  enabled: true
+  evaluation_interval: 30s
+  rules: []
+
+backup:
+  enabled: true
+  max_backups: 10
+  backup_dir: $CONFIG_DIR/backups
 EOF
 fi
 
@@ -212,7 +227,7 @@ Environment="PATH=$INSTALL_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="CONFIG_PATH=$CONFIG_DIR/config.json"
 Environment="JWT_SECRET=$JWT_SECRET"
 Environment="APP_VERSION=$APP_VERSION"
-ExecStart=$INSTALL_DIR/venv/bin/pymon server --config $CONFIG_DIR/config.json
+ExecStart=$INSTALL_DIR/venv/bin/pymon server --config $CONFIG_DIR/config.yml
 Restart=always
 RestartSec=10
 StandardOutput=append:$LOG_DIR/pymon.log

@@ -1,0 +1,257 @@
+"""Scrape manager for collecting metrics from targets (Prometheus-style)"""
+
+import asyncio
+import time
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional
+from urllib.parse import urlparse
+
+import httpx
+
+from pymon.config import PyMonConfig, ScrapeConfig, StaticConfig
+from pymon.metrics.collector import Counter, Gauge, Histogram, registry
+from pymon.metrics.models import Label
+from pymon.storage import get_storage
+
+
+@dataclass
+class ScrapeTarget:
+    job_name: str
+    target: str
+    metrics_path: str
+    interval: int
+    timeout: int
+    labels: dict[str, str]
+    honor_labels: bool = False
+
+
+@dataclass
+class ScrapeResult:
+    target: ScrapeTarget
+    success: bool
+    status_code: int = 0
+    latency_ms: float = 0
+    error: str = ""
+    metrics_count: int = 0
+    timestamp: datetime | None = None
+
+
+class ScrapeManager:
+    def __init__(self, config: PyMonConfig):
+        self.config = config
+        self.targets: list[ScrapeTarget] = []
+        self._running = False
+        self._tasks: list[asyncio.Task] = []
+        
+        self.scrape_total = Counter("pymon_scrape_total", "Total scrape attempts")
+        self.scrape_success = Counter("pymon_scrape_success_total", "Successful scrapes")
+        self.scrape_failures = Counter("pymon_scrape_failures_total", "Failed scrapes")
+        self.scrape_duration = Histogram("pymon_scrape_duration_seconds", "Scrape duration")
+        self.up_gauge = Gauge("up", "Target availability (1=up, 0=down)")
+        self.response_time = Gauge("pymon_response_time_seconds", "Response time in seconds")
+        
+        self._client = httpx.AsyncClient(timeout=30.0)
+        self._build_targets()
+
+    def _build_targets(self):
+        for scrape_config in self.config.scrape_configs:
+            for static_config in scrape_config.static_configs:
+                for target in static_config.targets:
+                    self.targets.append(ScrapeTarget(
+                        job_name=scrape_config.job_name,
+                        target=target,
+                        metrics_path=scrape_config.metrics_path,
+                        interval=scrape_config.scrape_interval,
+                        timeout=scrape_config.scrape_timeout,
+                        labels={**static_config.labels, "job": scrape_config.job_name},
+                        honor_labels=scrape_config.honor_labels,
+                    ))
+        
+        print(f"ScrapeManager: {len(self.targets)} targets configured")
+
+    async def scrape_target(self, target: ScrapeTarget) -> ScrapeResult:
+        result = ScrapeResult(
+            target=target,
+            success=False,
+            timestamp=datetime.utcnow(),
+        )
+        
+        try:
+            if target.target.startswith(("http://", "https://")):
+                url = target.target
+                if not url.endswith(target.metrics_path):
+                    url = url.rstrip("/") + target.metrics_path
+            else:
+                url = f"http://{target.target}{target.metrics_path}"
+            
+            start_time = time.time()
+            
+            response = await self._client.get(
+                url,
+                timeout=target.timeout,
+                follow_redirects=True,
+            )
+            
+            result.latency_ms = (time.time() - start_time) * 1000
+            result.status_code = response.status_code
+            result.success = response.status_code == 200
+            
+            if result.success:
+                content_type = response.headers.get("content-type", "")
+                if "text/plain" in content_type or "application/openmetrics" in content_type:
+                    result.metrics_count = await self._parse_prometheus_response(
+                        response.text, target
+                    )
+            
+        except httpx.TimeoutException:
+            result.error = "timeout"
+        except httpx.ConnectError:
+            result.error = "connection_refused"
+        except Exception as e:
+            result.error = str(e)[:100]
+        
+        return result
+
+    async def _parse_prometheus_response(self, content: str, target: ScrapeTarget) -> int:
+        count = 0
+        storage = get_storage()
+        
+        for line in content.split("\n"):
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            
+            try:
+                if "{" in line:
+                    name_part, value_part = line.split("{", 1)
+                    labels_part, value = value_part.rsplit("}", 1)
+                    name = name_part.strip()
+                    value = float(value.strip())
+                    
+                    labels = list(target.labels.items()) if not target.honor_labels else []
+                    for label_str in labels_part.split(","):
+                        if "=" in label_str:
+                            lname, lvalue = label_str.split("=", 1)
+                            lvalue = lvalue.strip('"')
+                            labels.append((lname.strip(), lvalue))
+                else:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        name = parts[0]
+                        value = float(parts[1])
+                        labels = list(target.labels.items()) if not target.honor_labels else []
+                    else:
+                        continue
+                
+                label_objs = [Label(name=k, value=v) for k, v in labels]
+                from pymon.metrics.models import MetricType
+                registry.register(name, MetricType.GAUGE, "", label_objs)
+                registry.set(name, value, label_objs)
+                
+                from pymon.metrics.models import Metric, MetricType
+                metric = Metric(
+                    name=name,
+                    value=value,
+                    metric_type=MetricType.GAUGE,
+                    labels=label_objs,
+                )
+                await storage.write(metric)
+                count += 1
+                
+            except Exception:
+                continue
+        
+        return count
+
+    async def _scrape_loop(self, target: ScrapeTarget):
+        while self._running:
+            try:
+                result = await self.scrape_target(target)
+                
+                self.scrape_total.inc()
+                
+                labels = [Label(name="job", value=target.job_name), Label(name="target", value=target.target)]
+                
+                if result.success:
+                    self.scrape_success.inc()
+                    self.up_gauge.set(1, labels)
+                else:
+                    self.scrape_failures.inc()
+                    self.up_gauge.set(0, labels)
+                    print(f"Scrape failed: {target.target} - {result.error}")
+                
+                self.response_time.set(result.latency_ms / 1000, labels)
+                
+            except Exception as e:
+                print(f"Scrape error for {target.target}: {e}")
+            
+            await asyncio.sleep(target.interval)
+
+    def start(self):
+        if self._running:
+            return
+        
+        self._running = True
+        
+        for target in self.targets:
+            task = asyncio.create_task(self._scrape_loop(target))
+            self._tasks.append(task)
+        
+        print(f"ScrapeManager started with {len(self.targets)} targets")
+
+    def stop(self):
+        self._running = False
+        
+        for task in self._tasks:
+            task.cancel()
+        
+        self._tasks.clear()
+        print("ScrapeManager stopped")
+
+    async def close(self):
+        self.stop()
+        await self._client.aclose()
+
+    def add_target(
+        self,
+        job_name: str,
+        target: str,
+        metrics_path: str = "/metrics",
+        interval: int = 15,
+        labels: dict | None = None,
+    ):
+        new_target = ScrapeTarget(
+            job_name=job_name,
+            target=target,
+            metrics_path=metrics_path,
+            interval=interval,
+            timeout=10,
+            labels=labels or {},
+        )
+        self.targets.append(new_target)
+        
+        if self._running:
+            task = asyncio.create_task(self._scrape_loop(new_target))
+            self._tasks.append(task)
+        
+        return new_target
+
+    def remove_target(self, job_name: str, target: str) -> bool:
+        for i, t in enumerate(self.targets):
+            if t.job_name == job_name and t.target == target:
+                self.targets.pop(i)
+                return True
+        return False
+
+    def list_targets(self) -> list[dict]:
+        return [
+            {
+                "job_name": t.job_name,
+                "target": t.target,
+                "metrics_path": t.metrics_path,
+                "interval": t.interval,
+                "labels": t.labels,
+            }
+            for t in self.targets
+        ]
