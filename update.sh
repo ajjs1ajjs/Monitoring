@@ -24,11 +24,11 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-VERSION="main"
+PYMON_VERSION="main"
 while [[ $# -gt 0 ]]; do
     case $1 in
         --version)
-            VERSION="$2"
+            PYMON_VERSION="$2"
             shift 2
             ;;
         --help)
@@ -53,12 +53,12 @@ fi
 
 CURRENT_VERSION=$(cat "$INSTALL_DIR/.version" 2>/dev/null || echo "unknown")
 echo -e "${YELLOW}Current version: $CURRENT_VERSION${NC}"
-echo -e "${YELLOW}Updating to: $VERSION${NC}"
+echo -e "${YELLOW}Updating to: $PYMON_VERSION${NC}"
 
-if [[ "$VERSION" == "main" ]]; then
+if [[ "$PYMON_VERSION" == "main" ]]; then
     DOWNLOAD_URL="https://github.com/$GITHUB_REPO/archive/refs/heads/main.tar.gz"
-elif [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    DOWNLOAD_URL="https://github.com/$GITHUB_REPO/archive/refs/tags/$VERSION.tar.gz"
+elif [[ "$PYMON_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    DOWNLOAD_URL="https://github.com/$GITHUB_REPO/archive/refs/tags/$PYMON_VERSION.tar.gz"
 else
     echo -e "${RED}Error: Invalid version format${NC}"
     exit 1
@@ -77,13 +77,16 @@ cd /tmp
 curl -fsSL "$DOWNLOAD_URL" -o pymon-update.tar.gz
 tar -xzf pymon-update.tar.gz
 
-EXTRACT_DIR=$(find . -maxdepth 1 -type d -name "pymon*" | head -1)
+EXTRACT_DIR=$(find . -maxdepth 1 -type d \( -name "Monitoring*" -o -name "Project2*" -o -name "pymon*" \) | head -1)
 
 if [ -z "$EXTRACT_DIR" ]; then
     echo -e "${RED}Error: Could not find extracted files${NC}"
+    ls -la
     systemctl start $SERVICE_NAME || true
     exit 1
 fi
+
+echo -e "${BLUE}Found: $EXTRACT_DIR${NC}"
 
 echo -e "${BLUE}Updating files...${NC}"
 rm -rf "$INSTALL_DIR/pymon"
@@ -95,7 +98,7 @@ cd "$INSTALL_DIR"
 ./venv/bin/pip install --upgrade pip > /dev/null
 ./venv/bin/pip install -e .
 
-echo "$VERSION" > "$INSTALL_DIR/.version"
+echo "$PYMON_VERSION" > "$INSTALL_DIR/.version"
 
 echo -e "${BLUE}Starting service...${NC}"
 systemctl start $SERVICE_NAME
@@ -108,7 +111,7 @@ if systemctl is-active --quiet $SERVICE_NAME; then
     echo "==========================================${NC}"
     echo ""
     echo -e "  ${GREEN}Previous version:${NC} $CURRENT_VERSION"
-    echo -e "  ${GREEN}New version:${NC}     $VERSION"
+    echo -e "  ${GREEN}New version:${NC}     $PYMON_VERSION"
     echo ""
     echo -e "  Backup saved to: $BACKUP_DIR"
     echo ""
