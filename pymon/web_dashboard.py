@@ -2623,10 +2623,17 @@ DASHBOARD_HTML = """
         }
         
         let currentTimeRange = '1h';
+        
         function setTimeRange(range) {
             currentTimeRange = range;
             document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            // Find and activate the clicked button
+            const buttons = document.querySelectorAll('.time-btn');
+            buttons.forEach(btn => {
+                if (btn.textContent === range || btn.getAttribute('onclick')?.includes(range)) {
+                    btn.classList.add('active');
+                }
+            });
             initCharts();
         }
         
