@@ -237,7 +237,7 @@ User=$USER
 Group=$USER
 WorkingDirectory=$INSTALL_DIR
 Environment="PATH=$INSTALL_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin"
-Environment="CONFIG_PATH=$CONFIG_DIR/config.json"
+Environment="CONFIG_PATH=$CONFIG_DIR/config.yml"
 Environment="JWT_SECRET=$JWT_SECRET"
 Environment="APP_VERSION=$APP_VERSION"
 ExecStart=$INSTALL_DIR/venv/bin/pymon server --config $CONFIG_DIR/config.yml
@@ -255,7 +255,7 @@ EOF
 
 echo -e "${BLUE}Setting permissions...${NC}"
 chown -R "$USER:$USER" "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
-chmod 600 "$CONFIG_DIR/config.json"
+chmod 600 "$CONFIG_DIR/config.yml"
 
 echo -e "${BLUE}Configuring firewall...${NC}"
 if command -v ufw &> /dev/null; then
