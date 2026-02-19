@@ -253,7 +253,7 @@ DASHBOARD_HTML = """
             color: var(--text);
         }
         .nav-item i { width: 24px; font-size: 18px; }
-        .main { margin-left: 280px; padding: 40px; min-height: 100vh; }
+        .main { margin-left: 280px; padding: 40px; min-height: 100vh; width: calc(100% - 280px); box-sizing: border-box; }
         .header {
             display: flex;
             justify-content: space-between;
@@ -303,6 +303,9 @@ DASHBOARD_HTML = """
             border-radius: 16px;
             padding: 32px;
             margin-bottom: 24px;
+            width: 100%;
+            box-sizing: border-box;
+            overflow-wrap: break-word;
         }
         .card-header {
             display: flex;
@@ -405,16 +408,22 @@ DASHBOARD_HTML = """
             border-radius: 12px;
             padding: 24px;
             margin-top: 24px;
+            width: 100%;
+            box-sizing: border-box;
+            word-wrap: break-word;
         }
-        .install-box h4 { margin-bottom: 12px; color: var(--blue); }
+        .install-box h4 { margin-bottom: 12px; color: var(--blue); word-wrap: break-word; }
         .install-box code {
             background: rgba(0,0,0,0.4);
             padding: 16px;
             border-radius: 8px;
             display: block;
-            font-family: 'Consolas', monospace;
-            font-size: 13px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
             overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.5;
         }
         .os-tabs {
             display: flex;
