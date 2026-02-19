@@ -2,6 +2,8 @@
 
 import argparse
 import os
+import sys
+import traceback
 
 import uvicorn
 
@@ -24,34 +26,42 @@ def main():
     args = parser.parse_args()
 
     if args.command == "server":
-        config_path = args.config or os.getenv("CONFIG_PATH", "config.yml")
-        
-        from pymon.config import load_config
-        config = load_config(config_path)
-        
-        host = args.host or config.server.host
-        port = args.port or config.server.port
-        storage = args.storage or config.storage.backend
-        db_path = args.db or config.storage.path
+        try:
+            config_path = args.config or os.getenv("CONFIG_PATH", "config.yml")
+            
+            from pymon.config import load_config
+            config = load_config(config_path)
+            
+            host = args.host or config.server.host
+            port = args.port or config.server.port
+            storage = args.storage or config.storage.backend
+            db_path = args.db or config.storage.path
 
-        os.environ.setdefault("STORAGE_BACKEND", storage)
-        os.environ.setdefault("DB_PATH", db_path)
-        os.environ.setdefault("CONFIG_PATH", config_path)
+            os.environ.setdefault("STORAGE_BACKEND", storage)
+            os.environ.setdefault("DB_PATH", db_path)
+            os.environ.setdefault("CONFIG_PATH", config_path)
 
-        from pymon.auth import init_auth_tables, auth_config as auth_cfg
-        from pymon.storage import init_storage
+            print(f"Initializing storage...", file=sys.stderr)
+            from pymon.auth import init_auth_tables, auth_config as auth_cfg
+            from pymon.storage import init_storage
 
-        init_storage(backend=storage, db_path=db_path)
-        auth_cfg.db_path = db_path
-        auth_cfg.admin_username = config.auth.admin_username
-        auth_cfg.admin_password = config.auth.admin_password
-        init_auth_tables()
+            init_storage(backend=storage, db_path=db_path)
+            auth_cfg.db_path = db_path
+            auth_cfg.admin_username = config.auth.admin_username
+            auth_cfg.admin_password = config.auth.admin_password
+            
+            print(f"Initializing auth tables...", file=sys.stderr)
+            init_auth_tables()
 
-        print(f"Starting PyMon server on {host}:{port}")
-        print(f"Dashboard: http://{host}:{port}/dashboard/")
+            print(f"Starting PyMon server on {host}:{port}")
+            print(f"Dashboard: http://{host}:{port}/dashboard/")
 
-        app = create_app()
-        uvicorn.run(app, host=host, port=port)
+            app = create_app()
+            uvicorn.run(app, host=host, port=port)
+        except Exception as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            traceback.print_exc()
+            sys.exit(1)
     else:
         parser.print_help()
 
@@ -65,6 +75,8 @@ def create_app():
     from pymon import web_dashboard
     from pymon.auth import init_auth_tables
 
+    print("Creating FastAPI app...", file=sys.stderr)
+    
     app = FastAPI(title="PyMon", version=__version__)
 
     app.add_middleware(
@@ -75,9 +87,17 @@ def create_app():
         allow_headers=["*"],
     )
 
-    # Initialize DB tables
-    init_auth_tables()
-    web_dashboard.init_web_tables()
+    try:
+        # Initialize DB tables
+        print("Initializing auth tables...", file=sys.stderr)
+        init_auth_tables()
+        print("Initializing web tables...", file=sys.stderr)
+        web_dashboard.init_web_tables()
+        print("All tables initialized", file=sys.stderr)
+    except Exception as e:
+        print(f"Error initializing tables: {e}", file=sys.stderr)
+        traceback.print_exc()
+        raise
 
     # Mount routers
     app.include_router(api, prefix="/api/v1")
