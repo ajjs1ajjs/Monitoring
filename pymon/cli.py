@@ -54,12 +54,18 @@ def main():
             
             # Ensure DB directory exists
             db_dir = os.path.dirname(db_path)
-            if db_dir and not os.path.exists(db_dir):
-                print(f"Creating DB directory: {db_dir}", file=sys.stderr)
-                os.makedirs(db_dir, exist_ok=True)
-                # Set proper permissions for pymon user
+            if not db_dir:  # If no directory in path, use current directory
+                db_dir = "."
+            abs_db_dir = os.path.abspath(db_dir)
+            if not os.path.exists(abs_db_dir):
+                print(f"Creating DB directory: {abs_db_dir}", file=sys.stderr)
+                os.makedirs(abs_db_dir, exist_ok=True)
+                # Set proper permissions
                 import stat
-                os.chmod(db_dir, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
+                os.chmod(abs_db_dir, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
+            # Update db_path to absolute path
+            db_path = os.path.abspath(db_path)
+            auth_cfg.db_path = db_path
             
             print(f"DB Path in auth_config: {auth_cfg.db_path}", file=sys.stderr)
             print(f"DB directory exists: {os.path.exists(os.path.dirname(db_path))}", file=sys.stderr)
