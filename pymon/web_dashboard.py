@@ -77,6 +77,57 @@ def init_web_tables():
         print(f"Error initializing web tables: {e}")
         raise
 
+LOGIN_HTML = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PyMon - Login</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d0f14; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .login-box { background: #181b1f; padding: 48px; border-radius: 16px; border: 1px solid #2c3235; width: 100%; max-width: 400px; }
+        .logo { text-align: center; margin-bottom: 32px; }
+        .logo h1 { color: #5794f2; font-size: 36px; font-weight: 700; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; color: #999; margin-bottom: 8px; font-size: 14px; }
+        input { width: 100%; padding: 14px; background: #111217; border: 1px solid #2c3235; border-radius: 8px; color: #e0e0e0; font-size: 15px; }
+        input:focus { outline: none; border-color: #5794f2; }
+        button { width: 100%; padding: 14px; background: linear-gradient(180deg, #2c7bd9, #1a5fb4); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        button:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="login-box">
+        <div class="logo"><h1>PyMon</h1></div>
+        <form id="loginForm">
+            <div class="form-group"><label>Username</label><input type="text" id="username" required placeholder="admin"></div>
+            <div class="form-group"><label>Password</label><input type="password" id="password" required placeholder="admin"></div>
+            <button type="submit">Sign In</button>
+        </form>
+    </div>
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resp = await fetch('/api/v1/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: document.getElementById('username').value,
+                    password: document.getElementById('password').value
+                })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                localStorage.setItem('token', data.access_token);
+                window.location.href = '/dashboard/';
+            } else {
+                alert('Login failed');
+            }
+        });
+    </script>
+</body>
+</html>'''
+
 DASHBOARD_HTML = '''<!DOCTYPE html>
 <html>
 <head>
