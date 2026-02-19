@@ -21,7 +21,7 @@ def main():
     server_parser.add_argument("--port", type=int, default=8090, help="Port to bind")
     server_parser.add_argument("--config", "-c", default=None, help="Path to config file")
     server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite"], help="Storage backend")
-    server_parser.add_argument("--db", default="pymon.db", help="Database path")
+    server_parser.add_argument("--db", default=None, help="Database path (defaults to config value)")
 
     args = parser.parse_args()
 
