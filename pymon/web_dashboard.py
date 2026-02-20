@@ -212,20 +212,21 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root { --bg: #0d0f14; --card: #181b1f; --border: #2c3235; --text: #e0e0e0; --muted: #999; --blue: #5794f2; --green: #73bf69; --red: #f2495c; --yellow: #f2cc0c; --purple: #b877d9; }
         body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 13px; }
-        .top-nav { background: linear-gradient(90deg, #161719, #1f2326); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; justify-content: space-between; align-items: center; height: 48px; position: sticky; top: 0; z-index: 1000; }
+        .top-nav { background: linear-gradient(90deg, #1a1d24, #252930); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; justify-content: space-between; align-items: center; height: 52px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 12px rgba(0,0,0,0.5); }
         .nav-left { display: flex; align-items: center; gap: 20px; }
         .logo { display: flex; align-items: center; gap: 8px; }
         .logo-icon { width: 24px; height: 24px; background: linear-gradient(135deg, var(--blue), #2c7bd9); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: white; font-weight: bold; }
         .logo h1 { color: var(--blue); font-size: 18px; font-weight: 600; }
         .nav-menu { display: flex; gap: 2px; }
-        .nav-item { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 4px; cursor: pointer; color: var(--muted); font-weight: 500; font-size: 12px; border: none; background: transparent; transition: all 0.2s; }
-        .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.05); }
-        .nav-item.active { background: rgba(87,148,242,0.15); color: var(--blue); }
+        .nav-item { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; font-size: 12px; border: none; background: transparent; transition: all 0.2s; }
+        .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.1); transform: translateY(-1px); }
+        .nav-item.active { background: linear-gradient(135deg, rgba(87,148,242,0.3), rgba(44,123,217,0.3)); color: var(--blue); box-shadow: 0 2px 8px rgba(87,148,242,0.3); }
         .nav-right { display: flex; align-items: center; gap: 12px; }
         .server-selector { padding: 5px 10px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; min-width: 150px; }
         .main { padding: 16px; }
         .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 16px; display: flex; align-items: center; gap: 12px; }
+        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
         .stat-icon { width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
         .stat-value { font-size: 24px; font-weight: 600; }
         .stat-label { color: var(--muted); font-size: 12px; }
@@ -233,8 +234,8 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .time-range { display: flex; gap: 2px; background: #111217; border-radius: 4px; padding: 2px; border: 1px solid var(--border); }
         .time-btn { padding: 4px 10px; background: transparent; border: none; border-radius: 3px; color: var(--muted); font-size: 12px; cursor: pointer; }
         .time-btn.active { background: #2c3235; color: var(--text); }
-        .panels-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .panel { background: var(--card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+        .panels-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
         .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
         .panel-title { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
@@ -246,16 +247,19 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .legend-color { width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; }
         .legend-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
         .legend-value { color: var(--muted); text-align: right; font-size: 11px; }
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 16px; margin-bottom: 16px; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
         .card-title { font-size: 14px; font-weight: 600; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
         th { color: var(--muted); font-size: 11px; text-transform: uppercase; font-weight: 600; background: rgba(0,0,0,0.2); }
-        .btn { padding: 8px 16px; border-radius: 4px; border: none; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
-        .btn-primary { background: linear-gradient(180deg, #2c7bd9, #1a5fb4); color: white; }
-        .btn-secondary { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--border); }
-        .btn-danger { background: rgba(242,73,92,0.15); color: var(--red); }
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; transition: all 0.2s; }
+        .btn-primary { background: linear-gradient(135deg, #2c7bd9, #1a5fb4); color: white; box-shadow: 0 2px 8px rgba(44,123,217,0.4); }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(44,123,217,0.6); }
+        .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+        .btn-danger { background: linear-gradient(135deg, rgba(242,73,92,0.3), rgba(242,73,92,0.15)); color: var(--red); }
+        .btn-danger:hover { background: linear-gradient(135deg, rgba(242,73,92,0.5), rgba(242,73,92,0.3)); }
         .btn-sm { padding: 6px 12px; font-size: 12px; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
@@ -288,11 +292,11 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .tab-menu { display: flex; gap: 2px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
         .tab-item { padding: 8px 16px; cursor: pointer; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; }
         .tab-item.active { color: var(--blue); border-bottom-color: var(--blue); }
-        .badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
-        .badge-success { background: rgba(115,191,105,0.15); color: var(--green); }
-        .badge-danger { background: rgba(242,73,92,0.15); color: var(--red); }
-        .badge-warning { background: rgba(242,204,12,0.15); color: var(--yellow); }
-        .badge-info { background: rgba(87,148,242,0.15); color: var(--blue); }
+        .badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+        .badge-success { background: linear-gradient(135deg, rgba(115,191,105,0.3), rgba(115,191,105,0.15)); color: var(--green); }
+        .badge-danger { background: linear-gradient(135deg, rgba(242,73,92,0.3), rgba(242,73,92,0.15)); color: var(--red); }
+        .badge-warning { background: linear-gradient(135deg, rgba(242,204,12,0.3), rgba(242,204,12,0.15)); color: var(--yellow); }
+        .badge-info { background: linear-gradient(135deg, rgba(87,148,242,0.3), rgba(87,148,242,0.15)); color: var(--blue); }
         .raid-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
         .raid-card { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 4px; padding: 12px; }
         .raid-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
@@ -488,7 +492,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     let alerts = [];
     let charts = {};
     let currentRange = '1h';
-    const grafanaColors = ["#73bf69", "#f2cc0c", "#5794f2", "#b877d9", "#ff780a", "#00d8d8", "#f2495c", "#9673b5"];
+    const grafanaColors = ["#73bf69", "#f2cc0c", "#5794f2", "#ff780a", "#b877d9", "#00d8d8", "#f2495c", "#9673b9", "#ff6b6b", "#4ecdc4"];
     const colors = grafanaColors;
     let currentAlertTab = 'global';
     
@@ -499,20 +503,24 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         });
     });
     
-    document.querySelectorAll(".tab-menu .tab-item").forEach(btn => {
+    // Tab switching for settings
+    document.querySelectorAll("#section-settings .tab-menu .tab-item").forEach(btn => {
         btn.addEventListener("click", function() {
-            const menu = this.parentElement;
-            menu.querySelectorAll(".tab-item").forEach(b => b.classList.remove('active'));
+            document.querySelectorAll("#section-settings .tab-menu .tab-item").forEach(b => b.classList.remove('active'));
             this.classList.add('active');
             const tab = this.dataset.tab;
-            const container = menu.parentElement;
-            container.querySelectorAll(".tab-content").forEach(c => c.style.display = 'none');
-            const content = document.getElementById(container.id.replace('section', 'settings') + '-' + tab);
-            if (content) content.style.display = 'block';
-            if (this.closest('#section-alerts')) {
-                currentAlertTab = tab;
-                loadAlerts();
-            }
+            document.querySelectorAll("#section-settings .tab-content").forEach(c => c.style.display = 'none');
+            document.getElementById('settings-' + tab).style.display = 'block';
+        });
+    });
+    
+    // Tab switching for alerts
+    document.querySelectorAll("#section-alerts .tab-menu .tab-item").forEach(btn => {
+        btn.addEventListener("click", function() {
+            document.querySelectorAll("#section-alerts .tab-menu .tab-item").forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentAlertTab = this.dataset.tab;
+            loadAlerts();
         });
     });
     
