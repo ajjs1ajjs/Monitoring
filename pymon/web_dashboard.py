@@ -244,10 +244,9 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .panel-chart { flex: 1; padding: 8px; position: relative; min-width: 0; }
         .panel-legend { width: 320px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
         .legend-header { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; }
-        .legend-header::after { content: ""; display: table; clear: both; }
-        .legend-header-name { float: left; width: calc(100% - 100px); }
-        .legend-header-last { float: right; width: 50px; text-align: right; }
-        .legend-header-max { float: right; width: 50px; text-align: right; }
+        .legend-header-name { float: left; }
+        .legend-header-last { float: right; width: 45px; text-align: right; }
+        .legend-header-max { float: right; width: 45px; text-align: right; margin-left: 8px; }
         .legend-item { display: flex; align-items: center; padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); gap: 12px; }
         .legend-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
         .legend-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; min-width: 80px; flex: 1; }
@@ -335,7 +334,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             </div>
         </div>
         <div class="nav-right">
-            <select class="server-selector" id="serverSelector"><option value="">All Servers</option></select>
             <button class="btn btn-secondary btn-sm" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
         </div>
     </nav>
