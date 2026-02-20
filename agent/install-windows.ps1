@@ -510,10 +510,10 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "Service installation output: $installResult" -ForegroundColor Gray
 }
 
-# Configure service startup and description
-$scResult = sc config $ServiceName start= auto 2>&1
-sc description $ServiceName "System metrics collector for PyMon monitoring server with RAID support" 2>&1 | Out-Null
-sc failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 2>&1 | Out-Null
+# Configure service startup and description using sc.exe explicitly
+$scResult = sc.exe config $ServiceName start= auto 2>&1
+sc.exe description $ServiceName "System metrics collector for PyMon monitoring server with RAID support" 2>&1 | Out-Null
+sc.exe failure $ServiceName reset= 86400 actions= restart/60000/restart/60000/restart/60000 2>&1 | Out-Null
 
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Green
