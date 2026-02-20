@@ -704,7 +704,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             document.getElementById('servers-tbody').innerHTML = servers.map(s => {
                 if (s.last_status === 'up') online++; else offline++;
                 if (s.os_type === 'linux') linux++; else windows++;
-                const statusBadge = s.last_status === 'up' ? '<span class="badge badge-success">' + (s.last_status || 'pending') + '</span>' : '<span class="badge badge-danger">' + (s.last_status || 'offline') + '</span>';
+                const statusBadge = s.last_status === 'up' ? '<span class="badge badge-success">up</span>' : '<span class="badge badge-danger">offline</span>';
                 return '<tr><td>' + statusBadge + '</td><td><strong>' + s.name + '</strong></td><td>' + s.host + '</td><td>' + s.os_type + '</td><td>' + (s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-') + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')">Delete</button></td></tr>';
             }).join('') || '<tr><td colspan="8" style="text-align:center;padding:40px;color:#999;">No servers</td></tr>';
             document.getElementById('stat-online').textContent = online;
