@@ -242,17 +242,16 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .panel.expanded .panel-body { height: 350px; }
         .panel-body { display: flex; height: 180px; }
         .panel-chart { flex: 1; padding: 8px; position: relative; min-width: 0; }
-        .panel-legend { width: 300px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
-        .legend-header { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; overflow: hidden; }
-        .legend-header-name { float: left; }
-        .legend-header-last { float: right; margin-right: 8px; }
-        .legend-header-max { float: right; }
-        .legend-item { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); overflow: hidden; }
-        .legend-item::after { content: ""; display: table; clear: both; }
-        .legend-color { width: 8px; height: 8px; border-radius: 2px; float: left; margin-right: 8px; margin-top: 3px; }
-        .legend-name { float: left; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
-        .legend-value-last { float: right; font-size: 11px; color: var(--muted); margin-right: 8px; }
-        .legend-value-max { float: right; font-size: 11px; color: var(--muted); }
+        .panel-legend { width: 280px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
+        .legend-header { display: flex; padding: 8px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; }
+        .legend-header-name { flex: 1; text-align: left; }
+        .legend-header-last { width: 45px; text-align: right; }
+        .legend-header-max { width: 45px; text-align: right; }
+        .legend-item { display: flex; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .legend-color { width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; margin-top: 2px; flex-shrink: 0; }
+        .legend-name { flex: 1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .legend-value-last { width: 45px; text-align: right; font-size: 11px; color: var(--muted); }
+        .legend-value-max { width: 45px; text-align: right; font-size: 11px; color: var(--muted); }
         .legend-item { display: flex; align-items: center; padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); gap: 12px; }
         .legend-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
         .legend-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; min-width: 80px; flex: 1; }
