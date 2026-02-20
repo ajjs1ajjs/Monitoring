@@ -11,6 +11,18 @@
 - **Alerts** - Notifications via Telegram, Discord, Slack, Email
 - **REST API** - Full API for integration
 - **Prometheus-compatible** - /metrics endpoint on each agent
+- **RAID Monitoring** - Linux mdadm, MegaRAID, HP Smart Array
+- **Background Scraping** - Auto-collects metrics every 60 seconds
+
+## Dashboard Features
+
+- **Charts** - CPU, Memory, Disk, Network with real-time updates
+- **Legend Sorting** - Click "Last" or "Max" to sort servers
+- **Legend Filtering** - Click on server in legend to filter
+- **Stat Cards** - Quick filters for Online/Offline/Linux/Windows
+- **Auto-refresh** - Dashboard refreshes every 30 seconds
+- **Manual Refresh** - Click refresh button to update immediately
+- **Time Range** - 5m, 15m, 1h, 6h, 24h views
 
 ## Quick Start
 
@@ -18,6 +30,12 @@
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
+```
+
+Or run locally:
+```bash
+pip install -r requirements.txt
+python -m pymon.cli server
 ```
 
 ### Install Agent on Linux Servers
@@ -56,7 +74,7 @@ After installation:
 2. **Install Agents** on each server you want to monitor:
    - **Linux**: Uses psutil, collects like node_exporter
    - **Windows**: Uses WMI + psutil, collects like windows_exporter
-3. **Agents send metrics** to the server every 15 seconds
+3. **Server auto-discovers agents** - Background scraping every 60 seconds
 4. **View metrics** in the web dashboard
 
 ## Agent Capabilities
@@ -68,6 +86,8 @@ After installation:
 - Network I/O (all interfaces)
 - System load average
 - Boot time
+- RAID monitoring (mdadm, MegaRAID, HP Smart Array)
+- SMART status for disks
 
 ### Windows Agent
 - CPU usage
@@ -77,6 +97,7 @@ After installation:
 - Windows services status
 - Process count
 - OS info (version, name)
+- RAID/Storage Spaces info
 
 ## Configuration
 
@@ -90,7 +111,7 @@ PYMON_AGENT_PORT=9100                   # Local HTTP port for /metrics
 
 ### Server Config
 
-File: `/etc/pymon/config.yml`
+File: `config.yml`
 
 ```yaml
 server:
@@ -99,7 +120,15 @@ server:
 
 storage:
   backend: sqlite
-  path: /var/lib/pymon/pymon.db
+  path: pymon.db
+
+scrape_configs:
+  - job_name: agents
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets: []
 
 auth:
   admin_username: admin
@@ -126,22 +155,28 @@ curl -X POST http://localhost:8090/api/servers \
   }'
 ```
 
+### Manual Scrape
+```bash
+curl -X POST http://localhost:8090/api/servers/1/scrape \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
 ## Architecture
 
 ```
 ┌─────────────────┐         ┌──────────────────┐
-│   PyMon Server  │◄────────│  Linux Agent     │
-│   (this repo)   │  HTTP   │  (node_exporter  │
-│                 │         │   style)         │
+│   PyMon Server  │◄--------│  Linux Agent    │
+│   (this repo)   │  HTTP   │  (port 9100)    │
+│                 │  /metrics                 │
 │  - Dashboard    │         └──────────────────┘
-│  - API          │
-│  - Alerts       │         ┌──────────────────┐
-│  - Storage      │◄────────│  Windows Agent   │
-└─────────────────┘  HTTP   │  (windows_exporter
-         ▲                  │   style)         │
-         │                  └──────────────────┘
-         │
-    Web Browser
+│  - API          │         ┌──────────────────┐
+│  - Alerts       │◄--------│  Windows Agent   │
+│  - Storage      │  HTTP   │  (port 9100)     │
+│  - Scraping     │  /metrics                 │
+└─────────────────┘         └──────────────────┘
+          ▲
+          │
+     Web Browser
 ```
 
 ## Management Commands
