@@ -244,9 +244,9 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .panel-chart { flex: 1; padding: 8px; position: relative; min-width: 0; }
         .panel-legend { width: 320px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
         .legend-header { display: flex; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; }
-        .legend-header span { flex: 1; text-align: center; }
-        .legend-header span:first-child { text-align: left; min-width: 80px; }
-        .legend-header span:last-child { text-align: right; min-width: 50px; }
+        .legend-header span { text-align: right; width: 50px; }
+        .legend-header span:first-child { text-align: left; width: auto; flex: 1; min-width: 100px; }
+        .legend-header span:nth-child(2) { text-align: center; }
         .legend-item { display: flex; align-items: center; padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); gap: 12px; }
         .legend-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
         .legend-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; min-width: 80px; flex: 1; }
