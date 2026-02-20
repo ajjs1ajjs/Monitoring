@@ -242,7 +242,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .panel.expanded .panel-body { height: 350px; }
         .panel-body { display: flex; height: 180px; }
         .panel-chart { flex: 1; padding: 8px; position: relative; min-width: 0; }
-        .panel-legend { width: 220px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
+        .panel-legend { width: 280px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
         .legend-header { display: grid; grid-template-columns: 12px 1fr 50px 50px; padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 9px; text-transform: uppercase; font-weight: 600; }
         .legend-item { display: grid; grid-template-columns: 12px 1fr 50px 50px; align-items: center; padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); gap: 4px; }
         .legend-color { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
