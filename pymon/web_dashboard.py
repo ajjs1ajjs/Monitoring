@@ -298,12 +298,19 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .badge-warning { background: linear-gradient(135deg, rgba(242,204,12,0.3), rgba(242,204,12,0.15)); color: var(--yellow); }
         .badge-info { background: linear-gradient(135deg, rgba(87,148,242,0.3), rgba(87,148,242,0.15)); color: var(--blue); }
         .raid-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-        .raid-card { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 4px; padding: 12px; }
+        .raid-card { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
         .raid-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .raid-card-title { font-weight: 600; font-size: 13px; }
         .raid-status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
         .raid-disks { margin-top: 8px; }
         .raid-disk { display: flex; justify-content: space-between; padding: 6px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 4px; font-size: 12px; }
+        
+        /* Server Status Panel */
+        .server-panel { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+        .server-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .metric-box { background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center; }
+        .metric-label { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+        .metric-value { font-weight: 600; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -341,11 +348,36 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                     <button class="time-btn" data-range="24h">24h</button>
                 </div>
             </div>
+            
+            <!-- Server Status Panel -->
+            <div class="card" style="margin-bottom: 16px;">
+                <div class="card-header"><h3 class="card-title"><i class="fas fa-server"></i> Server Status</h3></div>
+                <div id="serverStatusPanel" style="max-height: 300px; overflow-y: auto;">
+                    <p style="color: var(--muted); text-align: center; padding: 20px;">No servers added</p>
+                </div>
+            </div>
+            
             <div class="panels-grid">
                 <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>CPU</div></div><div class="panel-body"><div class="panel-chart"><canvas id="cpuChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="cpuLegend"></div></div></div></div>
                 <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Memory</div></div><div class="panel-body"><div class="panel-chart"><canvas id="memoryChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="memoryLegend"></div></div></div></div>
                 <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Disk</div></div><div class="panel-body"><div class="panel-chart"><canvas id="diskChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="diskLegend"></div></div></div></div>
                 <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div></div><div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="networkLegend"></div></div></div></div>
+            </div>
+            
+            <!-- RAID & Exporter Status -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title"><i class="fas fa-hdd"></i> RAID Status</h3></div>
+                    <div id="raidStatusPanel" style="max-height: 200px; overflow-y: auto;">
+                        <p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title"><i class="fas fa-export"></i> Exporter Status</h3></div>
+                    <div id="exporterStatusPanel" style="max-height: 200px; overflow-y: auto;">
+                        <p style="color: var(--muted); text-align: center; padding: 20px;">No exporters</p>
+                    </div>
+                </div>
             </div>
         </div>
         <div id="section-servers" class="section-content">
@@ -603,7 +635,77 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             document.getElementById('stat-offline').textContent = offline;
             document.getElementById('stat-linux').textContent = linux;
             document.getElementById('stat-windows').textContent = windows;
+            updateServerStatusPanel();
         } catch(e) { console.error(e); }
+    }
+    
+    function updateServerStatusPanel() {
+        const panel = document.getElementById('serverStatusPanel');
+        if (!servers.length) {
+            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers added</p>';
+            return;
+        }
+        
+        panel.innerHTML = servers.map((s, i) => {
+            const statusColor = s.last_status === 'up' ? 'var(--green)' : 'var(--red)';
+            const statusIcon = s.last_status === 'up' ? 'fa-check-circle' : 'fa-times-circle';
+            const cpuColor = (s.cpu_percent || 0) > 80 ? 'var(--red)' : (s.cpu_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
+            const memColor = (s.memory_percent || 0) > 80 ? 'var(--red)' : (s.memory_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
+            const diskColor = (s.disk_percent || 0) > 90 ? 'var(--red)' : (s.disk_percent || 0) > 80 ? 'var(--yellow)' : 'var(--green)';
+            
+            return '<div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; margin-bottom: 8px; border-left: 3px solid ' + statusColor + ';">' +
+                '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">' +
+                '<div style="display: flex; align-items: center; gap: 8px;">' +
+                '<i class="fas ' + statusIcon + '" style="color: ' + statusColor + ';"></i>' +
+                '<strong style="font-size: 14px;">' + s.name + '</strong>' +
+                '<span style="color: var(--muted); font-size: 12px;">' + s.host + '</span>' +
+                '</div>' +
+                '<div style="display: flex; gap: 12px; font-size: 12px;">' +
+                '<span>Last: ' + (s.last_check || '-') + '</span>' +
+                '<span>Uptime: ' + (s.uptime || '-') + '</span>' +
+                '</div>' +
+                '</div>' +
+                '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">' +
+                '<div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center;"><div style="color: var(--muted); font-size: 10px;">CPU</div><div style="color: ' + cpuColor + '; font-weight: 600;">' + (s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-') + '</div></div>' +
+                '<div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center;"><div style="color: var(--muted); font-size: 10px;">Memory</div><div style="color: ' + memColor + '; font-weight: 600;">' + (s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-') + '</div></div>' +
+                '<div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center;"><div style="color: var(--muted); font-size: 10px;">Disk</div><div style="color: ' + diskColor + '; font-weight: 600;">' + (s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-') + '</div></div>' +
+                '</div></div>';
+        }).join('');
+        
+        // Update RAID and Exporter panels
+        updateRAIDStatusPanel();
+        updateExporterStatusPanel();
+    }
+    
+    function updateRAIDStatusPanel() {
+        const panel = document.getElementById('raidStatusPanel');
+        const raidServers = servers.filter(s => s.raid_status);
+        if (!raidServers.length) {
+            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data</p>';
+            return;
+        }
+        panel.innerHTML = raidServers.map(s => {
+            let raidData = {status: 'unknown', disks: []};
+            try { if (s.raid_status) raidData = JSON.parse(s.raid_status); } catch(e) {}
+            const statusColor = raidData.status === 'healthy' ? 'var(--green)' : 'var(--red)';
+            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong><span class="badge ' + (raidData.status === 'healthy' ? 'badge-success' : 'badge-danger') + '">' + (raidData.status || 'Unknown') + '</span></div>' +
+                (raidData.disks || []).map(d => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + d.name + '</span><span class="badge ' + (d.status === 'online' ? 'badge-success' : 'badge-danger') + '">' + d.status + '</span></div>').join('') + '</div>';
+        }).join('');
+    }
+    
+    function updateExporterStatusPanel() {
+        const panel = document.getElementById('exporterStatusPanel');
+        if (!servers.length) {
+            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No exporters</p>';
+            return;
+        }
+        panel.innerHTML = servers.map(s => {
+            const isUp = s.last_status === 'up';
+            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
+                '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 9100) + '</span></div>' +
+                '<div style="text-align: right;"><span class="badge ' + (isUp ? 'badge-success' : 'badge-danger') + '">' + (isUp ? 'Online' : 'Offline') + '</span><br><span style="color: var(--muted); font-size: 10px;">' + (s.last_check || 'Never') + '</span></div>' +
+                '</div>';
+        }).join('');
     }
     
     async function deleteServer(id) {
