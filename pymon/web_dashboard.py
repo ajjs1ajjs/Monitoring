@@ -11,7 +11,7 @@ from datetime import datetime
 
 router = APIRouter()
 
-DB_PATH = os.getenv("DB_PATH", "/var/lib/pymon/pymon.db")
+DB_PATH = os.getenv("DB_PATH", "pymon.db")
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -1349,7 +1349,7 @@ async def delete_alert(alert_id: int):
 @router.post("/api/backups")
 async def create_backup():
     try:
-        BACKUP_DIR = "/var/lib/pymon/backups"
+        BACKUP_DIR = os.path.join(os.path.dirname(DB_PATH), "backups")
         os.makedirs(BACKUP_DIR, exist_ok=True)
         filename = f"pymon_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sqlite"
         dest = os.path.join(BACKUP_DIR, filename)
