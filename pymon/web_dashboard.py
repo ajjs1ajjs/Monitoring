@@ -339,10 +339,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     <main class="main">
         <div id="section-dashboard" class="section-content active">
             <div class="stats-row">
-                <div class="stat-card clickable" onclick="filterBy('online')" id="card-online"><div class="stat-icon" style="background: rgba(115,191,105,0.15); color: var(--green);"><i class="fas fa-check-circle"></i></div><div class="stat-content"><div class="stat-value" id="stat-online" style="color: var(--green);">0</div><div class="stat-label">Online</div></div></div>
-                <div class="stat-card clickable" onclick="filterBy('offline')" id="card-offline"><div class="stat-icon" style="background: rgba(242,73,92,0.15); color: var(--red);"><i class="fas fa-times-circle"></i></div><div class="stat-content"><div class="stat-value" id="stat-offline" style="color: var(--red);">0</div><div class="stat-label">Offline</div></div></div>
-                <div class="stat-card clickable" onclick="filterBy('linux')" id="card-linux"><div class="stat-icon" style="background: rgba(87,148,242,0.15); color: var(--blue);"><i class="fab fa-linux"></i></div><div class="stat-content"><div class="stat-value" id="stat-linux" style="color: var(--blue);">0</div><div class="stat-label">Linux</div></div></div>
-                <div class="stat-card clickable" onclick="filterBy('windows')" id="card-windows"><div class="stat-icon" style="background: rgba(242,204,12,0.15); color: var(--yellow);"><i class="fab fa-windows"></i></div><div class="stat-content"><div class="stat-value" id="stat-windows" style="color: var(--yellow);">0</div><div class="stat-label">Windows</div></div></div>
+                <div class="stat-card" data-filter="online" id="card-online"><div class="stat-icon" style="background: rgba(115,191,105,0.15); color: var(--green);"><i class="fas fa-check-circle"></i></div><div class="stat-content"><div class="stat-value" id="stat-online" style="color: var(--green);">0</div><div class="stat-label">Online</div></div></div>
+                <div class="stat-card" data-filter="offline" id="card-offline"><div class="stat-icon" style="background: rgba(242,73,92,0.15); color: var(--red);"><i class="fas fa-times-circle"></i></div><div class="stat-content"><div class="stat-value" id="stat-offline" style="color: var(--red);">0</div><div class="stat-label">Offline</div></div></div>
+                <div class="stat-card" data-filter="linux" id="card-linux"><div class="stat-icon" style="background: rgba(87,148,242,0.15); color: var(--blue);"><i class="fab fa-linux"></i></div><div class="stat-content"><div class="stat-value" id="stat-linux" style="color: var(--blue);">0</div><div class="stat-label">Linux</div></div></div>
+                <div class="stat-card" data-filter="windows" id="card-windows"><div class="stat-icon" style="background: rgba(242,204,12,0.15); color: var(--yellow);"><i class="fab fa-windows"></i></div><div class="stat-content"><div class="stat-value" id="stat-windows" style="color: var(--yellow);">0</div><div class="stat-label">Windows</div></div></div>
             </div>
             <div class="dashboard-toolbar">
                 <div style="display: flex; align-items: center; gap: 12px;">
@@ -531,6 +531,16 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     let currentServerFilter = '';
     const colors = grafanaColors;
     let currentAlertTab = 'global';
+    
+    // Add click handlers for stat cards
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.stat-card[data-filter]').forEach(card => {
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', function() {
+                filterBy(this.dataset.filter);
+            });
+        });
+    });
     
     // Filter functions
     function filterBy(type) {
