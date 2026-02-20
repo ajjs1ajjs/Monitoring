@@ -242,11 +242,17 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .panel.expanded .panel-body { height: 350px; }
         .panel-body { display: flex; height: 180px; }
         .panel-chart { flex: 1; padding: 8px; position: relative; min-width: 0; }
-        .panel-legend { width: 320px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
-        .legend-header { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; }
+        .panel-legend { width: 300px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
+        .legend-header { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; overflow: hidden; }
         .legend-header-name { float: left; }
-        .legend-header-last { float: right; width: 45px; text-align: right; }
-        .legend-header-max { float: right; width: 45px; text-align: right; margin-left: 8px; }
+        .legend-header-last { float: right; margin-right: 8px; }
+        .legend-header-max { float: right; }
+        .legend-item { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); overflow: hidden; }
+        .legend-item::after { content: ""; display: table; clear: both; }
+        .legend-color { width: 8px; height: 8px; border-radius: 2px; float: left; margin-right: 8px; margin-top: 3px; }
+        .legend-name { float: left; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+        .legend-value-last { float: right; font-size: 11px; color: var(--muted); margin-right: 8px; }
+        .legend-value-max { float: right; font-size: 11px; color: var(--muted); }
         .legend-item { display: flex; align-items: center; padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); gap: 12px; }
         .legend-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
         .legend-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; min-width: 80px; flex: 1; }
@@ -362,10 +368,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             
             <!-- Resizable Panels -->
             <div class="panels-grid" id="panelsGrid">
-                <div class="panel" style="min-height: 200px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>CPU</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="cpuChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="cpuLegend"></div></div></div></div>
-                <div class="panel" style="min-height: 200px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Memory</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="memoryChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="memoryLegend"></div></div></div></div>
-                <div class="panel" style="min-height: 200px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Disk</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="diskChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="diskLegend"></div></div></div></div>
-                <div class="panel" style="min-height: 200px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="networkLegend"></div></div></div></div>
+                <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>CPU</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="cpuChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="cpuLegend"></div></div></div></div>
+                <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Memory</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="memoryChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="memoryLegend"></div></div></div></div>
+                <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Disk</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="diskChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="diskLegend"></div></div></div></div>
+                <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="networkLegend"></div></div></div></div>
             </div>
             
             <!-- RAID & Exporter Status -->
@@ -816,7 +822,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         el.innerHTML = datasets.map((ds,i) => {
             const last = ds.data[ds.data.length-1];
             const mx = Math.max(...ds.data);
-            return '<div class="legend-item"><div class="legend-color" style="background:'+ds.borderColor+'"></div><div class="legend-name">'+ds.label+'</div><div class="legend-value">'+last.toFixed(1)+suffix+'</div><div class="legend-value">'+mx.toFixed(1)+suffix+'</div></div>';
+            return '<div class="legend-item"><div class="legend-color" style="background:'+ds.borderColor+'"></div><div class="legend-name">'+ds.label+'</div><div class="legend-value-last">'+last.toFixed(1)+suffix+'</div><div class="legend-value-max">'+mx.toFixed(1)+suffix+'</div></div>';
         }).join('');
     }
     
