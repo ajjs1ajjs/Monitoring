@@ -119,6 +119,60 @@ def create_app():
         traceback.print_exc()
         raise
 
+    # Background task for scraping servers
+    import asyncio
+    import httpx
+    from datetime import datetime
+    
+    async def scrape_servers_periodically():
+        """Background task to scrape all registered servers"""
+        while True:
+            try:
+                await asyncio.sleep(30)  # Wait 30 seconds between scrapes
+                servers = web_dashboard.get_db().execute("SELECT * FROM servers WHERE enabled=1").fetchall()
+                for server in servers:
+                    try:
+                        host = server['host']
+                        port = server.get('agent_port', 9100)
+                        url = f"http://{host}:{port}/health"
+                        async with httpx.AsyncClient(timeout=5.0) as client:
+                            resp = await client.get(url)
+                            status = 'up' if resp.status_code == 200 else 'down'
+                            # Try to get metrics for additional data
+                            metrics_url = f"http://{host}:{port}/api/metrics"
+                            try:
+                                metrics_resp = await client.get(metrics_url)
+                                if metrics_resp.status_code == 200:
+                                    import json
+                                    data = metrics_resp.json()
+                                    cpu = data.get('cpu_percent', 0)
+                                    memory = data.get('memory_percent', 0)
+                                    disk = data.get('disk_percent', 0)
+                                    network_rx = data.get('network_rx', 0)
+                                    network_tx = data.get('network_tx', 0)
+                                    uptime = data.get('uptime', '')
+                                    raid_status = json.dumps(data.get('raid', {})) if data.get('raid') else None
+                                else:
+                                    cpu = memory = disk = network_rx = network_tx = 0
+                                    uptime = ''
+                                    raid_status = None
+                            except:
+                                cpu = memory = disk = network_rx = network_tx = 0
+                                uptime = ''
+                                raid_status = None
+                            
+                            web_dashboard.get_db().execute('''UPDATE servers SET last_status=?, last_check=?, cpu_percent=?, memory_percent=?, disk_percent=?, network_rx=?, network_tx=?, uptime=?, raid_status=? WHERE id=?''',
+                                (status, datetime.utcnow().isoformat(), cpu, memory, disk, network_rx, network_tx, uptime, raid_status, server['id']))
+                            web_dashboard.get_db().commit()
+                    except Exception as e:
+                        print(f"Error scraping {server['host']}: {e}")
+            except Exception as e:
+                print(f"Scrape error: {e}")
+
+    @app.on_event("startup")
+    async def startup_event():
+        asyncio.create_task(scrape_servers_periodically())
+
     # Mount routers
     app.include_router(api, prefix="/api/v1")
     app.include_router(web_dashboard.router)
