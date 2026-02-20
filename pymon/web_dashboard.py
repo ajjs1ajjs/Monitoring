@@ -529,6 +529,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     let currentRange = '1h';
     let currentFilter = '';
     let currentServerFilter = '';
+    const grafanaColors = ["#73bf69", "#f2cc0c", "#5794f2", "#ff780a", "#b877d9", "#00d8d8", "#f2495c", "#9673b9"];
     const colors = grafanaColors;
     let currentAlertTab = 'global';
     
