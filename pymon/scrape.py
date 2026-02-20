@@ -34,6 +34,7 @@ class ScrapeResult:
     latency_ms: float = 0
     error: str = ""
     metrics_count: int = 0
+    metrics: dict | None = None
     timestamp: datetime | None = None
 
 
@@ -75,6 +76,7 @@ class ScrapeManager:
             target=target,
             success=False,
             timestamp=datetime.utcnow(),
+            metrics={}
         )
         
         try:
@@ -100,9 +102,10 @@ class ScrapeManager:
             if result.success:
                 content_type = response.headers.get("content-type", "")
                 if "text/plain" in content_type or "application/openmetrics" in content_type:
-                    result.metrics_count = await self._parse_prometheus_response(
+                    result.metrics = await self._parse_prometheus_response(
                         response.text, target
                     )
+                    result.metrics_count = len(result.metrics)
             
         except httpx.TimeoutException:
             result.error = "timeout"
@@ -113,8 +116,8 @@ class ScrapeManager:
         
         return result
 
-    async def _parse_prometheus_response(self, content: str, target: ScrapeTarget) -> int:
-        count = 0
+    async def _parse_prometheus_response(self, content: str, target: ScrapeTarget) -> dict:
+        metrics = {}
         storage = get_storage()
         
         for line in content.split("\n"):
@@ -144,6 +147,8 @@ class ScrapeManager:
                     else:
                         continue
                 
+                metrics[name] = value
+                
                 label_objs = [Label(name=k, value=v) for k, v in labels]
                 from pymon.metrics.models import MetricType
                 registry.register(name, MetricType.GAUGE, "", label_objs)
@@ -157,12 +162,54 @@ class ScrapeManager:
                     labels=label_objs,
                 )
                 await storage.write(metric)
-                count += 1
                 
             except Exception:
                 continue
         
-        return count
+        return metrics
+
+    def _update_server_status(self, target: str, metrics: dict, success: bool, error: str = ""):
+        import sqlite3
+        import os
+        from datetime import datetime
+        
+        try:
+            db_path = os.getenv("DB_PATH", "pymon.db")
+            conn = sqlite3.connect(db_path, timeout=1)
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            
+            server = c.execute("SELECT id FROM servers WHERE host = ? OR host LIKE ?", 
+                              (target, f"{target}%")).fetchone()
+            
+            if server:
+                server_id = server['id']
+                now = datetime.utcnow().isoformat()
+                
+                if success:
+                    cpu = metrics.get('node_cpu_usage_percent') or metrics.get('system_cpu_usage_percent') or metrics.get('cpu_usage_percent', 0)
+                    memory = metrics.get('node_memory_usage_percent') or metrics.get('system_memory_usage_percent') or metrics.get('memory_usage_percent', 0)
+                    disk = metrics.get('node_disk_usage_percent') or metrics.get('system_disk_usage_percent') or metrics.get('disk_usage_percent', 0)
+                    network_rx = metrics.get('node_network_receive_bytes_total') or metrics.get('system_network_rx_bytes', 0)
+                    network_tx = metrics.get('node_network_transmit_bytes_total') or metrics.get('system_network_tx_bytes', 0)
+                    uptime = metrics.get('node_boot_time_seconds') or metrics.get('system_uptime_seconds', '')
+                    
+                    c.execute('''UPDATE servers SET 
+                        last_check = ?, last_status = 'up',
+                        cpu_percent = ?, memory_percent = ?, disk_percent = ?,
+                        network_rx = ?, network_tx = ?, uptime = ?
+                        WHERE id = ?''',
+                        (now, cpu, memory, disk, network_rx, network_tx, str(uptime), server_id))
+                else:
+                    c.execute('''UPDATE servers SET 
+                        last_check = ?, last_status = 'down'
+                        WHERE id = ?''', (now, server_id))
+                
+                conn.commit()
+            
+            conn.close()
+        except Exception as e:
+            print(f"Error updating server status: {e}")
 
     async def _scrape_loop(self, target: ScrapeTarget):
         while self._running:
@@ -176,17 +223,24 @@ class ScrapeManager:
                 if result.success:
                     self.scrape_success.inc()
                     self.up_gauge.set(1, labels)
+                    self._update_server_status(target.target, result.metrics or {}, True)
                 else:
                     self.scrape_failures.inc()
                     self.up_gauge.set(0, labels)
+                    self._update_server_status(target.target, {}, False, result.error)
                     print(f"Scrape failed: {target.target} - {result.error}")
                 
                 self.response_time.set(result.latency_ms / 1000, labels)
                 
             except Exception as e:
                 print(f"Scrape error for {target.target}: {e}")
+                self._update_server_status(target.target, {}, False, str(e))
             
-            await asyncio.sleep(target.interval)
+            # Sleep outside try block to avoid issues
+            try:
+                await asyncio.sleep(target.interval)
+            except asyncio.CancelledError:
+                break
 
     def start(self):
         if self._running:
@@ -194,24 +248,102 @@ class ScrapeManager:
         
         self._running = True
         
-        for target in self.targets:
-            task = asyncio.create_task(self._scrape_loop(target))
-            self._tasks.append(task)
+        # Use threading instead of asyncio tasks to avoid blocking the main event loop
+        import threading
         
-        print(f"ScrapeManager started with {len(self.targets)} targets")
+        for target in self.targets:
+            thread = threading.Thread(target=self._scrape_thread, args=(target,), daemon=True)
+            thread.start()
+            self._tasks.append(thread)
+        
+        print(f"ScrapeManager started with {len(self.targets)} targets (threaded)")
+    
+    def _scrape_thread(self, target: ScrapeTarget):
+        """Run scrape loop in a separate thread using synchronous httpx"""
+        import httpx
+        import time
+        from datetime import datetime
+        
+        client = httpx.Client(timeout=target.timeout)
+        
+        while self._running:
+            try:
+                if target.target.startswith(("http://", "https://")):
+                    url = target.target
+                    if not url.endswith(target.metrics_path):
+                        url = url.rstrip("/") + target.metrics_path
+                else:
+                    url = f"http://{target.target}{target.metrics_path}"
+                
+                start_time = time.time()
+                response = client.get(url)
+                latency_ms = (time.time() - start_time) * 1000
+                
+                self.scrape_total.inc()
+                labels = [Label(name="job", value=target.job_name), Label(name="target", value=target.target)]
+                
+                if response.status_code == 200:
+                    self.scrape_success.inc()
+                    self.up_gauge.set(1, labels)
+                    
+                    # Parse metrics
+                    metrics = {}
+                    for line in response.text.split("\n"):
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        try:
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                name = parts[0]
+                                value = float(parts[1])
+                                metrics[name] = value
+                        except:
+                            continue
+                    
+                    self._update_server_status(target.target, metrics, True)
+                else:
+                    self.scrape_failures.inc()
+                    self.up_gauge.set(0, labels)
+                    self._update_server_status(target.target, {}, False, f"HTTP {response.status_code}")
+                    print(f"Scrape failed: {target.target} - HTTP {response.status_code}")
+                
+                self.response_time.set(latency_ms / 1000, labels)
+                
+            except httpx.TimeoutException:
+                self.scrape_failures.inc()
+                print(f"Scrape timeout: {target.target}")
+                self._update_server_status(target.target, {}, False, "timeout")
+            except httpx.ConnectError:
+                self.scrape_failures.inc()
+                print(f"Scrape connection refused: {target.target}")
+                self._update_server_status(target.target, {}, False, "connection_refused")
+            except Exception as e:
+                print(f"Scrape error for {target.target}: {e}")
+                self._update_server_status(target.target, {}, False, str(e))
+            
+            time.sleep(target.interval)
+        
+        client.close()
 
     def stop(self):
         self._running = False
         
+        # For threads, we just set the flag and they will exit on next iteration
         for task in self._tasks:
-            task.cancel()
+            if hasattr(task, 'cancel'):
+                try:
+                    task.cancel()
+                except:
+                    pass
         
         self._tasks.clear()
         print("ScrapeManager stopped")
 
     async def close(self):
         self.stop()
-        await self._client.aclose()
+        if hasattr(self, '_client') and self._client:
+            await self._client.aclose()
 
     def add_target(
         self,

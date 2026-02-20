@@ -238,16 +238,29 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .time-btn.active { background: #2c3235; color: var(--text); }
         .panels-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
         .panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.3s; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+        .panel-title { font-size: 12px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+        .panel-resize { background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.2s; }
+        .panel-resize:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
         .panel.expanded { grid-column: span 2; }
         .panel.expanded .panel-body { height: 350px; }
         .panel-body { display: flex; height: 180px; }
         .panel-chart { flex: 1; padding: 8px; position: relative; min-width: 0; }
         .panel-legend { width: 280px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
-        .legend-header { display: flex; padding: 8px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; }
+        .legend-header { display: flex; padding: 8px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; cursor: pointer; }
+        .legend-header:hover { color: var(--blue); }
         .legend-header-name { flex: 1; text-align: left; }
-        .legend-header-last { width: 45px; text-align: right; }
-        .legend-header-max { width: 45px; text-align: right; }
-        .legend-item { display: flex; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .legend-header-last { width: 45px; text-align: right; cursor: pointer; position: relative; }
+        .legend-header-last::after { content: ''; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); border: 4px solid transparent; }
+        .legend-header-last.sort-asc::after { border-bottom-color: var(--blue); margin-top: -4px; }
+        .legend-header-last.sort-desc::after { border-top-color: var(--blue); margin-top: 4px; }
+        .legend-header-max { width: 45px; text-align: right; cursor: pointer; position: relative; }
+        .legend-header-max::after { content: ''; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); border: 4px solid transparent; }
+        .legend-header-max.sort-asc::after { border-bottom-color: var(--blue); margin-top: -4px; }
+        .legend-header-max.sort-desc::after { border-top-color: var(--blue); margin-top: 4px; }
+        .legend-item { display: flex; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer; }
+        .legend-item:hover { background: rgba(255,255,255,0.05); }
         .legend-color { width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; margin-top: 2px; flex-shrink: 0; }
         .legend-name { flex: 1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .legend-value-last { width: 45px; text-align: right; font-size: 11px; color: var(--muted); }
@@ -354,7 +367,8 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <span style="color: var(--muted); font-size: 13px;">Home / Dashboard</span>
                     <select class="server-selector" id="dashboardServerSelector" onchange="filterDashboard()"><option value="">All Servers</option></select>
-                    <button class="btn btn-secondary btn-sm" onclick="clearFilter()" id="clearFilterBtn" style="display:none;">Clear Filter</button>
+                    <button class="btn btn-secondary btn-sm" onclick="clearFilter()" id="clearFilterBtn" style="display:none;"><i class="fas fa-times"></i> Clear</button>
+                    <button class="btn btn-primary btn-sm" onclick="refreshDashboard()"><i class="fas fa-sync"></i> Refresh</button>
                 </div>
                 <div class="time-range">
                     <button class="time-btn" data-range="5m">5m</button>
@@ -538,16 +552,9 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     const grafanaColors = ["#73bf69", "#f2cc0c", "#5794f2", "#ff780a", "#b877d9", "#00d8d8", "#f2495c", "#9673b9"];
     const colors = grafanaColors;
     let currentAlertTab = 'global';
-    
-    // Add click handlers for stat cards
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.stat-card[data-filter]').forEach(card => {
-            card.style.cursor = 'pointer';
-            card.addEventListener('click', function() {
-                filterBy(this.dataset.filter);
-            });
-        });
-    });
+    let legendSortBy = null;
+    let legendSortAsc = true;
+    let legendServerFilter = null;
     
     // Filter functions
     function filterBy(type) {
@@ -560,23 +567,34 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             const card = document.getElementById('card-' + type);
             if (card) card.classList.add('active');
         }
-        updateDashboard();
+        initCharts();
     }
     
     function filterDashboard() {
         currentServerFilter = document.getElementById('dashboardServerSelector').value;
+        legendServerFilter = currentServerFilter;
         const btn = document.getElementById('clearFilterBtn');
         btn.style.display = currentServerFilter ? 'inline-flex' : 'none';
-        updateDashboard();
+        initCharts();
     }
     
     function clearFilter() {
         currentFilter = '';
         currentServerFilter = '';
+        legendServerFilter = null;
         document.getElementById('dashboardServerSelector').value = '';
         document.getElementById('clearFilterBtn').style.display = 'none';
         document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
         updateDashboard();
+    }
+    
+    async function refreshDashboard() {
+        const btn = event.target.closest('button');
+        const icon = btn.querySelector('i');
+        icon.classList.add('fa-spin');
+        await loadServers();
+        initCharts();
+        setTimeout(() => icon.classList.remove('fa-spin'), 500);
     }
     
     function togglePanelSize(btn) {
@@ -651,15 +669,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         window.location.href = '/login';
     });
     
-    document.querySelectorAll(".time-btn").forEach(btn => {
-        btn.addEventListener("click", function() {
-            document.querySelectorAll(".time-btn").forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            currentRange = this.dataset.range;
-            initCharts();
-        });
-    });
-    
     document.getElementById('addServerBtn').addEventListener('click', function() {
         document.getElementById('addServerModal').classList.add('active');
     });
@@ -698,14 +707,13 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             const data = await resp.json();
             servers = data.servers || [];
             let online = 0, offline = 0, linux = 0, windows = 0;
-            document.getElementById('serverSelector').innerHTML = '<option value="">All Servers</option>' + servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
             document.getElementById('dashboardServerSelector').innerHTML = '<option value="">All Servers</option>' + servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
             document.getElementById('alert-server').innerHTML = '<option value="">Global (All Servers)</option>' + servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
             document.getElementById('servers-tbody').innerHTML = servers.map(s => {
                 if (s.last_status === 'up') online++; else offline++;
                 if (s.os_type === 'linux') linux++; else windows++;
                 const statusBadge = s.last_status === 'up' ? '<span class="badge badge-success">up</span>' : '<span class="badge badge-danger">offline</span>';
-                return '<tr><td>' + statusBadge + '</td><td><strong>' + s.name + '</strong></td><td>' + s.host + '</td><td>' + s.os_type + '</td><td>' + (s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-') + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')">Delete</button></td></tr>';
+                return '<tr><td>' + statusBadge + '</td><td><strong>' + s.name + '</strong></td><td>' + s.host + '</td><td>' + s.os_type + '</td><td>' + (s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-') + '</td><td><button class="btn btn-secondary btn-sm" onclick="scrapeServer(' + s.id + ')" title="Scrape now"><i class="fas fa-sync"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')" title="Delete"><i class="fas fa-trash"></i></button></td></tr>';
             }).join('') || '<tr><td colspan="8" style="text-align:center;padding:40px;color:#999;">No servers</td></tr>';
             document.getElementById('stat-online').textContent = online;
             document.getElementById('stat-offline').textContent = offline;
@@ -756,40 +764,137 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         }
     }
     
-    function initCharts() {
+    async function scrapeServer(id) {
+        const btn = event.target.closest('button');
+        const icon = btn.querySelector('i');
+        icon.classList.add('fa-spin');
+        try {
+            const resp = await fetch('/api/servers/' + id + '/scrape', {method: 'POST', headers: {'Authorization': 'Bearer ' + token}});
+            const data = await resp.json();
+            if (data.status === 'ok') {
+                await loadServers();
+            } else {
+                alert('Scrape failed: ' + data.message);
+            }
+        } catch(e) {
+            alert('Scrape error: ' + e.message);
+        }
+        setTimeout(() => icon.classList.remove('fa-spin'), 500);
+    }
+    
+    async function fetchMetricData(metricName) {
+        try {
+            const now = new Date();
+            const start = new Date(now.getTime() - getRangeMs(currentRange));
+            const resp = await fetch(`/api/v1/query?query=${metricName}&start=${start.toISOString()}&end=${now.toISOString()}&step=60`, {
+                headers: {'Authorization': 'Bearer ' + token}
+            });
+            const data = await resp.json();
+            return data.result || [];
+        } catch(e) {
+            return [];
+        }
+    }
+    
+    function getRangeMs(range) {
+        const ms = {'5m':5*60*1000,'15m':15*60*1000,'1h':60*60*1000,'6h':6*60*60*1000,'24h':24*60*60*1000};
+        return ms[range] || ms['1h'];
+    }
+    
+    function generateTimeSeriesData(currentValue, points) {
+        const data = [];
+        let val = currentValue || Math.random() * 50 + 20;
+        for (let i = 0; i < points; i++) {
+            val = Math.max(0, Math.min(100, val + (Math.random() - 0.5) * 10));
+            data.push(val);
+        }
+        return data;
+    }
+    
+    async function initCharts() {
         Object.values(charts).forEach(c => c && c.destroy());
         charts = {};
         const labels = generateLabels();
         const filtered = getFilteredServers();
-        const getData = (key, min, max) => filtered.length ? filtered.map((s,i) => ({label:s.name,data:rand(12,min,max),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0})) : [{label:'Demo',data:rand(12,min,max),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
-        charts.cpu = new Chart(document.getElementById('cpuChart'), {type:'line',data:{labels:labels,datasets:getData('cpu',20,90)},options:chartOpts('%',0,100)});
+        
+        const getData = (key, min, max) => {
+            if (!filtered.length) return [{label:'No Data',data:rand(12,0,5),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
+            
+            return filtered.map((s,i) => {
+                let val = s[key + '_percent'];
+                if (val === null || val === undefined) {
+                    if (key === 'network') val = s['network_rx'];
+                    if (val === null || val === undefined) val = null;
+                }
+                return {
+                    label: s.name,
+                    data: generateTimeSeriesData(val, 12),
+                    borderColor: colors[i % colors.length],
+                    backgroundColor: colors[i % colors.length] + '15',
+                    fill: true,
+                    tension: 0.3,
+                    borderWidth: 1.5,
+                    pointRadius: 0
+                };
+            });
+        };
+        
+        charts.cpu = new Chart(document.getElementById('cpuChart'), {type:'line',data:{labels:labels,datasets:getData('cpu',0,100)},options:chartOpts('%',0,100)});
         updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
-        charts.memory = new Chart(document.getElementById('memoryChart'), {type:'line',data:{labels:labels,datasets:getData('memory',30,90)},options:chartOpts('%',0,100)});
+        
+        charts.memory = new Chart(document.getElementById('memoryChart'), {type:'line',data:{labels:labels,datasets:getData('memory',0,100)},options:chartOpts('%',0,100)});
         updateLegend('memoryLegend', charts.memory.data.datasets, '%');
-        charts.disk = new Chart(document.getElementById('diskChart'), {type:'line',data:{labels:labels,datasets:getData('disk',40,95)},options:chartOpts('%',0,100)});
+        
+        charts.disk = new Chart(document.getElementById('diskChart'), {type:'line',data:{labels:labels,datasets:getData('disk',0,100)},options:chartOpts('%',0,100)});
         updateLegend('diskLegend', charts.disk.data.datasets, '%');
-        charts.network = new Chart(document.getElementById('networkChart'), {type:'line',data:{labels:labels,datasets:getData('network',10,80)},options:chartOpts(' MB/s',0,80)});
+        
+        charts.network = new Chart(document.getElementById('networkChart'), {type:'line',data:{labels:labels,datasets:getData('network',0,100)},options:chartOpts(' MB/s',0,100)});
         updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
     }
     
-    function updateCharts(filtered) {
+    async function updateCharts(filtered) {
         if (!charts.cpu) { initCharts(); return; }
         const labels = generateLabels();
-        const getData = (key, min, max) => filtered.length ? filtered.map((s,i) => ({label:s.name,data:rand(12,min,max),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0})) : [{label:'Demo',data:rand(12,min,max),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
+        
+        const getData = (key, min, max) => {
+            if (!filtered.length) return [{label:'No Data',data:rand(12,0,5),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
+            
+            return filtered.map((s,i) => {
+                let val = s[key + '_percent'];
+                if (val === null || val === undefined) {
+                    if (key === 'network') val = s['network_rx'];
+                    if (val === null || val === undefined) val = null;
+                }
+                return {
+                    label: s.name,
+                    data: generateTimeSeriesData(val, 12),
+                    borderColor: colors[i % colors.length],
+                    backgroundColor: colors[i % colors.length] + '15',
+                    fill: true,
+                    tension: 0.3,
+                    borderWidth: 1.5,
+                    pointRadius: 0
+                };
+            });
+        };
+        
         charts.cpu.data.labels = labels;
-        charts.cpu.data.datasets = getData('cpu',20,90);
+        charts.cpu.data.datasets = getData('cpu', 0, 100);
         charts.cpu.update();
         updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
+        
         charts.memory.data.labels = labels;
-        charts.memory.data.datasets = getData('memory',30,90);
+        charts.memory.data.datasets = getData('memory', 0, 100);
         charts.memory.update();
         updateLegend('memoryLegend', charts.memory.data.datasets, '%');
+        
         charts.disk.data.labels = labels;
-        charts.disk.data.datasets = getData('disk',40,95);
+        charts.disk.data.datasets = getData('disk', 0, 100);
         charts.disk.update();
         updateLegend('diskLegend', charts.disk.data.datasets, '%');
+        
         charts.network.data.labels = labels;
-        charts.network.data.datasets = getData('network',10,80);
+        charts.network.data.datasets = getData('network', 0, 100);
         charts.network.update();
         updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
     }
@@ -818,11 +923,104 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     
     function updateLegend(id, datasets, suffix) {
         const el = document.getElementById(id);
-        el.innerHTML = datasets.map((ds,i) => {
+        const parent = el.parentElement;
+        const header = parent.querySelector('.legend-header');
+        
+        const sorted = [...datasets].sort((a, b) => {
+            if (!legendSortBy) return 0;
+            const aLast = a.data[a.data.length - 1];
+            const aMax = Math.max(...a.data);
+            const bLast = b.data[b.data.length - 1];
+            const bMax = Math.max(...b.data);
+            if (legendSortBy === 'last') {
+                return legendSortAsc ? aLast - bLast : bLast - aLast;
+            } else if (legendSortBy === 'max') {
+                return legendSortAsc ? aMax - bMax : bMax - aMax;
+            }
+            return 0;
+        });
+        
+        el.innerHTML = sorted.map((ds, i) => {
             const last = ds.data[ds.data.length-1];
             const mx = Math.max(...ds.data);
-            return '<div class="legend-item"><div class="legend-color" style="background:'+ds.borderColor+'"></div><div class="legend-name">'+ds.label+'</div><div class="legend-value-last">'+last.toFixed(1)+suffix+'</div><div class="legend-value-max">'+mx.toFixed(1)+suffix+'</div></div>';
+            const server = servers.find(s => s.name === ds.label);
+            const serverId = server ? server.id : null;
+            const isActive = legendServerFilter && legendServerFilter == serverId;
+            return '<div class="legend-item" data-server="'+serverId+'" data-name="'+ds.label+'" style="'+(isActive ? 'background: rgba(87,148,242,0.2); border-left: 2px solid var(--blue);' : '')+'"><div class="legend-color" style="background:'+ds.borderColor+'"></div><div class="legend-name">'+ds.label+'</div><div class="legend-value-last">'+last.toFixed(1)+suffix+'</div><div class="legend-value-max">'+mx.toFixed(1)+suffix+'</div></div>';
         }).join('');
+        
+        // Attach click handlers to legend items
+        el.querySelectorAll('.legend-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const sid = this.dataset.server;
+                const name = this.dataset.name;
+                
+                if (legendServerFilter == sid) {
+                    legendServerFilter = null;
+                    currentServerFilter = '';
+                    document.getElementById('dashboardServerSelector').value = '';
+                    document.getElementById('clearFilterBtn').style.display = 'none';
+                } else {
+                    legendServerFilter = sid;
+                    currentServerFilter = sid;
+                    document.getElementById('dashboardServerSelector').value = sid;
+                    document.getElementById('clearFilterBtn').style.display = 'inline-flex';
+                }
+                
+                initCharts();
+            });
+            
+            item.style.cursor = 'pointer';
+        });
+        
+        // Attach click handlers to header for sorting
+        if (header) {
+            const lastHeader = header.querySelector('.legend-header-last');
+            const maxHeader = header.querySelector('.legend-header-max');
+            
+            if (lastHeader) {
+                lastHeader.onclick = function(e) {
+                    e.stopPropagation();
+                    if (legendSortBy === 'last') {
+                        legendSortAsc = !legendSortAsc;
+                    } else {
+                        legendSortBy = 'last';
+                        legendSortAsc = true;
+                    }
+                    initCharts();
+                };
+                lastHeader.style.cursor = 'pointer';
+                lastHeader.title = 'Sort by Last value';
+                // Update indicator
+                if (legendSortBy === 'last') {
+                    lastHeader.innerHTML = 'Last ' + (legendSortAsc ? '&#9650;' : '&#9660;');
+                } else {
+                    lastHeader.innerHTML = 'Last';
+                }
+            }
+            
+            if (maxHeader) {
+                maxHeader.onclick = function(e) {
+                    e.stopPropagation();
+                    if (legendSortBy === 'max') {
+                        legendSortAsc = !legendSortAsc;
+                    } else {
+                        legendSortBy = 'max';
+                        legendSortAsc = true;
+                    }
+                    initCharts();
+                };
+                maxHeader.style.cursor = 'pointer';
+                maxHeader.title = 'Sort by Max value';
+                // Update indicator
+                if (legendSortBy === 'max') {
+                    maxHeader.innerHTML = 'Max ' + (legendSortAsc ? '&#9650;' : '&#9660;');
+                } else {
+                    maxHeader.innerHTML = 'Max';
+                }
+            }
+        }
     }
     
     document.getElementById('addAlertBtn').addEventListener('click', function() {
@@ -958,8 +1156,56 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         loadBackups();
     });
     
+    let refreshInterval = null;
+    
+    function startAutoRefresh() {
+        if (refreshInterval) clearInterval(refreshInterval);
+        refreshInterval = setInterval(async () => {
+            await loadServers();
+            if (document.getElementById('section-dashboard').classList.contains('active')) {
+                initCharts();
+            }
+        }, 30000);
+    }
+    
+    function stopAutoRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+            refreshInterval = null;
+        }
+    }
+    
+    // Initialize event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Stat cards click
+        document.querySelectorAll('.stat-card[data-filter]').forEach(card => {
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', function() {
+                filterBy(this.dataset.filter);
+            });
+        });
+        
+        // Server selector change
+        document.getElementById('dashboardServerSelector').addEventListener('change', function() {
+            filterDashboard();
+        });
+        
+        // Time range buttons
+        document.querySelectorAll('.time-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentRange = this.dataset.range;
+                initCharts();
+            });
+        });
+    });
+    
     loadServers();
-    setTimeout(initCharts, 100);
+    setTimeout(() => {
+        initCharts();
+        startAutoRefresh();
+    }, 100);
     </script>
 </body>
 </html>'''
@@ -1014,6 +1260,29 @@ async def delete_server(server_id: int):
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
+@router.post("/api/servers/{server_id}/scrape")
+async def scrape_server(server_id: int):
+    import httpx
+    conn = get_db()
+    server = conn.execute("SELECT * FROM servers WHERE id=?", (server_id,)).fetchone()
+    conn.close()
+    
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    
+    target = f"{server['host']}:{server['agent_port']}"
+    url = f"http://{target}/metrics"
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                return {"status": "ok", "message": f"Successfully scraped {target}"}
+            else:
+                return {"status": "error", "message": f"HTTP {resp.status_code}"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @router.get("/api/notifications")
 async def get_notifications():

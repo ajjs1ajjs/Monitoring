@@ -5,10 +5,13 @@ import asyncio
 import os
 import sys
 import traceback
+from contextlib import asynccontextmanager
 
 import uvicorn
 
 from pymon import __version__
+
+scrape_manager = None
 
 
 def main():
@@ -53,23 +56,17 @@ def main():
             auth_cfg.admin_username = config.auth.admin_username
             auth_cfg.admin_password = config.auth.admin_password
             
-            # Ensure DB directory exists
             db_dir = os.path.dirname(db_path)
-            if not db_dir:  # If no directory in path, use current directory
+            if not db_dir:
                 db_dir = "."
             abs_db_dir = os.path.abspath(db_dir)
             if not os.path.exists(abs_db_dir):
                 print(f"Creating DB directory: {abs_db_dir}", file=sys.stderr)
                 os.makedirs(abs_db_dir, exist_ok=True)
-                # Set proper permissions
-                import stat
-                os.chmod(abs_db_dir, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
-            # Update db_path to absolute path
             db_path = os.path.abspath(db_path)
             auth_cfg.db_path = db_path
             
             print(f"DB Path in auth_config: {auth_cfg.db_path}", file=sys.stderr)
-            print(f"DB directory exists: {os.path.exists(os.path.dirname(db_path))}", file=sys.stderr)
             
             print(f"Initializing auth tables...", file=sys.stderr)
             init_auth_tables()
@@ -87,6 +84,45 @@ def main():
         parser.print_help()
 
 
+@asynccontextmanager
+async def lifespan(app):
+    global scrape_manager
+    from pymon import web_dashboard
+    
+    try:
+        from pymon.scrape import ScrapeManager
+        from pymon.config import load_config
+        
+        config_path = os.getenv("CONFIG_PATH", "config.yml")
+        config = load_config(config_path)
+        
+        conn = web_dashboard.get_db()
+        servers = conn.execute("SELECT * FROM servers WHERE enabled=1").fetchall()
+        conn.close()
+        
+        if config.scrape_configs and servers:
+            for server in servers:
+                target = f"{server['host']}:{server['agent_port']}"
+                if target not in config.scrape_configs[0].static_configs[0].targets:
+                    config.scrape_configs[0].static_configs[0].targets.append(target)
+            
+            if config.scrape_configs[0].static_configs[0].targets:
+                config.scrape_configs[0].scrape_interval = 60
+                scrape_manager = ScrapeManager(config)
+                scrape_manager.start()
+                print(f"Background scraping started (interval: {config.scrape_configs[0].scrape_interval}s, targets: {len(config.scrape_configs[0].static_configs[0].targets)})", file=sys.stderr)
+        else:
+            print("No scrape configs or no servers to scrape", file=sys.stderr)
+    except Exception as e:
+        print(f"Warning: Could not start background scraping: {e}", file=sys.stderr)
+    
+    yield
+    
+    if scrape_manager:
+        scrape_manager.stop()
+        print("Background scraping stopped", file=sys.stderr)
+
+
 def create_app():
     from fastapi import FastAPI
     from fastapi.responses import HTMLResponse, RedirectResponse
@@ -98,7 +134,7 @@ def create_app():
 
     print("Creating FastAPI app...", file=sys.stderr)
     
-    app = FastAPI(title="PyMon", version=__version__)
+    app = FastAPI(title="PyMon", version=__version__, lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -109,7 +145,6 @@ def create_app():
     )
 
     try:
-        # Initialize DB tables
         print("Initializing auth tables...", file=sys.stderr)
         init_auth_tables()
         print("Initializing web tables...", file=sys.stderr)
@@ -120,13 +155,6 @@ def create_app():
         traceback.print_exc()
         raise
 
-    # Background task for scraping servers
-    @app.on_event("startup")
-    @app.on_event("startup")
-    async def startup_event():
-        pass  # Background scraping disabled for now
-
-    # Mount routers
     app.include_router(api, prefix="/api/v1")
     app.include_router(web_dashboard.router)
 
