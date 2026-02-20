@@ -100,19 +100,16 @@ async def lifespan(app):
         servers = conn.execute("SELECT * FROM servers WHERE enabled=1").fetchall()
         conn.close()
         
-        if config.scrape_configs and servers:
+        if servers:
+            scrape_manager = ScrapeManager(config)
             for server in servers:
-                target = f"{server['host']}:{server['agent_port']}"
-                if target not in config.scrape_configs[0].static_configs[0].targets:
-                    config.scrape_configs[0].static_configs[0].targets.append(target)
+                scrape_manager.add_server_target(server)
             
-            if config.scrape_configs[0].static_configs[0].targets:
-                config.scrape_configs[0].scrape_interval = 60
-                scrape_manager = ScrapeManager(config)
+            if scrape_manager.targets:
                 scrape_manager.start()
-                print(f"Background scraping started (interval: {config.scrape_configs[0].scrape_interval}s, targets: {len(config.scrape_configs[0].static_configs[0].targets)})", file=sys.stderr)
+                print(f"Background scraping started (interval: {config.scrape_configs[0].scrape_interval if config.scrape_configs else 60}s, targets: {len(scrape_manager.targets)})", file=sys.stderr)
         else:
-            print("No scrape configs or no servers to scrape", file=sys.stderr)
+            print("No servers to scrape", file=sys.stderr)
     except Exception as e:
         print(f"Warning: Could not start background scraping: {e}", file=sys.stderr)
     

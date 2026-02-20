@@ -23,6 +23,7 @@ class ScrapeTarget:
     interval: int
     timeout: int
     labels: dict[str, str]
+    server_id: Optional[int] = None
     honor_labels: bool = False
 
 
@@ -43,7 +44,7 @@ class ScrapeManager:
         self.config = config
         self.targets: list[ScrapeTarget] = []
         self._running = False
-        self._tasks: list[asyncio.Task] = []
+        self._tasks = []
         
         self.scrape_total = Counter("pymon_scrape_total", "Total scrape attempts")
         self.scrape_success = Counter("pymon_scrape_success_total", "Successful scrapes")
@@ -168,30 +169,35 @@ class ScrapeManager:
         
         return metrics
 
-    def _update_server_status(self, target: str, metrics: dict, success: bool, error: str = ""):
+    def _update_server_status(self, target: str, metrics: dict, success: bool, error: str = "", server_id: Optional[int] = None):
         import sqlite3
         import os
         from datetime import datetime
         
         try:
             db_path = os.getenv("DB_PATH", "pymon.db")
-            conn = sqlite3.connect(db_path, timeout=1)
+            conn = sqlite3.connect(db_path, timeout=5)
             conn.row_factory = sqlite3.Row
             c = conn.cursor()
             
-            server = c.execute("SELECT id FROM servers WHERE host = ? OR host LIKE ?", 
-                              (target, f"{target}%")).fetchone()
-            
-            if server:
-                server_id = server['id']
+            sid = None
+            if server_id:
+                sid = server_id
+            else:
+                server = c.execute("SELECT id FROM servers WHERE host = ? OR host LIKE ?", 
+                                  (target, f"{target}%")).fetchone()
+                if server:
+                    sid = server['id']
+
+            if sid:
                 now = datetime.utcnow().isoformat()
                 
                 if success:
-                    cpu = metrics.get('node_cpu_usage_percent') or metrics.get('system_cpu_usage_percent') or metrics.get('cpu_usage_percent', 0)
-                    memory = metrics.get('node_memory_usage_percent') or metrics.get('system_memory_usage_percent') or metrics.get('memory_usage_percent', 0)
-                    disk = metrics.get('node_disk_usage_percent') or metrics.get('system_disk_usage_percent') or metrics.get('disk_usage_percent', 0)
-                    network_rx = metrics.get('node_network_receive_bytes_total') or metrics.get('system_network_rx_bytes', 0)
-                    network_tx = metrics.get('node_network_transmit_bytes_total') or metrics.get('system_network_tx_bytes', 0)
+                    cpu = metrics.get('node_cpu_percent') or metrics.get('node_cpu_usage_percent') or metrics.get('system_cpu_usage_percent') or metrics.get('cpu_usage_percent', 0)
+                    memory = metrics.get('node_memory_percent') or metrics.get('node_memory_usage_percent') or metrics.get('system_memory_usage_percent') or metrics.get('memory_usage_percent', 0)
+                    disk = metrics.get('node_disk_percent') or metrics.get('node_disk_usage_percent') or metrics.get('system_disk_usage_percent') or metrics.get('disk_usage_percent', 0)
+                    network_rx = metrics.get('node_network_receive_bytes') or metrics.get('node_network_receive_bytes_total') or metrics.get('system_network_rx_bytes', 0)
+                    network_tx = metrics.get('node_network_transmit_bytes') or metrics.get('node_network_transmit_bytes_total') or metrics.get('system_network_tx_bytes', 0)
                     uptime = metrics.get('node_boot_time_seconds') or metrics.get('system_uptime_seconds', '')
                     
                     c.execute('''UPDATE servers SET 
@@ -199,11 +205,11 @@ class ScrapeManager:
                         cpu_percent = ?, memory_percent = ?, disk_percent = ?,
                         network_rx = ?, network_tx = ?, uptime = ?
                         WHERE id = ?''',
-                        (now, cpu, memory, disk, network_rx, network_tx, str(uptime), server_id))
+                        (now, cpu, memory, disk, network_rx, network_tx, str(uptime), sid))
                 else:
                     c.execute('''UPDATE servers SET 
                         last_check = ?, last_status = 'down'
-                        WHERE id = ?''', (now, server_id))
+                        WHERE id = ?''', (now, sid))
                 
                 conn.commit()
             
@@ -293,19 +299,27 @@ class ScrapeManager:
                         if not line or line.startswith("#"):
                             continue
                         try:
-                            parts = line.split()
-                            if len(parts) >= 2:
-                                name = parts[0]
-                                value = float(parts[1])
+                            # Use the fixed parsing logic from threaded version
+                            if "{" in line:
+                                name_part, rest = line.split("{", 1)
+                                labels_part, value_str = rest.rsplit("}", 1)
+                                name = name_part.strip()
+                                value = float(value_str.strip())
                                 metrics[name] = value
+                            else:
+                                parts = line.split()
+                                if len(parts) >= 2:
+                                    name = parts[0]
+                                    value = float(parts[1])
+                                    metrics[name] = value
                         except:
                             continue
                     
-                    self._update_server_status(target.target, metrics, True)
+                    self._update_server_status(target.target, metrics, True, server_id=target.server_id)
                 else:
                     self.scrape_failures.inc()
                     self.up_gauge.set(0, labels)
-                    self._update_server_status(target.target, {}, False, f"HTTP {response.status_code}")
+                    self._update_server_status(target.target, {}, False, f"HTTP {response.status_code}", server_id=target.server_id)
                     print(f"Scrape failed: {target.target} - HTTP {response.status_code}")
                 
                 self.response_time.set(latency_ms / 1000, labels)
@@ -313,14 +327,14 @@ class ScrapeManager:
             except httpx.TimeoutException:
                 self.scrape_failures.inc()
                 print(f"Scrape timeout: {target.target}")
-                self._update_server_status(target.target, {}, False, "timeout")
+                self._update_server_status(target.target, {}, False, "timeout", server_id=target.server_id)
             except httpx.ConnectError:
                 self.scrape_failures.inc()
                 print(f"Scrape connection refused: {target.target}")
-                self._update_server_status(target.target, {}, False, "connection_refused")
+                self._update_server_status(target.target, {}, False, "connection_refused", server_id=target.server_id)
             except Exception as e:
                 print(f"Scrape error for {target.target}: {e}")
-                self._update_server_status(target.target, {}, False, str(e))
+                self._update_server_status(target.target, {}, False, str(e), server_id=target.server_id)
             
             time.sleep(target.interval)
         
@@ -345,29 +359,34 @@ class ScrapeManager:
         if hasattr(self, '_client') and self._client:
             await self._client.aclose()
 
-    def add_target(
-        self,
-        job_name: str,
-        target: str,
-        metrics_path: str = "/metrics",
-        interval: int = 15,
-        labels: dict | None = None,
-    ):
-        new_target = ScrapeTarget(
-            job_name=job_name,
-            target=target,
-            metrics_path=metrics_path,
-            interval=interval,
-            timeout=10,
-            labels=labels or {},
+    def add_server_target(self, server: dict):
+        """Add a server from the database as a scrape target"""
+        target_str = f"{server['host']}:{server['agent_port']}"
+        # Use first scrape config as template if exists
+        scrape_config = self.config.scrape_configs[0] if self.config.scrape_configs else None
+        
+        target = ScrapeTarget(
+            job_name="agents",
+            target=target_str,
+            metrics_path=scrape_config.metrics_path if scrape_config else "/metrics",
+            interval=scrape_config.scrape_interval if scrape_config else 60,
+            timeout=scrape_config.scrape_timeout if scrape_config else 10,
+            labels={"job": "agents", "server": server['name']},
+            server_id=server['id'],
+            honor_labels=scrape_config.honor_labels if scrape_config else False
         )
-        self.targets.append(new_target)
         
-        if self._running:
-            task = asyncio.create_task(self._scrape_loop(new_target))
-            self._tasks.append(task)
+        # Avoid duplicates
+        if not any(t.target == target.target for t in self.targets):
+            self.targets.append(target)
+            if self._running:
+                # Start a new thread for this target if already running
+                import threading
+                thread = threading.Thread(target=self._scrape_thread, args=(target,), daemon=True)
+                thread.start()
+                self._tasks.append(thread)
         
-        return new_target
+        return target
 
     def remove_target(self, job_name: str, target: str) -> bool:
         for i, t in enumerate(self.targets):
