@@ -247,12 +247,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
         .panel-body { display: flex; height: 220px; }
         .panel-chart { flex: 1; padding: 12px; position: relative; }
-        .panel-legend { width: 140px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; }
-        .legend-header { display: grid; grid-template-columns: 1fr 45px 45px; padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; }
+        .panel-legend { width: 180px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; }
+        .legend-header { display: grid; grid-template-columns: 12px 1fr 45px 45px; padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; }
         .legend-item { display: grid; grid-template-columns: 12px 1fr 45px 45px; align-items: center; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
-        .legend-color { width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; }
-        .legend-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
-        .legend-value { color: var(--muted); text-align: right; font-size: 11px; }
+        .legend-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+        .legend-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; min-width: 0; }
+        .legend-value { color: var(--muted); text-align: right; font-size: 11px; flex-shrink: 0; }
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
         .card-title { font-size: 14px; font-weight: 600; }
