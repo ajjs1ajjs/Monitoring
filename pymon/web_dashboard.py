@@ -64,7 +64,6 @@ def init_web_tables():
         conn = get_db()
         c = conn.cursor()
         
-        # 1. Servers Table
         c.execute('''CREATE TABLE IF NOT EXISTS servers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -85,10 +84,11 @@ def init_web_tables():
             disk_percent REAL,
             network_rx REAL,
             network_tx REAL,
-            uptime TEXT
+            uptime TEXT,
+            raid_status TEXT,
+            disk_info TEXT
         )''')
         
-        # 2. Notifications Table
         c.execute('''CREATE TABLE IF NOT EXISTS notifications (
             channel TEXT UNIQUE NOT NULL,
             enabled BOOLEAN DEFAULT 0,
@@ -98,10 +98,9 @@ def init_web_tables():
         try:
             for channel in ['telegram', 'discord', 'slack', 'email']:
                 c.execute("INSERT OR IGNORE INTO notifications (channel, enabled, config) VALUES (?, 0, '{}')", (channel,))
-        except sqlite3.OperationalError:
+        except:
             pass
         
-        # 3. Users Table
         try:
             c.execute('''CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,10 +111,9 @@ def init_web_tables():
                 last_login TEXT
             )''')
             c.execute("INSERT OR IGNORE INTO users (username, password_hash, role) VALUES ('admin', 'pbkdf2:sha256:admin', 'admin')")
-        except sqlite3.OperationalError:
+        except:
             pass
         
-        # 4. Alerts Table
         c.execute('''CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -124,7 +122,7 @@ def init_web_tables():
             threshold INTEGER NOT NULL,
             duration INTEGER DEFAULT 0,
             severity TEXT DEFAULT 'warning',
-            server_id INTEGER, -- NULL for global alerts
+            server_id INTEGER,
             notify_telegram BOOLEAN DEFAULT 0,
             notify_discord BOOLEAN DEFAULT 0,
             notify_slack BOOLEAN DEFAULT 0,
@@ -134,14 +132,11 @@ def init_web_tables():
             created_at TEXT
         )''')
         
-        # 5. Security/Settings Table
         c.execute('''CREATE TABLE IF NOT EXISTS security (
             key TEXT PRIMARY KEY,
             value TEXT
         )''')
-        c.execute("INSERT OR IGNORE INTO security (key) VALUES ('ssl_cert_path'), ('ssl_key_path'), ('https_redirect'), ('listen_port')")
         
-        # 6. Backups Table
         c.execute('''CREATE TABLE IF NOT EXISTS backups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             filename TEXT NOT NULL,
@@ -151,9 +146,9 @@ def init_web_tables():
 
         conn.commit()
         conn.close()
+        print("All tables initialized")
     except Exception as e:
         print(f"Error initializing web tables: {e}")
-        raise
 
 LOGIN_HTML = r'''<!DOCTYPE html>
 <html>
@@ -215,153 +210,73 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --bg: #0d0f14;
-            --card: #181b1f;
-            --border: #2c3235;
-            --text: #e0e0e0;
-            --muted: #999;
-            --blue: #5794f2;
-            --green: #73bf69;
-            --red: #f2495c;
-            --yellow: #f2cc0c;
-        }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            font-size: 13px;
-        }
-        .top-nav {
-            background: linear-gradient(90deg, #161719, #1f2326);
-            border-bottom: 1px solid var(--border);
-            padding: 0 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 48px;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
+        :root { --bg: #0d0f14; --card: #181b1f; --border: #2c3235; --text: #e0e0e0; --muted: #999; --blue: #5794f2; --green: #73bf69; --red: #f2495c; --yellow: #f2cc0c; --purple: #b877d9; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 13px; }
+        .top-nav { background: linear-gradient(90deg, #161719, #1f2326); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; justify-content: space-between; align-items: center; height: 48px; position: sticky; top: 0; z-index: 1000; }
         .nav-left { display: flex; align-items: center; gap: 20px; }
         .logo { display: flex; align-items: center; gap: 8px; }
-        .logo-icon {
-            width: 24px; height: 24px;
-            background: linear-gradient(135deg, var(--blue), #2c7bd9);
-            border-radius: 4px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 12px; color: white; font-weight: bold;
-        }
+        .logo-icon { width: 24px; height: 24px; background: linear-gradient(135deg, var(--blue), #2c7bd9); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: white; font-weight: bold; }
         .logo h1 { color: var(--blue); font-size: 18px; font-weight: 600; }
         .nav-menu { display: flex; gap: 2px; }
-        .nav-item {
-            display: flex; align-items: center; gap: 6px;
-            padding: 8px 10px; border-radius: 4px;
-            cursor: pointer; color: var(--muted); font-weight: 500; font-size: 12px;
-            border: none; background: transparent;
-            transition: all 0.2s;
-        }
+        .nav-item { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 4px; cursor: pointer; color: var(--muted); font-weight: 500; font-size: 12px; border: none; background: transparent; transition: all 0.2s; }
         .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.05); }
         .nav-item.active { background: rgba(87,148,242,0.15); color: var(--blue); }
         .nav-right { display: flex; align-items: center; gap: 12px; }
-        .server-selector {
-            padding: 5px 10px; background: #111217; border: 1px solid var(--border);
-            border-radius: 4px; color: var(--text); font-size: 12px; min-width: 150px;
-        }
+        .server-selector { padding: 5px 10px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; min-width: 150px; }
         .main { padding: 16px; }
-        
         .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-        .stat-card {
-            background: var(--card); border: 1px solid var(--border); border-radius: 4px;
-            padding: 16px; display: flex; align-items: center; gap: 12px;
-        }
-        .stat-icon {
-            width: 40px; height: 40px; border-radius: 6px;
-            display: flex; align-items: center; justify-content: center; font-size: 18px;
-        }
+        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 16px; display: flex; align-items: center; gap: 12px; }
+        .stat-icon { width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
         .stat-value { font-size: 24px; font-weight: 600; }
         .stat-label { color: var(--muted); font-size: 12px; }
-        
-        .dashboard-toolbar {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 16px; padding: 8px 12px; background: var(--card);
-            border: 1px solid var(--border); border-radius: 4px;
-        }
+        .dashboard-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 4px; }
         .time-range { display: flex; gap: 2px; background: #111217; border-radius: 4px; padding: 2px; border: 1px solid var(--border); }
-        .time-btn {
-            padding: 4px 10px; background: transparent; border: none; border-radius: 3px;
-            color: var(--muted); font-size: 12px; cursor: pointer;
-        }
+        .time-btn { padding: 4px 10px; background: transparent; border: none; border-radius: 3px; color: var(--muted); font-size: 12px; cursor: pointer; }
         .time-btn.active { background: #2c3235; color: var(--text); }
-        
         .panels-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
         .panel { background: var(--card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
-        .panel-header {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 8px 12px; border-bottom: 1px solid var(--border);
-        }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
         .panel-title { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
-        .panel-body { display: flex; height: 280px; }
+        .panel-body { display: flex; height: 220px; }
         .panel-chart { flex: 1; padding: 12px; position: relative; }
         .panel-legend { width: 140px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; }
-        .legend-header {
-            display: grid; grid-template-columns: 1fr 45px 45px;
-            padding: 8px 10px; border-bottom: 1px solid var(--border);
-            color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600;
-        }
-        .legend-item {
-            display: grid; grid-template-columns: 12px 1fr 45px 45px;
-            align-items: center; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.03);
-            cursor: pointer;
-        }
+        .legend-header { display: grid; grid-template-columns: 1fr 45px 45px; padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; }
+        .legend-item { display: grid; grid-template-columns: 12px 1fr 45px 45px; align-items: center; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); }
         .legend-color { width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; }
         .legend-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
         .legend-value { color: var(--muted); text-align: right; font-size: 11px; }
-        
         .card { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 16px; margin-bottom: 16px; }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
         .card-title { font-size: 14px; font-weight: 600; }
         table { width: 100%; border-collapse: collapse; }
         th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
         th { color: var(--muted); font-size: 11px; text-transform: uppercase; font-weight: 600; background: rgba(0,0,0,0.2); }
-        
-        .btn {
-            padding: 8px 16px; border-radius: 4px; border: none; font-weight: 500;
-            cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px;
-        }
+        .btn { padding: 8px 16px; border-radius: 4px; border: none; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
         .btn-primary { background: linear-gradient(180deg, #2c7bd9, #1a5fb4); color: white; }
         .btn-secondary { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--border); }
         .btn-danger { background: rgba(242,73,92,0.15); color: var(--red); }
         .btn-sm { padding: 6px 12px; font-size: 12px; }
-        
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
-        .modal-content { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 24px; width: 90%; max-width: 500px; }
+        .modal-content { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 24px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
         .form-group { margin-bottom: 16px; }
-        label { display: block; margin-bottom: 6px; color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
-        input, select { width: 100%; padding: 10px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 13px; }
-        input:focus, select:focus { outline: none; border-color: var(--blue); }
+        .form-group label { display: block; margin-bottom: 6px; color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 13px; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--blue); }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        
         .section-content { display: none; }
         .section-content.active { display: block; }
-        
         .install-box { background: rgba(87,148,242,0.05); border: 1px solid rgba(87,148,242,0.2); border-radius: 4px; padding: 16px; margin-top: 12px; }
         .install-box h4 { margin-bottom: 10px; color: var(--blue); font-size: 13px; font-weight: 600; }
         .code-block { position: relative; background: #111217; border: 1px solid var(--border); border-radius: 4px; margin: 10px 0; }
         .code-block code { display: block; padding: 12px; font-family: Monaco,Consolas,monospace; font-size: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; color: var(--text); }
         .copy-btn { position: absolute; top: 8px; right: 8px; padding: 4px 8px; background: rgba(255,255,255,0.1); border: none; border-radius: 3px; color: var(--muted); font-size: 11px; cursor: pointer; }
-        .code-block:hover .copy-btn { opacity: 1; }
         .install-step { display: flex; gap: 12px; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 4px; border-left: 3px solid var(--blue); }
         .step-number { width: 24px; height: 24px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
         .step-title { font-weight: 600; margin-bottom: 4px; font-size: 13px; }
-        .step-desc { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
-        
         .alert-rule { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 4px; padding: 16px; margin-bottom: 12px; }
         .alert-rule-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .alert-rule-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
@@ -369,87 +284,66 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .condition-box { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; font-size: 12px; }
         .condition-label { color: var(--muted); margin-bottom: 4px; font-size: 11px; text-transform: uppercase; }
         .condition-value { font-weight: 600; color: var(--text); font-size: 13px; }
-        .notification-tag { padding: 4px 10px; background: rgba(87,148,242,0.15); border-radius: 3px; font-size: 11px; color: var(--blue); }
+        .notification-tag { padding: 4px 10px; background: rgba(87,148,242,0.15); border-radius: 3px; font-size: 11px; color: var(--blue); margin-right: 6px; }
+        .tab-menu { display: flex; gap: 2px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .tab-item { padding: 8px 16px; cursor: pointer; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; }
+        .tab-item.active { color: var(--blue); border-bottom-color: var(--blue); }
+        .badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .badge-success { background: rgba(115,191,105,0.15); color: var(--green); }
+        .badge-danger { background: rgba(242,73,92,0.15); color: var(--red); }
+        .badge-warning { background: rgba(242,204,12,0.15); color: var(--yellow); }
+        .badge-info { background: rgba(87,148,242,0.15); color: var(--blue); }
+        .raid-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        .raid-card { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 4px; padding: 12px; }
+        .raid-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .raid-card-title { font-weight: 600; font-size: 13px; }
+        .raid-status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+        .raid-disks { margin-top: 8px; }
+        .raid-disk { display: flex; justify-content: space-between; padding: 6px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 4px; font-size: 12px; }
     </style>
 </head>
 <body>
     <nav class="top-nav">
         <div class="nav-left">
-            <div class="logo">
-                <div class="logo-icon">P</div>
-                <h1>PyMon</h1>
+            <div class="logo"><div class="logo-icon">P</div><h1>PyMon</h1></div>
+            <div class="nav-menu">
+                <button class="nav-item active" data-section="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button>
+                <button class="nav-item" data-section="servers"><i class="fas fa-server"></i> Servers</button>
+                <button class="nav-item" data-section="alerts"><i class="fas fa-bell"></i> Alerts</button>
+                <button class="nav-item" data-section="raid"><i class="fas fa-hdd"></i> RAID</button>
+                <button class="nav-item" data-section="settings"><i class="fas fa-cog"></i> Settings</button>
             </div>
-                <div class="nav-menu">
-                    <button class="nav-item active" data-section="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button>
-                    <button class="nav-item" data-section="servers"><i class="fas fa-server"></i> Servers</button>
-                    <button class="nav-item" data-section="alerts"><i class="fas fa-bell"></i> Alerts</button>
-                    <button class="nav-item" data-section="settings"><i class="fas fa-cog"></i> Config</button>
-                </div>
         </div>
         <div class="nav-right">
-            <select class="server-selector" id="serverSelector">
-                <option value="">All Servers</option>
-            </select>
-            <button class="btn btn-secondary btn-sm" id="logoutBtn">Logout</button>
+            <select class="server-selector" id="serverSelector"><option value="">All Servers</option></select>
+            <button class="btn btn-secondary btn-sm" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
         </div>
     </nav>
-    
     <main class="main">
-        <!-- Dashboard -->
         <div id="section-dashboard" class="section-content active">
             <div class="stats-row">
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: rgba(115,191,105,0.15); color: var(--green);"><i class="fas fa-server"></i></div>
-                    <div class="stat-content"><div class="stat-value" id="stat-online" style="color: var(--green);">0</div><div class="stat-label">Online</div></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: rgba(242,73,92,0.15); color: var(--red);"><i class="fas fa-exclamation-triangle"></i></div>
-                    <div class="stat-content"><div class="stat-value" id="stat-offline" style="color: var(--red);">0</div><div class="stat-label">Offline</div></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: rgba(87,148,242,0.15); color: var(--blue);"><i class="fab fa-linux"></i></div>
-                    <div class="stat-content"><div class="stat-value" id="stat-linux" style="color: var(--blue);">0</div><div class="stat-label">Linux</div></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: rgba(242,204,12,0.15); color: var(--yellow);"><i class="fab fa-windows"></i></div>
-                    <div class="stat-content"><div class="stat-value" id="stat-windows" style="color: var(--yellow);">0</div><div class="stat-label">Windows</div></div>
-                </div>
+                <div class="stat-card"><div class="stat-icon" style="background: rgba(115,191,105,0.15); color: var(--green);"><i class="fas fa-server"></i></div><div class="stat-content"><div class="stat-value" id="stat-online" style="color: var(--green);">0</div><div class="stat-label">Online</div></div></div>
+                <div class="stat-card"><div class="stat-icon" style="background: rgba(242,73,92,0.15); color: var(--red);"><i class="fas fa-exclamation-triangle"></i></div><div class="stat-content"><div class="stat-value" id="stat-offline" style="color: var(--red);">0</div><div class="stat-label">Offline</div></div></div>
+                <div class="stat-card"><div class="stat-icon" style="background: rgba(87,148,242,0.15); color: var(--blue);"><i class="fab fa-linux"></i></div><div class="stat-content"><div class="stat-value" id="stat-linux" style="color: var(--blue);">0</div><div class="stat-label">Linux</div></div></div>
+                <div class="stat-card"><div class="stat-icon" style="background: rgba(242,204,12,0.15); color: var(--yellow);"><i class="fab fa-windows"></i></div><div class="stat-content"><div class="stat-value" id="stat-windows" style="color: var(--yellow);">0</div><div class="stat-label">Windows</div></div></div>
             </div>
-            
             <div class="dashboard-toolbar">
                 <span style="color: var(--muted); font-size: 13px;">Home / Dashboard</span>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <div class="time-range">
-                        <button class="time-btn" data-range="5m">5m</button>
-                        <button class="time-btn" data-range="15m">15m</button>
-                        <button class="time-btn" data-range="1h">1h</button>
-                        <button class="time-btn" data-range="6h">6h</button>
-                        <button class="time-btn" data-range="24h">24h</button>
-                    </div>
+                <div class="time-range">
+                    <button class="time-btn" data-range="5m">5m</button>
+                    <button class="time-btn" data-range="15m">15m</button>
+                    <button class="time-btn active" data-range="1h">1h</button>
+                    <button class="time-btn" data-range="6h">6h</button>
+                    <button class="time-btn" data-range="24h">24h</button>
                 </div>
             </div>
-            
             <div class="panels-grid">
-                <div class="panel">
-                    <div class="panel-header"><div class="panel-title"><span class="status-dot"></span>CPU</div></div>
-                    <div class="panel-body"><div class="panel-chart"><canvas id="cpuChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="cpuLegend"></div></div></div>
-                </div>
-                <div class="panel">
-                    <div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Memory</div></div>
-                    <div class="panel-body"><div class="panel-chart"><canvas id="memoryChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="memoryLegend"></div></div></div>
-                </div>
-                <div class="panel">
-                    <div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Disk</div></div>
-                    <div class="panel-body"><div class="panel-chart"><canvas id="diskChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="diskLegend"></div></div></div>
-                </div>
-                <div class="panel">
-                    <div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div></div>
-                    <div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="networkLegend"></div></div></div>
-                </div>
+                <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>CPU</div></div><div class="panel-body"><div class="panel-chart"><canvas id="cpuChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="cpuLegend"></div></div></div></div>
+                <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Memory</div></div><div class="panel-body"><div class="panel-chart"><canvas id="memoryChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="memoryLegend"></div></div></div></div>
+                <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Disk</div></div><div class="panel-body"><div class="panel-chart"><canvas id="diskChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="diskLegend"></div></div></div></div>
+                <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div></div><div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="networkLegend"></div></div></div></div>
             </div>
         </div>
-        
-        <!-- Servers -->
         <div id="section-servers" class="section-content">
             <div class="card">
                 <div class="card-header"><h3 class="card-title">Monitored Servers</h3><button class="btn btn-primary" id="addServerBtn"><i class="fas fa-plus"></i> Add Server</button></div>
@@ -459,48 +353,38 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 <h3 class="card-title" style="margin-bottom: 16px;">Agent Installation</h3>
                 <div class="install-box">
                     <h4>Linux Agent</h4>
-                    <div class="install-step">
-                        <div class="step-number">1</div>
-                        <div class="step-content">
-                            <div class="step-title">Download and run installer</div>
-                            <div class="code-block"><code id="linux-install">curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</code><button class="copy-btn" data-target="linux-install">Copy</button></div>
-                        </div>
-                    </div>
-                    <div class="install-step">
-                        <div class="step-number">2</div>
-                        <div class="step-content">
-                            <div class="step-title">Configure and start</div>
-                            <div class="code-block"><code>sudo nano /etc/systemd/system/pymon-agent.service && sudo systemctl start pymon-agent</code></div>
-                        </div>
-                    </div>
+                    <div class="install-step"><div class="step-number">1</div><div class="step-content"><div class="step-title">Download and run installer</div><div class="code-block"><code id="linux-install">curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</code><button class="copy-btn" data-target="linux-install">Copy</button></div></div></div>
                 </div>
                 <div class="install-box">
                     <h4>Windows Agent</h4>
-                    <div class="install-step">
-                        <div class="step-number">1</div>
-                        <div class="step-content">
-                            <div class="step-title">Run in PowerShell as Administrator</div>
-                            <div class="code-block"><code id="windows-install">Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-windows.ps1" -OutFile "install.ps1"; .\install.ps1</code><button class="copy-btn" data-target="windows-install">Copy</button></div>
-                        </div>
-                    </div>
+                    <div class="install-step"><div class="step-number">1</div><div class="step-content"><div class="step-title">Run in PowerShell as Administrator</div><div class="code-block"><code id="windows-install">powershell -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-windows.ps1' -OutFile 'install.ps1'; .\install.ps1"</code><button class="copy-btn" data-target="windows-install">Copy</button></div></div></div>
                 </div>
             </div>
         </div>
-        
-        <!-- Alerts -->
         <div id="section-alerts" class="section-content">
+            <div class="tab-menu">
+                <div class="tab-item active" data-tab="global">Global Alerts</div>
+                <div class="tab-item" data-tab="server">Server Alerts</div>
+            </div>
             <div class="card">
                 <div class="card-header"><h3 class="card-title">Alert Rules</h3><button class="btn btn-primary" id="addAlertBtn"><i class="fas fa-plus"></i> New Alert</button></div>
                 <p style="color: var(--muted); margin-bottom: 20px;">Configure alerts to receive notifications when metrics exceed thresholds.</p>
                 <div id="alertsList"></div>
             </div>
         </div>
-        
-        <!-- Settings -->
-        <div id="section-settings" class="section-content">
+        <div id="section-raid" class="section-content">
             <div class="card">
-                <h3 class="card-title" style="margin-bottom: 20px;"><i class="fas fa-bell"></i> Notification Settings</h3>
-                
+                <div class="card-header"><h3 class="card-title"><i class="fas fa-hdd"></i> RAID Status</h3><button class="btn btn-secondary btn-sm" id="refreshRaidBtn"><i class="fas fa-sync"></i> Refresh</button></div>
+                <div id="raidGrid" class="raid-grid"><p style="color: var(--muted); padding: 20px; text-align: center;">No RAID data available.</p></div>
+            </div>
+        </div>
+        <div id="section-settings" class="section-content">
+            <div class="tab-menu">
+                <div class="tab-item active" data-tab="notif">Notifications</div>
+                <div class="tab-item" data-tab="security">Security</div>
+                <div class="tab-item" data-tab="backups">Backups</div>
+            </div>
+            <div id="settings-notif" class="tab-content">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div>
                         <h4 style="font-size: 12px; color: #0088cc; margin-bottom: 10px;"><i class="fab fa-telegram"></i> TELEGRAM</h4>
@@ -508,48 +392,49 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                         <div id="telegram-config" style="display: none;">
                             <div class="form-group"><label>Bot Token</label><input type="text" id="telegram-token" placeholder="123456789:ABCdef..."></div>
                             <div class="form-group"><label>Chat ID</label><input type="text" id="telegram-chat" placeholder="-1001234567890"></div>
-                            <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Get token from @BotFather, chat ID from @userinfobot</p>
                         </div>
                     </div>
                     <div>
                         <h4 style="font-size: 12px; color: #5865F2; margin-bottom: 10px;"><i class="fab fa-discord"></i> DISCORD</h4>
                         <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="discord-enabled" style="width: auto;"> Enable Discord</label></div>
-                        <div id="discord-config" style="display: none;">
-                            <div class="form-group"><label>Webhook URL</label><input type="text" id="discord-webhook" placeholder="https://discord.com/api/webhooks/..."></div>
-                            <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Create webhook in Discord channel settings</p>
-                        </div>
+                        <div id="discord-config" style="display: none;"><div class="form-group"><label>Webhook URL</label><input type="text" id="discord-webhook" placeholder="https://discord.com/api/webhooks/..."></div></div>
                     </div>
                 </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
                     <div>
                         <h4 style="font-size: 12px; color: #4A154B; margin-bottom: 10px;"><i class="fab fa-slack"></i> SLACK</h4>
                         <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="slack-enabled" style="width: auto;"> Enabled</label></div>
-                        <div id="slack-config" style="display: none;">
-                            <div class="form-group"><label>Webhook URL</label><input type="text" id="slack-webhook" placeholder="https://hooks.slack.com/services/..."></div>
-                            <p style="color: var(--muted); font-size: 12px; margin-bottom: 20px;">Create incoming webhook in Slack app settings</p>
-                        </div>
+                        <div id="slack-config" style="display: none;"><div class="form-group"><label>Webhook URL</label><input type="text" id="slack-webhook" placeholder="https://hooks.slack.com/services/..."></div></div>
                     </div>
                     <div>
-                        <h4 style="font-size: 12px; color: var(--red); margin-bottom: 10px;"><i class="fas fa-envelope"></i> SMTP (EMAIL)</h4>
+                        <h4 style="font-size: 12px; color: var(--red); margin-bottom: 10px;"><i class="fas fa-envelope"></i> EMAIL</h4>
                         <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="email-enabled" style="width: auto;"> Enabled</label></div>
                         <div id="email-config" style="display: none;">
-                            <div class="form-row">
-                                <div class="form-group"><label>Host</label><input type="text" id="email-host" placeholder="smtp.gmail.com"></div>
-                                <div class="form-group"><label>Port</label><input type="number" id="email-port" value="587"></div>
-                            </div>
+                            <div class="form-row"><div class="form-group"><label>Host</label><input type="text" id="email-host" placeholder="smtp.gmail.com"></div><div class="form-group"><label>Port</label><input type="number" id="email-port" value="587"></div></div>
                             <div class="form-group"><label>User</label><input type="text" id="email-user" placeholder="user@gmail.com"></div>
-                            <div class="form-group"><label>Password / App Password</label><input type="password" id="email-pass" placeholder="app password"></div>
+                            <div class="form-group"><label>Password</label><input type="password" id="email-pass" placeholder="app password"></div>
                         </div>
                     </div>
                 </div>
-                
-                <button class="btn btn-primary" id="saveNotifyBtn" style="margin-top: 20px;"><i class="fas fa-save"></i> Save All Settings</button>
+                <button class="btn btn-primary" id="saveNotifyBtn" style="margin-top: 20px;"><i class="fas fa-save"></i> Save Settings</button>
+            </div>
+            <div id="settings-security" class="tab-content" style="display: none;">
+                <div class="form-row">
+                    <div class="form-group"><label>SSL Certificate Path</label><input type="text" id="ssl-cert" placeholder="/path/to/fullchain.pem"></div>
+                    <div class="form-group"><label>SSL Private Key Path</label><input type="text" id="ssl-key" placeholder="/path/to/privkey.pem"></div>
+                </div>
+                <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="https-redirect" style="width: auto;"> Redirect HTTP to HTTPS</label></div>
+                <div class="form-group"><label>Listen Port</label><input type="number" id="listen-port" value="8090"></div>
+                <button class="btn btn-primary" id="saveSecurityBtn" style="margin-top: 20px;"><i class="fas fa-save"></i> Save Settings</button>
+            </div>
+            <div id="settings-backups" class="tab-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">Database Backups</h3><button class="btn btn-primary" id="createBackupBtn"><i class="fas fa-plus"></i> Create Backup</button></div>
+                    <table><thead><tr><th>Filename</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead><tbody id="backups-tbody"></tbody></table>
+                </div>
             </div>
         </div>
     </main>
-    
-    <!-- Add Server Modal -->
     <div class="modal" id="addServerModal">
         <div class="modal-content">
             <div class="modal-header"><h3>Add Server</h3><button class="modal-close" id="closeServerModal">&times;</button></div>
@@ -560,47 +445,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                     <div class="form-group"><label>Operating System</label><select id="server-os"><option value="linux">Linux</option><option value="windows">Windows</option></select></div>
                     <div class="form-group"><label>Check Interval (sec)</label><input type="number" id="server-interval" value="15"></div>
                 </div>
-                <div class="form-group">
-                    <label>Notification Channels</label>
-                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 8px;">
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="server-notify-telegram"> Telegram</label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="server-notify-discord"> Discord</label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="server-notify-slack"> Slack</label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="server-notify-email"> Email</label>
-                    </div>
-                </div>
                 <button type="submit" class="btn btn-primary" style="width:100%">Add Server</button>
             </form>
         </div>
     </div>
-    
-    <!-- Edit Server Modal -->
-    <div class="modal" id="editServerModal">
-        <div class="modal-content">
-            <div class="modal-header"><h3>Edit Server</h3><button class="modal-close" id="closeEditServerModal">&times;</button></div>
-            <form id="editServerForm">
-                <input type="hidden" id="edit-server-id">
-                <div class="form-group"><label>Server Name</label><input type="text" id="edit-server-name" required></div>
-                <div class="form-group"><label>Host / IP Address</label><input type="text" id="edit-server-host" required></div>
-                <div class="form-row">
-                    <div class="form-group"><label>Operating System</label><select id="edit-server-os"><option value="linux">Linux</option><option value="windows">Windows</option></select></div>
-                    <div class="form-group"><label>Check Interval (sec)</label><input type="number" id="edit-server-interval" value="15"></div>
-                </div>
-                <div class="form-group">
-                    <label>Notification Channels</label>
-                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 8px;">
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="edit-server-notify-telegram"> Telegram</label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="edit-server-notify-discord"> Discord</label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="edit-server-notify-slack"> Slack</label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="edit-server-notify-email"> Email</label>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary" style="width:100%">Save Changes</button>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Add/Edit Alert Modal -->
     <div class="modal" id="alertModal">
         <div class="modal-content">
             <div class="modal-header"><h3 id="alertModalTitle">Add Alert Rule</h3><button class="modal-close" id="closeAlertModal">&times;</button></div>
@@ -608,40 +456,42 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 <input type="hidden" id="alert-id">
                 <div class="form-group"><label>Alert Name</label><input type="text" id="alert-name" required placeholder="High CPU Alert"></div>
                 <div class="form-row">
+                    <div class="form-group"><label>Server (Global = none)</label><select id="alert-server"><option value="">Global (All Servers)</option></select></div>
                     <div class="form-group"><label>Metric</label><select id="alert-metric"><option value="cpu">CPU Usage</option><option value="memory">Memory Usage</option><option value="disk">Disk Usage</option><option value="network">Network I/O</option></select></div>
-                    <div class="form-group"><label>Condition</label><select id="alert-condition"><option value=">">Greater than (&gt;)</option><option value="<">Less than (&lt;)</option><option value="=">Equal to (=)</option></select></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Condition</label><select id="alert-condition"><option value=">">Greater than (&gt;)</option><option value="<">Less than (&lt;)</option></select></div>
                     <div class="form-group"><label>Threshold (%)</label><input type="number" id="alert-threshold" value="80" min="0" max="100"></div>
                 </div>
                 <div class="form-row">
-                    <div class="form-group"><label>Duration</label><select id="alert-duration"><option value="0">Immediate</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>
-                    <div class="form-group"><label>Severity</label><select id="alert-severity"><option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Info</option></select></div>
+                    <div class="form-group"><label>Duration</label><select id="alert-duration"><option value="0">Immediate</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option></select></div>
+                    <div class="form-group"><label>Severity</label><select id="alert-severity"><option value="critical">Critical</option><option value="warning">Warning</option></select></div>
                 </div>
                 <div class="form-group">
                     <label>Notification Channels</label>
                     <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 8px;">
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="alert-notify-telegram"> Telegram</label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="alert-notify-discord"> Discord</label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="alert-notify-slack"> Slack</label>
-                        <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;"><input type="checkbox" id="alert-notify-email"> Email</label>
+                        <label style="display: flex; align-items: center; gap: 5px;"><input type="checkbox" id="alert-notify-telegram"> Telegram</label>
+                        <label style="display: flex; align-items: center; gap: 5px;"><input type="checkbox" id="alert-notify-discord"> Discord</label>
+                        <label style="display: flex; align-items: center; gap: 5px;"><input type="checkbox" id="alert-notify-slack"> Slack</label>
+                        <label style="display: flex; align-items: center; gap: 5px;"><input type="checkbox" id="alert-notify-email"> Email</label>
                     </div>
                 </div>
-                <div class="form-group"><label>Description (optional)</label><textarea id="alert-description" rows="2" style="width:100%;padding:10px;background:#111217;border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;" placeholder="Alert when CPU usage is high..."></textarea></div>
                 <button type="submit" class="btn btn-primary" style="width:100%">Save Alert</button>
             </form>
         </div>
     </div>
-    
     <script>
     const token = localStorage.getItem('token');
     if (!token) window.location.href = '/login';
     
     let servers = [];
+    let alerts = [];
     let charts = {};
     let currentRange = '1h';
     const grafanaColors = ["#73bf69", "#f2cc0c", "#5794f2", "#b877d9", "#ff780a", "#00d8d8", "#f2495c", "#9673b5"];
     const colors = grafanaColors;
+    let currentAlertTab = 'global';
     
-    // Navigation
     document.querySelectorAll(".nav-item").forEach(btn => {
         btn.addEventListener("click", function() {
             const section = this.dataset.section;
@@ -649,21 +499,52 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         });
     });
     
-    // Logout
+    document.querySelectorAll(".tab-menu .tab-item").forEach(btn => {
+        btn.addEventListener("click", function() {
+            const menu = this.parentElement;
+            menu.querySelectorAll(".tab-item").forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            const tab = this.dataset.tab;
+            const container = menu.parentElement;
+            container.querySelectorAll(".tab-content").forEach(c => c.style.display = 'none');
+            const content = document.getElementById(container.id.replace('section', 'settings') + '-' + tab);
+            if (content) content.style.display = 'block';
+            if (this.closest('#section-alerts')) {
+                currentAlertTab = tab;
+                loadAlerts();
+            }
+        });
+    });
+    
+    function showSection(section) {
+        document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        const sectionEl = document.getElementById('section-' + section);
+        if (sectionEl) sectionEl.classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(el => {
+            if (el.dataset.section === section) el.classList.add('active');
+        });
+        if (section === 'dashboard') setTimeout(initCharts, 100);
+        if (section === 'servers') loadServers();
+        if (section === 'alerts') loadAlerts();
+        if (section === 'raid') loadRAID();
+        if (section === 'settings') { loadNotifications(); loadBackups(); }
+    }
+    
     document.getElementById('logoutBtn').addEventListener('click', function() {
         localStorage.removeItem('token');
         window.location.href = '/login';
     });
     
-    // Time range
     document.querySelectorAll(".time-btn").forEach(btn => {
         btn.addEventListener("click", function() {
-            const range = this.dataset.range;
-            if (range) setTimeRange(range);
+            document.querySelectorAll(".time-btn").forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentRange = this.dataset.range;
+            initCharts();
         });
     });
     
-    // Add Server
     document.getElementById('addServerBtn').addEventListener('click', function() {
         document.getElementById('addServerModal').classList.add('active');
     });
@@ -686,7 +567,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         loadServers();
     });
     
-    // Copy buttons
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const target = this.getAttribute('data-target');
@@ -697,25 +577,20 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         });
     });
     
-    // Load servers
     async function loadServers() {
         try {
             const resp = await fetch('/api/servers', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
             servers = data.servers || [];
             let online = 0, offline = 0, linux = 0, windows = 0;
-            
-            document.getElementById('serverSelector').innerHTML = '<option value="">All Servers</option>' + 
-                servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-            
+            document.getElementById('serverSelector').innerHTML = '<option value="">All Servers</option>' + servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
+            document.getElementById('alert-server').innerHTML = '<option value="">Global (All Servers)</option>' + servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
             document.getElementById('servers-tbody').innerHTML = servers.map(s => {
-                if (s.last_status === 'up') online++;
-                else if (s.last_status === 'down') offline++;
-                if (s.os_type === 'linux') linux++;
-                else if (s.os_type === 'windows') windows++;
-                return '<tr><td><span style="padding:4px 8px;background:rgba(115,191,105,0.15);color:#73bf69;border-radius:12px;font-size:11px;">' + (s.last_status || 'pending') + '</span></td><td><strong>' + s.name + '</strong></td><td>' + s.host + '</td><td>' + s.os_type + '</td><td>' + (s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-') + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')">Delete</button></td></tr>';
+                if (s.last_status === 'up') online++; else offline++;
+                if (s.os_type === 'linux') linux++; else windows++;
+                const statusBadge = s.last_status === 'up' ? '<span class="badge badge-success">' + (s.last_status || 'pending') + '</span>' : '<span class="badge badge-danger">' + (s.last_status || 'offline') + '</span>';
+                return '<tr><td>' + statusBadge + '</td><td><strong>' + s.name + '</strong></td><td>' + s.host + '</td><td>' + s.os_type + '</td><td>' + (s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-') + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')">Delete</button></td></tr>';
             }).join('') || '<tr><td colspan="8" style="text-align:center;padding:40px;color:#999;">No servers</td></tr>';
-            
             document.getElementById('stat-online').textContent = online;
             document.getElementById('stat-offline').textContent = offline;
             document.getElementById('stat-linux').textContent = linux;
@@ -730,56 +605,19 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         }
     }
     
-    // Navigation functions
-    function showSection(section) {
-        document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        
-        const sectionEl = document.getElementById('section-' + section);
-        if (sectionEl) sectionEl.classList.add('active');
-        
-        document.querySelectorAll('.nav-item').forEach(el => {
-            if (el.dataset.section === section) el.classList.add('active');
-        });
-        
-        if (section === 'dashboard') {
-            setTimeout(initCharts, 100);
-        }
-    }
-    
-    function setTimeRange(range) {
-        currentRange = range;
-        document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
-        document.querySelector('.time-btn[data-range="' + range + '"]').classList.add('active');
-        initCharts();
-    }
-    
-    // Charts
     function initCharts() {
         Object.values(charts).forEach(c => c && c.destroy());
         charts = {};
-        
         const labels = generateLabels();
-        
-        // CPU
-        const cpuData = servers.length ? servers.map((s,i) => ({label:s.name,data:rand(12,30,90),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0})) : [{label:'Demo',data:rand(12,30,80),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
-        charts.cpu = new Chart(document.getElementById('cpuChart'), {type:'line',data:{labels:labels,datasets:cpuData},options:chartOpts('%',0,100)});
-        updateLegend('cpuLegend', cpuData, '%');
-        
-        // Memory
-        const memData = servers.length ? servers.map((s,i) => ({label:s.name,data:rand(12,40,90),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0})) : [{label:'Demo',data:rand(12,50,85),borderColor:colors[1],backgroundColor:colors[1]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
-        charts.memory = new Chart(document.getElementById('memoryChart'), {type:'line',data:{labels:labels,datasets:memData},options:chartOpts('%',0,100)});
-        updateLegend('memoryLegend', memData, '%');
-        
-        // Disk
-        const diskData = servers.length ? servers.map((s,i) => ({label:s.name,data:rand(12,50,95),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0})) : [{label:'Demo',data:rand(12,60,90),borderColor:colors[2],backgroundColor:colors[2]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
-        charts.disk = new Chart(document.getElementById('diskChart'), {type:'line',data:{labels:labels,datasets:diskData},options:chartOpts('%',0,100)});
-        updateLegend('diskLegend', diskData, '%');
-        
-        // Network
-        const netData = servers.length ? servers.map((s,i) => ({label:s.name,data:rand(12,10,60),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0})) : [{label:'Demo',data:rand(12,20,50),borderColor:colors[3],backgroundColor:colors[3]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
-        charts.network = new Chart(document.getElementById('networkChart'), {type:'line',data:{labels:labels,datasets:netData},options:chartOpts(' MB/s',0,60)});
-        updateLegend('networkLegend', netData, ' MB/s');
+        const getData = (key, min, max) => servers.length ? servers.map((s,i) => ({label:s.name,data:rand(12,min,max),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0})) : [{label:'Demo',data:rand(12,min,max),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
+        charts.cpu = new Chart(document.getElementById('cpuChart'), {type:'line',data:{labels:labels,datasets:getData('cpu',20,90)},options:chartOpts('%',0,100)});
+        updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
+        charts.memory = new Chart(document.getElementById('memoryChart'), {type:'line',data:{labels:labels,datasets:getData('memory',30,90)},options:chartOpts('%',0,100)});
+        updateLegend('memoryLegend', charts.memory.data.datasets, '%');
+        charts.disk = new Chart(document.getElementById('diskChart'), {type:'line',data:{labels:labels,datasets:getData('disk',40,95)},options:chartOpts('%',0,100)});
+        updateLegend('diskLegend', charts.disk.data.datasets, '%');
+        charts.network = new Chart(document.getElementById('networkChart'), {type:'line',data:{labels:labels,datasets:getData('network',10,80)},options:chartOpts(' MB/s',0,80)});
+        updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
     }
     
     function generateLabels() {
@@ -798,20 +636,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         return labels;
     }
     
-    function rand(n, min, max) {
-        return Array(n).fill(0).map(() => min + Math.random() * (max - min));
-    }
+    function rand(n, min, max) { return Array(n).fill(0).map(() => min + Math.random() * (max - min)); }
     
     function chartOpts(suffix, min, max) {
-        return {
-            responsive: true, maintainAspectRatio: false,
-            interaction: {intersect: false, mode: 'index'},
-            scales: {
-                y: {min:min, max:max, grid:{color:'rgba(255,255,255,0.03)'}, ticks:{color:'#666',font:{size:10},callback:v=>v+suffix}},
-                x: {grid:{display:false}, ticks:{color:'#666',font:{size:10}}}
-            },
-            plugins: {legend:{display:false}}
-        };
+        return { responsive: true, maintainAspectRatio: false, interaction: {intersect: false, mode: 'index'}, scales: { y: {min:min, max:max, grid:{color:'rgba(255,255,255,0.03)'}, ticks:{color:'#666',font:{size:10},callback:v=>v+suffix}}, x: {grid:{display:false}, ticks:{color:'#666',font:{size:10}}}}, plugins: {legend:{display:false}} };
     }
     
     function updateLegend(id, datasets, suffix) {
@@ -822,77 +650,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             return '<div class="legend-item"><div class="legend-color" style="background:'+ds.borderColor+'"></div><div class="legend-name">'+ds.label+'</div><div class="legend-value">'+last.toFixed(1)+suffix+'</div><div class="legend-value">'+mx.toFixed(1)+suffix+'</div></div>';
         }).join('');
     }
-    
-    // Edit Server
-    document.getElementById('closeEditServerModal').addEventListener('click', function() {
-        document.getElementById('editServerModal').classList.remove('active');
-    });
-    document.getElementById('editServerForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const id = document.getElementById('edit-server-id').value;
-        await fetch('/api/servers/' + id, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-            body: JSON.stringify({
-                name: document.getElementById('edit-server-name').value,
-                host: document.getElementById('edit-server-host').value,
-                os_type: document.getElementById('edit-server-os').value,
-                check_interval: parseInt(document.getElementById('edit-server-interval').value),
-                notify_telegram: document.getElementById('edit-server-notify-telegram').checked,
-                notify_discord: document.getElementById('edit-server-notify-discord').checked,
-                notify_slack: document.getElementById('edit-server-notify-slack').checked,
-                notify_email: document.getElementById('edit-server-notify-email').checked
-            })
-        });
-        document.getElementById('editServerModal').classList.remove('active');
-        loadServers();
-    });
-    
-    async function editServer(id) {
-        const resp = await fetch('/api/servers/' + id, {headers: {'Authorization': 'Bearer ' + token}});
-        const data = await resp.json();
-        const s = data.server;
-        document.getElementById('edit-server-id').value = s.id;
-        document.getElementById('edit-server-name').value = s.name;
-        document.getElementById('edit-server-host').value = s.host;
-        document.getElementById('edit-server-os').value = s.os_type;
-        document.getElementById('edit-server-interval').value = s.check_interval;
-        document.getElementById('edit-server-notify-telegram').checked = s.notify_telegram;
-        document.getElementById('edit-server-notify-discord').checked = s.notify_discord;
-        document.getElementById('edit-server-notify-slack').checked = s.notify_slack;
-        document.getElementById('edit-server-notify-email').checked = s.notify_email;
-        document.getElementById('editServerModal').classList.add('active');
-    }
-    
-    // Update servers table with edit button
-    async function loadServersWithEdit() {
-        try {
-            const resp = await fetch('/api/servers', {headers: {'Authorization': 'Bearer ' + token}});
-            const data = await resp.json();
-            servers = data.servers || [];
-            let online = 0, offline = 0, linux = 0, windows = 0;
-            
-            document.getElementById('serverSelector').innerHTML = '<option value="">All Servers</option>' + 
-                servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-            
-            document.getElementById('servers-tbody').innerHTML = servers.map(s => {
-                if (s.last_status === 'up') online++;
-                else if (s.last_status === 'down') offline++;
-                if (s.os_type === 'linux') linux++;
-                else if (s.os_type === 'windows') windows++;
-                const statusColor = s.last_status === 'up' ? 'rgba(115,191,105,0.15);color:#73bf69' : 'rgba(242,73,92,0.15);color:#f2495c';
-                return '<tr><td><span style="padding:4px 8px;background:' + statusColor + ';border-radius:12px;font-size:11px;">' + (s.last_status || 'pending') + '</span></td><td><strong>' + s.name + '</strong></td><td>' + s.host + '</td><td>' + s.os_type + '</td><td>' + (s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-') + '</td><td><button class="btn btn-secondary btn-sm" onclick="editServer(' + s.id + ')" style="margin-right:5px;">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')">Delete</button></td></tr>';
-            }).join('') || '<tr><td colspan="8" style="text-align:center;padding:40px;color:#999;">No servers</td></tr>';
-            
-            document.getElementById('stat-online').textContent = online;
-            document.getElementById('stat-offline').textContent = offline;
-            document.getElementById('stat-linux').textContent = linux;
-            document.getElementById('stat-windows').textContent = windows;
-        } catch(e) { console.error(e); }
-    }
-    
-    // Alerts
-    let alerts = [];
     
     document.getElementById('addAlertBtn').addEventListener('click', function() {
         document.getElementById('alert-id').value = '';
@@ -905,7 +662,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         document.getElementById('alertModal').classList.remove('active');
     });
     
-document.getElementById('alertForm').addEventListener('submit', async function(e) {
+    document.getElementById('alertForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const id = document.getElementById('alert-id').value;
         const alertData = {
@@ -915,22 +672,16 @@ document.getElementById('alertForm').addEventListener('submit', async function(e
             threshold: parseInt(document.getElementById('alert-threshold').value),
             duration: parseInt(document.getElementById('alert-duration').value),
             severity: document.getElementById('alert-severity').value,
-            server_id: document.getElementById('alert-server-id').value || null, // Server-specific alert
+            server_id: document.getElementById('alert-server').value || null,
             notify_telegram: document.getElementById('alert-notify-telegram').checked,
             notify_discord: document.getElementById('alert-notify-discord').checked,
             notify_slack: document.getElementById('alert-notify-slack').checked,
             notify_email: document.getElementById('alert-notify-email').checked,
-            description: document.getElementById('alert-description').value,
             enabled: true
         };
-        
         const url = id ? '/api/alerts/' + id : '/api/alerts';
         const method = id ? 'PUT' : 'POST';
-        await fetch(url, {
-            method,
-            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-            body: JSON.stringify(alertData)
-        });
+        await fetch(url, { method, headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify(alertData) });
         document.getElementById('alertModal').classList.remove('active');
         loadAlerts();
     });
@@ -940,150 +691,100 @@ document.getElementById('alertForm').addEventListener('submit', async function(e
             const resp = await fetch('/api/alerts', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
             alerts = data.alerts || [];
-            
-            const metricIcons = {cpu: 'fa-microchip', memory: 'fa-memory', disk: 'fa-hdd', network: 'fa-network-wired', raid: 'fa-layer-group', exporter: 'fa-sync-alt'};
-            const metricColors = {cpu: 'var(--blue)', memory: 'var(--green)', disk: 'var(--yellow)', network: 'var(--purple)', raid: 'var(--orange)', exporter: 'var(--red)'};
-            
-            const activeTab = document.querySelector('#section-alerts .tab-menu .tab-item.active')?.dataset.tab || 'all-alerts';
-            
-            document.getElementById('alertsList').innerHTML = alerts.filter(a => {
-                if (activeTab === 'all-alerts') return a.server_id === null;
-                if (activeTab === 'server-alerts') return a.server_id !== null;
+            const metricIcons = {cpu: 'fa-microchip', memory: 'fa-memory', disk: 'fa-hdd', network: 'fa-network-wired'};
+            const metricColors = {cpu: 'var(--blue)', memory: 'var(--green)', disk: 'var(--yellow)', network: 'var(--purple)'};
+            const filtered = alerts.filter(a => {
+                if (currentAlertTab === 'global') return a.server_id === null || a.server_id === 0;
+                if (currentAlertTab === 'server') return a.server_id !== null && a.server_id !== 0;
                 return true;
-            }).map(a => {
+            });
+            document.getElementById('alertsList').innerHTML = filtered.map(a => {
                 const notifyTags = [];
-                if (a.notify_telegram) notifyTags.push('<span class="notification-tag"><i class="fab fa-telegram"></i> Telegram</span>');
-                if (a.notify_discord) notifyTags.push('<span class="notification-tag"><i class="fab fa-discord"></i> Discord</span>');
-                if (a.notify_slack) notifyTags.push('<span class="notification-tag"><i class="fab fa-slack"></i> Slack</span>');
-                if (a.notify_email) notifyTags.push('<span class="notification-tag"><i class="fas fa-envelope"></i> Email</span>');
-                
-                const durationText = a.duration === 0 ? 'Immediate' : a.duration + ' min';
-                const serverIdText = a.server_id ? `ID:${a.server_id}` : 'GLOBAL';
-                
-                return '<div class="alert-rule">' +
-                    '<div class="alert-rule-header">' +
-                    '<div class="alert-rule-title"><i class="fas ' + (metricIcons[a.metric] || 'fa-bell') + '" style="color: ' + (metricColors[a.metric] || 'var(--blue)') + ';"></i> ' + a.name + '</div>' +
-                    '<div>' +
-                    '<button class="btn btn-secondary btn-sm" onclick="editAlert(' + a.id + ')" style="margin-right:5px;">Edit</button>' +
-                    '<button class="btn btn-danger btn-sm" onclick="deleteAlert(' + a.id + ')">Delete</button>' +
-                    '</div></div>' +
-                    '<div class="alert-conditions">' +
-                    '<div class="condition-box"><div class="condition-label">Scope</div><div class="condition-value">' + serverIdText + '</div></div>' +
-                    '<div class="condition-box"><div class="condition-label">Metric</div><div class="condition-value">' + a.metric.toUpperCase() + '</div></div>' +
-                    '<div class="condition-box"><div class="condition-label">Condition</div><div class="condition-value">' + a.condition + ' ' + a.threshold + '%</div></div>' +
-                    '<div class="condition-box"><div class="condition-label">Duration</div><div class="condition-value">' + durationText + '</div></div>' +
-                    '</div>' +
-                    '<div class="alert-notifications">' + (notifyTags.length ? notifyTags.join('') : '<span style="color: var(--muted);">No notifications configured</span>') + '</div>' +
-                    '</div>';
-            }).join('') || '<p style="color: var(--muted); text-align: center; padding: 40px;">No alert rules configured. Click "New Alert Rule" to create one.</p>';
+                if (a.notify_telegram) notifyTags.push('<span class="notification-tag"><i class="fab fa-telegram"></i></span>');
+                if (a.notify_discord) notifyTags.push('<span class="notification-tag"><i class="fab fa-discord"></i></span>');
+                if (a.notify_slack) notifyTags.push('<span class="notification-tag"><i class="fab fa-slack"></i></span>');
+                if (a.notify_email) notifyTags.push('<span class="notification-tag"><i class="fas fa-envelope"></i></span>');
+                const serverName = a.server_id ? servers.find(s => s.id == a.server_id)?.name || 'Server ' + a.server_id : 'Global';
+                const severityBadge = a.severity === 'critical' ? 'badge-danger' : 'badge-warning';
+                return '<div class="alert-rule"><div class="alert-rule-header"><div class="alert-rule-title"><i class="fas ' + (metricIcons[a.metric] || 'fa-bell') + '" style="color: ' + (metricColors[a.metric] || 'var(--blue)') + ';"></i> ' + a.name + ' <span class="badge ' + severityBadge + '">' + a.severity + '</span></div><div><button class="btn btn-danger btn-sm" onclick="deleteAlert(' + a.id + ')">Delete</button></div></div><div class="alert-conditions"><div class="condition-box"><div class="condition-label">Scope</div><div class="condition-value">' + serverName + '</div></div><div class="condition-box"><div class="condition-label">Metric</div><div class="condition-value">' + a.metric.toUpperCase() + '</div></div><div class="condition-box"><div class="condition-label">Condition</div><div class="condition-value">' + a.condition + ' ' + a.threshold + '%</div></div></div><div class="alert-notifications">' + (notifyTags.length ? notifyTags.join('') : '<span style="color: var(--muted);">No notifications</span>') + '</div></div>';
+            }).join('') || '<p style="color: var(--muted); text-align: center; padding: 40px;">No alert rules configured.</p>';
         } catch(e) { console.error(e); }
     }
     
-    async function editAlert(id) {
-        const resp = await fetch('/api/alerts/' + id, {headers: {'Authorization': 'Bearer ' + token}});
-        const data = await resp.json();
-        const a = data.alert;
-        
-        document.getElementById('alert-id').value = a.id;
-        document.getElementById('alert-name').value = a.name;
-        document.getElementById('alert-metric').value = a.metric;
-        document.getElementById('alert-condition').value = a.condition;
-        document.getElementById('alert-threshold').value = a.threshold;
-        document.getElementById('alert-duration').value = a.duration;
-        document.getElementById('alert-severity').value = a.severity;
-        document.getElementById('alert-notify-telegram').checked = a.notify_telegram;
-        document.getElementById('alert-notify-discord').checked = a.notify_discord;
-        document.getElementById('alert-notify-slack').checked = a.notify_slack;
-        document.getElementById('alert-notify-email').checked = a.notify_email;
-        document.getElementById('alert-description').value = a.description || '';
-        document.getElementById('alertModalTitle').textContent = 'Edit Alert Rule';
-        document.getElementById('alertModal').classList.add('active');
-    }
-    
     async function deleteAlert(id) {
-        if (confirm('Delete this alert rule?')) {
+        if (confirm('Delete this alert?')) {
             await fetch('/api/alerts/' + id, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
             loadAlerts();
         }
     }
     
-    // Settings - toggle config visibility
+    async function loadRAID() {
+        const grid = document.getElementById('raidGrid');
+        if (!servers.length) { grid.innerHTML = '<p style="color: var(--muted); padding: 20px; text-align: center;">No servers added yet.</p>'; return; }
+        const raidServers = servers.filter(s => s.raid_status);
+        if (!raidServers.length) { grid.innerHTML = '<p style="color: var(--muted); padding: 20px; text-align: center;">No RAID data available.</p>'; return; }
+        grid.innerHTML = raidServers.map(s => {
+            let raidData = {status: 'unknown', disks: []};
+            try { if (s.raid_status) raidData = JSON.parse(s.raid_status); } catch(e) {}
+            const statusColor = raidData.status === 'healthy' ? 'var(--green)' : 'var(--red)';
+            const statusIcon = raidData.status === 'healthy' ? 'fa-check-circle' : 'fa-exclamation-triangle';
+            return '<div class="raid-card"><div class="raid-card-header"><div class="raid-card-title">' + s.name + '</div><div class="raid-status"><i class="fas ' + statusIcon + '" style="color: ' + statusColor + ';"></i> ' + (raidData.status || 'Unknown') + '</div></div><div class="raid-disks">' + (raidData.disks || []).map(d => '<div class="raid-disk"><span>' + d.name + '</span><span class="badge ' + (d.status === 'online' ? 'badge-success' : 'badge-danger') + '">' + d.status + '</span></div>').join('') + '</div></div>';
+        }).join('');
+    }
+    
+    document.getElementById('refreshRaidBtn').addEventListener('click', loadRAID);
+    
     ['telegram', 'discord', 'slack', 'email'].forEach(ch => {
-        document.getElementById(ch + '-enabled').addEventListener('change', function() {
-            document.getElementById(ch + '-config').style.display = this.checked ? 'block' : 'none';
-        });
+        const enabled = document.getElementById(ch + '-enabled');
+        if (enabled) {
+            enabled.addEventListener('change', function() {
+                document.getElementById(ch + '-config').style.display = this.checked ? 'block' : 'none';
+            });
+        }
     });
     
-    // Load notification settings
     async function loadNotifications() {
         try {
             const resp = await fetch('/api/notifications', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
             data.notifications.forEach(n => {
                 const enabled = document.getElementById(n.channel + '-enabled');
-                if (enabled) {
-                    enabled.checked = n.enabled;
-                    document.getElementById(n.channel + '-config').style.display = n.enabled ? 'block' : 'none';
-                }
-                if (n.channel === 'telegram' && n.telegram_bot_token) {
-                    document.getElementById('telegram-token').value = n.telegram_bot_token || '';
-                    document.getElementById('telegram-chat').value = n.telegram_chat_id || '';
-                }
-                if (n.channel === 'discord' && n.discord_webhook) {
-                    document.getElementById('discord-webhook').value = n.discord_webhook || '';
-                }
-                if (n.channel === 'slack' && n.slack_webhook) {
-                    document.getElementById('slack-webhook').value = n.slack_webhook || '';
-                }
-                if (n.channel === 'email') {
-                    document.getElementById('email-host').value = n.email_smtp_host || '';
-                    document.getElementById('email-port').value = n.email_smtp_port || 587;
-                    document.getElementById('email-user').value = n.email_user || '';
-                    document.getElementById('email-pass').value = n.email_pass || '';
-                }
+                if (enabled) { enabled.checked = n.enabled; document.getElementById(n.channel + '-config').style.display = n.enabled ? 'block' : 'none'; }
+                if (n.channel === 'telegram') { document.getElementById('telegram-token').value = n.telegram_bot_token || ''; document.getElementById('telegram-chat').value = n.telegram_chat_id || ''; }
+                if (n.channel === 'discord') document.getElementById('discord-webhook').value = n.discord_webhook || '';
+                if (n.channel === 'slack') document.getElementById('slack-webhook').value = n.slack_webhook || '';
+                if (n.channel === 'email') { document.getElementById('email-host').value = n.email_smtp_host || ''; document.getElementById('email-port').value = n.email_smtp_port || 587; document.getElementById('email-user').value = n.email_user || ''; document.getElementById('email-pass').value = n.email_pass || ''; }
             });
         } catch(e) { console.error(e); }
     }
     
-    // Save notifications
     document.getElementById('saveNotifyBtn').addEventListener('click', async function() {
         const channels = {
-            telegram: {
-                enabled: document.getElementById('telegram-enabled').checked,
-                telegram_bot_token: document.getElementById('telegram-token').value,
-                telegram_chat_id: document.getElementById('telegram-chat').value
-            },
-            discord: {
-                enabled: document.getElementById('discord-enabled').checked,
-                discord_webhook: document.getElementById('discord-webhook').value
-            },
-            slack: {
-                enabled: document.getElementById('slack-enabled').checked,
-                slack_webhook: document.getElementById('slack-webhook').value
-            },
-            email: {
-                enabled: document.getElementById('email-enabled').checked,
-                email_smtp_host: document.getElementById('email-host').value,
-                email_smtp_port: parseInt(document.getElementById('email-port').value) || 587,
-                email_user: document.getElementById('email-user').value,
-                email_pass: document.getElementById('email-pass').value
-            }
+            telegram: {enabled: document.getElementById('telegram-enabled').checked, telegram_bot_token: document.getElementById('telegram-token').value, telegram_chat_id: document.getElementById('telegram-chat').value},
+            discord: {enabled: document.getElementById('discord-enabled').checked, discord_webhook: document.getElementById('discord-webhook').value},
+            slack: {enabled: document.getElementById('slack-enabled').checked, slack_webhook: document.getElementById('slack-webhook').value},
+            email: {enabled: document.getElementById('email-enabled').checked, email_smtp_host: document.getElementById('email-host').value, email_smtp_port: parseInt(document.getElementById('email-port').value)||587, email_user: document.getElementById('email-user').value, email_pass: document.getElementById('email-pass').value}
         };
-        
         for (const [channel, config] of Object.entries(channels)) {
-            await fetch('/api/notifications/' + channel, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-                body: JSON.stringify(config)
-            });
+            await fetch('/api/notifications/' + channel, {method: 'PUT', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify(config)});
         }
-        alert('Settings saved successfully!');
+        alert('Settings saved!');
     });
     
-    // Init
-    loadServersWithEdit();
-    loadAlerts();
-    loadNotifications();
+    async function loadBackups() {
+        try {
+            const resp = await fetch('/api/backups', {headers: {'Authorization': 'Bearer ' + token}});
+            const data = await resp.json();
+            document.getElementById('backups-tbody').innerHTML = data.backups.map(b => '<tr><td>' + b.filename + '</td><td>' + (b.size_bytes ? (b.size_bytes/1024).toFixed(1) + ' KB' : '-') + '</td><td>' + b.created_at + '</td><td><button class="btn btn-danger btn-sm">Delete</button></td></tr>').join('') || '<tr><td colspan="4" style="text-align:center;color:#999;">No backups</td></tr>';
+        } catch(e) { console.error(e); }
+    }
+    
+    document.getElementById('createBackupBtn').addEventListener('click', async function() {
+        await fetch('/api/backups', {method: 'POST', headers: {'Authorization': 'Bearer ' + token}});
+        loadBackups();
+    });
+    
+    loadServers();
     setTimeout(initCharts, 100);
     </script>
 </body>
@@ -1125,13 +826,9 @@ async def get_server(server_id: int):
 @router.put("/api/servers/{server_id}")
 async def update_server(server_id: int, server: ServerModel):
     conn = get_db()
-    conn.execute('''UPDATE servers 
-        SET name=?, host=?, os_type=?, agent_port=?, check_interval=?,
-            notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?
-        WHERE id=?''',
+    conn.execute('''UPDATE servers SET name=?, host=?, os_type=?, agent_port=?, check_interval=?, notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=? WHERE id=?''',
         (server.name, server.host, server.os_type, server.agent_port, server.check_interval,
-         int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email),
-         server_id))
+         int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email), server_id))
     conn.commit()
     conn.close()
     return {"status": "ok"}
@@ -1165,56 +862,32 @@ async def update_notification(channel: str, config: dict):
     conn.close()
     return {"status": "ok"}
 
-# Alert endpoints
 @router.get("/api/alerts")
 async def list_alerts():
     conn = get_db()
-    try:
-        alerts = conn.execute("SELECT * FROM alerts ORDER BY created_at DESC").fetchall()
-    except sqlite3.OperationalError:
-        init_web_tables() 
-        alerts = []
+    alerts = conn.execute("SELECT * FROM alerts ORDER BY created_at DESC").fetchall()
     conn.close()
     return {"alerts": [dict(a) for a in alerts]}
-
-@router.get("/api/alerts/{alert_id}")
-async def get_alert(alert_id: int):
-    conn = get_db()
-    alert = conn.execute("SELECT * FROM alerts WHERE id=?", (alert_id,)).fetchone()
-    conn.close()
-    if alert:
-        return {"alert": dict(alert)}
-    raise HTTPException(status_code=404, detail="Alert not found")
 
 @router.post("/api/alerts")
 async def create_alert(alert: AlertModel):
     conn = get_db()
-    c = conn.cursor()
     try:
-        c.execute('''INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity, alert.server_id,
-             int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
-             alert.description, int(alert.enabled), datetime.utcnow().isoformat()))
-        conn.commit()
-    except sqlite3.OperationalError:
-        init_web_tables() 
         conn.execute('''INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity, alert.server_id,
              int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
              alert.description, int(alert.enabled), datetime.utcnow().isoformat()))
         conn.commit()
+    except Exception as e:
+        print(f"Error creating alert: {e}")
     conn.close()
     return {"status": "ok"}
 
 @router.put("/api/alerts/{alert_id}")
 async def update_alert(alert_id: int, alert: AlertModel):
     conn = get_db()
-    conn.execute('''UPDATE alerts 
-        SET name=?, metric=?, condition=?, threshold=?, duration=?, severity=?, server_id=?,
-            notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?, description=?, enabled=?
-        WHERE id=?''',
+    conn.execute('''UPDATE alerts SET name=?, metric=?, condition=?, threshold=?, duration=?, severity=?, server_id=?, notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?, description=?, enabled=? WHERE id=?''',
         (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity, alert.server_id,
          int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
          alert.description, int(alert.enabled), alert_id))
@@ -1230,14 +903,6 @@ async def delete_alert(alert_id: int):
     conn.close()
     return {"status": "ok"}
 
-@router.delete("/api/users/{user_id}")
-async def delete_user(user_id: int):
-    conn = get_db()
-    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
-    conn.commit()
-    conn.close()
-    return {"status": "ok"}
-
 @router.post("/api/backups")
 async def create_backup():
     try:
@@ -1248,7 +913,6 @@ async def create_backup():
         import shutil
         shutil.copy2(DB_PATH, dest)
         size = os.path.getsize(dest)
-        
         conn = get_db()
         conn.execute("INSERT INTO backups (filename, size_bytes, created_at) VALUES (?, ?, ?)",
                      (filename, size, datetime.utcnow().isoformat()))
