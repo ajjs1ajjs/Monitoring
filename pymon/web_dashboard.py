@@ -225,8 +225,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .server-selector { padding: 5px 10px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; min-width: 150px; }
         .main { padding: 16px; }
         .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: transform 0.2s; }
-        .stat-card:hover { transform: translateY(-2px); }
+        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.2s; }
+        .stat-card:hover, .stat-card.clickable { cursor: pointer; transform: translateY(-2px); }
+        .stat-card.clickable:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+        .stat-card.active { border-color: var(--blue); box-shadow: 0 0 12px rgba(87,148,242,0.4); }
         .stat-icon { width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
         .stat-value { font-size: 24px; font-weight: 600; }
         .stat-label { color: var(--muted); font-size: 12px; }
@@ -235,9 +237,13 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .time-btn { padding: 4px 10px; background: transparent; border: none; border-radius: 3px; color: var(--muted); font-size: 12px; cursor: pointer; }
         .time-btn.active { background: #2c3235; color: var(--text); }
         .panels-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.3s; }
+        .panel.expanded { grid-column: span 2; }
+        .panel.expanded .panel-body { height: 350px; }
         .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
         .panel-title { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+        .panel-resize { cursor: pointer; padding: 4px 8px; color: var(--muted); transition: color 0.2s; }
+        .panel-resize:hover { color: var(--blue); }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
         .panel-body { display: flex; height: 220px; }
         .panel-chart { flex: 1; padding: 12px; position: relative; }
@@ -333,13 +339,17 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     <main class="main">
         <div id="section-dashboard" class="section-content active">
             <div class="stats-row">
-                <div class="stat-card"><div class="stat-icon" style="background: rgba(115,191,105,0.15); color: var(--green);"><i class="fas fa-server"></i></div><div class="stat-content"><div class="stat-value" id="stat-online" style="color: var(--green);">0</div><div class="stat-label">Online</div></div></div>
-                <div class="stat-card"><div class="stat-icon" style="background: rgba(242,73,92,0.15); color: var(--red);"><i class="fas fa-exclamation-triangle"></i></div><div class="stat-content"><div class="stat-value" id="stat-offline" style="color: var(--red);">0</div><div class="stat-label">Offline</div></div></div>
-                <div class="stat-card"><div class="stat-icon" style="background: rgba(87,148,242,0.15); color: var(--blue);"><i class="fab fa-linux"></i></div><div class="stat-content"><div class="stat-value" id="stat-linux" style="color: var(--blue);">0</div><div class="stat-label">Linux</div></div></div>
-                <div class="stat-card"><div class="stat-icon" style="background: rgba(242,204,12,0.15); color: var(--yellow);"><i class="fab fa-windows"></i></div><div class="stat-content"><div class="stat-value" id="stat-windows" style="color: var(--yellow);">0</div><div class="stat-label">Windows</div></div></div>
+                <div class="stat-card clickable" onclick="filterBy('online')" id="card-online"><div class="stat-icon" style="background: rgba(115,191,105,0.15); color: var(--green);"><i class="fas fa-check-circle"></i></div><div class="stat-content"><div class="stat-value" id="stat-online" style="color: var(--green);">0</div><div class="stat-label">Online</div></div></div>
+                <div class="stat-card clickable" onclick="filterBy('offline')" id="card-offline"><div class="stat-icon" style="background: rgba(242,73,92,0.15); color: var(--red);"><i class="fas fa-times-circle"></i></div><div class="stat-content"><div class="stat-value" id="stat-offline" style="color: var(--red);">0</div><div class="stat-label">Offline</div></div></div>
+                <div class="stat-card clickable" onclick="filterBy('linux')" id="card-linux"><div class="stat-icon" style="background: rgba(87,148,242,0.15); color: var(--blue);"><i class="fab fa-linux"></i></div><div class="stat-content"><div class="stat-value" id="stat-linux" style="color: var(--blue);">0</div><div class="stat-label">Linux</div></div></div>
+                <div class="stat-card clickable" onclick="filterBy('windows')" id="card-windows"><div class="stat-icon" style="background: rgba(242,204,12,0.15); color: var(--yellow);"><i class="fab fa-windows"></i></div><div class="stat-content"><div class="stat-value" id="stat-windows" style="color: var(--yellow);">0</div><div class="stat-label">Windows</div></div></div>
             </div>
             <div class="dashboard-toolbar">
-                <span style="color: var(--muted); font-size: 13px;">Home / Dashboard</span>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="color: var(--muted); font-size: 13px;">Home / Dashboard</span>
+                    <select class="server-selector" id="dashboardServerSelector" onchange="filterDashboard()"><option value="">All Servers</option></select>
+                    <button class="btn btn-secondary btn-sm" onclick="clearFilter()" id="clearFilterBtn" style="display:none;">Clear Filter</button>
+                </div>
                 <div class="time-range">
                     <button class="time-btn" data-range="5m">5m</button>
                     <button class="time-btn" data-range="15m">15m</button>
@@ -349,19 +359,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 </div>
             </div>
             
-            <!-- Server Status Panel -->
-            <div class="card" style="margin-bottom: 16px;">
-                <div class="card-header"><h3 class="card-title"><i class="fas fa-server"></i> Server Status</h3></div>
-                <div id="serverStatusPanel" style="max-height: 300px; overflow-y: auto;">
-                    <p style="color: var(--muted); text-align: center; padding: 20px;">No servers added</p>
-                </div>
-            </div>
-            
-            <div class="panels-grid">
-                <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>CPU</div></div><div class="panel-body"><div class="panel-chart"><canvas id="cpuChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="cpuLegend"></div></div></div></div>
-                <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Memory</div></div><div class="panel-body"><div class="panel-chart"><canvas id="memoryChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="memoryLegend"></div></div></div></div>
-                <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Disk</div></div><div class="panel-body"><div class="panel-chart"><canvas id="diskChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="diskLegend"></div></div></div></div>
-                <div class="panel"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div></div><div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="networkLegend"></div></div></div></div>
+            <!-- Resizable Panels -->
+            <div class="panels-grid" id="panelsGrid">
+                <div class="panel" style="min-height: 200px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>CPU</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="cpuChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="cpuLegend"></div></div></div></div>
+                <div class="panel" style="min-height: 200px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Memory</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="memoryChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="memoryLegend"></div></div></div></div>
+                <div class="panel" style="min-height: 200px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Disk</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="diskChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="diskLegend"></div></div></div></div>
+                <div class="panel" style="min-height: 200px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span>Name</span><span>Last</span><span>Max</span></div><div id="networkLegend"></div></div></div></div>
             </div>
             
             <!-- RAID & Exporter Status -->
@@ -524,9 +527,64 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     let alerts = [];
     let charts = {};
     let currentRange = '1h';
-    const grafanaColors = ["#73bf69", "#f2cc0c", "#5794f2", "#ff780a", "#b877d9", "#00d8d8", "#f2495c", "#9673b9", "#ff6b6b", "#4ecdc4"];
+    let currentFilter = '';
+    let currentServerFilter = '';
     const colors = grafanaColors;
     let currentAlertTab = 'global';
+    
+    // Filter functions
+    function filterBy(type) {
+        if (currentFilter === type) {
+            currentFilter = '';
+            document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+        } else {
+            currentFilter = type;
+            document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+            const card = document.getElementById('card-' + type);
+            if (card) card.classList.add('active');
+        }
+        updateDashboard();
+    }
+    
+    function filterDashboard() {
+        currentServerFilter = document.getElementById('dashboardServerSelector').value;
+        const btn = document.getElementById('clearFilterBtn');
+        btn.style.display = currentServerFilter ? 'inline-flex' : 'none';
+        updateDashboard();
+    }
+    
+    function clearFilter() {
+        currentFilter = '';
+        currentServerFilter = '';
+        document.getElementById('dashboardServerSelector').value = '';
+        document.getElementById('clearFilterBtn').style.display = 'none';
+        document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
+        updateDashboard();
+    }
+    
+    function togglePanelSize(btn) {
+        const panel = btn.closest('.panel');
+        panel.classList.toggle('expanded');
+    }
+    
+    function getFilteredServers() {
+        let filtered = [...servers];
+        if (currentServerFilter) {
+            filtered = filtered.filter(s => s.id == currentServerFilter);
+        }
+        if (currentFilter === 'online') filtered = filtered.filter(s => s.last_status === 'up');
+        if (currentFilter === 'offline') filtered = filtered.filter(s => s.last_status !== 'up');
+        if (currentFilter === 'linux') filtered = filtered.filter(s => s.os_type === 'linux');
+        if (currentFilter === 'windows') filtered = filtered.filter(s => s.os_type === 'windows');
+        return filtered;
+    }
+    
+    function updateDashboard() {
+        const filtered = getFilteredServers();
+        updateCharts(filtered);
+        updateRAIDStatusPanel(filtered);
+        updateExporterStatusPanel(filtered);
+    }
     
     document.querySelectorAll(".nav-item").forEach(btn => {
         btn.addEventListener("click", function() {
@@ -624,6 +682,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             servers = data.servers || [];
             let online = 0, offline = 0, linux = 0, windows = 0;
             document.getElementById('serverSelector').innerHTML = '<option value="">All Servers</option>' + servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
+            document.getElementById('dashboardServerSelector').innerHTML = '<option value="">All Servers</option>' + servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
             document.getElementById('alert-server').innerHTML = '<option value="">Global (All Servers)</option>' + servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
             document.getElementById('servers-tbody').innerHTML = servers.map(s => {
                 if (s.last_status === 'up') online++; else offline++;
@@ -635,51 +694,15 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             document.getElementById('stat-offline').textContent = offline;
             document.getElementById('stat-linux').textContent = linux;
             document.getElementById('stat-windows').textContent = windows;
-            updateServerStatusPanel();
+            updateRAIDStatusPanel();
+            updateExporterStatusPanel();
         } catch(e) { console.error(e); }
     }
     
-    function updateServerStatusPanel() {
-        const panel = document.getElementById('serverStatusPanel');
-        if (!servers.length) {
-            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers added</p>';
-            return;
-        }
-        
-        panel.innerHTML = servers.map((s, i) => {
-            const statusColor = s.last_status === 'up' ? 'var(--green)' : 'var(--red)';
-            const statusIcon = s.last_status === 'up' ? 'fa-check-circle' : 'fa-times-circle';
-            const cpuColor = (s.cpu_percent || 0) > 80 ? 'var(--red)' : (s.cpu_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
-            const memColor = (s.memory_percent || 0) > 80 ? 'var(--red)' : (s.memory_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
-            const diskColor = (s.disk_percent || 0) > 90 ? 'var(--red)' : (s.disk_percent || 0) > 80 ? 'var(--yellow)' : 'var(--green)';
-            
-            return '<div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; margin-bottom: 8px; border-left: 3px solid ' + statusColor + ';">' +
-                '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">' +
-                '<div style="display: flex; align-items: center; gap: 8px;">' +
-                '<i class="fas ' + statusIcon + '" style="color: ' + statusColor + ';"></i>' +
-                '<strong style="font-size: 14px;">' + s.name + '</strong>' +
-                '<span style="color: var(--muted); font-size: 12px;">' + s.host + '</span>' +
-                '</div>' +
-                '<div style="display: flex; gap: 12px; font-size: 12px;">' +
-                '<span>Last: ' + (s.last_check || '-') + '</span>' +
-                '<span>Uptime: ' + (s.uptime || '-') + '</span>' +
-                '</div>' +
-                '</div>' +
-                '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">' +
-                '<div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center;"><div style="color: var(--muted); font-size: 10px;">CPU</div><div style="color: ' + cpuColor + '; font-weight: 600;">' + (s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-') + '</div></div>' +
-                '<div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center;"><div style="color: var(--muted); font-size: 10px;">Memory</div><div style="color: ' + memColor + '; font-weight: 600;">' + (s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-') + '</div></div>' +
-                '<div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center;"><div style="color: var(--muted); font-size: 10px;">Disk</div><div style="color: ' + diskColor + '; font-weight: 600;">' + (s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-') + '</div></div>' +
-                '</div></div>';
-        }).join('');
-        
-        // Update RAID and Exporter panels
-        updateRAIDStatusPanel();
-        updateExporterStatusPanel();
-    }
-    
     function updateRAIDStatusPanel() {
+        const filtered = getFilteredServers();
         const panel = document.getElementById('raidStatusPanel');
-        const raidServers = servers.filter(s => s.raid_status);
+        const raidServers = filtered.filter(s => s.raid_status);
         if (!raidServers.length) {
             panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data</p>';
             return;
@@ -694,12 +717,13 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     }
     
     function updateExporterStatusPanel() {
+        const filtered = getFilteredServers();
         const panel = document.getElementById('exporterStatusPanel');
-        if (!servers.length) {
+        if (!filtered.length) {
             panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No exporters</p>';
             return;
         }
-        panel.innerHTML = servers.map(s => {
+        panel.innerHTML = filtered.map(s => {
             const isUp = s.last_status === 'up';
             return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
                 '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 9100) + '</span></div>' +
@@ -719,7 +743,8 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         Object.values(charts).forEach(c => c && c.destroy());
         charts = {};
         const labels = generateLabels();
-        const getData = (key, min, max) => servers.length ? servers.map((s,i) => ({label:s.name,data:rand(12,min,max),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0})) : [{label:'Demo',data:rand(12,min,max),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
+        const filtered = getFilteredServers();
+        const getData = (key, min, max) => filtered.length ? filtered.map((s,i) => ({label:s.name,data:rand(12,min,max),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0})) : [{label:'Demo',data:rand(12,min,max),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
         charts.cpu = new Chart(document.getElementById('cpuChart'), {type:'line',data:{labels:labels,datasets:getData('cpu',20,90)},options:chartOpts('%',0,100)});
         updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
         charts.memory = new Chart(document.getElementById('memoryChart'), {type:'line',data:{labels:labels,datasets:getData('memory',30,90)},options:chartOpts('%',0,100)});
@@ -727,6 +752,28 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         charts.disk = new Chart(document.getElementById('diskChart'), {type:'line',data:{labels:labels,datasets:getData('disk',40,95)},options:chartOpts('%',0,100)});
         updateLegend('diskLegend', charts.disk.data.datasets, '%');
         charts.network = new Chart(document.getElementById('networkChart'), {type:'line',data:{labels:labels,datasets:getData('network',10,80)},options:chartOpts(' MB/s',0,80)});
+        updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
+    }
+    
+    function updateCharts(filtered) {
+        if (!charts.cpu) { initCharts(); return; }
+        const labels = generateLabels();
+        const getData = (key, min, max) => filtered.length ? filtered.map((s,i) => ({label:s.name,data:rand(12,min,max),borderColor:colors[i%colors.length],backgroundColor:colors[i%colors.length]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0})) : [{label:'Demo',data:rand(12,min,max),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
+        charts.cpu.data.labels = labels;
+        charts.cpu.data.datasets = getData('cpu',20,90);
+        charts.cpu.update();
+        updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
+        charts.memory.data.labels = labels;
+        charts.memory.data.datasets = getData('memory',30,90);
+        charts.memory.update();
+        updateLegend('memoryLegend', charts.memory.data.datasets, '%');
+        charts.disk.data.labels = labels;
+        charts.disk.data.datasets = getData('disk',40,95);
+        charts.disk.update();
+        updateLegend('diskLegend', charts.disk.data.datasets, '%');
+        charts.network.data.labels = labels;
+        charts.network.data.datasets = getData('network',10,80);
+        charts.network.update();
         updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
     }
     
