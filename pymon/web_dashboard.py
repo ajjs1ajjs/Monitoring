@@ -1371,14 +1371,22 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     
     async function loadBackups() {
         try {
-            const resp = await fetch('/api/backups', {headers: {'Authorization': 'Bearer ' + token}});
+            const resp = await fetch('/api/backup/list', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
-            document.getElementById('backups-tbody').innerHTML = data.backups.map(b => '<tr><td>' + b.filename + '</td><td>' + (b.size_bytes ? (b.size_bytes/1024).toFixed(1) + ' KB' : '-') + '</td><td>' + b.created_at + '</td><td><button class="btn btn-danger btn-sm">Delete</button></td></tr>').join('') || '<tr><td colspan="4" style="text-align:center;color:#999;">No backups</td></tr>';
+            const files = data.files || [];
+            let html = '';
+            for (let i = 0; i < files.length; i++) {
+                const b = files[i];
+                const size = b.size ? (b.size/1024).toFixed(1) + ' KB' : '-';
+                const created = b.created ? b.created.substring(0, 19) : '-';
+                html += '<tr><td>' + b.filename + '</td><td>' + size + '</td><td>' + created + '</td><td><button class="btn btn-danger btn-sm">Delete</button></td></tr>';
+            }
+            document.getElementById('backups-tbody').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No backups</td></tr>';
         } catch(e) { console.error(e); }
     }
     
     document.getElementById('createBackupBtn').addEventListener('click', async function() {
-        await fetch('/api/backups', {method: 'POST', headers: {'Authorization': 'Bearer ' + token}});
+        await fetch('/api/backup/create', {method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: '{}'});
         loadBackups();
     });
     
