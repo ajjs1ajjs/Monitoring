@@ -1379,15 +1379,47 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 const b = files[i];
                 const size = b.size ? (b.size/1024).toFixed(1) + ' KB' : '-';
                 const created = b.created ? b.created.substring(0, 19) : '-';
-                html += '<tr><td>' + b.filename + '</td><td>' + size + '</td><td>' + created + '</td><td><button class="btn btn-danger btn-sm">Delete</button></td></tr>';
+                html += '<tr><td>' + b.filename + '</td><td>' + size + '</td><td>' + created + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteBackupFile(\'' + b.path + '\')"><i class="fas fa-trash"></i></button></td></tr>';
             }
             document.getElementById('backups-tbody').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No backups</td></tr>';
         } catch(e) { console.error(e); }
     }
     
+    async function deleteBackupFile(path) {
+        if (!confirm('Delete this backup file?')) return;
+        try {
+            await fetch('/api/backup/file', {
+                method: 'DELETE',
+                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                body: JSON.stringify({path: path})
+            });
+            loadBackups();
+        } catch(e) { alert('Error: ' + e.message); }
+    }
+    
     document.getElementById('createBackupBtn').addEventListener('click', async function() {
-        await fetch('/api/backup/create', {method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: '{}'});
-        loadBackups();
+        const btn = this;
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+        btn.disabled = true;
+        try {
+            const resp = await fetch('/api/backup/create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                body: '{}'
+            });
+            const data = await resp.json();
+            if (data.status === 'ok') {
+                alert('Backup created: ' + data.filename);
+                loadBackups();
+            } else {
+                alert('Error creating backup');
+            }
+        } catch(e) {
+            alert('Error: ' + e.message);
+        }
+        btn.innerHTML = orig;
+        btn.disabled = false;
     });
     
     // API Keys
