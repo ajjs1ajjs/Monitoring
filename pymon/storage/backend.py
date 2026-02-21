@@ -49,7 +49,7 @@ class MemoryStorage(StorageBackend):
             await self._cleanup(key)
 
     async def _cleanup(self, key: str) -> None:
-        cutoff = datetime.utcnow() - self._retention
+        cutoff = datetime.now(timezone.utc) - self._retention
         self._data[key] = [dp for dp in self._data[key] if dp.timestamp > cutoff]
 
     async def read(

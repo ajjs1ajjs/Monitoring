@@ -100,7 +100,7 @@ def init_auth_tables():
         password_hash = hash_password(auth_config.admin_password)
         c.execute(
             "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) VALUES (?, ?, 1, 1, ?)",
-            (auth_config.admin_username, password_hash, datetime.utcnow().isoformat())
+            (auth_config.admin_username, password_hash, datetime.now(timezone.utc).isoformat())
         )
         print(f"Created default user: {auth_config.admin_username} / {auth_config.admin_password}")
     
@@ -126,8 +126,8 @@ def create_token(user_id: int, username: str, is_admin: bool, must_change: bool)
         "user_id": user_id,
         "is_admin": is_admin,
         "must_change_password": must_change,
-        "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRE_HOURS),
-        "iat": datetime.utcnow(),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_HOURS),
+        "iat": datetime.now(timezone.utc),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -188,7 +188,7 @@ async def validate_api_key(api_key: str) -> User:
     
     for row in c.execute("SELECT user_id, key_hash FROM api_keys"):
         if verify_password(api_key, row["key_hash"]):
-            c.execute("UPDATE api_keys SET last_used = ? WHERE user_id = ?", (datetime.utcnow().isoformat(), row["user_id"]))
+            c.execute("UPDATE api_keys SET last_used = ? WHERE user_id = ?", (datetime.now(timezone.utc).isoformat(), row["user_id"]))
             conn.commit()
             
             c.execute("SELECT id, username, is_admin, must_change_password FROM users WHERE id = ?", (row["user_id"],))
@@ -210,7 +210,7 @@ def create_user(username: str, password: str, is_admin: bool = False) -> User:
         password_hash = hash_password(password)
         c.execute(
             "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) VALUES (?, ?, ?, 1, ?)",
-            (username, password_hash, int(is_admin), datetime.utcnow().isoformat())
+            (username, password_hash, int(is_admin), datetime.now(timezone.utc).isoformat())
         )
         user_id = c.lastrowid
         conn.commit()
@@ -232,7 +232,7 @@ def authenticate_user(username: str, password: str) -> Token:
         conn.close()
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    c.execute("UPDATE users SET last_login = ? WHERE id = ?", (datetime.utcnow().isoformat(), row["id"]))
+    c.execute("UPDATE users SET last_login = ? WHERE id = ?", (datetime.now(timezone.utc).isoformat(), row["id"]))
     conn.commit()
     conn.close()
     
@@ -277,7 +277,7 @@ def create_api_key(user_id: int, name: str) -> str:
     c = conn.cursor()
     c.execute(
         "INSERT INTO api_keys (user_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)",
-        (user_id, key_hash, name, datetime.utcnow().isoformat())
+        (user_id, key_hash, name, datetime.now(timezone.utc).isoformat())
     )
     conn.commit()
     conn.close()

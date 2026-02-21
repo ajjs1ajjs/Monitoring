@@ -1229,7 +1229,7 @@ async def create_server(server: ServerModel):
         VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)''',
         (server.name, server.host, server.os_type, server.agent_port, server.check_interval,
          int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email),
-         datetime.utcnow().isoformat()))
+         datetime.now(timezone.utc).isoformat()))
     conn.commit()
     conn.close()
     return {"status": "ok"}
@@ -1320,7 +1320,7 @@ async def create_alert(alert: AlertModel):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity, alert.server_id,
              int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
-             alert.description, int(alert.enabled), datetime.utcnow().isoformat()))
+             alert.description, int(alert.enabled), datetime.now(timezone.utc).isoformat()))
         conn.commit()
     except Exception as e:
         print(f"Error creating alert: {e}")
@@ -1358,7 +1358,7 @@ async def create_backup():
         size = os.path.getsize(dest)
         conn = get_db()
         conn.execute("INSERT INTO backups (filename, size_bytes, created_at) VALUES (?, ?, ?)",
-                     (filename, size, datetime.utcnow().isoformat()))
+                     (filename, size, datetime.now(timezone.utc).isoformat()))
         conn.commit()
         conn.close()
         return {"status": "ok", "filename": filename}

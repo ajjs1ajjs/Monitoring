@@ -53,7 +53,7 @@ class AlertRule:
 
         if metric.value > self.threshold:
             if self._pending_since is None:
-                self._pending_since = datetime.utcnow()
+                self._pending_since = datetime.now(timezone.utc)
                 return Alert(
                     name=self.name,
                     state=AlertState.PENDING,
@@ -63,7 +63,7 @@ class AlertRule:
                 )
 
             if self.duration > 0:
-                elapsed = (datetime.utcnow() - self._pending_since).total_seconds()
+                elapsed = (datetime.now(timezone.utc) - self._pending_since).total_seconds()
                 if elapsed >= self.duration:
                     return Alert(
                         name=self.name,
@@ -71,7 +71,7 @@ class AlertRule:
                         message=f"{self.expr} = {metric.value} > {self.threshold}",
                         value=metric.value,
                         labels=self.labels,
-                        fired_at=datetime.utcnow(),
+                        fired_at=datetime.now(timezone.utc),
                     )
             else:
                 return Alert(
@@ -80,7 +80,7 @@ class AlertRule:
                     message=f"{self.expr} = {metric.value} > {self.threshold}",
                     value=metric.value,
                     labels=self.labels,
-                    fired_at=datetime.utcnow(),
+                    fired_at=datetime.now(timezone.utc),
                 )
         else:
             if self._pending_since is not None:
@@ -91,7 +91,7 @@ class AlertRule:
                     message=f"{self.expr} = {metric.value} <= {self.threshold}",
                     value=metric.value,
                     labels=self.labels,
-                    resolved_at=datetime.utcnow(),
+                    resolved_at=datetime.now(timezone.utc),
                 )
 
         return None

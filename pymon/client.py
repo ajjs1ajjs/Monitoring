@@ -61,7 +61,7 @@ class PyMonClient:
         if end:
             params["end"] = end
         if hours and not start:
-            end_dt = datetime.utcnow()
+            end_dt = datetime.now(timezone.utc)
             start_dt = end_dt - timedelta(hours=hours)
             params["start"] = start_dt.isoformat()
             params["end"] = end_dt.isoformat()

@@ -90,7 +90,7 @@ async def query_metrics(
     current_user: User = Depends(get_current_user),
 ):
     storage = get_storage()
-    end = end or datetime.utcnow()
+    end = end or datetime.now(timezone.utc)
     start = start or (end - timedelta(hours=1))
     points = await storage.read(query, start, end, step=step)
     return {
@@ -106,4 +106,4 @@ async def list_series(current_user: User = Depends(get_current_user)):
 
 @api.get("/health")
 async def health():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}

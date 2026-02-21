@@ -65,3 +65,9 @@ pymon.db
 backups/
 data/
 config/
+
+# Additional
+.venv-1/
+test_registry.py
+pymon_err.log
+pymon_out.log

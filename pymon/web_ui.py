@@ -1,6 +1,6 @@
 """Web UI templates and routes"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -8,6 +8,8 @@ from typing import Optional
 import json
 import sqlite3
 import os
+import httpx
+import time
 
 router = APIRouter()
 
@@ -102,7 +104,7 @@ async def create_site(site: SiteCreate):
         VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)''',
         (site.name, site.url, site.check_interval, site.timeout,
          int(site.notify_telegram), int(site.notify_discord), int(site.notify_slack),
-         int(site.notify_email), int(site.notify_sms), datetime.utcnow().isoformat()))
+         int(site.notify_email), int(site.notify_sms), datetime.now(timezone.utc).isoformat()))
     site_id = c.lastrowid
     conn.commit()
     conn.close()
@@ -156,7 +158,7 @@ async def check_site_now(site_id: int):
         status = "down"
         response_time = 0
     
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     conn.execute("UPDATE sites SET last_check=?, last_status=?, last_response_time=? WHERE id=?",
                  (now, status, response_time, site_id))
     conn.execute("INSERT INTO check_history (site_id, status, response_time, checked_at) VALUES (?, ?, ?, ?)",
@@ -171,7 +173,7 @@ async def check_site_now(site_id: int):
 async def get_site_history(site_id: int, hours: int = 24):
     conn = get_db()
     from datetime import datetime, timedelta
-    since = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
     history = conn.execute(
         "SELECT * FROM check_history WHERE site_id=? AND checked_at > ? ORDER BY checked_at DESC LIMIT 100",
         (site_id, since)

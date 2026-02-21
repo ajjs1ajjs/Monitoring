@@ -76,7 +76,7 @@ class ScrapeManager:
         result = ScrapeResult(
             target=target,
             success=False,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             metrics={}
         )
         
@@ -190,7 +190,7 @@ class ScrapeManager:
                     sid = server['id']
 
             if sid:
-                now = datetime.utcnow().isoformat()
+                now = datetime.now(timezone.utc).isoformat()
                 
                 if success:
                     cpu = metrics.get('node_cpu_percent') or metrics.get('node_cpu_usage_percent') or metrics.get('system_cpu_usage_percent') or metrics.get('cpu_usage_percent', 0)
