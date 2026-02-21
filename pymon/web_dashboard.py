@@ -553,7 +553,27 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             </div>
             <div id="settings-backups" class="tab-content" style="display: none;">
                 <div class="card">
-                    <div class="card-header"><h3 class="card-title">Database Backups</h3><button class="btn btn-primary" id="createBackupBtn"><i class="fas fa-plus"></i> Create Backup</button></div>
+                    <div class="card-header"><h3 class="card-title"><i class="fas fa-database"></i> Backup & Restore</h3></div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                        <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+                            <h4 style="margin-bottom: 10px; color: var(--green);"><i class="fas fa-download"></i> Create Backup</h4>
+                            <div class="form-group"><label>Save to path:</label><input type="text" id="backupPath" placeholder="backups" style="width: 100%;"></div>
+                            <button class="btn btn-success" id="createBackupBtn" style="width: 100%;"><i class="fas fa-plus"></i> Create Full Backup</button>
+                        </div>
+                        <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+                            <h4 style="margin-bottom: 10px; color: var(--yellow);"><i class="fas fa-upload"></i> Restore Backup</h4>
+                            <div class="form-group"><label>Backup file path:</label><input type="text" id="restorePath" placeholder="backups\pymon_full_xxx.zip" style="width: 100%;"></div>
+                            <div style="margin-bottom: 8px;">
+                                <label style="margin-right: 12px;"><input type="checkbox" id="restoreDb" checked> Database</label>
+                                <label style="margin-right: 12px;"><input type="checkbox" id="restoreConfig" checked> Config</label>
+                                <label><input type="checkbox" id="restoreSettings" checked> Settings</label>
+                            </div>
+                            <button class="btn btn-warning" id="restoreBackupBtn" style="width: 100%;"><i class="fas fa-undo"></i> Restore from Backup</button>
+                        </div>
+                    </div>
+                    
+                    <h4 style="margin-bottom: 8px;"><i class="fas fa-list"></i> Backup Files</h4>
                     <table><thead><tr><th>Filename</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead><tbody id="backups-tbody"></tbody></table>
                 </div>
             </div>
@@ -1374,15 +1394,23 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             const resp = await fetch('/api/backup/list', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
             const files = data.files || [];
+            if (data.backup_path) {
+                document.getElementById('backupPath').value = data.backup_path;
+            }
             let html = '';
             for (let i = 0; i < files.length; i++) {
                 const b = files[i];
                 const size = b.size ? (b.size/1024).toFixed(1) + ' KB' : '-';
                 const created = b.created ? b.created.substring(0, 19) : '-';
-                html += '<tr><td>' + b.filename + '</td><td>' + size + '</td><td>' + created + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteBackupFile(\'' + b.path + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+                html += '<tr><td>' + b.filename + '</td><td>' + size + '</td><td>' + created + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteBackupFile(\'' + b.path + '\')"><i class="fas fa-trash"></i></button> <button class="btn btn-secondary btn-sm" onclick="restoreThisBackup(\'' + b.path + '\')"><i class="fas fa-undo"></i></button></td></tr>';
             }
             document.getElementById('backups-tbody').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No backups</td></tr>';
         } catch(e) { console.error(e); }
+    }
+    
+    function restoreThisBackup(path) {
+        document.getElementById('restorePath').value = path;
+        document.getElementById('restorePath').scrollIntoView();
     }
     
     async function deleteBackupFile(path) {
@@ -1403,17 +1431,57 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
         btn.disabled = true;
         try {
+            const backupPath = document.getElementById('backupPath').value || '';
             const resp = await fetch('/api/backup/create', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-                body: '{}'
+                body: JSON.stringify({path: backupPath})
             });
             const data = await resp.json();
             if (data.status === 'ok') {
-                alert('Backup created: ' + data.filename);
+                alert('Backup created!\nFile: ' + data.filename + '\nSize: ' + (data.size/1024).toFixed(1) + ' KB\nPath: ' + data.path);
                 loadBackups();
             } else {
-                alert('Error creating backup');
+                alert('Error: ' + (data.detail || 'Unknown error'));
+            }
+        } catch(e) {
+            alert('Error: ' + e.message);
+        }
+        btn.innerHTML = orig;
+        btn.disabled = false;
+    });
+    
+    document.getElementById('restoreBackupBtn').addEventListener('click', async function() {
+        const filePath = document.getElementById('restorePath').value;
+        if (!filePath) {
+            alert('Please enter backup file path');
+            return;
+        }
+        if (!confirm('Restore from backup?\n\nThis will overwrite current data!\nFile: ' + filePath)) {
+            return;
+        }
+        
+        const btn = this;
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Restoring...';
+        btn.disabled = true;
+        
+        try {
+            const resp = await fetch('/api/backup/restore', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                body: JSON.stringify({
+                    file: filePath,
+                    restore_db: document.getElementById('restoreDb').checked,
+                    restore_config: document.getElementById('restoreConfig').checked,
+                    restore_settings: document.getElementById('restoreSettings').checked
+                })
+            });
+            const data = await resp.json();
+            if (data.status === 'ok') {
+                alert('Backup restored successfully!\nPlease restart the server to apply changes.');
+            } else {
+                alert('Error: ' + (data.detail || 'Unknown error'));
             }
         } catch(e) {
             alert('Error: ' + e.message);
