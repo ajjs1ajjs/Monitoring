@@ -7,7 +7,7 @@ from typing import Optional
 import json
 import sqlite3
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -1272,11 +1272,11 @@ async def scrape_server(server_id: int):
         raise HTTPException(status_code=404, detail="Server not found")
     
     target = f"{server['host']}:{server['agent_port']}"
-    url = f"http://{target}/metrics"
+    url = f"http://{target}/api/v1/metrics"
     
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url)
+            resp = await client.post(url, json={"name": "test", "value": 1.0, "type": "gauge"})
             if resp.status_code == 200:
                 return {"status": "ok", "message": f"Successfully scraped {target}"}
             else:

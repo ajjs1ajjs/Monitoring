@@ -11,7 +11,7 @@ import os
 import httpx
 import time
 
-router = APIRouter()
+app = APIRouter()
 
 DB_PATH = os.getenv("DB_PATH", "pymon.db")
 
@@ -86,7 +86,7 @@ class NotificationConfig(BaseModel):
 
 
 # API Routes
-@router.get("/api/sites")
+@app.get("/api/servers")
 async def list_sites():
     conn = get_db()
     sites = conn.execute("SELECT * FROM sites ORDER BY created_at DESC").fetchall()
@@ -94,7 +94,7 @@ async def list_sites():
     return {"sites": [dict(s) for s in sites]}
 
 
-@router.post("/api/sites")
+@app.post("/api/servers")
 async def create_site(site: SiteCreate):
     conn = get_db()
     c = conn.cursor()
@@ -111,7 +111,7 @@ async def create_site(site: SiteCreate):
     return {"id": site_id, "status": "ok"}
 
 
-@router.put("/api/sites/{site_id}")
+@app.put("/api/servers/{site_id}")
 async def update_site(site_id: int, site: SiteCreate):
     conn = get_db()
     c = conn.cursor()
@@ -127,7 +127,7 @@ async def update_site(site_id: int, site: SiteCreate):
     return {"status": "ok"}
 
 
-@router.delete("/api/sites/{site_id}")
+@app.delete("/api/servers/{site_id}")
 async def delete_site(site_id: int):
     conn = get_db()
     conn.execute("DELETE FROM sites WHERE id=?", (site_id,))
@@ -137,7 +137,7 @@ async def delete_site(site_id: int):
     return {"status": "ok"}
 
 
-@router.post("/api/sites/{site_id}/check")
+@app.post("/api/servers/{site_id}/check")
 async def check_site_now(site_id: int):
     conn = get_db()
     site = conn.execute("SELECT * FROM sites WHERE id=?", (site_id,)).fetchone()
@@ -169,7 +169,7 @@ async def check_site_now(site_id: int):
     return {"status": status, "response_time": response_time}
 
 
-@router.get("/api/sites/{site_id}/history")
+@app.get("/api/servers/{site_id}/history")
 async def get_site_history(site_id: int, hours: int = 24):
     conn = get_db()
     from datetime import datetime, timedelta
@@ -182,7 +182,7 @@ async def get_site_history(site_id: int, hours: int = 24):
     return {"history": [dict(h) for h in history]}
 
 
-@router.get("/api/notifications")
+@app.get("/api/servers")
 async def get_notifications():
     conn = get_db()
     notifications = conn.execute("SELECT * FROM notifications").fetchall()
@@ -195,7 +195,7 @@ async def get_notifications():
     return {"notifications": result}
 
 
-@router.put("/api/notifications/{channel}")
+@app.put("/api/servers/{channel}")
 async def update_notification(channel: str, config: dict):
     conn = get_db()
     c = conn.cursor()
@@ -334,6 +334,6 @@ LOGIN_HTML = """
 """
 
 
-@router.get("/login", response_class=HTMLResponse)
+@app.get("/login", response_class=HTMLResponse)
 async def login_page():
     return LOGIN_HTML
