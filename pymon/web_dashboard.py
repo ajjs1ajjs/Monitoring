@@ -143,6 +143,39 @@ def init_web_tables():
             size_bytes INTEGER,
             created_at TEXT
         )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS api_keys (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            key_hash TEXT NOT NULL,
+            user_id INTEGER,
+            created_at TEXT,
+            last_used TEXT
+        )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            action TEXT NOT NULL,
+            details TEXT,
+            ip_address TEXT,
+            created_at TEXT
+        )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS maintenance_windows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            servers TEXT,
+            enabled BOOLEAN DEFAULT 1,
+            created_at TEXT
+        )''')
+        
+        c.execute('''CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )''')
 
         conn.commit()
         conn.close()
@@ -347,7 +380,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 <button class="nav-item active" data-section="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button>
                 <button class="nav-item" data-section="servers"><i class="fas fa-server"></i> Servers</button>
                 <button class="nav-item" data-section="alerts"><i class="fas fa-bell"></i> Alerts</button>
-                <button class="nav-item" data-section="raid"><i class="fas fa-hdd"></i> RAID</button>
                 <button class="nav-item" data-section="settings"><i class="fas fa-cog"></i> Settings</button>
             </div>
         </div>
@@ -387,54 +419,73 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="networkLegend"></div></div></div></div>
             </div>
 
-            <!-- RAID Status -->
+            <!-- RAID Status - Extended -->
             <div class="card" style="margin-top: 16px;">
                 <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-hdd"></i> RAID Status</h3>
+                    <h3 class="card-title"><i class="fas fa-hdd"></i> RAID Arrays Status</h3>
                     <button class="btn btn-secondary btn-sm" id="refreshRaidBtn"><i class="fas fa-sync"></i> Refresh</button>
                 </div>
-                <div id="raidStatusPanel" style="max-height: 200px; overflow-y: auto;">
-                    <p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data</p>
+                <div id="raidStats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 12px;">
+                    <div style="text-align: center;"><div style="font-size: 24px; color: var(--blue);" id="raidTotalServers">-</div><div style="color: var(--muted); font-size: 11px;">Servers with RAID</div></div>
+                    <div style="text-align: center;"><div style="font-size: 24px; color: var(--green);" id="raidHealthy">-</div><div style="color: var(--muted); font-size: 11px;">Healthy Arrays</div></div>
+                    <div style="text-align: center;"><div style="font-size: 24px; color: var(--red);" id="raidDegraded">-</div><div style="color: var(--muted); font-size: 11px;">Degraded Arrays</div></div>
+                    <div style="text-align: center;"><div style="font-size: 24px; color: var(--yellow);" id="raidTotalSize">-</div><div style="color: var(--muted); font-size: 11px;">Total Capacity</div></div>
                 </div>
-            </div>
-
-            <!-- Disk Status -->
-            <div class="card" style="margin-top: 16px;">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-hdd"></i> Disk Status</h3>
-                    <button class="btn btn-secondary btn-sm" id="refreshDiskBtn"><i class="fas fa-sync"></i> Refresh</button>
-                </div>
-                <div id="diskStatusPanel" style="max-height: 200px; overflow-y: auto;">
-                    <p style="color: var(--muted); text-align: center; padding: 20px;">No disk data</p>
-                </div>
-            </div>
-
-            <!-- SQL Always On Nodes -->
-            <div class="card" style="margin-top: 16px;">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-database"></i> SQL Always On Nodes</h3>
-                    <button class="btn btn-secondary btn-sm" id="refreshSqlBtn"><i class="fas fa-sync"></i> Refresh</button>
-                </div>
-                <div id="sqlStatusPanel" style="max-height: 200px; overflow-y: auto;">
-                    <p style="color: var(--muted); text-align: center; padding: 20px;">No SQL Always On data</p>
+                <div id="raidStatusPanel" style="max-height: 400px; overflow-y: auto;">
+                    <p style="color: var(--muted); text-align: center; padding: 20px;">Loading RAID data...</p>
                 </div>
             </div>
         </div>
         <div id="section-servers" class="section-content">
             <div class="card">
-                <div class="card-header"><h3 class="card-title">Monitored Servers</h3><button class="btn btn-primary" id="addServerBtn"><i class="fas fa-plus"></i> Add Server</button></div>
-                <table><thead><tr><th>Status</th><th>Name</th><th>Host</th><th>OS</th><th>CPU</th><th>Memory</th><th>Disk</th><th>Actions</th></tr></thead><tbody id="servers-tbody"></tbody></table>
-            </div>
-            <div class="card">
-                <h3 class="card-title" style="margin-bottom: 16px;">Agent Installation</h3>
-                <div class="install-box">
-                    <h4>Linux Agent</h4>
-                    <div class="install-step"><div class="step-number">1</div><div class="step-content"><div class="step-title">Download and run installer</div><div class="code-block"><code id="linux-install">curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</code><button class="copy-btn" data-target="linux-install">Copy</button></div></div></div>
+                <div class="card-header">
+                    <h3 class="card-title">Monitored Servers</h3>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <input type="text" id="serverSearch" placeholder="Search name/host..." style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text); width: 140px;">
+                        <select id="filterStatus" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                            <option value="">All Status</option>
+                            <option value="up">Online</option>
+                            <option value="down">Offline</option>
+                        </select>
+                        <select id="filterOS" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                            <option value="">All OS</option>
+                            <option value="windows">Windows</option>
+                            <option value="linux">Linux</option>
+                        </select>
+                        <select id="filterCPU" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                            <option value="">CPU Any</option>
+                            <option value="90">CPU > 90%</option>
+                            <option value="80">CPU > 80%</option>
+                            <option value="70">CPU > 70%</option>
+                            <option value="50">CPU > 50%</option>
+                        </select>
+                        <select id="filterMemory" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                            <option value="">Memory Any</option>
+                            <option value="95">Memory > 95%</option>
+                            <option value="90">Memory > 90%</option>
+                            <option value="80">Memory > 80%</option>
+                            <option value="70">Memory > 70%</option>
+                        </select>
+                        <select id="filterDisk" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                            <option value="">Disk Any</option>
+                            <option value="95">Disk > 95%</option>
+                            <option value="90">Disk > 90%</option>
+                            <option value="80">Disk > 80%</option>
+                            <option value="70">Disk > 70%</option>
+                        </select>
+                        <select id="serverSortSelect" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                            <option value="name">Sort: Name</option>
+                            <option value="status">Sort: Status</option>
+                            <option value="cpu">Sort: CPU</option>
+                            <option value="memory">Sort: Memory</option>
+                            <option value="disk">Sort: Disk</option>
+                        </select>
+                        <button class="btn btn-secondary btn-sm" id="clearFiltersBtn"><i class="fas fa-times"></i> Clear</button>
+                        <button class="btn btn-primary" id="addServerBtn"><i class="fas fa-plus"></i> Add</button>
+                    </div>
                 </div>
-                <div class="install-box">
-                    <h4>Windows Agent</h4>
-                    <div class="install-step"><div class="step-number">1</div><div class="step-content"><div class="step-title">Run in PowerShell as Administrator</div><div class="code-block"><code id="windows-install">powershell -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-windows.ps1' -OutFile 'install.ps1'; .\install.ps1"</code><button class="copy-btn" data-target="windows-install">Copy</button></div></div></div>
-                </div>
+                <div id="filterStats" style="padding: 8px 12px; background: rgba(0,0,0,0.2); font-size: 12px; color: var(--muted); margin-bottom: 8px;"></div>
+                <table><thead><tr><th>Status</th><th>Name</th><th>Host:Port</th><th>OS</th><th>CPU</th><th>Memory</th><th>Disk</th><th>Last Check</th><th>Actions</th></tr></thead><tbody id="servers-tbody"></tbody></table>
             </div>
         </div>
         <div id="section-alerts" class="section-content">
@@ -448,17 +499,14 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 <div id="alertsList"></div>
             </div>
         </div>
-        <div id="section-raid" class="section-content">
-            <div class="card">
-                <div class="card-header"><h3 class="card-title"><i class="fas fa-hdd"></i> RAID Status</h3><button class="btn btn-secondary btn-sm" id="refreshRaidBtn"><i class="fas fa-sync"></i> Refresh</button></div>
-                <div id="raidGrid" class="raid-grid"><p style="color: var(--muted); padding: 20px; text-align: center;">No RAID data available.</p></div>
-            </div>
-        </div>
         <div id="section-settings" class="section-content">
             <div class="tab-menu">
                 <div class="tab-item active" data-tab="notif">Notifications</div>
                 <div class="tab-item" data-tab="security">Security</div>
                 <div class="tab-item" data-tab="backups">Backups</div>
+                <div class="tab-item" data-tab="apikeys">API Keys</div>
+                <div class="tab-item" data-tab="audit">Audit Log</div>
+                <div class="tab-item" data-tab="maintenance">Maintenance</div>
             </div>
             <div id="settings-notif" class="tab-content">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -509,6 +557,33 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                     <table><thead><tr><th>Filename</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead><tbody id="backups-tbody"></tbody></table>
                 </div>
             </div>
+            <div id="settings-apikeys" class="tab-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">API Keys</h3><button class="btn btn-primary" id="createApiKeyBtn"><i class="fas fa-plus"></i> Generate Key</button></div>
+                    <p style="color: var(--muted); margin-bottom: 16px;">API keys allow external systems to access PyMon API.</p>
+                    <table><thead><tr><th>Name</th><th>Key</th><th>Created</th><th>Last Used</th><th>Actions</th></tr></thead><tbody id="apikeys-tbody"></tbody></table>
+                </div>
+            </div>
+            <div id="settings-audit" class="tab-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">Audit Log</h3><button class="btn btn-secondary btn-sm" id="refreshAuditBtn"><i class="fas fa-sync"></i> Refresh</button></div>
+                    <p style="color: var(--muted); margin-bottom: 16px;">Track all user actions and system events.</p>
+                    <table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead><tbody id="audit-tbody"></tbody></table>
+                </div>
+            </div>
+            <div id="settings-maintenance" class="tab-content" style="display: none;">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">Maintenance Windows</h3><button class="btn btn-primary" id="addMaintenanceBtn"><i class="fas fa-plus"></i> Add Window</button></div>
+                    <p style="color: var(--muted); margin-bottom: 16px;">Define maintenance periods when alerts are suppressed.</p>
+                    <div id="maintenanceList"></div>
+                </div>
+                <div class="card" style="margin-top: 16px;">
+                    <div class="card-header"><h3 class="card-title">Data Retention</h3></div>
+                    <div class="form-group"><label>Keep metrics for (days)</label><input type="number" id="retention-days" value="30"></div>
+                    <div class="form-group"><label>Keep audit logs for (days)</label><input type="number" id="audit-retention-days" value="90"></div>
+                    <button class="btn btn-primary" id="saveRetentionBtn"><i class="fas fa-save"></i> Save</button>
+                </div>
+            </div>
         </div>
     </main>
     <div class="modal" id="addServerModal">
@@ -533,7 +608,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 <div class="form-group"><label>Alert Name</label><input type="text" id="alert-name" required placeholder="High CPU Alert"></div>
                 <div class="form-row">
                     <div class="form-group"><label>Server (Global = none)</label><select id="alert-server"><option value="">Global (All Servers)</option></select></div>
-                    <div class="form-group"><label>Metric</label><select id="alert-metric"><option value="cpu">CPU Usage</option><option value="memory">Memory Usage</option><option value="disk">Disk Usage</option><option value="network">Network I/O</option></select></div>
+                    <div class="form-group"><label>Metric</label><select id="alert-metric"><option value="cpu">CPU Usage</option><option value="memory">Memory Usage</option><option value="disk">Disk Usage</option><option value="network">Network I/O</option><option value="exporter">Exporter Status</option><option value="raid">RAID Status</option></select></div>
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label>Condition</label><select id="alert-condition"><option value=">">Greater than (&gt;)</option><option value="<">Less than (&lt;)</option></select></div>
@@ -634,25 +709,13 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     function updateDashboard() {
         const filtered = getFilteredServers();
         updateCharts(filtered);
-        updateRAIDStatusPanel(filtered);
-        updateExporterStatusPanel(filtered);
+        updateRAIDStatusPanel();
     }
     
     document.querySelectorAll(".nav-item").forEach(btn => {
         btn.addEventListener("click", function() {
             const section = this.dataset.section;
             if (section) showSection(section);
-        });
-    });
-    
-    // Tab switching for settings
-    document.querySelectorAll("#section-settings .tab-menu .tab-item").forEach(btn => {
-        btn.addEventListener("click", function() {
-            document.querySelectorAll("#section-settings .tab-menu .tab-item").forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            const tab = this.dataset.tab;
-            document.querySelectorAll("#section-settings .tab-content").forEach(c => c.style.display = 'none');
-            document.getElementById('settings-' + tab).style.display = 'block';
         });
     });
     
@@ -722,108 +785,216 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         try {
             const resp = await fetch('/api/servers', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
-            servers = data.servers || [];
+            let allServers = data.servers || [];
+            
+            // Get filter values
+            const search = document.getElementById('serverSearch').value.toLowerCase();
+            const filterStatus = document.getElementById('filterStatus').value;
+            const filterOS = document.getElementById('filterOS').value;
+            const filterCPU = parseFloat(document.getElementById('filterCPU').value) || 0;
+            const filterMemory = parseFloat(document.getElementById('filterMemory').value) || 0;
+            const filterDisk = parseFloat(document.getElementById('filterDisk').value) || 0;
+            const sortBy = document.getElementById('serverSortSelect').value;
+            
+            // Apply filters
+            servers = allServers.filter(s => {
+                // Search filter
+                if (search && !s.name.toLowerCase().includes(search) && !s.host.toLowerCase().includes(search)) {
+                    return false;
+                }
+                // Status filter
+                if (filterStatus && s.last_status !== filterStatus) {
+                    return false;
+                }
+                // OS filter
+                if (filterOS && s.os_type !== filterOS) {
+                    return false;
+                }
+                // CPU filter
+                if (filterCPU > 0 && (!s.cpu_percent || s.cpu_percent < filterCPU)) {
+                    return false;
+                }
+                // Memory filter
+                if (filterMemory > 0 && (!s.memory_percent || s.memory_percent < filterMemory)) {
+                    return false;
+                }
+                // Disk filter
+                if (filterDisk > 0 && (!s.disk_percent || s.disk_percent < filterDisk)) {
+                    return false;
+                }
+                return true;
+            });
+            
+            // Sort servers
+            servers.sort((a, b) => {
+                if (sortBy === 'status') {
+                    if (a.last_status === 'up' && b.last_status !== 'up') return -1;
+                    if (a.last_status !== 'up' && b.last_status === 'up') return 1;
+                    return 0;
+                } else if (sortBy === 'cpu') {
+                    return (b.cpu_percent || 0) - (a.cpu_percent || 0);
+                } else if (sortBy === 'memory') {
+                    return (b.memory_percent || 0) - (a.memory_percent || 0);
+                } else if (sortBy === 'disk') {
+                    return (b.disk_percent || 0) - (a.disk_percent || 0);
+                }
+                return a.name.localeCompare(b.name);
+            });
+            
+            // Update stats
             let online = 0, offline = 0, linux = 0, windows = 0;
-            document.getElementById('dashboardServerSelector').innerHTML = '<option value="">All Servers</option>' + servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-            document.getElementById('alert-server').innerHTML = '<option value="">Global (All Servers)</option>' + servers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-            document.getElementById('servers-tbody').innerHTML = servers.map(s => {
+            allServers.forEach(s => {
                 if (s.last_status === 'up') online++; else offline++;
                 if (s.os_type === 'linux') linux++; else windows++;
+            });
+            
+            document.getElementById('dashboardServerSelector').innerHTML = '<option value="">All Servers</option>' + allServers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
+            document.getElementById('alert-server').innerHTML = '<option value="">Global (All Servers)</option>' + allServers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
+            
+            // Filter stats
+            const filterStats = document.getElementById('filterStats');
+            let statsText = 'Showing ' + servers.length + ' of ' + allServers.length + ' servers';
+            const activeFilters = [];
+            if (search) activeFilters.push('search:"' + search + '"');
+            if (filterStatus) activeFilters.push('status:' + filterStatus);
+            if (filterOS) activeFilters.push('OS:' + filterOS);
+            if (filterCPU > 0) activeFilters.push('CPU>' + filterCPU + '%');
+            if (filterMemory > 0) activeFilters.push('MEM>' + filterMemory + '%');
+            if (filterDisk > 0) activeFilters.push('DISK>' + filterDisk + '%');
+            if (activeFilters.length > 0) {
+                statsText += ' | Filters: ' + activeFilters.join(', ');
+            }
+            filterStats.textContent = statsText;
+            
+            document.getElementById('servers-tbody').innerHTML = servers.map(s => {
                 const statusBadge = s.last_status === 'up' ? '<span class="badge badge-success">up</span>' : '<span class="badge badge-danger">offline</span>';
-                return '<tr><td>' + statusBadge + '</td><td><strong>' + s.name + '</strong></td><td>' + s.host + '</td><td>' + s.os_type + '</td><td>' + (s.cpu_percent ? s.cpu_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.memory_percent ? s.memory_percent.toFixed(1) + '%' : '-') + '</td><td>' + (s.disk_percent ? s.disk_percent.toFixed(1) + '%' : '-') + '</td><td><button class="btn btn-secondary btn-sm" onclick="scrapeServer(' + s.id + ')" title="Scrape now"><i class="fas fa-sync"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')" title="Delete"><i class="fas fa-trash"></i></button></td></tr>';
-            }).join('') || '<tr><td colspan="8" style="text-align:center;padding:40px;color:#999;">No servers</td></tr>';
+                
+                // Host with port
+                const hostDisplay = s.host + ':' + (s.agent_port || 9100);
+                
+                // CPU with color
+                const cpuVal = s.cpu_percent ? s.cpu_percent.toFixed(1) : '-';
+                const cpuColor = s.cpu_percent > 90 ? 'var(--red)' : s.cpu_percent > 70 ? 'var(--yellow)' : 'var(--text)';
+                const cpuDisplay = s.cpu_percent ? '<span style="color:' + cpuColor + '">' + cpuVal + '%</span>' : '-';
+                
+                // Memory with color
+                const memVal = s.memory_percent ? s.memory_percent.toFixed(1) : '-';
+                const memColor = s.memory_percent > 90 ? 'var(--red)' : s.memory_percent > 70 ? 'var(--yellow)' : 'var(--text)';
+                const memDisplay = s.memory_percent ? '<span style="color:' + memColor + '">' + memVal + '%</span>' : '-';
+                
+                // Parse disk info
+                let diskDisplay = '-';
+                if (s.disk_info) {
+                    try {
+                        const disks = JSON.parse(s.disk_info);
+                        diskDisplay = disks.filter(d => d.volume.includes(':')).map(d => {
+                            const vol = d.volume.replace(':', '');
+                            const pct = d.percent ? d.percent.toFixed(0) : '?';
+                            const color = d.percent > 90 ? 'var(--red)' : d.percent > 80 ? 'var(--yellow)' : 'var(--green)';
+                            return '<span style="margin-right:4px;padding:2px 4px;background:rgba(0,0,0,0.3);border-radius:3px;font-size:11px;"><span style="color:' + color + '">' + vol + '</span>:' + pct + '%</span>';
+                        }).join('');
+                    } catch(e) {}
+                } else if (s.disk_percent) {
+                    const diskColor = s.disk_percent > 90 ? 'var(--red)' : s.disk_percent > 80 ? 'var(--yellow)' : 'var(--text)';
+                    diskDisplay = '<span style="color:' + diskColor + '">' + s.disk_percent.toFixed(1) + '%</span>';
+                }
+                
+                // Last check time
+                const lastCheck = s.last_check ? s.last_check.substring(11, 19) : '-';
+                
+                return '<tr><td>' + statusBadge + '</td><td><strong>' + s.name + '</strong></td><td style="font-size:11px;color:var(--muted);">' + hostDisplay + '</td><td>' + s.os_type + '</td><td>' + cpuDisplay + '</td><td>' + memDisplay + '</td><td>' + diskDisplay + '</td><td style="font-size:11px;color:var(--muted);">' + lastCheck + '</td><td><button class="btn btn-secondary btn-sm" onclick="scrapeServer(' + s.id + ')" title="Scrape now"><i class="fas fa-sync"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')" title="Delete"><i class="fas fa-trash"></i></button></td></tr>';
+            }).join('') || '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">No servers match filters</td></tr>';
+            
             document.getElementById('stat-online').textContent = online;
             document.getElementById('stat-offline').textContent = offline;
             document.getElementById('stat-linux').textContent = linux;
             document.getElementById('stat-windows').textContent = windows;
             updateRAIDStatusPanel();
-            updateDiskStatusPanel();
-            updateExporterStatusPanel();
-            updateTelegrafStatusPanel();
-            updateSQLStatusPanel();
         } catch(e) { console.error(e); }
     }
+    
+    // Filter event listeners
+    ['serverSearch', 'filterStatus', 'filterOS', 'filterCPU', 'filterMemory', 'filterDisk', 'serverSortSelect'].forEach(id => {
+        document.getElementById(id).addEventListener('change', loadServers);
+        document.getElementById(id).addEventListener('input', loadServers);
+    });
+    
+    document.getElementById('clearFiltersBtn').addEventListener('click', function() {
+        document.getElementById('serverSearch').value = '';
+        document.getElementById('filterStatus').value = '';
+        document.getElementById('filterOS').value = '';
+        document.getElementById('filterCPU').value = '';
+        document.getElementById('filterMemory').value = '';
+        document.getElementById('filterDisk').value = '';
+        document.getElementById('serverSortSelect').value = 'name';
+        loadServers();
+    });
 
-    function updateRAIDStatusPanel() {
-        const filtered = getFilteredServers();
+    async function updateRAIDStatusPanel() {
         const panel = document.getElementById('raidStatusPanel');
-        const raidServers = filtered.filter(s => s.raid_status);
-        if (!raidServers.length) {
-            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data</p>';
-            return;
+        panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading RAID data...</p>';
+        
+        try {
+            const resp = await fetch('/api/raid-status');
+            const data = await resp.json();
+            const raidData = data.raid_status || [];
+            
+            if (!raidData.length) {
+                panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data available</p>';
+                document.getElementById('raidTotalServers').textContent = '0';
+                document.getElementById('raidHealthy').textContent = '0';
+                document.getElementById('raidDegraded').textContent = '0';
+                document.getElementById('raidTotalSize').textContent = '0 TB';
+                return;
+            }
+            
+            // Calculate statistics
+            let totalRaids = 0, healthyRaids = 0, degradedRaids = 0, totalSizeGB = 0;
+            raidData.forEach(s => {
+                s.raids.forEach(r => {
+                    totalRaids++;
+                    if (r.healthy) healthyRaids++; else degradedRaids++;
+                    const size = parseInt(r.size) || 0;
+                    totalSizeGB += size;
+                });
+            });
+            
+            // Update stats
+            document.getElementById('raidTotalServers').textContent = raidData.length;
+            document.getElementById('raidHealthy').textContent = healthyRaids;
+            document.getElementById('raidDegraded').textContent = degradedRaids;
+            document.getElementById('raidTotalSize').textContent = Math.round(totalSizeGB / 1024) + ' TB';
+            
+            // Sort by health (degraded first)
+            raidData.sort((a, b) => a.healthy - b.healthy);
+            
+            panel.innerHTML = raidData.map(s => {
+                const statusColor = s.healthy ? 'var(--green)' : 'var(--red)';
+                const statusIcon = s.healthy ? 'fa-check-circle' : 'fa-exclamation-triangle';
+                const borderColor = s.healthy ? 'rgba(115,191,105,0.3)' : 'rgba(242,73,92,0.5)';
+                
+                // Calculate server totals
+                const serverSize = s.raids.reduce((sum, r) => sum + (parseInt(r.size) || 0), 0);
+                
+                return '<div style="margin-bottom: 12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid ' + borderColor + ';">' +
+                    '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">' +
+                    '<div><i class="fas fa-server" style="color: var(--muted); margin-right: 8px;"></i><strong style="font-size: 13px;">' + s.server + '</strong></div>' +
+                    '<div><span style="color: var(--muted); font-size: 11px; margin-right: 12px;">' + s.raids.length + ' arrays | ' + Math.round(serverSize/1024) + ' TB</span>' +
+                    '<span class="badge ' + (s.healthy ? 'badge-success' : 'badge-danger') + '"><i class="fas ' + statusIcon + '"></i> ' + (s.healthy ? 'Healthy' : 'Degraded') + '</span></div></div>' +
+                    '<table style="width: 100%; font-size: 11px; border-collapse: collapse;">' +
+                    '<tr style="color: var(--muted); border-bottom: 1px solid var(--border);"><th style="padding: 6px; text-align: left;">ID</th><th style="padding: 6px; text-align: left;">Type</th><th style="padding: 6px; text-align: right;">Size</th><th style="padding: 6px; text-align: center;">Status</th></tr>' +
+                    s.raids.map(r => {
+                        const rowBg = r.healthy ? '' : 'background: rgba(242,73,92,0.1);';
+                        return '<tr style="' + rowBg + ' border-bottom: 1px solid rgba(255,255,255,0.03);">' +
+                        '<td style="padding: 6px;"><span style="background: rgba(87,148,242,0.2); padding: 2px 6px; border-radius: 3px;">RAID' + r.id + '</span></td>' +
+                        '<td style="padding: 6px;"><span style="color: ' + (r.type.includes('10') ? 'var(--purple)' : r.type.includes('6') ? 'var(--blue)' : r.type.includes('5') ? 'var(--green)' : 'var(--yellow)') + ';">' + r.type + '</span></td>' +
+                        '<td style="padding: 6px; text-align: right; color: var(--muted);">' + r.size + '</td>' +
+                        '<td style="padding: 6px; text-align: center;"><span class="badge ' + (r.healthy ? 'badge-success' : 'badge-danger') + '" style="font-size: 10px;">' + (r.healthy ? 'OK' : 'FAILED') + '</span></td></tr>';
+                    }).join('') + '</table></div>';
+            }).join('');
+        } catch(e) {
+            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">Error loading RAID data: ' + e.message + '</p>';
         }
-        panel.innerHTML = raidServers.map(s => {
-            let raidData = {status: 'unknown', disks: []};
-            try { if (s.raid_status) raidData = JSON.parse(s.raid_status); } catch(e) {}
-            const statusColor = raidData.status === 'healthy' ? 'var(--green)' : 'var(--red)';
-            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong><span class="badge ' + (raidData.status === 'healthy' ? 'badge-success' : 'badge-danger') + '">' + (raidData.status || 'Unknown') + '</span></div>' +
-                (raidData.disks || []).map(d => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + d.name + '</span><span class="badge ' + (d.status === 'online' ? 'badge-success' : 'badge-danger') + '">' + d.status + '</span></div>').join('') + '</div>';
-        }).join('');
-    }
-
-    function updateDiskStatusPanel() {
-        const filtered = getFilteredServers();
-        const panel = document.getElementById('diskStatusPanel');
-        const diskServers = filtered.filter(s => s.disk_status);
-        if (!diskServers.length) {
-            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No disk data</p>';
-            return;
-        }
-        panel.innerHTML = diskServers.map(s => {
-            let diskData = {disks: []};
-            try { if (s.disk_status) diskData = JSON.parse(s.disk_status); } catch(e) {}
-            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong></div>' +
-                (diskData.disks || []).map(d => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + d.name + '</span><span>' + (d.used || 0) + '% used</span></div>').join('') + '</div>';
-        }).join('');
-    }
-
-    function updateExporterStatusPanel() {
-        const filtered = getFilteredServers();
-        const panel = document.getElementById('exporterStatusPanel');
-        if (!filtered.length) {
-            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No exporters data</p>';
-            return;
-        }
-        panel.innerHTML = filtered.map(s => {
-            const isUp = s.last_status === 'up';
-            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
-                '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 9100) + '</span></div>' +
-                '<div style="text-align: right;"><span class="badge ' + (isUp ? 'badge-success' : 'badge-danger') + '">' + (isUp ? 'Online' : 'Offline') + '</span><br><span style="color: var(--muted); font-size: 10px;">' + (s.last_check || 'Never') + '</span></div>' +
-                '</div>';
-        }).join('');
-    }
-
-    function updateTelegrafStatusPanel() {
-        const filtered = getFilteredServers();
-        const panel = document.getElementById('telegrafStatusPanel');
-        if (!filtered.length) {
-            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No Telegraf data</p>';
-            return;
-        }
-        panel.innerHTML = filtered.map(s => {
-            const isUp = s.last_status === 'up';
-            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
-                '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 8094) + '</span></div>' +
-                '<div style="text-align: right;"><span class="badge ' + (isUp ? 'badge-success' : 'badge-danger') + '">' + (isUp ? 'Online' : 'Offline') + '</span><br><span style="color: var(--muted); font-size: 10px;">' + (s.last_check || 'Never') + '</span></div>' +
-                '</div>';
-        }).join('');
-    }
-
-    function updateSQLStatusPanel() {
-        const filtered = getFilteredServers();
-        const panel = document.getElementById('sqlStatusPanel');
-        const sqlServers = filtered.filter(s => s.sql_status);
-        if (!sqlServers.length) {
-            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No SQL Always On data</p>';
-            return;
-        }
-        panel.innerHTML = sqlServers.map(s => {
-            let sqlData = {nodes: [], role: 'unknown'};
-            try { if (s.sql_status) sqlData = JSON.parse(s.sql_status); } catch(e) {}
-            const roleColor = sqlData.role === 'primary' ? 'var(--green)' : sqlData.role === 'secondary' ? 'var(--blue)' : 'var(--yellow)';
-            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong><span class="badge" style="color: ' + roleColor + '; border-color: ' + roleColor + '">' + (sqlData.role || 'Unknown') + '</span></div>' +
-                (sqlData.nodes || []).map(n => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + n.name + '</span><span>' + (n.status || 'unknown') + '</span></div>').join('') + '</div>';
-        }).join('');
     }
 
     async function deleteServer(id) {
@@ -1159,76 +1330,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         }
     }
     
-    async function loadRAID() {
-        const grid = document.getElementById('raidGrid');
-        if (!servers.length) { grid.innerHTML = '<p style="color: var(--muted); padding: 20px; text-align: center;">No servers added yet.</p>'; return; }
-        const raidServers = servers.filter(s => s.raid_status);
-        if (!raidServers.length) { grid.innerHTML = '<p style="color: var(--muted); padding: 20px; text-align: center;">No RAID data available.</p>'; return; }
-        grid.innerHTML = raidServers.map(s => {
-            let raidData = {status: 'unknown', disks: []};
-            try { if (s.raid_status) raidData = JSON.parse(s.raid_status); } catch(e) {}
-            const statusColor = raidData.status === 'healthy' ? 'var(--green)' : 'var(--red)';
-            const statusIcon = raidData.status === 'healthy' ? 'fa-check-circle' : 'fa-exclamation-triangle';
-            return '<div class="raid-card"><div class="raid-card-header"><div class="raid-card-title">' + s.name + '</div><div class="raid-status"><i class="fas ' + statusIcon + '" style="color: ' + statusColor + ';"></i> ' + (raidData.status || 'Unknown') + '</div></div><div class="raid-disks">' + (raidData.disks || []).map(d => '<div class="raid-disk"><span>' + d.name + '</span><span class="badge ' + (d.status === 'online' ? 'badge-success' : 'badge-danger') + '">' + d.status + '</span></div>').join('') + '</div></div>';
-        }).join('');
-    }
-
-    async function loadDisk() {
-        const panel = document.getElementById('diskStatusPanel');
-        if (!servers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers added yet.</p>'; return; }
-        const diskServers = servers.filter(s => s.disk_status);
-        if (!diskServers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No disk data available.</p>'; return; }
-        panel.innerHTML = diskServers.map(s => {
-            let diskData = {disks: []};
-            try { if (s.disk_status) diskData = JSON.parse(s.disk_status); } catch(e) {}
-            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong></div>' +
-                (diskData.disks || []).map(d => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + d.name + '</span><span>' + (d.used || 0) + '% used</span></div>').join('') + '</div>';
-        }).join('');
-    }
-
-    async function loadSQL() {
-        const panel = document.getElementById('sqlStatusPanel');
-        if (!servers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers added yet.</p>'; return; }
-        const sqlServers = servers.filter(s => s.sql_status);
-        if (!sqlServers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No SQL Always On data available.</p>'; return; }
-        panel.innerHTML = sqlServers.map(s => {
-            let sqlData = {nodes: [], role: 'unknown'};
-            try { if (s.sql_status) sqlData = JSON.parse(s.sql_status); } catch(e) {}
-            const roleColor = sqlData.role === 'primary' ? 'var(--green)' : sqlData.role === 'secondary' ? 'var(--blue)' : 'var(--yellow)';
-            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong><span class="badge" style="color: ' + roleColor + '; border-color: ' + roleColor + '">' + (sqlData.role || 'Unknown') + '</span></div>' +
-                (sqlData.nodes || []).map(n => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + n.name + '</span><span>' + (n.status || 'unknown') + '</span></div>').join('') + '</div>';
-        }).join('');
-    }
-
-    async function loadExporters() {
-        const panel = document.getElementById('exporterStatusPanel');
-        if (!servers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers added yet.</p>'; return; }
-        panel.innerHTML = servers.map(s => {
-            const isUp = s.last_status === 'up';
-            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
-                '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 9100) + '</span></div>' +
-                '<div style="text-align: right;"><span class="badge ' + (isUp ? 'badge-success' : 'badge-danger') + '">' + (isUp ? 'Online' : 'Offline') + '</span><br><span style="color: var(--muted); font-size: 10px;">' + (s.last_check || 'Never') + '</span></div>' +
-                '</div>';
-        }).join('');
-    }
-
-    async function loadTelegraf() {
-        const panel = document.getElementById('telegrafStatusPanel');
-        if (!servers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers added yet.</p>'; return; }
-        panel.innerHTML = servers.map(s => {
-            const isUp = s.last_status === 'up';
-            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
-                '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 8094) + '</span></div>' +
-                '<div style="text-align: right;"><span class="badge ' + (isUp ? 'badge-success' : 'badge-danger') + '">' + (isUp ? 'Online' : 'Offline') + '</span><br><span style="color: var(--muted); font-size: 10px;">' + (s.last_check || 'Never') + '</span></div>' +
-                '</div>';
-        }).join('');
-    }
-
-    document.getElementById('refreshRaidBtn').addEventListener('click', loadRAID);
-    document.getElementById('refreshDiskBtn').addEventListener('click', loadDisk);
-    document.getElementById('refreshSqlBtn').addEventListener('click', loadSQL);
-    document.getElementById('refreshExportersBtn').addEventListener('click', loadExporters);
-    document.getElementById('refreshTelegrafBtn').addEventListener('click', loadTelegraf);
+    document.getElementById('refreshRaidBtn').addEventListener('click', updateRAIDStatusPanel);
 
     ['telegram', 'discord', 'slack', 'email'].forEach(ch => {
         const enabled = document.getElementById(ch + '-enabled');
@@ -1280,12 +1382,96 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         loadBackups();
     });
     
+    // API Keys
+    async function loadApiKeys() {
+        try {
+            const resp = await fetch('/api/api-keys', {headers: {'Authorization': 'Bearer ' + token}});
+            const data = await resp.json();
+            document.getElementById('apikeys-tbody').innerHTML = (data.keys || []).map(k => 
+                '<tr><td>' + k.name + '</td><td><code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;">****</code></td><td>' + (k.created_at || '-') + '</td><td>' + (k.last_used || 'Never') + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteApiKey(' + k.id + ')"><i class="fas fa-trash"></i></button></td></tr>'
+            ).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;">No API keys</td></tr>';
+        } catch(e) { console.error(e); }
+    }
+    
+    document.getElementById('createApiKeyBtn').addEventListener('click', async function() {
+        const name = prompt('Enter API key name:');
+        if (name) {
+            const resp = await fetch('/api/api-keys', {method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify({name})});
+            const data = await resp.json();
+            if (data.key) {
+                alert('API Key created! Copy it now (shown once):\\n\\n' + data.key);
+                loadApiKeys();
+            }
+        }
+    });
+    
+    async function deleteApiKey(id) {
+        if (confirm('Delete this API key?')) {
+            await fetch('/api/api-keys/' + id, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
+            loadApiKeys();
+        }
+    }
+    
+    // Audit Log
+    async function loadAuditLog() {
+        try {
+            const resp = await fetch('/api/audit-log', {headers: {'Authorization': 'Bearer ' + token}});
+            const data = await resp.json();
+            document.getElementById('audit-tbody').innerHTML = (data.logs || []).map(l => 
+                '<tr><td>' + (l.created_at || '-') + '</td><td>' + (l.user_id || 'System') + '</td><td>' + l.action + '</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + (l.details || '-') + '</td><td>' + (l.ip_address || '-') + '</td></tr>'
+            ).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;">No audit logs</td></tr>';
+        } catch(e) { console.error(e); }
+    }
+    
+    document.getElementById('refreshAuditBtn').addEventListener('click', loadAuditLog);
+    
+    // Maintenance
+    async function loadMaintenance() {
+        try {
+            const resp = await fetch('/api/maintenance', {headers: {'Authorization': 'Bearer ' + token}});
+            const data = await resp.json();
+            document.getElementById('maintenanceList').innerHTML = (data.windows || []).map(w => 
+                '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:8px;">' +
+                '<div><strong>' + w.name + '</strong><br><span style="color:var(--muted);font-size:11px;">' + w.start_time + ' - ' + w.end_time + '</span></div>' +
+                '<span class="badge ' + (w.enabled ? 'badge-success' : 'badge-warning') + '">' + (w.enabled ? 'Active' : 'Disabled') + '</span>' +
+                '</div>'
+            ).join('') || '<p style="color:var(--muted);text-align:center;padding:20px;">No maintenance windows configured</p>';
+        } catch(e) { console.error(e); }
+    }
+    
+    document.getElementById('addMaintenanceBtn').addEventListener('click', async function() {
+        const name = prompt('Maintenance window name:');
+        if (name) {
+            const start = prompt('Start time (YYYY-MM-DD HH:MM):');
+            const end = prompt('End time (YYYY-MM-DD HH:MM):');
+            if (start && end) {
+                await fetch('/api/maintenance', {method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify({name, start_time: start, end_time: end})});
+                loadMaintenance();
+            }
+        }
+    });
+    
+    // Settings tabs
+    document.querySelectorAll("#section-settings .tab-menu .tab-item").forEach(btn => {
+        btn.addEventListener("click", function() {
+            document.querySelectorAll("#section-settings .tab-menu .tab-item").forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            const tab = this.dataset.tab;
+            document.querySelectorAll("#section-settings .tab-content").forEach(c => c.style.display = 'none');
+            document.getElementById('settings-' + tab).style.display = 'block';
+            if (tab === 'apikeys') loadApiKeys();
+            if (tab === 'audit') loadAuditLog();
+            if (tab === 'maintenance') loadMaintenance();
+        });
+    });
+    
     let refreshInterval = null;
     
     function startAutoRefresh() {
         if (refreshInterval) clearInterval(refreshInterval);
         refreshInterval = setInterval(async () => {
             await loadServers();
+            updateRAIDStatusPanel();
             if (document.getElementById('section-dashboard').classList.contains('active')) {
                 initCharts();
             }
@@ -1326,6 +1512,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     });
     
     loadServers();
+    updateRAIDStatusPanel();
     setTimeout(() => {
         initCharts();
         startAutoRefresh();
@@ -1396,16 +1583,144 @@ async def scrape_server(server_id: int):
         raise HTTPException(status_code=404, detail="Server not found")
     
     target = f"{server['host']}:{server['agent_port']}"
-    url = f"http://{target}/api/v1/metrics"
+    url = f"http://{target}/metrics"
     
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(url, json={"name": "test", "value": 1.0, "type": "gauge"})
+            resp = await client.get(url)
             if resp.status_code == 200:
-                return {"status": "ok", "message": f"Successfully scraped {target}"}
+                # Parse metrics and update database
+                metrics = {}
+                cpu_idle_total = 0
+                cpu_all_total = 0
+                disk_info = {}
+                
+                for line in resp.text.split('\n'):
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    try:
+                        if '{' in line:
+                            name_part, rest = line.split('{', 1)
+                            labels_part, value_str = rest.rsplit('}', 1)
+                            name = name_part.strip()
+                            value = float(value_str.strip())
+                            
+                            # Aggregate CPU idle time from windows_exporter
+                            if name == 'windows_cpu_time_total':
+                                if 'mode="idle"' in labels_part:
+                                    cpu_idle_total += value
+                                cpu_all_total += value
+                            
+                            # Collect ALL disks from windows_exporter
+                            if name == 'windows_logical_disk_free_bytes':
+                                import re
+                                vol_match = re.search(r'volume="([^"]+)"', labels_part)
+                                if vol_match:
+                                    vol = vol_match.group(1)
+                                    if vol not in disk_info:
+                                        disk_info[vol] = {'volume': vol, 'free': 0, 'size': 0}
+                                    disk_info[vol]['free'] = value
+                            if name == 'windows_logical_disk_size_bytes':
+                                import re
+                                vol_match = re.search(r'volume="([^"]+)"', labels_part)
+                                if vol_match:
+                                    vol = vol_match.group(1)
+                                    if vol not in disk_info:
+                                        disk_info[vol] = {'volume': vol, 'free': 0, 'size': 0}
+                                    disk_info[vol]['size'] = value
+                        else:
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                name = parts[0]
+                                value = float(parts[1])
+                            else:
+                                continue
+                        metrics[name] = value
+                    except:
+                        continue
+                
+                # Store aggregated values
+                if cpu_idle_total > 0:
+                    metrics['windows_cpu_time_total_idle'] = cpu_idle_total
+                    metrics['windows_cpu_time_total_all'] = cpu_all_total
+                
+                # Calculate disk percentages and get C: for main metric
+                disks_list = []
+                for vol, info in disk_info.items():
+                    if info['size'] > 0:
+                        info['percent'] = 100 * (1 - info['free'] / info['size'])
+                        info['used_gb'] = round((info['size'] - info['free']) / (1024**3), 1)
+                        info['size_gb'] = round(info['size'] / (1024**3), 1)
+                        disks_list.append(info)
+                        # Use C: for main disk_percent if available
+                        if 'C:' in vol:
+                            metrics['windows_logical_disk_free_bytes'] = info['free']
+                            metrics['windows_logical_disk_size_bytes'] = info['size']
+                
+                disk_info_json = json.dumps(disks_list) if disks_list else None
+                
+                # Parse CPU - support both node_exporter and windows_exporter
+                cpu = metrics.get('node_cpu_percent') or metrics.get('cpu_usage_percent') or 0
+                if not cpu:
+                    idle = metrics.get('windows_cpu_time_total_idle', 0)
+                    total = metrics.get('windows_cpu_time_total_all', 0)
+                    if total > 0:
+                        cpu = 100 * (1 - idle / total) if idle < total else 0
+                
+                # Parse Memory - support both node_exporter and windows_exporter
+                memory = metrics.get('node_memory_percent') or metrics.get('memory_usage_percent') or 0
+                if not memory:
+                    mem_total = metrics.get('windows_cs_physical_memory_bytes', 0)
+                    mem_free = metrics.get('windows_os_physical_memory_free_bytes', 0)
+                    if mem_total > 0:
+                        memory = 100 * (1 - mem_free / mem_total) if mem_free < mem_total else 0
+                
+                # Parse Disk - support both node_exporter and windows_exporter
+                disk = metrics.get('node_disk_percent') or metrics.get('disk_usage_percent') or 0
+                if not disk:
+                    disk_total = metrics.get('windows_logical_disk_size_bytes', 0)
+                    disk_free = metrics.get('windows_logical_disk_free_bytes', 0)
+                    if disk_total > 0:
+                        disk = 100 * (1 - disk_free / disk_total) if disk_free < disk_total else 0
+                
+                network_rx = metrics.get('node_network_receive_bytes_total') or metrics.get('system_network_rx_bytes') or 0
+                network_tx = metrics.get('node_network_transmit_bytes_total') or metrics.get('system_network_tx_bytes') or 0
+                uptime = metrics.get('system_uptime_seconds') or metrics.get('windows_system_system_up_time', '') or ''
+                
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc).isoformat()
+                
+                conn = get_db()
+                conn.execute('''UPDATE servers SET 
+                    last_check = ?, last_status = 'up',
+                    cpu_percent = ?, memory_percent = ?, disk_percent = ?,
+                    network_rx = ?, network_tx = ?, uptime = ?, disk_info = ?
+                    WHERE id = ?''',
+                    (now, cpu, memory, disk, network_rx, network_tx, str(uptime), disk_info_json, server_id))
+                conn.commit()
+                conn.close()
+                
+                return {"status": "ok", "message": f"Scraped {target}", "metrics": {"cpu": cpu, "memory": memory, "disk": disk, "disks": disks_list}}
             else:
+                # Update server as down
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc).isoformat()
+                conn = get_db()
+                conn.execute('UPDATE servers SET last_check = ?, last_status = ? WHERE id = ?',
+                            (now, 'down', server_id))
+                conn.commit()
+                conn.close()
                 return {"status": "error", "message": f"HTTP {resp.status_code}"}
     except Exception as e:
+        # Update server as down
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        conn = get_db()
+        conn.execute('UPDATE servers SET last_check = ?, last_status = ? WHERE id = ?',
+                    (now, 'down', server_id))
+        conn.commit()
+        conn.close()
         return {"status": "error", "message": str(e)}
 
 @router.get("/api/notifications")
@@ -1419,6 +1734,64 @@ async def get_notifications():
         item.update(json.loads(n['config'] or '{}'))
         result.append(item)
     return {"notifications": result}
+
+@router.get("/api/raid-status")
+async def get_raid_status():
+    import httpx
+    import asyncio
+    import re
+    
+    telegraf_hosts = [
+        'host-vm.it.ua:9273', 'host-vm1.it.ua:9273', 'host-vm2.it.ua:9273', 'host-vm3.it.ua:9273',
+        'host-vm4.it.ua:9273', 'host-vm7.it.ua:9273', 'host-vm8.it.ua:9273', 'host-vm9.it.ua:9273',
+        'host-vm10.it.ua:9273', 'host-vm11.it.ua:9273', 'host-vm12.it.ua:9273',
+        'hst01.smarttender.biz.int:9273', 'hst02.smarttender.biz.int:9273', 'hst03.smarttender.biz.int:9273',
+        'hst04.smarttender.biz.int:9273', 'hst05.smarttender.biz.int:9273', 'hst06.smarttender.biz.int:9273',
+        'itdb01.it.ua:9273', 'itdb02.it.ua:9273', 'SMSDBAZ.it.ua:9273', 'SMSDBAZ2.it.ua:9273',
+        'TENDER.smarttender.biz.int:9273', 'TENDER-SEC.smarttender.biz.int:9273',
+        'TENDER-THIRD.smarttender.biz.int:9273', '10.0.12.4:9273', 'TENDER-FS.smarttender.biz.int:9273',
+    ]
+    
+    raid_data = []
+    
+    async def fetch_raid(host):
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(f'http://{host}/metrics')
+                if resp.status_code == 200:
+                    raids = {}
+                    server_name = host.split(':')[0]
+                    for line in resp.text.split('\n'):
+                        if line.startswith('prometheus_raid_status{'):
+                            match = re.match(r'prometheus_raid_status\{host="([^"]+)",id="([^"]+)",raid_type="([^"]+)",size="([^"]+)"\}\s+(\d+)', line)
+                            if match:
+                                hname, raid_id, raid_type, size, status = match.groups()
+                                server_name = hname
+                                raids[raid_id] = {
+                                    "id": raid_id,
+                                    "type": raid_type,
+                                    "size": size + " GB",
+                                    "healthy": status == "1"
+                                }
+                    
+                    if raids:
+                        all_healthy = all(r["healthy"] for r in raids.values())
+                        return {
+                            "server": server_name,
+                            "raids": list(raids.values()),
+                            "healthy": all_healthy
+                        }
+        except:
+            pass
+        return None
+    
+    # Fetch all hosts in parallel
+    tasks = [fetch_raid(host) for host in telegraf_hosts]
+    results = await asyncio.gather(*tasks)
+    
+    raid_data = [r for r in results if r is not None]
+    
+    return {"raid_status": raid_data}
 
 @router.put("/api/notifications/{channel}")
 async def update_notification(channel: str, config: dict):
@@ -1470,7 +1843,247 @@ async def delete_alert(alert_id: int):
     conn.close()
     return {"status": "ok"}
 
-@router.post("/api/backups")
+# Full Backup System
+import zipfile
+import shutil
+
+@router.get("/api/backup/config")
+async def get_backup_config():
+    conn = get_db()
+    rows = conn.execute("SELECT key, value FROM settings WHERE key LIKE 'backup_%'").fetchall()
+    config = {r["key"]: r["value"] for r in rows}
+    conn.close()
+    return {
+        "auto_backup": config.get("backup_auto", "false") == "true",
+        "backup_time": config.get("backup_time", "02:00"),
+        "backup_path": config.get("backup_path", os.path.join(os.path.dirname(DB_PATH), "backups")),
+        "keep_days": int(config.get("backup_keep_days", "30")),
+        "last_backup": config.get("backup_last", "")
+    }
+
+@router.post("/api/backup/config")
+async def set_backup_config(data: dict):
+    conn = get_db()
+    for key, value in data.items():
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", 
+                     (f"backup_{key}", str(value)))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+@router.post("/api/backup/create")
+async def create_full_backup(data: dict = {}):
+    try:
+        backup_path = data.get("path") if data else None
+        if not backup_path:
+            conn = get_db()
+            row = conn.execute("SELECT value FROM settings WHERE key = 'backup_path'").fetchone()
+            backup_path = row["value"] if row else os.path.join(os.path.dirname(DB_PATH), "backups")
+            conn.close()
+        
+        os.makedirs(backup_path, exist_ok=True)
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"pymon_full_{timestamp}.zip"
+        dest = os.path.join(backup_path, filename)
+        
+        with zipfile.ZipFile(dest, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # Database
+            if os.path.exists(DB_PATH):
+                zf.write(DB_PATH, 'pymon.db')
+            
+            # Config file
+            config_path = os.path.join(os.path.dirname(DB_PATH), 'config.yml')
+            if os.path.exists(config_path):
+                zf.write(config_path, 'config.yml')
+            
+            # Export all settings as JSON
+            conn = get_db()
+            settings = {}
+            for table in ['servers', 'alerts', 'notifications', 'settings', 'api_keys', 'maintenance_windows']:
+                try:
+                    rows = conn.execute(f"SELECT * FROM {table}").fetchall()
+                    settings[table] = [dict(r) for r in rows]
+                except:
+                    settings[table] = []
+            
+            import json
+            zf.writestr('settings.json', json.dumps(settings, indent=2, default=str))
+            
+            # Update last backup time
+            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                        ("backup_last", datetime.now(timezone.utc).isoformat()))
+            conn.commit()
+            conn.close()
+        
+        size = os.path.getsize(dest)
+        
+        # Log to backups table
+        conn = get_db()
+        conn.execute("INSERT INTO backups (filename, size_bytes, created_at) VALUES (?, ?, ?)",
+                     (filename, size, datetime.now(timezone.utc).isoformat()))
+        conn.commit()
+        conn.close()
+        
+        return {"status": "ok", "filename": filename, "size": size, "path": dest}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/backup/restore")
+async def restore_from_backup(data: dict):
+    try:
+        backup_file = data.get("file")
+        if not backup_file or not os.path.exists(backup_file):
+            raise HTTPException(status_code=400, detail="Backup file not found")
+        
+        restore_db = data.get("restore_db", True)
+        restore_config = data.get("restore_config", True)
+        restore_settings = data.get("restore_settings", True)
+        
+        with zipfile.ZipFile(backup_file, 'r') as zf:
+            # Restore database
+            if restore_db and 'pymon.db' in zf.namelist():
+                # Backup current DB first
+                if os.path.exists(DB_PATH):
+                    shutil.copy2(DB_PATH, DB_PATH + ".pre_restore")
+                zf.extract('pymon.db', os.path.dirname(DB_PATH))
+            
+            # Restore config
+            if restore_config and 'config.yml' in zf.namelist():
+                zf.extract('config.yml', os.path.dirname(DB_PATH))
+            
+            # Restore settings
+            if restore_settings and 'settings.json' in zf.namelist():
+                import json
+                settings_data = json.loads(zf.read('settings.json').decode())
+                conn = get_db()
+                for table, rows in settings_data.items():
+                    if rows:
+                        try:
+                            # Clear existing data
+                            conn.execute(f"DELETE FROM {table}")
+                            # Insert restored data
+                            for row in rows:
+                                cols = ', '.join([k for k in row.keys() if k != 'id'])
+                                vals = ', '.join(['?' for _ in row if _ != 'id'])
+                                placeholders = [row[k] for k in row.keys() if k != 'id']
+                                if cols:
+                                    conn.execute(f"INSERT INTO {table} ({cols}) VALUES ({vals})", placeholders)
+                        except Exception as e:
+                            print(f"Error restoring {table}: {e}")
+                conn.commit()
+                conn.close()
+        
+        return {"status": "ok", "message": "Backup restored successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/api/backup/list")
+async def list_backup_files():
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT value FROM settings WHERE key = 'backup_path'").fetchone()
+        backup_path = row["value"] if row else os.path.join(os.path.dirname(DB_PATH), "backups")
+        conn.close()
+        
+        files = []
+        if os.path.exists(backup_path):
+            for f in os.listdir(backup_path):
+                if f.endswith('.zip') or f.endswith('.sqlite'):
+                    path = os.path.join(backup_path, f)
+                    files.append({
+                        "filename": f,
+                        "path": path,
+                        "size": os.path.getsize(path),
+                        "created": datetime.fromtimestamp(os.path.getctime(path)).isoformat()
+                    })
+        files.sort(key=lambda x: x["created"], reverse=True)
+        return {"files": files, "backup_path": backup_path}
+    except Exception as e:
+        return {"files": [], "error": str(e)}
+
+@router.delete("/api/backup/file")
+async def delete_backup_file(data: dict):
+    try:
+        filepath = data.get("path")
+        if filepath and os.path.exists(filepath):
+            os.remove(filepath)
+            return {"status": "ok"}
+        return {"status": "error", "message": "File not found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/backup/cleanup")
+async def cleanup_old_backups():
+    try:
+        conn = get_db()
+        row = conn.execute("SELECT value FROM settings WHERE key = 'backup_keep_days'").fetchone()
+        keep_days = int(row["value"]) if row else 30
+        row = conn.execute("SELECT value FROM settings WHERE key = 'backup_path'").fetchone()
+        backup_path = row["value"] if row else os.path.join(os.path.dirname(DB_PATH), "backups")
+        conn.close()
+        
+        cutoff = datetime.now().timestamp() - (keep_days * 86400)
+        deleted = 0
+        
+        if os.path.exists(backup_path):
+            for f in os.listdir(backup_path):
+                filepath = os.path.join(backup_path, f)
+                if os.path.getctime(filepath) < cutoff:
+                    os.remove(filepath)
+                    deleted += 1
+        
+        return {"status": "ok", "deleted": deleted}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Factory Reset
+@router.post("/api/system/reset")
+async def factory_reset(data: dict):
+    try:
+        confirm = data.get("confirm", "")
+        if confirm != "RESET ALL DATA":
+            raise HTTPException(status_code=400, detail="Confirmation required. Send 'confirm': 'RESET ALL DATA'")
+        
+        conn = get_db()
+        # Clear all data tables
+        tables = ['servers', 'alerts', 'api_keys', 'audit_log', 'maintenance_windows', 'backups']
+        for table in tables:
+            try:
+                conn.execute(f"DELETE FROM {table}")
+            except:
+                pass
+        
+        # Reset notifications to defaults
+        conn.execute("UPDATE notifications SET enabled = 0, config = '{}'")
+        
+        # Keep users but reset admin password
+        conn.execute("UPDATE users SET password_hash = 'pbkdf2:sha256:admin' WHERE username = 'admin'")
+        
+        conn.commit()
+        conn.close()
+        
+        return {"status": "ok", "message": "All data has been reset"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/system/clear-metrics")
+async def clear_metrics_data():
+    try:
+        conn = get_db()
+        # Clear metrics but keep server definitions
+        conn.execute('''UPDATE servers SET 
+            last_check = NULL, last_status = NULL,
+            cpu_percent = NULL, memory_percent = NULL, disk_percent = NULL,
+            network_rx = NULL, network_tx = NULL, uptime = NULL,
+            raid_status = NULL, disk_info = NULL''')
+        conn.commit()
+        conn.close()
+        return {"status": "ok", "message": "Metrics cleared"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/api/backups")
 async def create_backup():
     try:
         BACKUP_DIR = os.path.join(os.path.dirname(DB_PATH), "backups")
@@ -1495,3 +2108,146 @@ async def list_backups():
     backups = conn.execute("SELECT * FROM backups ORDER BY created_at DESC").fetchall()
     conn.close()
     return {"backups": [dict(b) for b in backups]}
+
+# API Keys
+@router.get("/api/api-keys")
+async def list_api_keys():
+    conn = get_db()
+    keys = conn.execute("SELECT id, name, created_at, last_used FROM api_keys ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return {"keys": [dict(k) for k in keys]}
+
+@router.post("/api/api-keys")
+async def create_api_key(data: dict):
+    import secrets
+    import hashlib
+    key = secrets.token_urlsafe(32)
+    key_hash = hashlib.sha256(key.encode()).hexdigest()
+    name = data.get("name", "API Key")
+    conn = get_db()
+    conn.execute("INSERT INTO api_keys (name, key_hash, created_at) VALUES (?, ?, ?)",
+                 (name, key_hash, datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "key": key}
+
+@router.delete("/api/api-keys/{key_id}")
+async def delete_api_key(key_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM api_keys WHERE id=?", (key_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+# Audit Log
+@router.get("/api/audit-log")
+async def list_audit_log(limit: int = 100):
+    conn = get_db()
+    logs = conn.execute("SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+    conn.close()
+    return {"logs": [dict(l) for l in logs]}
+
+def log_audit(user_id: int, action: str, details: str = "", ip: str = ""):
+    try:
+        conn = get_db()
+        conn.execute("INSERT INTO audit_log (user_id, action, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?)",
+                     (user_id, action, details, ip, datetime.now(timezone.utc).isoformat()))
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+# Maintenance Windows
+@router.get("/api/maintenance")
+async def list_maintenance():
+    conn = get_db()
+    windows = conn.execute("SELECT * FROM maintenance_windows ORDER BY start_time").fetchall()
+    conn.close()
+    return {"windows": [dict(w) for w in windows]}
+
+@router.post("/api/maintenance")
+async def create_maintenance(data: dict):
+    conn = get_db()
+    conn.execute("INSERT INTO maintenance_windows (name, start_time, end_time, servers, enabled, created_at) VALUES (?, ?, ?, ?, 1, ?)",
+                 (data.get("name"), data.get("start_time"), data.get("end_time"), 
+                  json.dumps(data.get("servers", [])), datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+@router.delete("/api/maintenance/{window_id}")
+async def delete_maintenance(window_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM maintenance_windows WHERE id=?", (window_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+# Settings
+@router.get("/api/settings")
+async def get_settings():
+    conn = get_db()
+    rows = conn.execute("SELECT key, value FROM settings").fetchall()
+    conn.close()
+    return {"settings": {r["key"]: r["value"] for r in rows}}
+
+@router.put("/api/settings")
+async def update_settings(data: dict):
+    conn = get_db()
+    for key, value in data.items():
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+# Webhooks
+@router.get("/api/webhooks")
+async def list_webhooks():
+    conn = get_db()
+    webhooks = conn.execute("SELECT * FROM webhooks").fetchall()
+    conn.close()
+    return {"webhooks": [dict(w) for w in webhooks]}
+
+@router.post("/api/webhooks")
+async def create_webhook(data: dict):
+    conn = get_db()
+    try:
+        conn.execute('''CREATE TABLE IF NOT EXISTS webhooks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            events TEXT,
+            enabled BOOLEAN DEFAULT 1,
+            created_at TEXT
+        )''')
+        conn.execute("INSERT INTO webhooks (name, url, events, enabled, created_at) VALUES (?, ?, ?, 1, ?)",
+                     (data.get("name"), data.get("url"), json.dumps(data.get("events", [])), 
+                      datetime.now(timezone.utc).isoformat()))
+        conn.commit()
+    except:
+        pass
+    conn.close()
+    return {"status": "ok"}
+
+@router.delete("/api/webhooks/{webhook_id}")
+async def delete_webhook(webhook_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM webhooks WHERE id=?", (webhook_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+# Health Check
+@router.get("/api/health")
+async def health_check():
+    conn = get_db()
+    servers_count = len(conn.execute("SELECT id FROM servers").fetchall())
+    online_count = len(conn.execute("SELECT id FROM servers WHERE last_status = 'up'").fetchall())
+    alerts_count = len(conn.execute("SELECT id FROM alerts WHERE enabled = 1").fetchall())
+    conn.close()
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "servers": {"total": servers_count, "online": online_count},
+        "alerts": alerts_count
+    }

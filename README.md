@@ -1,217 +1,509 @@
-# PyMon - Server Monitoring System
+# PyMon - Enterprise Server Monitoring
 
-**Enterprise server monitoring for Linux and Windows (like Prometheus + node_exporter/windows_exporter)**
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
+
+**Professional server monitoring dashboard with real-time metrics, alerts, and RAID monitoring.**
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Servers-300+-blue" alt="Servers">
+  <img src="https://img.shields.io/badge/Features-20+-green" alt="Features">
+  <img src="https://img.shields.io/badge/Alerts-Telegram%20%7C%20Discord%20%7C%20Slack%20%7C%20Email-orange" alt="Alerts">
+</p>
+
+---
 
 ## Features
 
-- **Server Monitoring** - Linux & Windows servers via agents
-- **System Metrics** - CPU, Memory, Disk, Network, Processes
-- **Agent-based** - Like node_exporter (Linux) and windows_exporter (Windows)
-- **Web Dashboard** - Modern UI for managing servers and viewing metrics
-- **Alerts** - Notifications via Telegram, Discord, Slack, Email
-- **REST API** - Full API for integration
-- **Prometheus-compatible** - /metrics endpoint on each agent
-- **RAID Monitoring** - Linux mdadm, MegaRAID, HP Smart Array
-- **Background Scraping** - Auto-collects metrics every 60 seconds
+| Category | Features |
+|----------|----------|
+| **Monitoring** | CPU, Memory, Disk, Network, Uptime |
+| **OS Support** | Windows Server, Linux (all distros) |
+| **RAID** | Hardware RAID monitoring via Telegraf |
+| **Alerts** | Telegram, Discord, Slack, Email |
+| **Dashboard** | Real-time charts, filtering, sorting |
+| **API** | Full REST API with authentication |
+| **Backup** | Automatic backups with restore |
 
-## Dashboard Features
+---
 
-- **Charts** - CPU, Memory, Disk, Network with real-time updates
-- **Legend Sorting** - Click "Last" or "Max" to sort servers
-- **Legend Filtering** - Click on server in legend to filter
-- **Stat Cards** - Quick filters for Online/Offline/Linux/Windows
-- **Auto-refresh** - Dashboard refreshes every 30 seconds
-- **Manual Refresh** - Click refresh button to update immediately
-- **Time Range** - 5m, 15m, 1h, 6h, 24h views
+## Screenshots
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  PyMon Dashboard                                    [Logout] │
+├─────────────────────────────────────────────────────────────┤
+│  Dashboard  │  Servers  │  Alerts  │  Settings              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐        │
+│  │  309    │  │   5     │  │  257    │  │   52    │        │
+│  │ Online  │  │ Offline │  │ Windows │  │  Linux  │        │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘        │
+│                                                             │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ CPU Usage Chart                          [5m][1h][24h]│  │
+│  │ ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░ SQL2019        77.4%  Max: 82%  │  │
+│  │ ▓▓▓▓▓▓▓▓▓▓░░░░░░░░░ APPSRV7        54.6%  Max: 61%  │  │
+│  │ ▓▓▓▓▓▓▓▓▓░░░░░░░░░░ APPSRV6        51.6%  Max: 58%  │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                             │
+│  RAID Status: 6 servers | 21 arrays | 2 degraded           │
+│  HOST-VM: RAID5 281GB ✓ RAID6 15258GB ✗ RAID6 3814GB ✓    │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
 
 ## Quick Start
 
-### Install Server (Main monitoring server)
+### Prerequisites
+
+- Python 3.9+
+- pip package manager
+
+### Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
-```
+# Clone repository
+git clone https://github.com/ajjs1ajjs/Monitoring.git
+cd Monitoring
 
-Or run locally:
-```bash
+# Create virtual environment
+python -m venv .venv
+.venv\Scripts\activate     # Windows
+source .venv/bin/activate  # Linux
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Start server
 python -m pymon.cli server
 ```
 
-### Install Agent on Linux Servers
+Access dashboard: **http://localhost:8090/dashboard/**
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash
-```
+Default credentials: `admin` / `admin`
 
-Then edit the config:
-```bash
-sudo nano /etc/systemd/system/pymon-agent.service
-# Set PYMON_SERVER and PYMON_API_KEY
-sudo systemctl start pymon-agent
-```
-
-### Install Agent on Windows Servers
-
-```powershell
-# Run as Administrator
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-windows.ps1" -OutFile "install.ps1"
-.\install.ps1 -ServerUrl "http://your-pymon-server:8090"
-```
-
-## Access
-
-After installation:
-- **Dashboard**: http://your-server:8090/dashboard/
-- **API**: http://your-server:8090/api/v1/
-- **Agent Metrics** (on each server): http://server-ip:9100/metrics
-
-**Default credentials**: `admin` / `admin`
-
-## How It Works
-
-1. **Install PyMon Server** - Main monitoring hub
-2. **Install Agents** on each server you want to monitor:
-   - **Linux**: Uses psutil, collects like node_exporter
-   - **Windows**: Uses WMI + psutil, collects like windows_exporter
-3. **Server auto-discovers agents** - Background scraping every 60 seconds
-4. **View metrics** in the web dashboard
-
-## Agent Capabilities
-
-### Linux Agent
-- CPU usage and frequency
-- Memory usage (total, available, used)
-- Disk usage (all partitions)
-- Network I/O (all interfaces)
-- System load average
-- Boot time
-- RAID monitoring (mdadm, MegaRAID, HP Smart Array)
-- SMART status for disks
-
-### Windows Agent
-- CPU usage
-- Memory usage
-- Disk usage (all drives)
-- Network I/O
-- Windows services status
-- Process count
-- OS info (version, name)
-- RAID/Storage Spaces info
+---
 
 ## Configuration
 
-### Agent Environment Variables
-
-```bash
-PYMON_SERVER=http://your-server:8090    # PyMon server URL
-PYMON_API_KEY=your-api-key              # API key for authentication
-PYMON_AGENT_PORT=9100                   # Local HTTP port for /metrics
-```
-
-### Server Config
-
-File: `config.yml`
+### config.yml
 
 ```yaml
 server:
-  port: 8090
   host: 0.0.0.0
+  port: 8090
 
 storage:
   backend: sqlite
   path: pymon.db
 
-scrape_configs:
-  - job_name: agents
-    scrape_interval: 15s
-    scrape_timeout: 10s
-    metrics_path: /metrics
-    static_configs:
-      - targets: []
-
 auth:
   admin_username: admin
   admin_password: admin
+
+scrape_configs:
+  - job_name: servers
+    scrape_interval: 60
+    scrape_timeout: 10
 ```
 
-## API Examples
+---
 
-### Get All Servers
-```bash
-curl http://localhost:8090/api/servers \
-  -H "Authorization: Bearer YOUR_TOKEN"
+## Data Sources
+
+PyMon collects metrics from industry-standard exporters:
+
+### Windows Servers
+
+**[windows_exporter](https://github.com/prometheus-community/windows_exporter)**
+
+```powershell
+# Download and install
+msiexec /i windows_exporter.msi ENABLED_COLLECTORS="cpu,cs,memory,net,logical_disk"
+
+# Default port: 9182
+# Metrics: http://server:9182/metrics
 ```
 
-### Add Server
+### Linux Servers
+
+**[node_exporter](https://github.com/prometheus/node_exporter)**
+
 ```bash
+# Download
+wget https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz
+tar xzf node_exporter-*.tar.gz
+
+# Run
+./node_exporter
+
+# Default port: 9100
+# Metrics: http://server:9100/metrics
+```
+
+### RAID Monitoring
+
+**[Telegraf](https://github.com/influxdata/telegraf)** with MegaRAID/SMART plugins
+
+```toml
+# /etc/telegraf/telegraf.conf
+[[inputs.prometheus]]
+  urls = ["http://localhost:9273/metrics"]
+
+[[outputs.prometheus_client]]
+  listen = ":9273"
+```
+
+| Server Type | Exporter | Port | Metrics |
+|-------------|----------|------|---------|
+| Windows | windows_exporter | 9182 | CPU, Memory, Disk, Network |
+| Linux | node_exporter | 9100 | CPU, Memory, Disk, Network |
+| RAID | Telegraf | 9273 | RAID status, disk health |
+
+---
+
+## Adding Servers
+
+### Via Dashboard
+
+1. Go to **Servers** tab
+2. Click **Add Server**
+3. Fill in: Name, Host/IP, OS Type, Port
+4. Click **Add**
+
+### Via API
+
+```bash
+# Login and get token
+TOKEN=$(curl -s -X POST http://localhost:8090/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}' | jq -r '.access_token')
+
+# Add server
 curl -X POST http://localhost:8090/api/servers \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Production DB",
+    "name": "Production SQL",
     "host": "192.168.1.100",
-    "os_type": "linux"
+    "os_type": "windows",
+    "agent_port": 9182
   }'
 ```
 
-### Manual Scrape
-```bash
-curl -X POST http://localhost:8090/api/servers/1/scrape \
-  -H "Authorization: Bearer YOUR_TOKEN"
-```
+### Import from Prometheus
 
-## Architecture
-
-```
-┌─────────────────┐         ┌──────────────────┐
-│   PyMon Server  │◄--------│  Linux Agent    │
-│   (this repo)   │  HTTP   │  (port 9100)    │
-│                 │  /metrics                 │
-│  - Dashboard    │         └──────────────────┘
-│  - API          │         ┌──────────────────┐
-│  - Alerts       │◄--------│  Windows Agent   │
-│  - Storage      │  HTTP   │  (port 9100)     │
-│  - Scraping     │  /metrics                 │
-└─────────────────┘         └──────────────────┘
-          ▲
-          │
-     Web Browser
-```
-
-## Management Commands
+If you have existing `prometheus.yml`:
 
 ```bash
-# Server
-sudo systemctl status pymon
-sudo systemctl restart pymon
-sudo journalctl -u pymon -f
-
-# Linux Agent
-sudo systemctl status pymon-agent
-sudo systemctl restart pymon-agent
-
-# Windows Agent
-Get-Service PyMonAgent
-Start-Service PyMonAgent
-Stop-Service PyMonAgent
+python scripts/import_prometheus.py prometheus.yml
 ```
+
+---
+
+## API Reference
+
+### Authentication
+
+```bash
+# Login
+POST /api/v1/auth/login
+Body: {"username": "admin", "password": "admin"}
+Response: {"access_token": "..."}
+
+# All requests need header:
+Authorization: Bearer <token>
+```
+
+### Servers
+
+```bash
+GET    /api/servers              # List all servers
+POST   /api/servers              # Add server
+GET    /api/servers/{id}         # Get server details
+PUT    /api/servers/{id}         # Update server
+DELETE /api/servers/{id}         # Delete server
+POST   /api/servers/{id}/scrape  # Manual scrape
+```
+
+### Alerts
+
+```bash
+GET    /api/alerts               # List alerts
+POST   /api/alerts               # Create alert
+PUT    /api/alerts/{id}          # Update alert
+DELETE /api/alerts/{id}          # Delete alert
+```
+
+### RAID Status
+
+```bash
+GET    /api/raid-status          # Get all RAID arrays
+```
+
+### Backups
+
+```bash
+GET    /api/backup/config        # Backup settings
+POST   /api/backup/config        # Update settings
+POST   /api/backup/create        # Create full backup
+POST   /api/backup/restore       # Restore from backup
+GET    /api/backup/list          # List backup files
+DELETE /api/backup/file          # Delete backup file
+```
+
+### System
+
+```bash
+GET    /api/health               # Health check
+POST   /api/system/reset         # Factory reset (dangerous!)
+POST   /api/system/clear-metrics # Clear all metrics
+```
+
+---
+
+## Alerts Configuration
+
+### Create Alert Rule
+
+| Parameter | Values |
+|-----------|--------|
+| Metric | cpu, memory, disk, network, exporter, raid |
+| Condition | greater_than, less_than, equals |
+| Threshold | Numeric value (0-100) |
+| Duration | Seconds to trigger |
+| Severity | critical, warning, info |
+| Notify | Telegram, Discord, Slack, Email |
+
+### Example: High CPU Alert
+
+```json
+{
+  "name": "High CPU Usage",
+  "metric": "cpu",
+  "condition": "greater_than",
+  "threshold": 90,
+  "duration": 300,
+  "severity": "critical",
+  "notify_telegram": true,
+  "notify_email": true
+}
+```
+
+---
+
+## Backup & Restore
+
+### Create Backup
+
+```bash
+# Via API
+curl -X POST http://localhost:8090/api/backup/create \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"path": "D:/backups"}'
+
+# Backup contains:
+# - pymon.db (database)
+# - config.yml (configuration)
+# - settings.json (all settings)
+```
+
+### Restore Backup
+
+```bash
+curl -X POST http://localhost:8090/api/backup/restore \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "file": "D:/backups/pymon_full_20260222.zip",
+    "restore_db": true,
+    "restore_config": true,
+    "restore_settings": true
+  }'
+```
+
+### Auto Backup Settings
+
+```bash
+curl -X POST http://localhost:8090/api/backup/config \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "auto": true,
+    "time": "02:00",
+    "path": "D:/backups",
+    "keep_days": 30
+  }'
+```
+
+---
 
 ## Update
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/update.sh | sudo bash
+# Stop server
+# Ctrl+C or:
+sudo systemctl stop pymon  # Linux
+
+# Pull latest changes
+git pull origin main
+
+# Update dependencies
+pip install -r requirements.txt --upgrade
+
+# Start server
+python -m pymon.cli server
 ```
+
+---
+
+## Dashboard Features
+
+### Servers Tab
+
+- **Search**: Filter by name or host
+- **Status Filter**: Online / Offline
+- **OS Filter**: Windows / Linux
+- **Metric Filters**: CPU/Memory/Disk thresholds
+- **Sorting**: Name, Status, CPU, Memory, Disk
+- **Disk Details**: Shows C:, D:, E: with percentages
+
+### Alert Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `cpu` | CPU usage percentage |
+| `memory` | Memory usage percentage |
+| `disk` | Disk usage percentage |
+| `network` | Network I/O |
+| `exporter` | Exporter availability |
+| `raid` | RAID array health |
+
+---
+
+## Directory Structure
+
+```
+Monitoring/
+├── pymon/
+│   ├── __init__.py
+│   ├── cli.py              # CLI entry point
+│   ├── config.py           # Configuration
+│   ├── web_dashboard.py    # Dashboard + API
+│   ├── api/
+│   │   └── endpoints.py    # API endpoints
+│   ├── auth.py             # Authentication
+│   ├── storage.py          # Database storage
+│   └── scrape.py           # Metrics scraping
+├── config.yml              # Configuration file
+├── pymon.db                # SQLite database
+├── backups/                # Backup storage
+├── requirements.txt        # Dependencies
+└── README.md
+```
+
+---
+
+## Troubleshooting
+
+### Server won't start
+
+```bash
+# Check port is free
+netstat -an | findstr :8090    # Windows
+netstat -tulpn | grep 8090     # Linux
+
+# Check logs
+python -m pymon.cli server 2>&1 | tee server.log
+```
+
+### Can't connect to exporter
+
+```bash
+# Test exporter directly
+curl http://server-ip:9182/metrics     # Windows
+curl http://server-ip:9100/metrics     # Linux
+curl http://server-ip:9273/metrics     # Telegraf
+
+# Check firewall
+# Windows: Allow port 9182 in Windows Firewall
+# Linux: sudo ufw allow 9100
+```
+
+### Metrics not updating
+
+```bash
+# Manual scrape test
+curl -X POST http://localhost:8090/api/servers/1/scrape \
+  -H "Authorization: Bearer $TOKEN"
+
+# Check scrape interval in config.yml
+```
+
+---
+
+## Security Recommendations
+
+1. **Change default password** immediately
+2. **Use HTTPS** in production
+3. **Restrict API access** with firewall rules
+4. **Enable backup encryption** for sensitive data
+5. **Use API keys** for integrations
+6. **Review audit logs** regularly
+
+---
+
+## Comparison
+
+| Feature | PyMon | Prometheus + Grafana |
+|---------|-------|---------------------|
+| Setup | Single command | Multiple components |
+| Dashboard | Built-in | Requires Grafana |
+| Alerts | Built-in | Requires AlertManager |
+| Database | SQLite (no setup) | Requires configuration |
+| Learning curve | Low | Medium-High |
+| RAID monitoring | Built-in | Custom setup |
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing`)
+5. Open Pull Request
+
+---
 
 ## License
 
-MIT License
+MIT License - see [LICENSE](LICENSE) file.
 
-## Similar Tools
+---
 
-- **Prometheus** - We are compatible with /metrics format
-- **node_exporter** - Our Linux agent works similarly
-- **windows_exporter** - Our Windows agent works similarly
-- **Grafana** - Our dashboard provides similar visualization
+## Support
 
-**Key difference**: PyMon is all-in-one (server + agents + dashboard) with easier setup.
+- **Issues**: [GitHub Issues](https://github.com/ajjs1ajjs/Monitoring/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ajjs1ajjs/Monitoring/discussions)
+
+---
+
+## Credits
+
+Built with:
+- [FastAPI](https://fastapi.tiangolo.com/) - Web framework
+- [SQLite](https://sqlite.org/) - Database
+- [httpx](https://www.python-httpx.org/) - HTTP client
+- [Chart.js](https://chartjs.org/) - Charts
+
+Compatible with:
+- [windows_exporter](https://github.com/prometheus-community/windows_exporter)
+- [node_exporter](https://github.com/prometheus/node_exporter)
+- [Telegraf](https://github.com/influxdata/telegraf)
