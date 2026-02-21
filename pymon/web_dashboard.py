@@ -1397,15 +1397,29 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             if (data.backup_path) {
                 document.getElementById('backupPath').value = data.backup_path;
             }
+            window.backupFiles = files;
             let html = '';
             for (let i = 0; i < files.length; i++) {
                 const b = files[i];
                 const size = b.size ? (b.size/1024).toFixed(1) + ' KB' : '-';
                 const created = b.created ? b.created.substring(0, 19) : '-';
-                html += '<tr><td>' + b.filename + '</td><td>' + size + '</td><td>' + created + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteBackupFile(\'' + b.path + '\')"><i class="fas fa-trash"></i></button> <button class="btn btn-secondary btn-sm" onclick="restoreThisBackup(\'' + b.path + '\')"><i class="fas fa-undo"></i></button></td></tr>';
+                html += '<tr><td>' + b.filename + '</td><td>' + size + '</td><td>' + created + '</td><td><button class="btn btn-danger btn-sm" data-idx="' + i + '" onclick="deleteBackupByIndex(' + i + ')"><i class="fas fa-trash"></i></button> <button class="btn btn-secondary btn-sm" data-idx="' + i + '" onclick="restoreByIndex(' + i + ')"><i class="fas fa-undo"></i></button></td></tr>';
             }
             document.getElementById('backups-tbody').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No backups</td></tr>';
         } catch(e) { console.error(e); }
+    }
+    
+    function deleteBackupByIndex(idx) {
+        const file = window.backupFiles[idx];
+        if (!file) return;
+        if (!confirm('Delete ' + file.filename + '?')) return;
+        deleteBackupFile(file.path);
+    }
+    
+    function restoreByIndex(idx) {
+        const file = window.backupFiles[idx];
+        if (!file) return;
+        restoreThisBackup(file.path);
     }
     
     function restoreThisBackup(path) {
