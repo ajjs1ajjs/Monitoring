@@ -386,6 +386,39 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Disk</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="diskChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="diskLegend"></div></div></div></div>
                 <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="networkLegend"></div></div></div></div>
             </div>
+
+            <!-- RAID Status -->
+            <div class="card" style="margin-top: 16px;">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-hdd"></i> RAID Status</h3>
+                    <button class="btn btn-secondary btn-sm" id="refreshRaidBtn"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+                <div id="raidStatusPanel" style="max-height: 200px; overflow-y: auto;">
+                    <p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data</p>
+                </div>
+            </div>
+
+            <!-- Disk Status -->
+            <div class="card" style="margin-top: 16px;">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-hdd"></i> Disk Status</h3>
+                    <button class="btn btn-secondary btn-sm" id="refreshDiskBtn"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+                <div id="diskStatusPanel" style="max-height: 200px; overflow-y: auto;">
+                    <p style="color: var(--muted); text-align: center; padding: 20px;">No disk data</p>
+                </div>
+            </div>
+
+            <!-- SQL Always On Nodes -->
+            <div class="card" style="margin-top: 16px;">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-database"></i> SQL Always On Nodes</h3>
+                    <button class="btn btn-secondary btn-sm" id="refreshSqlBtn"><i class="fas fa-sync"></i> Refresh</button>
+                </div>
+                <div id="sqlStatusPanel" style="max-height: 200px; overflow-y: auto;">
+                    <p style="color: var(--muted); text-align: center; padding: 20px;">No SQL Always On data</p>
+                </div>
+            </div>
         </div>
         <div id="section-servers" class="section-content">
             <div class="card">
@@ -704,10 +737,95 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             document.getElementById('stat-linux').textContent = linux;
             document.getElementById('stat-windows').textContent = windows;
             updateRAIDStatusPanel();
+            updateDiskStatusPanel();
             updateExporterStatusPanel();
+            updateTelegrafStatusPanel();
+            updateSQLStatusPanel();
         } catch(e) { console.error(e); }
     }
-    
+
+    function updateRAIDStatusPanel() {
+        const filtered = getFilteredServers();
+        const panel = document.getElementById('raidStatusPanel');
+        const raidServers = filtered.filter(s => s.raid_status);
+        if (!raidServers.length) {
+            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data</p>';
+            return;
+        }
+        panel.innerHTML = raidServers.map(s => {
+            let raidData = {status: 'unknown', disks: []};
+            try { if (s.raid_status) raidData = JSON.parse(s.raid_status); } catch(e) {}
+            const statusColor = raidData.status === 'healthy' ? 'var(--green)' : 'var(--red)';
+            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong><span class="badge ' + (raidData.status === 'healthy' ? 'badge-success' : 'badge-danger') + '">' + (raidData.status || 'Unknown') + '</span></div>' +
+                (raidData.disks || []).map(d => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + d.name + '</span><span class="badge ' + (d.status === 'online' ? 'badge-success' : 'badge-danger') + '">' + d.status + '</span></div>').join('') + '</div>';
+        }).join('');
+    }
+
+    function updateDiskStatusPanel() {
+        const filtered = getFilteredServers();
+        const panel = document.getElementById('diskStatusPanel');
+        const diskServers = filtered.filter(s => s.disk_status);
+        if (!diskServers.length) {
+            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No disk data</p>';
+            return;
+        }
+        panel.innerHTML = diskServers.map(s => {
+            let diskData = {disks: []};
+            try { if (s.disk_status) diskData = JSON.parse(s.disk_status); } catch(e) {}
+            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong></div>' +
+                (diskData.disks || []).map(d => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + d.name + '</span><span>' + (d.used || 0) + '% used</span></div>').join('') + '</div>';
+        }).join('');
+    }
+
+    function updateExporterStatusPanel() {
+        const filtered = getFilteredServers();
+        const panel = document.getElementById('exporterStatusPanel');
+        if (!filtered.length) {
+            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No exporters data</p>';
+            return;
+        }
+        panel.innerHTML = filtered.map(s => {
+            const isUp = s.last_status === 'up';
+            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
+                '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 9100) + '</span></div>' +
+                '<div style="text-align: right;"><span class="badge ' + (isUp ? 'badge-success' : 'badge-danger') + '">' + (isUp ? 'Online' : 'Offline') + '</span><br><span style="color: var(--muted); font-size: 10px;">' + (s.last_check || 'Never') + '</span></div>' +
+                '</div>';
+        }).join('');
+    }
+
+    function updateTelegrafStatusPanel() {
+        const filtered = getFilteredServers();
+        const panel = document.getElementById('telegrafStatusPanel');
+        if (!filtered.length) {
+            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No Telegraf data</p>';
+            return;
+        }
+        panel.innerHTML = filtered.map(s => {
+            const isUp = s.last_status === 'up';
+            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
+                '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 8094) + '</span></div>' +
+                '<div style="text-align: right;"><span class="badge ' + (isUp ? 'badge-success' : 'badge-danger') + '">' + (isUp ? 'Online' : 'Offline') + '</span><br><span style="color: var(--muted); font-size: 10px;">' + (s.last_check || 'Never') + '</span></div>' +
+                '</div>';
+        }).join('');
+    }
+
+    function updateSQLStatusPanel() {
+        const filtered = getFilteredServers();
+        const panel = document.getElementById('sqlStatusPanel');
+        const sqlServers = filtered.filter(s => s.sql_status);
+        if (!sqlServers.length) {
+            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No SQL Always On data</p>';
+            return;
+        }
+        panel.innerHTML = sqlServers.map(s => {
+            let sqlData = {nodes: [], role: 'unknown'};
+            try { if (s.sql_status) sqlData = JSON.parse(s.sql_status); } catch(e) {}
+            const roleColor = sqlData.role === 'primary' ? 'var(--green)' : sqlData.role === 'secondary' ? 'var(--blue)' : 'var(--yellow)';
+            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong><span class="badge" style="color: ' + roleColor + '; border-color: ' + roleColor + '">' + (sqlData.role || 'Unknown') + '</span></div>' +
+                (sqlData.nodes || []).map(n => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + n.name + '</span><span>' + (n.status || 'unknown') + '</span></div>').join('') + '</div>';
+        }).join('');
+    }
+
     async function deleteServer(id) {
         if (confirm('Delete server?')) {
             await fetch('/api/servers/' + id, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
@@ -1054,9 +1172,64 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             return '<div class="raid-card"><div class="raid-card-header"><div class="raid-card-title">' + s.name + '</div><div class="raid-status"><i class="fas ' + statusIcon + '" style="color: ' + statusColor + ';"></i> ' + (raidData.status || 'Unknown') + '</div></div><div class="raid-disks">' + (raidData.disks || []).map(d => '<div class="raid-disk"><span>' + d.name + '</span><span class="badge ' + (d.status === 'online' ? 'badge-success' : 'badge-danger') + '">' + d.status + '</span></div>').join('') + '</div></div>';
         }).join('');
     }
-    
+
+    async function loadDisk() {
+        const panel = document.getElementById('diskStatusPanel');
+        if (!servers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers added yet.</p>'; return; }
+        const diskServers = servers.filter(s => s.disk_status);
+        if (!diskServers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No disk data available.</p>'; return; }
+        panel.innerHTML = diskServers.map(s => {
+            let diskData = {disks: []};
+            try { if (s.disk_status) diskData = JSON.parse(s.disk_status); } catch(e) {}
+            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong></div>' +
+                (diskData.disks || []).map(d => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + d.name + '</span><span>' + (d.used || 0) + '% used</span></div>').join('') + '</div>';
+        }).join('');
+    }
+
+    async function loadSQL() {
+        const panel = document.getElementById('sqlStatusPanel');
+        if (!servers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers added yet.</p>'; return; }
+        const sqlServers = servers.filter(s => s.sql_status);
+        if (!sqlServers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No SQL Always On data available.</p>'; return; }
+        panel.innerHTML = sqlServers.map(s => {
+            let sqlData = {nodes: [], role: 'unknown'};
+            try { if (s.sql_status) sqlData = JSON.parse(s.sql_status); } catch(e) {}
+            const roleColor = sqlData.role === 'primary' ? 'var(--green)' : sqlData.role === 'secondary' ? 'var(--blue)' : 'var(--yellow)';
+            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong><span class="badge" style="color: ' + roleColor + '; border-color: ' + roleColor + '">' + (sqlData.role || 'Unknown') + '</span></div>' +
+                (sqlData.nodes || []).map(n => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + n.name + '</span><span>' + (n.status || 'unknown') + '</span></div>').join('') + '</div>';
+        }).join('');
+    }
+
+    async function loadExporters() {
+        const panel = document.getElementById('exporterStatusPanel');
+        if (!servers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers added yet.</p>'; return; }
+        panel.innerHTML = servers.map(s => {
+            const isUp = s.last_status === 'up';
+            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
+                '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 9100) + '</span></div>' +
+                '<div style="text-align: right;"><span class="badge ' + (isUp ? 'badge-success' : 'badge-danger') + '">' + (isUp ? 'Online' : 'Offline') + '</span><br><span style="color: var(--muted); font-size: 10px;">' + (s.last_check || 'Never') + '</span></div>' +
+                '</div>';
+        }).join('');
+    }
+
+    async function loadTelegraf() {
+        const panel = document.getElementById('telegrafStatusPanel');
+        if (!servers.length) { panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers added yet.</p>'; return; }
+        panel.innerHTML = servers.map(s => {
+            const isUp = s.last_status === 'up';
+            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
+                '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 8094) + '</span></div>' +
+                '<div style="text-align: right;"><span class="badge ' + (isUp ? 'badge-success' : 'badge-danger') + '">' + (isUp ? 'Online' : 'Offline') + '</span><br><span style="color: var(--muted); font-size: 10px;">' + (s.last_check || 'Never') + '</span></div>' +
+                '</div>';
+        }).join('');
+    }
+
     document.getElementById('refreshRaidBtn').addEventListener('click', loadRAID);
-    
+    document.getElementById('refreshDiskBtn').addEventListener('click', loadDisk);
+    document.getElementById('refreshSqlBtn').addEventListener('click', loadSQL);
+    document.getElementById('refreshExportersBtn').addEventListener('click', loadExporters);
+    document.getElementById('refreshTelegrafBtn').addEventListener('click', loadTelegraf);
+
     ['telegram', 'discord', 'slack', 'email'].forEach(ch => {
         const enabled = document.getElementById(ch + '-enabled');
         if (enabled) {
