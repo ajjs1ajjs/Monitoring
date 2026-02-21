@@ -386,22 +386,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Disk</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="diskChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="diskLegend"></div></div></div></div>
                 <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="networkLegend"></div></div></div></div>
             </div>
-            
-            <!-- RAID & Exporter Status -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px;">
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title"><i class="fas fa-hdd"></i> RAID Status</h3></div>
-                    <div id="raidStatusPanel" style="max-height: 200px; overflow-y: auto;">
-                        <p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data</p>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title"><i class="fas fa-export"></i> Exporter Status</h3></div>
-                    <div id="exporterStatusPanel" style="max-height: 200px; overflow-y: auto;">
-                        <p style="color: var(--muted); text-align: center; padding: 20px;">No exporters</p>
-                    </div>
-                </div>
-            </div>
         </div>
         <div id="section-servers" class="section-content">
             <div class="card">
@@ -722,39 +706,6 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             updateRAIDStatusPanel();
             updateExporterStatusPanel();
         } catch(e) { console.error(e); }
-    }
-    
-    function updateRAIDStatusPanel() {
-        const filtered = getFilteredServers();
-        const panel = document.getElementById('raidStatusPanel');
-        const raidServers = filtered.filter(s => s.raid_status);
-        if (!raidServers.length) {
-            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data</p>';
-            return;
-        }
-        panel.innerHTML = raidServers.map(s => {
-            let raidData = {status: 'unknown', disks: []};
-            try { if (s.raid_status) raidData = JSON.parse(s.raid_status); } catch(e) {}
-            const statusColor = raidData.status === 'healthy' ? 'var(--green)' : 'var(--red)';
-            return '<div style="margin-bottom: 8px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><strong>' + s.name + '</strong><span class="badge ' + (raidData.status === 'healthy' ? 'badge-success' : 'badge-danger') + '">' + (raidData.status || 'Unknown') + '</span></div>' +
-                (raidData.disks || []).map(d => '<div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 2px; font-size: 11px;"><span>' + d.name + '</span><span class="badge ' + (d.status === 'online' ? 'badge-success' : 'badge-danger') + '">' + d.status + '</span></div>').join('') + '</div>';
-        }).join('');
-    }
-    
-    function updateExporterStatusPanel() {
-        const filtered = getFilteredServers();
-        const panel = document.getElementById('exporterStatusPanel');
-        if (!filtered.length) {
-            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No exporters</p>';
-            return;
-        }
-        panel.innerHTML = filtered.map(s => {
-            const isUp = s.last_status === 'up';
-            return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-bottom: 6px;">' +
-                '<div><strong>' + s.name + '</strong><br><span style="color: var(--muted); font-size: 11px;">' + s.host + ':' + (s.agent_port || 9100) + '</span></div>' +
-                '<div style="text-align: right;"><span class="badge ' + (isUp ? 'badge-success' : 'badge-danger') + '">' + (isUp ? 'Online' : 'Offline') + '</span><br><span style="color: var(--muted); font-size: 10px;">' + (s.last_check || 'Never') + '</span></div>' +
-                '</div>';
-        }).join('');
     }
     
     async function deleteServer(id) {
