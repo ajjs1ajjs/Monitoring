@@ -65,6 +65,7 @@ pymon.db
 backups/
 data/
 config/
+config.yml
 
 # Additional
 .venv-1/
