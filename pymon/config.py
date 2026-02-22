@@ -85,7 +85,7 @@ class AuthConfig:
 class BackupConfig:
     enabled: bool = True
     max_backups: int = 10
-    backup_dir: str = "/etc/pymon/backups"
+    backup_dir: str = "./backups"
     schedule: str = "0 2 * * *"
 
 
