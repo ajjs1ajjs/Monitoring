@@ -1118,7 +1118,40 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
             datasets.cpu.push({ ...common, data: history.map(h => h.cpu_percent) });
             datasets.memory.push({ ...common, data: history.map(h => h.memory_percent) });
-            datasets.disk.push({ ...common, data: history.map(h => h.disk_percent) });
+            
+            // Multiple disks handling
+            const diskDataMap = {}; // {volume: [values]}
+            history.forEach(h => {
+                if (h.disk_info) {
+                    try {
+                        const info = typeof h.disk_info === 'string' ? JSON.parse(h.disk_info) : h.disk_info;
+                        if (Array.isArray(info)) {
+                            info.forEach(d => {
+                                const vol = d.volume || d.path || '?';
+                                if (!diskDataMap[vol]) diskDataMap[vol] = [];
+                                diskDataMap[vol].push(d.percent);
+                            });
+                        }
+                    } catch(e) {}
+                }
+            });
+
+            const vols = Object.keys(diskDataMap);
+            if (vols.length > 0) {
+                vols.forEach((vol, vIdx) => {
+                    const vColor = colors[(idx + vIdx) % colors.length];
+                    datasets.disk.push({
+                        ...common,
+                        label: `${server.name} (${vol})`,
+                        borderColor: vColor,
+                        backgroundColor: vColor + '15',
+                        data: diskDataMap[vol]
+                    });
+                });
+            } else {
+                datasets.disk.push({ ...common, data: history.map(h => h.disk_percent) });
+            }
+
             datasets.network.push({ ...common, data: history.map(h => h.network_rx / 1024 / 1024) }); // MB/s
         });
 
@@ -1823,7 +1856,6 @@ async def scrape_server(server_id: int):
                             # Collect ALL disks from windows_exporter
                             if name == "windows_logical_disk_free_bytes":
                                 import re
-
                                 vol_match = re.search(r'volume="([^"]+)"', labels_part)
                                 if vol_match:
                                     vol = vol_match.group(1)
@@ -1832,13 +1864,52 @@ async def scrape_server(server_id: int):
                                     disk_info[vol]["free"] = value
                             if name == "windows_logical_disk_size_bytes":
                                 import re
-
                                 vol_match = re.search(r'volume="([^"]+)"', labels_part)
                                 if vol_match:
                                     vol = vol_match.group(1)
                                     if vol not in disk_info:
                                         disk_info[vol] = {"volume": vol, "free": 0, "size": 0}
                                     disk_info[vol]["size"] = value
+
+                            # Support for node_exporter (Linux)
+                            if name == "node_filesystem_free_bytes":
+                                import re
+                                mount_match = re.search(r'mountpoint="([^"]+)"', labels_part)
+                                if mount_match:
+                                    mount = mount_match.group(1)
+                                    # Filter common ignore-worthy mountpoints
+                                    if not any(x in mount for x in ['/proc', '/sys', '/dev', '/run', '/tmp']):
+                                        if mount not in disk_info:
+                                            disk_info[mount] = {"volume": mount, "free": 0, "size": 0}
+                                        disk_info[mount]["free"] = value
+                            if name == "node_filesystem_size_bytes":
+                                import re
+                                mount_match = re.search(r'mountpoint="([^"]+)"', labels_part)
+                                if mount_match:
+                                    mount = mount_match.group(1)
+                                    if not any(x in mount for x in ['/proc', '/sys', '/dev', '/run', '/tmp']):
+                                        if mount not in disk_info:
+                                            disk_info[mount] = {"volume": mount, "free": 0, "size": 0}
+                                        disk_info[mount]["size"] = value
+
+                            # Support for telegraf
+                            if name == "disk_free":
+                                import re
+                                path_match = re.search(r'path="([^"]+)"', labels_part)
+                                if path_match:
+                                    path = path_match.group(1)
+                                    if path not in disk_info:
+                                        disk_info[path] = {"volume": path, "free": 0, "size": 0}
+                                    disk_info[path]["free"] = value
+                            if name == "disk_total":
+                                import re
+                                path_match = re.search(r'path="([^"]+)"', labels_part)
+                                if path_match:
+                                    path = path_match.group(1)
+                                    if path not in disk_info:
+                                        disk_info[path] = {"volume": path, "free": 0, "size": 0}
+                                    disk_info[path]["size"] = value
+
                         else:
                             parts = line.split()
                             if len(parts) >= 2:
