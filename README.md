@@ -72,7 +72,7 @@ python -m pymon.cli server
 
 Access dashboard: **http://localhost:8090/dashboard/**
 
-Default credentials: `admin` / `admin`
+Default credentials: `admin` / `changeme`
 
 ---
 

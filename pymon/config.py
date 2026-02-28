@@ -77,7 +77,7 @@ class StorageConfig:
 @dataclass
 class AuthConfig:
     admin_username: str = "admin"
-    admin_password: str = "admin"
+    admin_password: str = "changeme"
     jwt_expire_hours: int = 24
 
 

@@ -1,33 +1,38 @@
 """Enterprise Server Monitoring Dashboard"""
 
+import json
+import os
+import sqlite3
+from datetime import datetime, timezone
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import Optional
-import json
-import sqlite3
-import os
-from datetime import datetime, timezone
 
 router = APIRouter()
 
 DB_PATH = os.getenv("DB_PATH", "pymon.db")
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
+
 class UserModel(BaseModel):
     username: str
     password: Optional[str] = None
     role: str = "viewer"
+
 
 class SecurityModel(BaseModel):
     ssl_cert_path: str
     ssl_key_path: str
     https_redirect: bool
     listen_port: int
+
 
 class AlertModel(BaseModel):
     name: str
@@ -44,27 +49,29 @@ class AlertModel(BaseModel):
     description: Optional[str] = None
     enabled: bool = True
 
+
 class ServerModel(BaseModel):
     name: str
     host: str
     os_type: str = "linux"
-    agent_port: int = 9100
+    agent_port: int | None = None
     check_interval: int = 15
     notify_telegram: bool = False
     notify_discord: bool = False
     notify_slack: bool = False
     notify_email: bool = False
 
+
 def init_web_tables():
     try:
         db_dir = os.path.dirname(DB_PATH)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir, exist_ok=True)
-        
+
         conn = get_db()
         c = conn.cursor()
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS servers (
+
+        c.execute("""CREATE TABLE IF NOT EXISTS servers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             host TEXT NOT NULL,
@@ -87,34 +94,38 @@ def init_web_tables():
             uptime TEXT,
             raid_status TEXT,
             disk_info TEXT
-        )''')
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS notifications (
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS notifications (
             channel TEXT UNIQUE NOT NULL,
             enabled BOOLEAN DEFAULT 0,
             config TEXT
-        )''')
-        
+        )""")
+
         try:
-            for channel in ['telegram', 'discord', 'slack', 'email']:
-                c.execute("INSERT OR IGNORE INTO notifications (channel, enabled, config) VALUES (?, 0, '{}')", (channel,))
+            for channel in ["telegram", "discord", "slack", "email"]:
+                c.execute(
+                    "INSERT OR IGNORE INTO notifications (channel, enabled, config) VALUES (?, 0, '{}')", (channel,)
+                )
         except:
             pass
-        
+
         try:
-            c.execute('''CREATE TABLE IF NOT EXISTS users (
+            c.execute("""CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
                 role TEXT DEFAULT 'viewer',
                 is_active BOOLEAN DEFAULT 1,
                 last_login TEXT
-            )''')
-            c.execute("INSERT OR IGNORE INTO users (username, password_hash, role) VALUES ('admin', 'pbkdf2:sha256:admin', 'admin')")
+            )""")
+            c.execute(
+                "INSERT OR IGNORE INTO users (username, password_hash, role) VALUES ('admin', 'pbkdf2:sha256:admin', 'admin')"
+            )
         except:
             pass
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS alerts (
+
+        c.execute("""CREATE TABLE IF NOT EXISTS alerts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             metric TEXT NOT NULL,
@@ -130,39 +141,39 @@ def init_web_tables():
             description TEXT,
             enabled BOOLEAN DEFAULT 1,
             created_at TEXT
-        )''')
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS security (
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS security (
             key TEXT PRIMARY KEY,
             value TEXT
-        )''')
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS backups (
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS backups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             filename TEXT NOT NULL,
             size_bytes INTEGER,
             created_at TEXT
-        )''')
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS api_keys (
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS api_keys (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             key_hash TEXT NOT NULL,
             user_id INTEGER,
             created_at TEXT,
             last_used TEXT
-        )''')
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS audit_log (
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             action TEXT NOT NULL,
             details TEXT,
             ip_address TEXT,
             created_at TEXT
-        )''')
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS maintenance_windows (
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS maintenance_windows (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             start_time TEXT NOT NULL,
@@ -170,12 +181,12 @@ def init_web_tables():
             servers TEXT,
             enabled BOOLEAN DEFAULT 1,
             created_at TEXT
-        )''')
-        
-        c.execute('''CREATE TABLE IF NOT EXISTS settings (
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT
-        )''')
+        )""")
 
         conn.commit()
         conn.close()
@@ -183,7 +194,8 @@ def init_web_tables():
     except Exception as e:
         print(f"Error initializing web tables: {e}")
 
-LOGIN_HTML = r'''<!DOCTYPE html>
+
+LOGIN_HTML = r"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -232,9 +244,9 @@ LOGIN_HTML = r'''<!DOCTYPE html>
         });
     </script>
 </body>
-</html>'''
+</html>"""
 
-DASHBOARD_HTML = r'''<!DOCTYPE html>
+DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -277,9 +289,10 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .panel-resize:hover { color: var(--text); background: rgba(255,255,255,0.1); }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
         .panel.expanded { grid-column: span 2; }
-        .panel.expanded .panel-body { height: 350px; }
-        .panel-body { display: flex; height: 180px; }
+        .panel.expanded .panel-body { height: 400px; }
+        .panel-body { display: flex; height: 250px; }
         .panel-chart { flex: 1; padding: 8px; position: relative; min-width: 0; }
+        .panel-legend { width: 150px; min-width: 150px; overflow-y: auto; background: rgba(0,0,0,0.2); }
         .panel-legend { width: 280px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
         .legend-header { display: flex; padding: 8px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; cursor: pointer; }
         .legend-header:hover { color: var(--blue); }
@@ -363,7 +376,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         .raid-status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
         .raid-disks { margin-top: 8px; }
         .raid-disk { display: flex; justify-content: space-between; padding: 6px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 4px; font-size: 12px; }
-        
+
         /* Server Status Panel */
         .server-panel { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
         .server-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -410,7 +423,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                     <button class="time-btn" data-range="24h">24h</button>
                 </div>
             </div>
-            
+
             <!-- Resizable Panels -->
             <div class="panels-grid" id="panelsGrid">
                 <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>CPU</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="cpuChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="cpuLegend"></div></div></div></div>
@@ -554,7 +567,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             <div id="settings-backups" class="tab-content" style="display: none;">
                 <div class="card">
                     <div class="card-header"><h3 class="card-title"><i class="fas fa-database"></i> Backup & Restore</h3></div>
-                    
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
                         <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
                             <h4 style="margin-bottom: 10px; color: var(--green);"><i class="fas fa-download"></i> Create Backup</h4>
@@ -572,7 +585,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                             <button class="btn btn-warning" id="restoreBackupBtn" style="width: 100%;"><i class="fas fa-undo"></i> Restore from Backup</button>
                         </div>
                     </div>
-                    
+
                     <h4 style="margin-bottom: 8px;"><i class="fas fa-list"></i> Backup Files</h4>
                     <table><thead><tr><th>Filename</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead><tbody id="backups-tbody"></tbody></table>
                 </div>
@@ -654,7 +667,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     <script>
     const token = localStorage.getItem('token');
     if (!token) window.location.href = '/login';
-    
+
     let servers = [];
     let alerts = [];
     let charts = {};
@@ -667,7 +680,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     let legendSortBy = null;
     let legendSortAsc = true;
     let legendServerFilter = null;
-    
+
     // Filter functions
     function filterBy(type) {
         if (currentFilter === type) {
@@ -681,7 +694,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         }
         initCharts();
     }
-    
+
     function filterDashboard() {
         currentServerFilter = document.getElementById('dashboardServerSelector').value;
         legendServerFilter = currentServerFilter;
@@ -689,7 +702,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         btn.style.display = currentServerFilter ? 'inline-flex' : 'none';
         initCharts();
     }
-    
+
     function clearFilter() {
         currentFilter = '';
         currentServerFilter = '';
@@ -699,7 +712,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
         updateDashboard();
     }
-    
+
     async function refreshDashboard() {
         const btn = event.target.closest('button');
         const icon = btn.querySelector('i');
@@ -708,12 +721,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         initCharts();
         setTimeout(() => icon.classList.remove('fa-spin'), 500);
     }
-    
+
     function togglePanelSize(btn) {
         const panel = btn.closest('.panel');
         panel.classList.toggle('expanded');
     }
-    
+
     function getFilteredServers() {
         let filtered = [...servers];
         if (currentServerFilter) {
@@ -725,20 +738,20 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         if (currentFilter === 'windows') filtered = filtered.filter(s => s.os_type === 'windows');
         return filtered;
     }
-    
+
     function updateDashboard() {
         const filtered = getFilteredServers();
         updateCharts(filtered);
         updateRAIDStatusPanel();
     }
-    
+
     document.querySelectorAll(".nav-item").forEach(btn => {
         btn.addEventListener("click", function() {
             const section = this.dataset.section;
             if (section) showSection(section);
         });
     });
-    
+
     // Tab switching for alerts
     document.querySelectorAll("#section-alerts .tab-menu .tab-item").forEach(btn => {
         btn.addEventListener("click", function() {
@@ -748,7 +761,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             loadAlerts();
         });
     });
-    
+
     function showSection(section) {
         document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -763,12 +776,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         if (section === 'raid') loadRAID();
         if (section === 'settings') { loadNotifications(); loadBackups(); }
     }
-    
+
     document.getElementById('logoutBtn').addEventListener('click', function() {
         localStorage.removeItem('token');
         window.location.href = '/login';
     });
-    
+
     document.getElementById('addServerBtn').addEventListener('click', function() {
         document.getElementById('addServerModal').classList.add('active');
     });
@@ -790,7 +803,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         document.getElementById('addServerModal').classList.remove('active');
         loadServers();
     });
-    
+
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const target = this.getAttribute('data-target');
@@ -800,13 +813,13 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             setTimeout(() => this.textContent = 'Copy', 2000);
         });
     });
-    
+
     async function loadServers() {
         try {
             const resp = await fetch('/api/servers', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
             let allServers = data.servers || [];
-            
+
             // Get filter values
             const search = document.getElementById('serverSearch').value.toLowerCase();
             const filterStatus = document.getElementById('filterStatus').value;
@@ -815,7 +828,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             const filterMemory = parseFloat(document.getElementById('filterMemory').value) || 0;
             const filterDisk = parseFloat(document.getElementById('filterDisk').value) || 0;
             const sortBy = document.getElementById('serverSortSelect').value;
-            
+
             // Apply filters
             servers = allServers.filter(s => {
                 // Search filter
@@ -844,7 +857,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 }
                 return true;
             });
-            
+
             // Sort servers
             servers.sort((a, b) => {
                 if (sortBy === 'status') {
@@ -860,17 +873,17 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 }
                 return a.name.localeCompare(b.name);
             });
-            
+
             // Update stats
             let online = 0, offline = 0, linux = 0, windows = 0;
             allServers.forEach(s => {
                 if (s.last_status === 'up') online++; else offline++;
                 if (s.os_type === 'linux') linux++; else windows++;
             });
-            
+
             document.getElementById('dashboardServerSelector').innerHTML = '<option value="">All Servers</option>' + allServers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
             document.getElementById('alert-server').innerHTML = '<option value="">Global (All Servers)</option>' + allServers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-            
+
             // Filter stats
             const filterStats = document.getElementById('filterStats');
             let statsText = 'Showing ' + servers.length + ' of ' + allServers.length + ' servers';
@@ -885,46 +898,52 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 statsText += ' | Filters: ' + activeFilters.join(', ');
             }
             filterStats.textContent = statsText;
-            
+
             document.getElementById('servers-tbody').innerHTML = servers.map(s => {
                 const statusBadge = s.last_status === 'up' ? '<span class="badge badge-success">up</span>' : '<span class="badge badge-danger">offline</span>';
-                
+
                 // Host with port
                 const hostDisplay = s.host + ':' + (s.agent_port || 9100);
-                
+
                 // CPU with color
                 const cpuVal = s.cpu_percent ? s.cpu_percent.toFixed(1) : '-';
                 const cpuColor = s.cpu_percent > 90 ? 'var(--red)' : s.cpu_percent > 70 ? 'var(--yellow)' : 'var(--text)';
                 const cpuDisplay = s.cpu_percent ? '<span style="color:' + cpuColor + '">' + cpuVal + '%</span>' : '-';
-                
+
                 // Memory with color
                 const memVal = s.memory_percent ? s.memory_percent.toFixed(1) : '-';
                 const memColor = s.memory_percent > 90 ? 'var(--red)' : s.memory_percent > 70 ? 'var(--yellow)' : 'var(--text)';
                 const memDisplay = s.memory_percent ? '<span style="color:' + memColor + '">' + memVal + '%</span>' : '-';
-                
-                // Parse disk info
+
+                // Parse disk info - now it's already an object from API
                 let diskDisplay = '-';
                 if (s.disk_info) {
                     try {
-                        const disks = JSON.parse(s.disk_info);
-                        diskDisplay = disks.filter(d => d.volume.includes(':')).map(d => {
-                            const vol = d.volume.replace(':', '');
-                            const pct = d.percent ? d.percent.toFixed(0) : '?';
-                            const color = d.percent > 90 ? 'var(--red)' : d.percent > 80 ? 'var(--yellow)' : 'var(--green)';
-                            return '<span style="margin-right:4px;padding:2px 4px;background:rgba(0,0,0,0.3);border-radius:3px;font-size:11px;"><span style="color:' + color + '">' + vol + '</span>:' + pct + '%</span>';
-                        }).join('');
-                    } catch(e) {}
-                } else if (s.disk_percent) {
+                        // disk_info is now already parsed as object/array from API
+                        const disks = Array.isArray(s.disk_info) ? s.disk_info : (typeof s.disk_info === 'string' ? JSON.parse(s.disk_info) : null);
+                        if (disks && Array.isArray(disks) && disks.length > 0) {
+                            diskDisplay = disks.map(d => {
+                                const vol = d.volume ? d.volume.replace(':', '') : '?';
+                                const pct = d.percent ? d.percent.toFixed(0) : '?';
+                                const color = d.percent > 90 ? 'var(--red)' : d.percent > 80 ? 'var(--yellow)' : 'var(--green)';
+                                return '<span style="margin-right:4px;padding:2px 4px;background:rgba(0,0,0,0.3);border-radius:3px;font-size:11px;"><span style="color:' + color + '">' + vol + '</span>:' + pct + '%</span>';
+                            }).join('');
+                        }
+                    } catch(e) { console.log('Error parsing disk_info:', e); }
+                }
+
+                // Fallback if disk_info didn't work
+                if (diskDisplay === '-' && s.disk_percent) {
                     const diskColor = s.disk_percent > 90 ? 'var(--red)' : s.disk_percent > 80 ? 'var(--yellow)' : 'var(--text)';
                     diskDisplay = '<span style="color:' + diskColor + '">' + s.disk_percent.toFixed(1) + '%</span>';
                 }
-                
+
                 // Last check time
                 const lastCheck = s.last_check ? s.last_check.substring(11, 19) : '-';
-                
+
                 return '<tr><td>' + statusBadge + '</td><td><strong>' + s.name + '</strong></td><td style="font-size:11px;color:var(--muted);">' + hostDisplay + '</td><td>' + s.os_type + '</td><td>' + cpuDisplay + '</td><td>' + memDisplay + '</td><td>' + diskDisplay + '</td><td style="font-size:11px;color:var(--muted);">' + lastCheck + '</td><td><button class="btn btn-secondary btn-sm" onclick="scrapeServer(' + s.id + ')" title="Scrape now"><i class="fas fa-sync"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')" title="Delete"><i class="fas fa-trash"></i></button></td></tr>';
             }).join('') || '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">No servers match filters</td></tr>';
-            
+
             document.getElementById('stat-online').textContent = online;
             document.getElementById('stat-offline').textContent = offline;
             document.getElementById('stat-linux').textContent = linux;
@@ -932,13 +951,13 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             updateRAIDStatusPanel();
         } catch(e) { console.error(e); }
     }
-    
+
     // Filter event listeners
     ['serverSearch', 'filterStatus', 'filterOS', 'filterCPU', 'filterMemory', 'filterDisk', 'serverSortSelect'].forEach(id => {
         document.getElementById(id).addEventListener('change', loadServers);
         document.getElementById(id).addEventListener('input', loadServers);
     });
-    
+
     document.getElementById('clearFiltersBtn').addEventListener('click', function() {
         document.getElementById('serverSearch').value = '';
         document.getElementById('filterStatus').value = '';
@@ -953,12 +972,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     async function updateRAIDStatusPanel() {
         const panel = document.getElementById('raidStatusPanel');
         panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading RAID data...</p>';
-        
+
         try {
             const resp = await fetch('/api/raid-status');
             const data = await resp.json();
             const raidData = data.raid_status || [];
-            
+
             if (!raidData.length) {
                 panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data available</p>';
                 document.getElementById('raidTotalServers').textContent = '0';
@@ -967,7 +986,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 document.getElementById('raidTotalSize').textContent = '0 TB';
                 return;
             }
-            
+
             // Calculate statistics
             let totalRaids = 0, healthyRaids = 0, degradedRaids = 0, totalSizeGB = 0;
             raidData.forEach(s => {
@@ -978,24 +997,24 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                     totalSizeGB += size;
                 });
             });
-            
+
             // Update stats
             document.getElementById('raidTotalServers').textContent = raidData.length;
             document.getElementById('raidHealthy').textContent = healthyRaids;
             document.getElementById('raidDegraded').textContent = degradedRaids;
             document.getElementById('raidTotalSize').textContent = Math.round(totalSizeGB / 1024) + ' TB';
-            
+
             // Sort by health (degraded first)
             raidData.sort((a, b) => a.healthy - b.healthy);
-            
+
             panel.innerHTML = raidData.map(s => {
                 const statusColor = s.healthy ? 'var(--green)' : 'var(--red)';
                 const statusIcon = s.healthy ? 'fa-check-circle' : 'fa-exclamation-triangle';
                 const borderColor = s.healthy ? 'rgba(115,191,105,0.3)' : 'rgba(242,73,92,0.5)';
-                
+
                 // Calculate server totals
                 const serverSize = s.raids.reduce((sum, r) => sum + (parseInt(r.size) || 0), 0);
-                
+
                 return '<div style="margin-bottom: 12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid ' + borderColor + ';">' +
                     '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">' +
                     '<div><i class="fas fa-server" style="color: var(--muted); margin-right: 8px;"></i><strong style="font-size: 13px;">' + s.server + '</strong></div>' +
@@ -1023,7 +1042,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             loadServers();
         }
     }
-    
+
     async function scrapeServer(id) {
         const btn = event.target.closest('button');
         const icon = btn.querySelector('i');
@@ -1041,7 +1060,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         }
         setTimeout(() => icon.classList.remove('fa-spin'), 500);
     }
-    
+
     async function fetchMetricData(metricName) {
         try {
             const now = new Date();
@@ -1055,12 +1074,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             return [];
         }
     }
-    
+
     function getRangeMs(range) {
         const ms = {'5m':5*60*1000,'15m':15*60*1000,'1h':60*60*1000,'6h':6*60*60*1000,'24h':24*60*60*1000};
         return ms[range] || ms['1h'];
     }
-    
+
     function generateTimeSeriesData(currentValue, points) {
         const data = [];
         let val = currentValue || Math.random() * 50 + 20;
@@ -1070,16 +1089,16 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         }
         return data;
     }
-    
+
     async function initCharts() {
         Object.values(charts).forEach(c => c && c.destroy());
         charts = {};
         const labels = generateLabels();
         const filtered = getFilteredServers();
-        
+
         const getData = (key, min, max) => {
             if (!filtered.length) return [{label:'No Data',data:rand(12,0,5),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
-            
+
             return filtered.map((s,i) => {
                 let val = s[key + '_percent'];
                 if (val === null || val === undefined) {
@@ -1098,27 +1117,28 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 };
             });
         };
-        
+
         charts.cpu = new Chart(document.getElementById('cpuChart'), {type:'line',data:{labels:labels,datasets:getData('cpu',0,100)},options:chartOpts('%',0,100)});
         updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
-        
+
         charts.memory = new Chart(document.getElementById('memoryChart'), {type:'line',data:{labels:labels,datasets:getData('memory',0,100)},options:chartOpts('%',0,100)});
         updateLegend('memoryLegend', charts.memory.data.datasets, '%');
-        
+
         charts.disk = new Chart(document.getElementById('diskChart'), {type:'line',data:{labels:labels,datasets:getData('disk',0,100)},options:chartOpts('%',0,100)});
         updateLegend('diskLegend', charts.disk.data.datasets, '%');
-        
+
         charts.network = new Chart(document.getElementById('networkChart'), {type:'line',data:{labels:labels,datasets:getData('network',0,100)},options:chartOpts(' MB/s',0,100)});
         updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
     }
-    
+
     async function updateCharts(filtered) {
+        console.log('updateCharts filtered:', filtered);
         if (!charts.cpu) { initCharts(); return; }
         const labels = generateLabels();
-        
+
         const getData = (key, min, max) => {
             if (!filtered.length) return [{label:'No Data',data:rand(12,0,5),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
-            
+
             return filtered.map((s,i) => {
                 let val = s[key + '_percent'];
                 if (val === null || val === undefined) {
@@ -1137,28 +1157,111 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 };
             });
         };
-        
+
         charts.cpu.data.labels = labels;
         charts.cpu.data.datasets = getData('cpu', 0, 100);
         charts.cpu.update();
         updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
-        
+
         charts.memory.data.labels = labels;
         charts.memory.data.datasets = getData('memory', 0, 100);
         charts.memory.update();
         updateLegend('memoryLegend', charts.memory.data.datasets, '%');
-        
+
+        // Disk - support multiple disks per server
+        const getDiskData = () => {
+            console.log('=== getDiskData START ===');
+            console.log('filtered.length:', filtered.length);
+            if (!filtered.length) return [{label:'No Data',data:rand(12,0,5),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
+
+            let datasets = [];
+            filtered.forEach((s, i) => {
+                console.log('--- Server', i, ':', s.name, '---');
+                console.log('  disk_info type:', typeof s.disk_info);
+                console.log('  disk_info value:', s.disk_info);
+                console.log('  disk_percent:', s.disk_percent);
+                let hasDiskInfo = false;
+                // Use disk_info if available - now it's already an object from API
+                if (s.disk_info && Array.isArray(s.disk_info)) {
+                    const disks = s.disk_info;
+                    console.log('  Using disk_info array:', disks);
+                    console.log('  disks.length:', disks.length);
+                    if (disks && disks.length > 0) {
+                        hasDiskInfo = true;
+                        console.log('  Adding', disks.length, 'disk datasets for', s.name);
+                        disks.forEach((d, j) => {
+                            const vol = d.volume ? d.volume.replace(':', '') : '?';
+                            console.log('    Disk', j, ': volume=', vol, 'percent=', d.percent);
+                            datasets.push({
+                                label: s.name + ' (' + vol + ')',
+                                data: generateTimeSeriesData(d.percent, 12),
+                                borderColor: colors[(i * 3 + j) % colors.length],
+                                backgroundColor: colors[(i * 3 + j) % colors.length] + '15',
+                                fill: true,
+                                tension: 0.3,
+                                borderWidth: 1.5,
+                                pointRadius: 0
+                            });
+                        });
+                    }
+                } else if (s.disk_info && typeof s.disk_info === 'string') {
+                    // Fallback for old string format
+                    try {
+                        const disks = JSON.parse(s.disk_info);
+                        console.log('  Parsed string disk_info:', disks);
+                        console.log('  disks.length:', disks.length);
+                        if (disks && disks.length > 0) {
+                            hasDiskInfo = true;
+                            console.log('  Adding', disks.length, 'disk datasets for', s.name);
+                            disks.forEach((d, j) => {
+                                const vol = d.volume ? d.volume.replace(':', '') : '?';
+                                console.log('    Disk', j, ': volume=', vol, 'percent=', d.percent);
+                                datasets.push({
+                                    label: s.name + ' (' + vol + ')',
+                                    data: generateTimeSeriesData(d.percent, 12),
+                                    borderColor: colors[(i * 3 + j) % colors.length],
+                                    backgroundColor: colors[(i * 3 + j) % colors.length] + '15',
+                                    fill: true,
+                                    tension: 0.3,
+                                    borderWidth: 1.5,
+                                    pointRadius: 0
+                                });
+                            });
+                        }
+                    } catch(e) { console.log('  Error parsing disk_info:', e); }
+                }
+                // Fallback - only if no disk_info was processed
+                if (!hasDiskInfo && s.disk_percent) {
+                    console.log('  Using fallback disk_percent for', s.name);
+                    datasets.push({
+                        label: s.name,
+                        data: generateTimeSeriesData(s.disk_percent, 12),
+                        borderColor: colors[i % colors.length],
+                        backgroundColor: colors[i % colors.length] + '15',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 1.5,
+                        pointRadius: 0
+                    });
+                }
+            });
+            console.log('=== getDiskData END ===');
+            console.log('Final disk datasets count:', datasets.length);
+            console.log('Final disk datasets:', datasets);
+            return datasets.length ? datasets : [{label:'No Data',data:rand(12,0,5),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
+        };
+
         charts.disk.data.labels = labels;
-        charts.disk.data.datasets = getData('disk', 0, 100);
+        charts.disk.data.datasets = getDiskData();
         charts.disk.update();
         updateLegend('diskLegend', charts.disk.data.datasets, '%');
-        
+
         charts.network.data.labels = labels;
         charts.network.data.datasets = getData('network', 0, 100);
         charts.network.update();
         updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
     }
-    
+
     function generateLabels() {
         const labels = [];
         const now = new Date();
@@ -1174,18 +1277,18 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         }
         return labels;
     }
-    
+
     function rand(n, min, max) { return Array(n).fill(0).map(() => min + Math.random() * (max - min)); }
-    
+
     function chartOpts(suffix, min, max) {
         return { responsive: true, maintainAspectRatio: false, interaction: {intersect: false, mode: 'index'}, scales: { y: {min:min, max:max, grid:{color:'rgba(255,255,255,0.03)'}, ticks:{color:'#666',font:{size:10},callback:v=>v+suffix}}, x: {grid:{display:false}, ticks:{color:'#666',font:{size:10}}}}, plugins: {legend:{display:false}} };
     }
-    
+
     function updateLegend(id, datasets, suffix) {
         const el = document.getElementById(id);
         const parent = el.parentElement;
         const header = parent.querySelector('.legend-header');
-        
+
         const sorted = [...datasets].sort((a, b) => {
             if (!legendSortBy) return 0;
             const aLast = a.data[a.data.length - 1];
@@ -1199,7 +1302,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             }
             return 0;
         });
-        
+
         el.innerHTML = sorted.map((ds, i) => {
             const last = ds.data[ds.data.length-1];
             const mx = Math.max(...ds.data);
@@ -1208,14 +1311,14 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             const isActive = legendServerFilter && legendServerFilter == serverId;
             return '<div class="legend-item" data-server="'+serverId+'" data-name="'+ds.label+'" style="'+(isActive ? 'background: rgba(87,148,242,0.2); border-left: 2px solid var(--blue);' : '')+'"><div class="legend-color" style="background:'+ds.borderColor+'"></div><div class="legend-name">'+ds.label+'</div><div class="legend-value-last">'+last.toFixed(1)+suffix+'</div><div class="legend-value-max">'+mx.toFixed(1)+suffix+'</div></div>';
         }).join('');
-        
+
         // Attach click handlers to legend items
         el.querySelectorAll('.legend-item').forEach(item => {
             item.addEventListener('click', function(e) {
                 e.stopPropagation();
                 const sid = this.dataset.server;
                 const name = this.dataset.name;
-                
+
                 if (legendServerFilter == sid) {
                     legendServerFilter = null;
                     currentServerFilter = '';
@@ -1227,18 +1330,18 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                     document.getElementById('dashboardServerSelector').value = sid;
                     document.getElementById('clearFilterBtn').style.display = 'inline-flex';
                 }
-                
+
                 initCharts();
             });
-            
+
             item.style.cursor = 'pointer';
         });
-        
+
         // Attach click handlers to header for sorting
         if (header) {
             const lastHeader = header.querySelector('.legend-header-last');
             const maxHeader = header.querySelector('.legend-header-max');
-            
+
             if (lastHeader) {
                 lastHeader.onclick = function(e) {
                     e.stopPropagation();
@@ -1259,7 +1362,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                     lastHeader.innerHTML = 'Last';
                 }
             }
-            
+
             if (maxHeader) {
                 maxHeader.onclick = function(e) {
                     e.stopPropagation();
@@ -1282,18 +1385,18 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             }
         }
     }
-    
+
     document.getElementById('addAlertBtn').addEventListener('click', function() {
         document.getElementById('alert-id').value = '';
         document.getElementById('alertForm').reset();
         document.getElementById('alertModalTitle').textContent = 'Add Alert Rule';
         document.getElementById('alertModal').classList.add('active');
     });
-    
+
     document.getElementById('closeAlertModal').addEventListener('click', function() {
         document.getElementById('alertModal').classList.remove('active');
     });
-    
+
     document.getElementById('alertForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         const id = document.getElementById('alert-id').value;
@@ -1317,7 +1420,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         document.getElementById('alertModal').classList.remove('active');
         loadAlerts();
     });
-    
+
     async function loadAlerts() {
         try {
             const resp = await fetch('/api/alerts', {headers: {'Authorization': 'Bearer ' + token}});
@@ -1342,14 +1445,14 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             }).join('') || '<p style="color: var(--muted); text-align: center; padding: 40px;">No alert rules configured.</p>';
         } catch(e) { console.error(e); }
     }
-    
+
     async function deleteAlert(id) {
         if (confirm('Delete this alert?')) {
             await fetch('/api/alerts/' + id, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
             loadAlerts();
         }
     }
-    
+
     document.getElementById('refreshRaidBtn').addEventListener('click', updateRAIDStatusPanel);
 
     ['telegram', 'discord', 'slack', 'email'].forEach(ch => {
@@ -1360,7 +1463,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             });
         }
     });
-    
+
     async function loadNotifications() {
         try {
             const resp = await fetch('/api/notifications', {headers: {'Authorization': 'Bearer ' + token}});
@@ -1375,7 +1478,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             });
         } catch(e) { console.error(e); }
     }
-    
+
     document.getElementById('saveNotifyBtn').addEventListener('click', async function() {
         const channels = {
             telegram: {enabled: document.getElementById('telegram-enabled').checked, telegram_bot_token: document.getElementById('telegram-token').value, telegram_chat_id: document.getElementById('telegram-chat').value},
@@ -1388,7 +1491,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         }
         alert('Settings saved!');
     });
-    
+
     async function loadBackups() {
         try {
             const resp = await fetch('/api/backup/list', {headers: {'Authorization': 'Bearer ' + token}});
@@ -1408,25 +1511,25 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             document.getElementById('backups-tbody').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No backups</td></tr>';
         } catch(e) { console.error(e); }
     }
-    
+
     function deleteBackupByIndex(idx) {
         const file = window.backupFiles[idx];
         if (!file) return;
         if (!confirm('Delete ' + file.filename + '?')) return;
         deleteBackupFile(file.path);
     }
-    
+
     function restoreByIndex(idx) {
         const file = window.backupFiles[idx];
         if (!file) return;
         restoreThisBackup(file.path);
     }
-    
+
     function restoreThisBackup(path) {
         document.getElementById('restorePath').value = path;
         document.getElementById('restorePath').scrollIntoView();
     }
-    
+
     async function deleteBackupFile(path) {
         if (!confirm('Delete this backup file?')) return;
         try {
@@ -1438,7 +1541,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             loadBackups();
         } catch(e) { alert('Error: ' + e.message); }
     }
-    
+
     document.getElementById('createBackupBtn').addEventListener('click', async function() {
         const btn = this;
         const orig = btn.innerHTML;
@@ -1464,7 +1567,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         btn.innerHTML = orig;
         btn.disabled = false;
     });
-    
+
     document.getElementById('restoreBackupBtn').addEventListener('click', async function() {
         const filePath = document.getElementById('restorePath').value;
         if (!filePath) {
@@ -1474,12 +1577,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         if (!confirm('Restore from backup?\n\nThis will overwrite current data!\nFile: ' + filePath)) {
             return;
         }
-        
+
         const btn = this;
         const orig = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Restoring...';
         btn.disabled = true;
-        
+
         try {
             const resp = await fetch('/api/backup/restore', {
                 method: 'POST',
@@ -1503,18 +1606,18 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
         btn.innerHTML = orig;
         btn.disabled = false;
     });
-    
+
     // API Keys
     async function loadApiKeys() {
         try {
             const resp = await fetch('/api/api-keys', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
-            document.getElementById('apikeys-tbody').innerHTML = (data.keys || []).map(k => 
+            document.getElementById('apikeys-tbody').innerHTML = (data.keys || []).map(k =>
                 '<tr><td>' + k.name + '</td><td><code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;">****</code></td><td>' + (k.created_at || '-') + '</td><td>' + (k.last_used || 'Never') + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteApiKey(' + k.id + ')"><i class="fas fa-trash"></i></button></td></tr>'
             ).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;">No API keys</td></tr>';
         } catch(e) { console.error(e); }
     }
-    
+
     document.getElementById('createApiKeyBtn').addEventListener('click', async function() {
         const name = prompt('Enter API key name:');
         if (name) {
@@ -1526,33 +1629,33 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             }
         }
     });
-    
+
     async function deleteApiKey(id) {
         if (confirm('Delete this API key?')) {
             await fetch('/api/api-keys/' + id, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
             loadApiKeys();
         }
     }
-    
+
     // Audit Log
     async function loadAuditLog() {
         try {
             const resp = await fetch('/api/audit-log', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
-            document.getElementById('audit-tbody').innerHTML = (data.logs || []).map(l => 
+            document.getElementById('audit-tbody').innerHTML = (data.logs || []).map(l =>
                 '<tr><td>' + (l.created_at || '-') + '</td><td>' + (l.user_id || 'System') + '</td><td>' + l.action + '</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + (l.details || '-') + '</td><td>' + (l.ip_address || '-') + '</td></tr>'
             ).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;">No audit logs</td></tr>';
         } catch(e) { console.error(e); }
     }
-    
+
     document.getElementById('refreshAuditBtn').addEventListener('click', loadAuditLog);
-    
+
     // Maintenance
     async function loadMaintenance() {
         try {
             const resp = await fetch('/api/maintenance', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
-            document.getElementById('maintenanceList').innerHTML = (data.windows || []).map(w => 
+            document.getElementById('maintenanceList').innerHTML = (data.windows || []).map(w =>
                 '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:8px;">' +
                 '<div><strong>' + w.name + '</strong><br><span style="color:var(--muted);font-size:11px;">' + w.start_time + ' - ' + w.end_time + '</span></div>' +
                 '<span class="badge ' + (w.enabled ? 'badge-success' : 'badge-warning') + '">' + (w.enabled ? 'Active' : 'Disabled') + '</span>' +
@@ -1560,7 +1663,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             ).join('') || '<p style="color:var(--muted);text-align:center;padding:20px;">No maintenance windows configured</p>';
         } catch(e) { console.error(e); }
     }
-    
+
     document.getElementById('addMaintenanceBtn').addEventListener('click', async function() {
         const name = prompt('Maintenance window name:');
         if (name) {
@@ -1572,7 +1675,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             }
         }
     });
-    
+
     // Settings tabs
     document.querySelectorAll("#section-settings .tab-menu .tab-item").forEach(btn => {
         btn.addEventListener("click", function() {
@@ -1586,9 +1689,9 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             if (tab === 'maintenance') loadMaintenance();
         });
     });
-    
+
     let refreshInterval = null;
-    
+
     function startAutoRefresh() {
         if (refreshInterval) clearInterval(refreshInterval);
         refreshInterval = setInterval(async () => {
@@ -1599,14 +1702,14 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             }
         }, 30000);
     }
-    
+
     function stopAutoRefresh() {
         if (refreshInterval) {
             clearInterval(refreshInterval);
             refreshInterval = null;
         }
     }
-    
+
     // Initialize event listeners
     document.addEventListener('DOMContentLoaded', function() {
         // Stat cards click
@@ -1616,12 +1719,12 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
                 filterBy(this.dataset.filter);
             });
         });
-        
+
         // Server selector change
         document.getElementById('dashboardServerSelector').addEventListener('change', function() {
             filterDashboard();
         });
-        
+
         // Time range buttons
         document.querySelectorAll('.time-btn').forEach(btn => {
             btn.addEventListener('click', function() {
@@ -1632,7 +1735,7 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
             });
         });
     });
-    
+
     loadServers();
     updateRAIDStatusPanel();
     setTimeout(() => {
@@ -1641,31 +1744,62 @@ DASHBOARD_HTML = r'''<!DOCTYPE html>
     }, 100);
     </script>
 </body>
-</html>'''
+</html>"""
+
 
 @router.get("/dashboard/", response_class=HTMLResponse)
 async def dashboard():
     return DASHBOARD_HTML
+
 
 @router.get("/api/servers")
 async def list_servers():
     conn = get_db()
     servers = conn.execute("SELECT * FROM servers ORDER BY name").fetchall()
     conn.close()
-    return {"servers": [dict(s) for s in servers]}
+    result = []
+    for s in servers:
+        server_dict = dict(s)
+        # Parse disk_info from JSON string to object
+        if server_dict.get("disk_info"):
+            try:
+                import json
+
+                server_dict["disk_info"] = json.loads(server_dict["disk_info"])
+            except:
+                pass
+        result.append(server_dict)
+    return {"servers": result}
+
 
 @router.post("/api/servers")
 async def create_server(server: ServerModel):
     conn = get_db()
     c = conn.cursor()
-    c.execute('''INSERT INTO servers (name, host, os_type, agent_port, check_interval, enabled, notify_telegram, notify_discord, notify_slack, notify_email, created_at)
-        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)''',
-        (server.name, server.host, server.os_type, server.agent_port, server.check_interval,
-         int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email),
-         datetime.now(timezone.utc).isoformat()))
+
+    if server.agent_port is None:
+        server.agent_port = 9182 if server.os_type == "windows" else 9100
+
+    c.execute(
+        """INSERT INTO servers (name, host, os_type, agent_port, check_interval, enabled, notify_telegram, notify_discord, notify_slack, notify_email, created_at)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)""",
+        (
+            server.name,
+            server.host,
+            server.os_type,
+            server.agent_port,
+            server.check_interval,
+            int(server.notify_telegram),
+            int(server.notify_discord),
+            int(server.notify_slack),
+            int(server.notify_email),
+            datetime.now(timezone.utc).isoformat(),
+        ),
+    )
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
 
 @router.get("/api/servers/{server_id}")
 async def get_server(server_id: int):
@@ -1676,15 +1810,29 @@ async def get_server(server_id: int):
         return {"server": dict(server)}
     raise HTTPException(status_code=404, detail="Server not found")
 
+
 @router.put("/api/servers/{server_id}")
 async def update_server(server_id: int, server: ServerModel):
     conn = get_db()
-    conn.execute('''UPDATE servers SET name=?, host=?, os_type=?, agent_port=?, check_interval=?, notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=? WHERE id=?''',
-        (server.name, server.host, server.os_type, server.agent_port, server.check_interval,
-         int(server.notify_telegram), int(server.notify_discord), int(server.notify_slack), int(server.notify_email), server_id))
+    conn.execute(
+        """UPDATE servers SET name=?, host=?, os_type=?, agent_port=?, check_interval=?, notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=? WHERE id=?""",
+        (
+            server.name,
+            server.host,
+            server.os_type,
+            server.agent_port,
+            server.check_interval,
+            int(server.notify_telegram),
+            int(server.notify_discord),
+            int(server.notify_slack),
+            int(server.notify_email),
+            server_id,
+        ),
+    )
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
 
 @router.delete("/api/servers/{server_id}")
 async def delete_server(server_id: int):
@@ -1694,19 +1842,57 @@ async def delete_server(server_id: int):
     conn.close()
     return {"status": "ok"}
 
+
 @router.post("/api/servers/{server_id}/scrape")
 async def scrape_server(server_id: int):
     import httpx
+
     conn = get_db()
     server = conn.execute("SELECT * FROM servers WHERE id=?", (server_id,)).fetchone()
     conn.close()
-    
+
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
-    
+
     target = f"{server['host']}:{server['agent_port']}"
     url = f"http://{target}/metrics"
-    
+
+    # Fallback: Get disk info via PowerShell if exporter fails
+    disk_info = {}
+
+    # Try PowerShell
+    import subprocess
+
+    try:
+        ps = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID,Size,FreeSpace | ConvertTo-Json",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        if ps.returncode == 0 and ps.stdout.strip():
+            import json as json_mod
+
+            disks = json_mod.loads(ps.stdout)
+            if isinstance(disks, dict):
+                disks = [disks]
+            for d in disks:
+                vol = d.get("DeviceID", "")
+                if vol and d.get("Size"):
+                    disk_info[vol] = {
+                        "volume": vol,
+                        "free": float(d.get("FreeSpace", 0)),
+                        "size": float(d.get("Size", 0)),
+                    }
+    except Exception as e:
+        pass
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(url)
@@ -1715,42 +1901,43 @@ async def scrape_server(server_id: int):
                 metrics = {}
                 cpu_idle_total = 0
                 cpu_all_total = 0
-                disk_info = {}
-                
-                for line in resp.text.split('\n'):
+
+                for line in resp.text.split("\n"):
                     line = line.strip()
-                    if not line or line.startswith('#'):
+                    if not line or line.startswith("#"):
                         continue
                     try:
-                        if '{' in line:
-                            name_part, rest = line.split('{', 1)
-                            labels_part, value_str = rest.rsplit('}', 1)
+                        if "{" in line:
+                            name_part, rest = line.split("{", 1)
+                            labels_part, value_str = rest.rsplit("}", 1)
                             name = name_part.strip()
                             value = float(value_str.strip())
-                            
+
                             # Aggregate CPU idle time from windows_exporter
-                            if name == 'windows_cpu_time_total':
+                            if name == "windows_cpu_time_total":
                                 if 'mode="idle"' in labels_part:
                                     cpu_idle_total += value
                                 cpu_all_total += value
-                            
+
                             # Collect ALL disks from windows_exporter
-                            if name == 'windows_logical_disk_free_bytes':
+                            if name == "windows_logical_disk_free_bytes":
                                 import re
+
                                 vol_match = re.search(r'volume="([^"]+)"', labels_part)
                                 if vol_match:
                                     vol = vol_match.group(1)
                                     if vol not in disk_info:
-                                        disk_info[vol] = {'volume': vol, 'free': 0, 'size': 0}
-                                    disk_info[vol]['free'] = value
-                            if name == 'windows_logical_disk_size_bytes':
+                                        disk_info[vol] = {"volume": vol, "free": 0, "size": 0}
+                                    disk_info[vol]["free"] = value
+                            if name == "windows_logical_disk_size_bytes":
                                 import re
+
                                 vol_match = re.search(r'volume="([^"]+)"', labels_part)
                                 if vol_match:
                                     vol = vol_match.group(1)
                                     if vol not in disk_info:
-                                        disk_info[vol] = {'volume': vol, 'free': 0, 'size': 0}
-                                    disk_info[vol]['size'] = value
+                                        disk_info[vol] = {"volume": vol, "free": 0, "size": 0}
+                                    disk_info[vol]["size"] = value
                         else:
                             parts = line.split()
                             if len(parts) >= 2:
@@ -1761,89 +1948,110 @@ async def scrape_server(server_id: int):
                         metrics[name] = value
                     except:
                         continue
-                
+
                 # Store aggregated values
                 if cpu_idle_total > 0:
-                    metrics['windows_cpu_time_total_idle'] = cpu_idle_total
-                    metrics['windows_cpu_time_total_all'] = cpu_all_total
-                
+                    metrics["windows_cpu_time_total_idle"] = cpu_idle_total
+                    metrics["windows_cpu_time_total_all"] = cpu_all_total
+
                 # Calculate disk percentages and get C: for main metric
                 disks_list = []
                 for vol, info in disk_info.items():
-                    if info['size'] > 0:
-                        info['percent'] = 100 * (1 - info['free'] / info['size'])
-                        info['used_gb'] = round((info['size'] - info['free']) / (1024**3), 1)
-                        info['size_gb'] = round(info['size'] / (1024**3), 1)
+                    if info["size"] > 0:
+                        info["percent"] = 100 * (1 - info["free"] / info["size"])
+                        info["used_gb"] = round((info["size"] - info["free"]) / (1024**3), 1)
+                        info["size_gb"] = round(info["size"] / (1024**3), 1)
                         disks_list.append(info)
                         # Use C: for main disk_percent if available
-                        if 'C:' in vol:
-                            metrics['windows_logical_disk_free_bytes'] = info['free']
-                            metrics['windows_logical_disk_size_bytes'] = info['size']
-                
+                        if "C:" in vol:
+                            metrics["windows_logical_disk_free_bytes"] = info["free"]
+                            metrics["windows_logical_disk_size_bytes"] = info["size"]
+
                 disk_info_json = json.dumps(disks_list) if disks_list else None
-                
+
                 # Parse CPU - support both node_exporter and windows_exporter
-                cpu = metrics.get('node_cpu_percent') or metrics.get('cpu_usage_percent') or 0
+                cpu = metrics.get("node_cpu_percent") or metrics.get("cpu_usage_percent") or 0
                 if not cpu:
-                    idle = metrics.get('windows_cpu_time_total_idle', 0)
-                    total = metrics.get('windows_cpu_time_total_all', 0)
+                    idle = metrics.get("windows_cpu_time_total_idle", 0)
+                    total = metrics.get("windows_cpu_time_total_all", 0)
                     if total > 0:
                         cpu = 100 * (1 - idle / total) if idle < total else 0
-                
+
                 # Parse Memory - support both node_exporter and windows_exporter
-                memory = metrics.get('node_memory_percent') or metrics.get('memory_usage_percent') or 0
+                memory = metrics.get("node_memory_percent") or metrics.get("memory_usage_percent") or 0
                 if not memory:
-                    mem_total = metrics.get('windows_cs_physical_memory_bytes', 0)
-                    mem_free = metrics.get('windows_os_physical_memory_free_bytes', 0)
+                    # windows_exporter v0.25+: windows_memory_physical_*
+                    mem_total = metrics.get("windows_memory_physical_total_bytes", 0)
+                    mem_free = metrics.get("windows_memory_physical_free_bytes", 0)
                     if mem_total > 0:
                         memory = 100 * (1 - mem_free / mem_total) if mem_free < mem_total else 0
-                
+                    # Fallback to older metric names
+                    if not memory:
+                        mem_total = metrics.get("windows_cs_physical_memory_bytes", 0)
+                        mem_free = metrics.get("windows_os_physical_memory_free_bytes", 0)
+                        if mem_total > 0:
+                            memory = 100 * (1 - mem_free / mem_total) if mem_free < mem_total else 0
+
                 # Parse Disk - support both node_exporter and windows_exporter
-                disk = metrics.get('node_disk_percent') or metrics.get('disk_usage_percent') or 0
+                disk = metrics.get("node_disk_percent") or metrics.get("disk_usage_percent") or 0
                 if not disk:
-                    disk_total = metrics.get('windows_logical_disk_size_bytes', 0)
-                    disk_free = metrics.get('windows_logical_disk_free_bytes', 0)
+                    disk_total = metrics.get("windows_logical_disk_size_bytes", 0)
+                    disk_free = metrics.get("windows_logical_disk_free_bytes", 0)
                     if disk_total > 0:
                         disk = 100 * (1 - disk_free / disk_total) if disk_free < disk_total else 0
-                
-                network_rx = metrics.get('node_network_receive_bytes_total') or metrics.get('system_network_rx_bytes') or 0
-                network_tx = metrics.get('node_network_transmit_bytes_total') or metrics.get('system_network_tx_bytes') or 0
-                uptime = metrics.get('system_uptime_seconds') or metrics.get('windows_system_system_up_time', '') or ''
-                
+
+                network_rx = (
+                    metrics.get("node_network_receive_bytes_total") or metrics.get("system_network_rx_bytes") or 0
+                )
+                network_tx = (
+                    metrics.get("node_network_transmit_bytes_total") or metrics.get("system_network_tx_bytes") or 0
+                )
+                uptime = metrics.get("system_uptime_seconds") or metrics.get("windows_system_system_up_time", "") or ""
+
                 from datetime import datetime, timezone
+
                 now = datetime.now(timezone.utc).isoformat()
-                
+
                 conn = get_db()
-                conn.execute('''UPDATE servers SET 
+                conn.execute(
+                    """UPDATE servers SET
                     last_check = ?, last_status = 'up',
                     cpu_percent = ?, memory_percent = ?, disk_percent = ?,
                     network_rx = ?, network_tx = ?, uptime = ?, disk_info = ?
-                    WHERE id = ?''',
-                    (now, cpu, memory, disk, network_rx, network_tx, str(uptime), disk_info_json, server_id))
+                    WHERE id = ?""",
+                    (now, cpu, memory, disk, network_rx, network_tx, str(uptime), disk_info_json, server_id),
+                )
                 conn.commit()
                 conn.close()
-                
-                return {"status": "ok", "message": f"Scraped {target}", "metrics": {"cpu": cpu, "memory": memory, "disk": disk, "disks": disks_list}}
+
+                return {
+                    "status": "ok",
+                    "message": f"Scraped {target}",
+                    "metrics": {"cpu": cpu, "memory": memory, "disk": disk, "disks": disks_list},
+                }
             else:
                 # Update server as down
                 from datetime import datetime, timezone
+
                 now = datetime.now(timezone.utc).isoformat()
                 conn = get_db()
-                conn.execute('UPDATE servers SET last_check = ?, last_status = ? WHERE id = ?',
-                            (now, 'down', server_id))
+                conn.execute(
+                    "UPDATE servers SET last_check = ?, last_status = ? WHERE id = ?", (now, "down", server_id)
+                )
                 conn.commit()
                 conn.close()
                 return {"status": "error", "message": f"HTTP {resp.status_code}"}
     except Exception as e:
         # Update server as down
         from datetime import datetime, timezone
+
         now = datetime.now(timezone.utc).isoformat()
         conn = get_db()
-        conn.execute('UPDATE servers SET last_check = ?, last_status = ? WHERE id = ?',
-                    (now, 'down', server_id))
+        conn.execute("UPDATE servers SET last_check = ?, last_status = ? WHERE id = ?", (now, "down", server_id))
         conn.commit()
         conn.close()
         return {"status": "error", "message": str(e)}
+
 
 @router.get("/api/notifications")
 async def get_notifications():
@@ -1852,40 +2060,63 @@ async def get_notifications():
     conn.close()
     result = []
     for n in notifications:
-        item = {"channel": n['channel'], "enabled": bool(n['enabled'])}
-        item.update(json.loads(n['config'] or '{}'))
+        item = {"channel": n["channel"], "enabled": bool(n["enabled"])}
+        item.update(json.loads(n["config"] or "{}"))
         result.append(item)
     return {"notifications": result}
 
+
 @router.get("/api/raid-status")
 async def get_raid_status():
-    import httpx
     import asyncio
     import re
-    
+
+    import httpx
+
     telegraf_hosts = [
-        'host-vm.it.ua:9273', 'host-vm1.it.ua:9273', 'host-vm2.it.ua:9273', 'host-vm3.it.ua:9273',
-        'host-vm4.it.ua:9273', 'host-vm7.it.ua:9273', 'host-vm8.it.ua:9273', 'host-vm9.it.ua:9273',
-        'host-vm10.it.ua:9273', 'host-vm11.it.ua:9273', 'host-vm12.it.ua:9273',
-        'hst01.smarttender.biz.int:9273', 'hst02.smarttender.biz.int:9273', 'hst03.smarttender.biz.int:9273',
-        'hst04.smarttender.biz.int:9273', 'hst05.smarttender.biz.int:9273', 'hst06.smarttender.biz.int:9273',
-        'itdb01.it.ua:9273', 'itdb02.it.ua:9273', 'SMSDBAZ.it.ua:9273', 'SMSDBAZ2.it.ua:9273',
-        'TENDER.smarttender.biz.int:9273', 'TENDER-SEC.smarttender.biz.int:9273',
-        'TENDER-THIRD.smarttender.biz.int:9273', '10.0.12.4:9273', 'TENDER-FS.smarttender.biz.int:9273',
+        "host-vm.it.ua:9273",
+        "host-vm1.it.ua:9273",
+        "host-vm2.it.ua:9273",
+        "host-vm3.it.ua:9273",
+        "host-vm4.it.ua:9273",
+        "host-vm7.it.ua:9273",
+        "host-vm8.it.ua:9273",
+        "host-vm9.it.ua:9273",
+        "host-vm10.it.ua:9273",
+        "host-vm11.it.ua:9273",
+        "host-vm12.it.ua:9273",
+        "hst01.smarttender.biz.int:9273",
+        "hst02.smarttender.biz.int:9273",
+        "hst03.smarttender.biz.int:9273",
+        "hst04.smarttender.biz.int:9273",
+        "hst05.smarttender.biz.int:9273",
+        "hst06.smarttender.biz.int:9273",
+        "itdb01.it.ua:9273",
+        "itdb02.it.ua:9273",
+        "SMSDBAZ.it.ua:9273",
+        "SMSDBAZ2.it.ua:9273",
+        "TENDER.smarttender.biz.int:9273",
+        "TENDER-SEC.smarttender.biz.int:9273",
+        "TENDER-THIRD.smarttender.biz.int:9273",
+        "10.0.12.4:9273",
+        "TENDER-FS.smarttender.biz.int:9273",
     ]
-    
+
     raid_data = []
-    
+
     async def fetch_raid(host):
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(f'http://{host}/metrics')
+                resp = await client.get(f"http://{host}/metrics")
                 if resp.status_code == 200:
                     raids = {}
-                    server_name = host.split(':')[0]
-                    for line in resp.text.split('\n'):
-                        if line.startswith('prometheus_raid_status{'):
-                            match = re.match(r'prometheus_raid_status\{host="([^"]+)",id="([^"]+)",raid_type="([^"]+)",size="([^"]+)"\}\s+(\d+)', line)
+                    server_name = host.split(":")[0]
+                    for line in resp.text.split("\n"):
+                        if line.startswith("prometheus_raid_status{"):
+                            match = re.match(
+                                r'prometheus_raid_status\{host="([^"]+)",id="([^"]+)",raid_type="([^"]+)",size="([^"]+)"\}\s+(\d+)',
+                                line,
+                            )
                             if match:
                                 hname, raid_id, raid_type, size, status = match.groups()
                                 server_name = hname
@@ -1893,36 +2124,36 @@ async def get_raid_status():
                                     "id": raid_id,
                                     "type": raid_type,
                                     "size": size + " GB",
-                                    "healthy": status == "1"
+                                    "healthy": status == "1",
                                 }
-                    
+
                     if raids:
                         all_healthy = all(r["healthy"] for r in raids.values())
-                        return {
-                            "server": server_name,
-                            "raids": list(raids.values()),
-                            "healthy": all_healthy
-                        }
+                        return {"server": server_name, "raids": list(raids.values()), "healthy": all_healthy}
         except:
             pass
         return None
-    
+
     # Fetch all hosts in parallel
     tasks = [fetch_raid(host) for host in telegraf_hosts]
     results = await asyncio.gather(*tasks)
-    
+
     raid_data = [r for r in results if r is not None]
-    
+
     return {"raid_status": raid_data}
+
 
 @router.put("/api/notifications/{channel}")
 async def update_notification(channel: str, config: dict):
     conn = get_db()
-    conn.execute("UPDATE notifications SET enabled=?, config=? WHERE channel=?",
-                 (int(config.get('enabled', False)), json.dumps(config), channel))
+    conn.execute(
+        "UPDATE notifications SET enabled=?, config=? WHERE channel=?",
+        (int(config.get("enabled", False)), json.dumps(config), channel),
+    )
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
 
 @router.get("/api/alerts")
 async def list_alerts():
@@ -1931,31 +2162,64 @@ async def list_alerts():
     conn.close()
     return {"alerts": [dict(a) for a in alerts]}
 
+
 @router.post("/api/alerts")
 async def create_alert(alert: AlertModel):
     conn = get_db()
     try:
-        conn.execute('''INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity, alert.server_id,
-             int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
-             alert.description, int(alert.enabled), datetime.now(timezone.utc).isoformat()))
+        conn.execute(
+            """INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                alert.name,
+                alert.metric,
+                alert.condition,
+                alert.threshold,
+                alert.duration,
+                alert.severity,
+                alert.server_id,
+                int(alert.notify_telegram),
+                int(alert.notify_discord),
+                int(alert.notify_slack),
+                int(alert.notify_email),
+                alert.description,
+                int(alert.enabled),
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
         conn.commit()
     except Exception as e:
         print(f"Error creating alert: {e}")
     conn.close()
     return {"status": "ok"}
 
+
 @router.put("/api/alerts/{alert_id}")
 async def update_alert(alert_id: int, alert: AlertModel):
     conn = get_db()
-    conn.execute('''UPDATE alerts SET name=?, metric=?, condition=?, threshold=?, duration=?, severity=?, server_id=?, notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?, description=?, enabled=? WHERE id=?''',
-        (alert.name, alert.metric, alert.condition, alert.threshold, alert.duration, alert.severity, alert.server_id,
-         int(alert.notify_telegram), int(alert.notify_discord), int(alert.notify_slack), int(alert.notify_email),
-         alert.description, int(alert.enabled), alert_id))
+    conn.execute(
+        """UPDATE alerts SET name=?, metric=?, condition=?, threshold=?, duration=?, severity=?, server_id=?, notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?, description=?, enabled=? WHERE id=?""",
+        (
+            alert.name,
+            alert.metric,
+            alert.condition,
+            alert.threshold,
+            alert.duration,
+            alert.severity,
+            alert.server_id,
+            int(alert.notify_telegram),
+            int(alert.notify_discord),
+            int(alert.notify_slack),
+            int(alert.notify_email),
+            alert.description,
+            int(alert.enabled),
+            alert_id,
+        ),
+    )
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
 
 @router.delete("/api/alerts/{alert_id}")
 async def delete_alert(alert_id: int):
@@ -1965,9 +2229,11 @@ async def delete_alert(alert_id: int):
     conn.close()
     return {"status": "ok"}
 
+
 # Full Backup System
-import zipfile
 import shutil
+import zipfile
+
 
 @router.get("/api/backup/config")
 async def get_backup_config():
@@ -1980,18 +2246,19 @@ async def get_backup_config():
         "backup_time": config.get("backup_time", "02:00"),
         "backup_path": config.get("backup_path", os.path.join(os.path.dirname(DB_PATH), "backups")),
         "keep_days": int(config.get("backup_keep_days", "30")),
-        "last_backup": config.get("backup_last", "")
+        "last_backup": config.get("backup_last", ""),
     }
+
 
 @router.post("/api/backup/config")
 async def set_backup_config(data: dict):
     conn = get_db()
     for key, value in data.items():
-        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", 
-                     (f"backup_{key}", str(value)))
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (f"backup_{key}", str(value)))
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
 
 @router.post("/api/backup/create")
 async def create_full_backup(data: dict = {}):
@@ -2002,54 +2269,60 @@ async def create_full_backup(data: dict = {}):
             row = conn.execute("SELECT value FROM settings WHERE key = 'backup_path'").fetchone()
             backup_path = row["value"] if row else os.path.join(os.path.dirname(DB_PATH), "backups")
             conn.close()
-        
+
         os.makedirs(backup_path, exist_ok=True)
-        
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"pymon_full_{timestamp}.zip"
         dest = os.path.join(backup_path, filename)
-        
-        with zipfile.ZipFile(dest, 'w', zipfile.ZIP_DEFLATED) as zf:
+
+        with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
             # Database
             if os.path.exists(DB_PATH):
-                zf.write(DB_PATH, 'pymon.db')
-            
+                zf.write(DB_PATH, "pymon.db")
+
             # Config file
-            config_path = os.path.join(os.path.dirname(DB_PATH), 'config.yml')
+            config_path = os.path.join(os.path.dirname(DB_PATH), "config.yml")
             if os.path.exists(config_path):
-                zf.write(config_path, 'config.yml')
-            
+                zf.write(config_path, "config.yml")
+
             # Export all settings as JSON
             conn = get_db()
             settings = {}
-            for table in ['servers', 'alerts', 'notifications', 'settings', 'api_keys', 'maintenance_windows']:
+            for table in ["servers", "alerts", "notifications", "settings", "api_keys", "maintenance_windows"]:
                 try:
                     rows = conn.execute(f"SELECT * FROM {table}").fetchall()
                     settings[table] = [dict(r) for r in rows]
                 except:
                     settings[table] = []
-            
+
             import json
-            zf.writestr('settings.json', json.dumps(settings, indent=2, default=str))
-            
+
+            zf.writestr("settings.json", json.dumps(settings, indent=2, default=str))
+
             # Update last backup time
-            conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                        ("backup_last", datetime.now(timezone.utc).isoformat()))
+            conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                ("backup_last", datetime.now(timezone.utc).isoformat()),
+            )
             conn.commit()
             conn.close()
-        
+
         size = os.path.getsize(dest)
-        
+
         # Log to backups table
         conn = get_db()
-        conn.execute("INSERT INTO backups (filename, size_bytes, created_at) VALUES (?, ?, ?)",
-                     (filename, size, datetime.now(timezone.utc).isoformat()))
+        conn.execute(
+            "INSERT INTO backups (filename, size_bytes, created_at) VALUES (?, ?, ?)",
+            (filename, size, datetime.now(timezone.utc).isoformat()),
+        )
         conn.commit()
         conn.close()
-        
+
         return {"status": "ok", "filename": filename, "size": size, "path": dest}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/api/backup/restore")
 async def restore_from_backup(data: dict):
@@ -2057,27 +2330,28 @@ async def restore_from_backup(data: dict):
         backup_file = data.get("file")
         if not backup_file or not os.path.exists(backup_file):
             raise HTTPException(status_code=400, detail="Backup file not found")
-        
+
         restore_db = data.get("restore_db", True)
         restore_config = data.get("restore_config", True)
         restore_settings = data.get("restore_settings", True)
-        
-        with zipfile.ZipFile(backup_file, 'r') as zf:
+
+        with zipfile.ZipFile(backup_file, "r") as zf:
             # Restore database
-            if restore_db and 'pymon.db' in zf.namelist():
+            if restore_db and "pymon.db" in zf.namelist():
                 # Backup current DB first
                 if os.path.exists(DB_PATH):
                     shutil.copy2(DB_PATH, DB_PATH + ".pre_restore")
-                zf.extract('pymon.db', os.path.dirname(DB_PATH))
-            
+                zf.extract("pymon.db", os.path.dirname(DB_PATH))
+
             # Restore config
-            if restore_config and 'config.yml' in zf.namelist():
-                zf.extract('config.yml', os.path.dirname(DB_PATH))
-            
+            if restore_config and "config.yml" in zf.namelist():
+                zf.extract("config.yml", os.path.dirname(DB_PATH))
+
             # Restore settings
-            if restore_settings and 'settings.json' in zf.namelist():
+            if restore_settings and "settings.json" in zf.namelist():
                 import json
-                settings_data = json.loads(zf.read('settings.json').decode())
+
+                settings_data = json.loads(zf.read("settings.json").decode())
                 conn = get_db()
                 for table, rows in settings_data.items():
                     if rows:
@@ -2086,19 +2360,20 @@ async def restore_from_backup(data: dict):
                             conn.execute(f"DELETE FROM {table}")
                             # Insert restored data
                             for row in rows:
-                                cols = ', '.join([k for k in row.keys() if k != 'id'])
-                                vals = ', '.join(['?' for _ in row if _ != 'id'])
-                                placeholders = [row[k] for k in row.keys() if k != 'id']
+                                cols = ", ".join([k for k in row.keys() if k != "id"])
+                                vals = ", ".join(["?" for _ in row if _ != "id"])
+                                placeholders = [row[k] for k in row.keys() if k != "id"]
                                 if cols:
                                     conn.execute(f"INSERT INTO {table} ({cols}) VALUES ({vals})", placeholders)
                         except Exception as e:
                             print(f"Error restoring {table}: {e}")
                 conn.commit()
                 conn.close()
-        
+
         return {"status": "ok", "message": "Backup restored successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/api/backup/list")
 async def list_backup_files():
@@ -2107,22 +2382,25 @@ async def list_backup_files():
         row = conn.execute("SELECT value FROM settings WHERE key = 'backup_path'").fetchone()
         backup_path = row["value"] if row else os.path.join(os.path.dirname(DB_PATH), "backups")
         conn.close()
-        
+
         files = []
         if os.path.exists(backup_path):
             for f in os.listdir(backup_path):
-                if f.endswith('.zip') or f.endswith('.sqlite'):
+                if f.endswith(".zip") or f.endswith(".sqlite"):
                     path = os.path.join(backup_path, f)
-                    files.append({
-                        "filename": f,
-                        "path": path,
-                        "size": os.path.getsize(path),
-                        "created": datetime.fromtimestamp(os.path.getctime(path)).isoformat()
-                    })
+                    files.append(
+                        {
+                            "filename": f,
+                            "path": path,
+                            "size": os.path.getsize(path),
+                            "created": datetime.fromtimestamp(os.path.getctime(path)).isoformat(),
+                        }
+                    )
         files.sort(key=lambda x: x["created"], reverse=True)
         return {"files": files, "backup_path": backup_path}
     except Exception as e:
         return {"files": [], "error": str(e)}
+
 
 @router.delete("/api/backup/file")
 async def delete_backup_file(data: dict):
@@ -2135,6 +2413,7 @@ async def delete_backup_file(data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/api/backup/cleanup")
 async def cleanup_old_backups():
     try:
@@ -2144,20 +2423,21 @@ async def cleanup_old_backups():
         row = conn.execute("SELECT value FROM settings WHERE key = 'backup_path'").fetchone()
         backup_path = row["value"] if row else os.path.join(os.path.dirname(DB_PATH), "backups")
         conn.close()
-        
+
         cutoff = datetime.now().timestamp() - (keep_days * 86400)
         deleted = 0
-        
+
         if os.path.exists(backup_path):
             for f in os.listdir(backup_path):
                 filepath = os.path.join(backup_path, f)
                 if os.path.getctime(filepath) < cutoff:
                     os.remove(filepath)
                     deleted += 1
-        
+
         return {"status": "ok", "deleted": deleted}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 # Factory Reset
 @router.post("/api/system/reset")
@@ -2166,44 +2446,46 @@ async def factory_reset(data: dict):
         confirm = data.get("confirm", "")
         if confirm != "RESET ALL DATA":
             raise HTTPException(status_code=400, detail="Confirmation required. Send 'confirm': 'RESET ALL DATA'")
-        
+
         conn = get_db()
         # Clear all data tables
-        tables = ['servers', 'alerts', 'api_keys', 'audit_log', 'maintenance_windows', 'backups']
+        tables = ["servers", "alerts", "api_keys", "audit_log", "maintenance_windows", "backups"]
         for table in tables:
             try:
                 conn.execute(f"DELETE FROM {table}")
             except:
                 pass
-        
+
         # Reset notifications to defaults
         conn.execute("UPDATE notifications SET enabled = 0, config = '{}'")
-        
+
         # Keep users but reset admin password
         conn.execute("UPDATE users SET password_hash = 'pbkdf2:sha256:admin' WHERE username = 'admin'")
-        
+
         conn.commit()
         conn.close()
-        
+
         return {"status": "ok", "message": "All data has been reset"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/api/system/clear-metrics")
 async def clear_metrics_data():
     try:
         conn = get_db()
         # Clear metrics but keep server definitions
-        conn.execute('''UPDATE servers SET 
+        conn.execute("""UPDATE servers SET
             last_check = NULL, last_status = NULL,
             cpu_percent = NULL, memory_percent = NULL, disk_percent = NULL,
             network_rx = NULL, network_tx = NULL, uptime = NULL,
-            raid_status = NULL, disk_info = NULL''')
+            raid_status = NULL, disk_info = NULL""")
         conn.commit()
         conn.close()
         return {"status": "ok", "message": "Metrics cleared"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/api/backups")
 async def create_backup():
@@ -2213,16 +2495,20 @@ async def create_backup():
         filename = f"pymon_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sqlite"
         dest = os.path.join(BACKUP_DIR, filename)
         import shutil
+
         shutil.copy2(DB_PATH, dest)
         size = os.path.getsize(dest)
         conn = get_db()
-        conn.execute("INSERT INTO backups (filename, size_bytes, created_at) VALUES (?, ?, ?)",
-                     (filename, size, datetime.now(timezone.utc).isoformat()))
+        conn.execute(
+            "INSERT INTO backups (filename, size_bytes, created_at) VALUES (?, ?, ?)",
+            (filename, size, datetime.now(timezone.utc).isoformat()),
+        )
         conn.commit()
         conn.close()
         return {"status": "ok", "filename": filename}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/api/backups")
 async def list_backups():
@@ -2230,6 +2516,7 @@ async def list_backups():
     backups = conn.execute("SELECT * FROM backups ORDER BY created_at DESC").fetchall()
     conn.close()
     return {"backups": [dict(b) for b in backups]}
+
 
 # API Keys
 @router.get("/api/api-keys")
@@ -2239,19 +2526,24 @@ async def list_api_keys():
     conn.close()
     return {"keys": [dict(k) for k in keys]}
 
+
 @router.post("/api/api-keys")
 async def create_api_key(data: dict):
-    import secrets
     import hashlib
+    import secrets
+
     key = secrets.token_urlsafe(32)
     key_hash = hashlib.sha256(key.encode()).hexdigest()
     name = data.get("name", "API Key")
     conn = get_db()
-    conn.execute("INSERT INTO api_keys (name, key_hash, created_at) VALUES (?, ?, ?)",
-                 (name, key_hash, datetime.now(timezone.utc).isoformat()))
+    conn.execute(
+        "INSERT INTO api_keys (name, key_hash, created_at) VALUES (?, ?, ?)",
+        (name, key_hash, datetime.now(timezone.utc).isoformat()),
+    )
     conn.commit()
     conn.close()
     return {"status": "ok", "key": key}
+
 
 @router.delete("/api/api-keys/{key_id}")
 async def delete_api_key(key_id: int):
@@ -2261,6 +2553,7 @@ async def delete_api_key(key_id: int):
     conn.close()
     return {"status": "ok"}
 
+
 # Audit Log
 @router.get("/api/audit-log")
 async def list_audit_log(limit: int = 100):
@@ -2269,15 +2562,19 @@ async def list_audit_log(limit: int = 100):
     conn.close()
     return {"logs": [dict(l) for l in logs]}
 
+
 def log_audit(user_id: int, action: str, details: str = "", ip: str = ""):
     try:
         conn = get_db()
-        conn.execute("INSERT INTO audit_log (user_id, action, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?)",
-                     (user_id, action, details, ip, datetime.now(timezone.utc).isoformat()))
+        conn.execute(
+            "INSERT INTO audit_log (user_id, action, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, action, details, ip, datetime.now(timezone.utc).isoformat()),
+        )
         conn.commit()
         conn.close()
     except:
         pass
+
 
 # Maintenance Windows
 @router.get("/api/maintenance")
@@ -2287,15 +2584,24 @@ async def list_maintenance():
     conn.close()
     return {"windows": [dict(w) for w in windows]}
 
+
 @router.post("/api/maintenance")
 async def create_maintenance(data: dict):
     conn = get_db()
-    conn.execute("INSERT INTO maintenance_windows (name, start_time, end_time, servers, enabled, created_at) VALUES (?, ?, ?, ?, 1, ?)",
-                 (data.get("name"), data.get("start_time"), data.get("end_time"), 
-                  json.dumps(data.get("servers", [])), datetime.now(timezone.utc).isoformat()))
+    conn.execute(
+        "INSERT INTO maintenance_windows (name, start_time, end_time, servers, enabled, created_at) VALUES (?, ?, ?, ?, 1, ?)",
+        (
+            data.get("name"),
+            data.get("start_time"),
+            data.get("end_time"),
+            json.dumps(data.get("servers", [])),
+            datetime.now(timezone.utc).isoformat(),
+        ),
+    )
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
 
 @router.delete("/api/maintenance/{window_id}")
 async def delete_maintenance(window_id: int):
@@ -2305,6 +2611,7 @@ async def delete_maintenance(window_id: int):
     conn.close()
     return {"status": "ok"}
 
+
 # Settings
 @router.get("/api/settings")
 async def get_settings():
@@ -2312,6 +2619,7 @@ async def get_settings():
     rows = conn.execute("SELECT key, value FROM settings").fetchall()
     conn.close()
     return {"settings": {r["key"]: r["value"] for r in rows}}
+
 
 @router.put("/api/settings")
 async def update_settings(data: dict):
@@ -2322,6 +2630,7 @@ async def update_settings(data: dict):
     conn.close()
     return {"status": "ok"}
 
+
 # Webhooks
 @router.get("/api/webhooks")
 async def list_webhooks():
@@ -2330,26 +2639,34 @@ async def list_webhooks():
     conn.close()
     return {"webhooks": [dict(w) for w in webhooks]}
 
+
 @router.post("/api/webhooks")
 async def create_webhook(data: dict):
     conn = get_db()
     try:
-        conn.execute('''CREATE TABLE IF NOT EXISTS webhooks (
+        conn.execute("""CREATE TABLE IF NOT EXISTS webhooks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             url TEXT NOT NULL,
             events TEXT,
             enabled BOOLEAN DEFAULT 1,
             created_at TEXT
-        )''')
-        conn.execute("INSERT INTO webhooks (name, url, events, enabled, created_at) VALUES (?, ?, ?, 1, ?)",
-                     (data.get("name"), data.get("url"), json.dumps(data.get("events", [])), 
-                      datetime.now(timezone.utc).isoformat()))
+        )""")
+        conn.execute(
+            "INSERT INTO webhooks (name, url, events, enabled, created_at) VALUES (?, ?, ?, 1, ?)",
+            (
+                data.get("name"),
+                data.get("url"),
+                json.dumps(data.get("events", [])),
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
         conn.commit()
     except:
         pass
     conn.close()
     return {"status": "ok"}
+
 
 @router.delete("/api/webhooks/{webhook_id}")
 async def delete_webhook(webhook_id: int):
@@ -2358,6 +2675,7 @@ async def delete_webhook(webhook_id: int):
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
 
 # Health Check
 @router.get("/api/health")
@@ -2371,5 +2689,5 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "servers": {"total": servers_count, "online": online_count},
-        "alerts": alerts_count
+        "alerts": alerts_count,
     }

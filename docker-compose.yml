@@ -8,7 +8,7 @@ services:
       - "8090:8090"
     volumes:
       - pymon-data:/data
-      - pymon-config:/config
+      - ./config.yml:/config/config.yml
     environment:
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - CONFIG_PATH=/config/config.json
@@ -23,4 +23,3 @@ services:
 
 volumes:
   pymon-data:
-  pymon-config:
