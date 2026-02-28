@@ -56,10 +56,12 @@ class ServerModel(BaseModel):
     os_type: str = "linux"
     agent_port: int | None = None
     check_interval: int = 15
+    enabled: bool = True
     notify_telegram: bool = False
     notify_discord: bool = False
     notify_slack: bool = False
     notify_email: bool = False
+
 
 
 def init_web_tables():
@@ -183,7 +185,20 @@ def init_web_tables():
             created_at TEXT
         )""")
 
+        c.execute("""CREATE TABLE IF NOT EXISTS metrics_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            server_id INTEGER NOT NULL,
+            cpu_percent REAL,
+            memory_percent REAL,
+            disk_percent REAL,
+            network_rx REAL,
+            network_tx REAL,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY (server_id) REFERENCES servers (id)
+        )""")
+
         c.execute("""CREATE TABLE IF NOT EXISTS settings (
+
             key TEXT PRIMARY KEY,
             value TEXT
         )""")
@@ -1061,206 +1076,84 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         setTimeout(() => icon.classList.remove('fa-spin'), 500);
     }
 
-    async function fetchMetricData(metricName) {
+    async function fetchServerHistory(serverId) {
         try {
-            const now = new Date();
-            const start = new Date(now.getTime() - getRangeMs(currentRange));
-            const resp = await fetch(`/api/v1/query?query=${metricName}&start=${start.toISOString()}&end=${now.toISOString()}&step=60`, {
+            const resp = await fetch(`/api/servers/${serverId}/history?range=${currentRange}`, {
                 headers: {'Authorization': 'Bearer ' + token}
             });
             const data = await resp.json();
-            return data.result || [];
+            return data.history || [];
         } catch(e) {
+            console.error('Error fetching history:', e);
             return [];
         }
-    }
-
-    function getRangeMs(range) {
-        const ms = {'5m':5*60*1000,'15m':15*60*1000,'1h':60*60*1000,'6h':6*60*60*1000,'24h':24*60*60*1000};
-        return ms[range] || ms['1h'];
-    }
-
-    function generateTimeSeriesData(currentValue, points) {
-        const data = [];
-        let val = currentValue || Math.random() * 50 + 20;
-        for (let i = 0; i < points; i++) {
-            val = Math.max(0, Math.min(100, val + (Math.random() - 0.5) * 10));
-            data.push(val);
-        }
-        return data;
     }
 
     async function initCharts() {
         Object.values(charts).forEach(c => c && c.destroy());
         charts = {};
-        const labels = generateLabels();
+        
         const filtered = getFilteredServers();
+        if (!filtered.length) return;
 
-        const getData = (key, min, max) => {
-            if (!filtered.length) return [{label:'No Data',data:rand(12,0,5),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
+        // Fetch history for all filtered servers
+        const historyPromises = filtered.map(s => fetchServerHistory(s.id));
+        const allHistories = await Promise.all(historyPromises);
+        
+        const datasets = { cpu: [], memory: [], disk: [], network: [] };
 
-            return filtered.map((s,i) => {
-                let val = s[key + '_percent'];
-                if (val === null || val === undefined) {
-                    if (key === 'network') val = s['network_rx'];
-                    if (val === null || val === undefined) val = null;
-                }
-                return {
-                    label: s.name,
-                    data: generateTimeSeriesData(val, 12),
-                    borderColor: colors[i % colors.length],
-                    backgroundColor: colors[i % colors.length] + '15',
-                    fill: true,
-                    tension: 0.3,
-                    borderWidth: 1.5,
-                    pointRadius: 0
-                };
-            });
-        };
+        filtered.forEach((server, idx) => {
+            const history = allHistories[idx];
+            const color = colors[idx % colors.length];
+            
+            const common = {
+                label: server.name,
+                borderColor: color,
+                backgroundColor: color + '15',
+                fill: true,
+                tension: 0.3,
+                borderWidth: 1.5,
+                pointRadius: 0
+            };
 
-        charts.cpu = new Chart(document.getElementById('cpuChart'), {type:'line',data:{labels:labels,datasets:getData('cpu',0,100)},options:chartOpts('%',0,100)});
+            datasets.cpu.push({ ...common, data: history.map(h => h.cpu_percent) });
+            datasets.memory.push({ ...common, data: history.map(h => h.memory_percent) });
+            datasets.disk.push({ ...common, data: history.map(h => h.disk_percent) });
+            datasets.network.push({ ...common, data: history.map(h => h.network_rx / 1024 / 1024) }); // MB/s
+        });
+
+        // Use the timestamps from the first non-empty history as labels
+        let labels = [];
+        for (const h of allHistories) {
+            if (h.length > 0) {
+                labels = h.map(item => {
+                    const d = new Date(item.timestamp);
+                    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+                });
+                break;
+            }
+        }
+        if (labels.length === 0) labels = generateLabels();
+
+        charts.cpu = new Chart(document.getElementById('cpuChart'), {type:'line', data:{labels, datasets:datasets.cpu}, options:chartOpts('%',0,100)});
         updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
 
-        charts.memory = new Chart(document.getElementById('memoryChart'), {type:'line',data:{labels:labels,datasets:getData('memory',0,100)},options:chartOpts('%',0,100)});
+        charts.memory = new Chart(document.getElementById('memoryChart'), {type:'line', data:{labels, datasets:datasets.memory}, options:chartOpts('%',0,100)});
         updateLegend('memoryLegend', charts.memory.data.datasets, '%');
 
-        charts.disk = new Chart(document.getElementById('diskChart'), {type:'line',data:{labels:labels,datasets:getData('disk',0,100)},options:chartOpts('%',0,100)});
+        charts.disk = new Chart(document.getElementById('diskChart'), {type:'line', data:{labels, datasets:datasets.disk}, options:chartOpts('%',0,100)});
         updateLegend('diskLegend', charts.disk.data.datasets, '%');
 
-        charts.network = new Chart(document.getElementById('networkChart'), {type:'line',data:{labels:labels,datasets:getData('network',0,100)},options:chartOpts(' MB/s',0,100)});
+        charts.network = new Chart(document.getElementById('networkChart'), {type:'line', data:{labels, datasets:datasets.network}, options:chartOpts(' MB/s', 0, null)});
         updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
     }
 
     async function updateCharts(filtered) {
-        console.log('updateCharts filtered:', filtered);
-        if (!charts.cpu) { initCharts(); return; }
-        const labels = generateLabels();
-
-        const getData = (key, min, max) => {
-            if (!filtered.length) return [{label:'No Data',data:rand(12,0,5),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
-
-            return filtered.map((s,i) => {
-                let val = s[key + '_percent'];
-                if (val === null || val === undefined) {
-                    if (key === 'network') val = s['network_rx'];
-                    if (val === null || val === undefined) val = null;
-                }
-                return {
-                    label: s.name,
-                    data: generateTimeSeriesData(val, 12),
-                    borderColor: colors[i % colors.length],
-                    backgroundColor: colors[i % colors.length] + '15',
-                    fill: true,
-                    tension: 0.3,
-                    borderWidth: 1.5,
-                    pointRadius: 0
-                };
-            });
-        };
-
-        charts.cpu.data.labels = labels;
-        charts.cpu.data.datasets = getData('cpu', 0, 100);
-        charts.cpu.update();
-        updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
-
-        charts.memory.data.labels = labels;
-        charts.memory.data.datasets = getData('memory', 0, 100);
-        charts.memory.update();
-        updateLegend('memoryLegend', charts.memory.data.datasets, '%');
-
-        // Disk - support multiple disks per server
-        const getDiskData = () => {
-            console.log('=== getDiskData START ===');
-            console.log('filtered.length:', filtered.length);
-            if (!filtered.length) return [{label:'No Data',data:rand(12,0,5),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
-
-            let datasets = [];
-            filtered.forEach((s, i) => {
-                console.log('--- Server', i, ':', s.name, '---');
-                console.log('  disk_info type:', typeof s.disk_info);
-                console.log('  disk_info value:', s.disk_info);
-                console.log('  disk_percent:', s.disk_percent);
-                let hasDiskInfo = false;
-                // Use disk_info if available - now it's already an object from API
-                if (s.disk_info && Array.isArray(s.disk_info)) {
-                    const disks = s.disk_info;
-                    console.log('  Using disk_info array:', disks);
-                    console.log('  disks.length:', disks.length);
-                    if (disks && disks.length > 0) {
-                        hasDiskInfo = true;
-                        console.log('  Adding', disks.length, 'disk datasets for', s.name);
-                        disks.forEach((d, j) => {
-                            const vol = d.volume ? d.volume.replace(':', '') : '?';
-                            console.log('    Disk', j, ': volume=', vol, 'percent=', d.percent);
-                            datasets.push({
-                                label: s.name + ' (' + vol + ')',
-                                data: generateTimeSeriesData(d.percent, 12),
-                                borderColor: colors[(i * 3 + j) % colors.length],
-                                backgroundColor: colors[(i * 3 + j) % colors.length] + '15',
-                                fill: true,
-                                tension: 0.3,
-                                borderWidth: 1.5,
-                                pointRadius: 0
-                            });
-                        });
-                    }
-                } else if (s.disk_info && typeof s.disk_info === 'string') {
-                    // Fallback for old string format
-                    try {
-                        const disks = JSON.parse(s.disk_info);
-                        console.log('  Parsed string disk_info:', disks);
-                        console.log('  disks.length:', disks.length);
-                        if (disks && disks.length > 0) {
-                            hasDiskInfo = true;
-                            console.log('  Adding', disks.length, 'disk datasets for', s.name);
-                            disks.forEach((d, j) => {
-                                const vol = d.volume ? d.volume.replace(':', '') : '?';
-                                console.log('    Disk', j, ': volume=', vol, 'percent=', d.percent);
-                                datasets.push({
-                                    label: s.name + ' (' + vol + ')',
-                                    data: generateTimeSeriesData(d.percent, 12),
-                                    borderColor: colors[(i * 3 + j) % colors.length],
-                                    backgroundColor: colors[(i * 3 + j) % colors.length] + '15',
-                                    fill: true,
-                                    tension: 0.3,
-                                    borderWidth: 1.5,
-                                    pointRadius: 0
-                                });
-                            });
-                        }
-                    } catch(e) { console.log('  Error parsing disk_info:', e); }
-                }
-                // Fallback - only if no disk_info was processed
-                if (!hasDiskInfo && s.disk_percent) {
-                    console.log('  Using fallback disk_percent for', s.name);
-                    datasets.push({
-                        label: s.name,
-                        data: generateTimeSeriesData(s.disk_percent, 12),
-                        borderColor: colors[i % colors.length],
-                        backgroundColor: colors[i % colors.length] + '15',
-                        fill: true,
-                        tension: 0.3,
-                        borderWidth: 1.5,
-                        pointRadius: 0
-                    });
-                }
-            });
-            console.log('=== getDiskData END ===');
-            console.log('Final disk datasets count:', datasets.length);
-            console.log('Final disk datasets:', datasets);
-            return datasets.length ? datasets : [{label:'No Data',data:rand(12,0,5),borderColor:colors[0],backgroundColor:colors[0]+'15',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0}];
-        };
-
-        charts.disk.data.labels = labels;
-        charts.disk.data.datasets = getDiskData();
-        charts.disk.update();
-        updateLegend('diskLegend', charts.disk.data.datasets, '%');
-
-        charts.network.data.labels = labels;
-        charts.network.data.datasets = getData('network', 0, 100);
-        charts.network.update();
-        updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
+        // For simplicity and to ensure data consistency, re-init charts on update
+        // but we could also just update the datasets if the lengths match.
+        initCharts();
     }
+
 
     function generateLabels() {
         const labels = [];
@@ -1782,13 +1675,14 @@ async def create_server(server: ServerModel):
 
     c.execute(
         """INSERT INTO servers (name, host, os_type, agent_port, check_interval, enabled, notify_telegram, notify_discord, notify_slack, notify_email, created_at)
-        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)""",
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             server.name,
             server.host,
             server.os_type,
             server.agent_port,
             server.check_interval,
+            int(server.enabled),
             int(server.notify_telegram),
             int(server.notify_discord),
             int(server.notify_slack),
@@ -1796,6 +1690,7 @@ async def create_server(server: ServerModel):
             datetime.now(timezone.utc).isoformat(),
         ),
     )
+
     conn.commit()
     conn.close()
     return {"status": "ok"}
@@ -1815,13 +1710,14 @@ async def get_server(server_id: int):
 async def update_server(server_id: int, server: ServerModel):
     conn = get_db()
     conn.execute(
-        """UPDATE servers SET name=?, host=?, os_type=?, agent_port=?, check_interval=?, notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=? WHERE id=?""",
+        """UPDATE servers SET name=?, host=?, os_type=?, agent_port=?, check_interval=?, enabled=?, notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=? WHERE id=?""",
         (
             server.name,
             server.host,
             server.os_type,
             server.agent_port,
             server.check_interval,
+            int(server.enabled),
             int(server.notify_telegram),
             int(server.notify_discord),
             int(server.notify_slack),
@@ -1832,6 +1728,7 @@ async def update_server(server_id: int, server: ServerModel):
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
 
 
 @router.delete("/api/servers/{server_id}")
@@ -1854,7 +1751,11 @@ async def scrape_server(server_id: int):
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
 
+    if not server["enabled"]:
+        return {"status": "skipped", "message": "Server is disabled"}
+
     target = f"{server['host']}:{server['agent_port']}"
+
     url = f"http://{target}/metrics"
 
     # Fallback: Get disk info via PowerShell if exporter fails
@@ -2021,8 +1922,22 @@ async def scrape_server(server_id: int):
                     WHERE id = ?""",
                     (now, cpu, memory, disk, network_rx, network_tx, str(uptime), disk_info_json, server_id),
                 )
+
+                # Add to metrics history
+                conn.execute(
+                    """INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (server_id, cpu, memory, disk, network_rx, network_tx, now),
+                )
+
+                # Cleanup old history (keep 7 days)
+                conn.execute(
+                    "DELETE FROM metrics_history WHERE timestamp < datetime('now', '-7 days')"
+                )
+
                 conn.commit()
                 conn.close()
+
 
                 return {
                     "status": "ok",
@@ -2155,8 +2070,27 @@ async def update_notification(channel: str, config: dict):
     return {"status": "ok"}
 
 
+@router.get("/api/servers/{server_id}/history")
+async def get_server_history(server_id: int, range: str = "1h"):
+    # Convert range to hours
+    hours = 1
+    if range == "5m": hours = 1/12
+    elif range == "15m": hours = 0.25
+    elif range == "6h": hours = 6
+    elif range == "24h": hours = 24
+
+    conn = get_db()
+    history = conn.execute(
+        f"SELECT * FROM metrics_history WHERE server_id = ? AND timestamp > datetime('now', '-{hours} hours') ORDER BY timestamp ASC",
+        (server_id,)
+    ).fetchall()
+    conn.close()
+    return {"history": [dict(h) for h in history]}
+
+
 @router.get("/api/alerts")
 async def list_alerts():
+
     conn = get_db()
     alerts = conn.execute("SELECT * FROM alerts ORDER BY created_at DESC").fetchall()
     conn.close()
