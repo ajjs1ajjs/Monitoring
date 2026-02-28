@@ -36,23 +36,35 @@
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.10+ (recommended: Python 3.14)
 - pip package manager
 
-### Installation
+### Windows Quick Start
+
+```batch
+# Clone and run
+git clone https://github.com/ajjs1ajjs/Monitoring.git
+cd Monitoring
+run.bat
+```
+
+### Manual Installation
 
 ```bash
 # Clone repository
 git clone https://github.com/ajjs1ajjs/Monitoring.git
 cd Monitoring
 
-# Create virtual environment
+# Create virtual environment (recommended)
 python -m venv .venv
 .venv\Scripts\activate     # Windows
 source .venv/bin/activate  # Linux
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Install PyMon in editable mode
+pip install -e . --no-deps
 
 # Start server
 python -m pymon.cli server
