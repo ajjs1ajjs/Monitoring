@@ -266,139 +266,183 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>PyMon - Server Monitoring</title>
+    <title>PyMon - Enterprise Monitoring</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root { --bg: #0d0f14; --card: #181b1f; --border: #2c3235; --text: #e0e0e0; --muted: #999; --blue: #5794f2; --green: #73bf69; --red: #f2495c; --yellow: #f2cc0c; --purple: #b877d9; }
-        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 13px; }
-        .top-nav { background: linear-gradient(90deg, #1a1d24, #252930); border-bottom: 1px solid var(--border); padding: 0 16px; display: flex; justify-content: space-between; align-items: center; height: 52px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 12px rgba(0,0,0,0.5); }
-        .nav-left { display: flex; align-items: center; gap: 20px; }
-        .logo { display: flex; align-items: center; gap: 8px; }
-        .logo-icon { width: 24px; height: 24px; background: linear-gradient(135deg, var(--blue), #2c7bd9); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: white; font-weight: bold; }
-        .logo h1 { color: var(--blue); font-size: 18px; font-weight: 600; }
-        .nav-menu { display: flex; gap: 2px; }
-        .nav-item { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 6px; cursor: pointer; color: var(--muted); font-weight: 500; font-size: 12px; border: none; background: transparent; transition: all 0.2s; }
-        .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.1); transform: translateY(-1px); }
-        .nav-item.active { background: linear-gradient(135deg, rgba(87,148,242,0.3), rgba(44,123,217,0.3)); color: var(--blue); box-shadow: 0 2px 8px rgba(87,148,242,0.3); }
-        .nav-right { display: flex; align-items: center; gap: 12px; }
-        .server-selector { padding: 5px 10px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; min-width: 150px; }
-        .main { padding: 16px; }
-        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.2s; }
-        .stat-card:hover, .stat-card.clickable { cursor: pointer; transform: translateY(-2px); }
-        .stat-card.clickable:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
-        .stat-card.active { border-color: var(--blue); box-shadow: 0 0 12px rgba(87,148,242,0.4); }
-        .stat-icon { width: 40px; height: 40px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-        .stat-value { font-size: 24px; font-weight: 600; }
-        .stat-label { color: var(--muted); font-size: 12px; }
-        .dashboard-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 4px; }
-        .time-range { display: flex; gap: 2px; background: #111217; border-radius: 4px; padding: 2px; border: 1px solid var(--border); }
-        .time-btn { padding: 4px 10px; background: transparent; border: none; border-radius: 3px; color: var(--muted); font-size: 12px; cursor: pointer; }
-        .time-btn.active { background: #2c3235; color: var(--text); }
-        .panels-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-        .panel { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.3); transition: all 0.3s; }
-        .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
-        .panel-title { font-size: 12px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
-        .panel-resize { background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.2s; }
-        .panel-resize:hover { color: var(--text); background: rgba(255,255,255,0.1); }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
-        .panel.expanded { grid-column: span 2; }
-        .panel.expanded .panel-body { height: 400px; }
-        .panel-body { display: flex; height: 250px; }
-        .panel-chart { flex: 1; padding: 8px; position: relative; min-width: 0; }
-        .panel-legend { width: 150px; min-width: 150px; overflow-y: auto; background: rgba(0,0,0,0.2); }
-        .panel-legend { width: 280px; border-left: 1px solid var(--border); background: rgba(0,0,0,0.2); overflow-y: auto; font-size: 11px; flex-shrink: 0; }
-        .legend-header { display: flex; padding: 8px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 10px; text-transform: uppercase; font-weight: 600; cursor: pointer; }
-        .legend-header:hover { color: var(--blue); }
-        .legend-header-name { flex: 1; text-align: left; }
-        .legend-header-last { width: 45px; text-align: right; cursor: pointer; position: relative; }
-        .legend-header-last::after { content: ''; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); border: 4px solid transparent; }
-        .legend-header-last.sort-asc::after { border-bottom-color: var(--blue); margin-top: -4px; }
-        .legend-header-last.sort-desc::after { border-top-color: var(--blue); margin-top: 4px; }
-        .legend-header-max { width: 45px; text-align: right; cursor: pointer; position: relative; }
-        .legend-header-max::after { content: ''; position: absolute; right: 2px; top: 50%; transform: translateY(-50%); border: 4px solid transparent; }
-        .legend-header-max.sort-asc::after { border-bottom-color: var(--blue); margin-top: -4px; }
-        .legend-header-max.sort-desc::after { border-top-color: var(--blue); margin-top: 4px; }
-        .legend-item { display: flex; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer; }
+        :root { 
+            --bg: #0b0c0f; --card: #14161a; --card-hover: #1a1d22; --border: #262a30; --border-light: #363b42;
+            --text: #e0e0e0; --muted: #8b8d98; --muted-light: #a0a2ab; --blue: #5794f2; --blue-glow: rgba(87,148,242,0.15);
+            --green: #73bf69; --green-glow: rgba(115,191,105,0.15); --red: #f2495c; --red-glow: rgba(242,73,92,0.15);
+            --yellow: #f2cc0c; --yellow-glow: rgba(242,204,12,0.15); --purple: #b877d9; --purple-glow: rgba(184,119,217,0.15);
+            --orange: #ff780a; --cyan: #00d8d8;
+        }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 13px; }
+        
+        /* Top Navigation */
+        .top-nav { background: linear-gradient(180deg, #1a1d22 0%, #14161a 100%); border-bottom: 1px solid var(--border); padding: 0 20px; height: 56px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .nav-left { display: flex; align-items: center; gap: 24px; }
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--blue), #2c7bd9); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: white; font-weight: bold; box-shadow: 0 2px 8px rgba(87,148,242,0.3); }
+        .logo h1 { color: var(--blue); font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+        .nav-menu { display: flex; gap: 4px; }
+        .nav-item { display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 8px; cursor: pointer; color: var(--muted); font-weight: 500; font-size: 13px; border: none; background: transparent; transition: all 0.2s; }
+        .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+        .nav-item.active { background: var(--blue-glow); color: var(--blue); box-shadow: inset 0 0 0 1px rgba(87,148,242,0.3); }
+        .nav-right { display: flex; align-items: center; gap: 16px; }
+        
+        /* Time Range Selector */
+        .time-range { display: flex; gap: 2px; background: var(--card); border-radius: 8px; padding: 3px; border: 1px solid var(--border); }
+        .time-btn { padding: 6px 14px; background: transparent; border: none; border-radius: 5px; color: var(--muted); font-size: 12px; cursor: pointer; transition: all 0.2s; }
+        .time-btn:hover { color: var(--text); }
+        .time-btn.active { background: var(--blue); color: white; }
+        
+        /* Main Content */
+        .main { padding: 20px; max-width: 1920px; margin: 0 auto; }
+        
+        /* Stats Overview */
+        .stats-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; align-items: center; gap: 16px; transition: all 0.3s; cursor: pointer; }
+        .stat-card:hover { transform: translateY(-2px); border-color: var(--border-light); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+        .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .stat-content { flex: 1; }
+        .stat-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
+        .stat-label { color: var(--muted); font-size: 12px; margin-top: 4px; }
+        .stat-trend { display: flex; align-items: center; gap: 4px; font-size: 12px; margin-top: 8px; }
+        .stat-trend.up { color: var(--green); }
+        .stat-trend.down { color: var(--red); }
+        
+        /* Grid Layout */
+        .dashboard-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+        .grid-item { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .grid-item.col-4 { grid-column: span 4; }
+        .grid-item.col-6 { grid-column: span 6; }
+        .grid-item.col-8 { grid-column: span 8; }
+        .grid-item.col-12 { grid-column: span 12; }
+        .grid-item.row-2 { grid-row: span 2; }
+        
+        /* Panel */
+        .panel { height: 100%; display: flex; flex-direction: column; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+        .panel-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .panel-actions { display: flex; gap: 8px; }
+        .panel-body { flex: 1; padding: 16px; min-height: 200px; position: relative; }
+        
+        /* Chart Container */
+        .chart-container { width: 100%; height: 250px; position: relative; }
+        .chart-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+        .legend-item { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: background 0.2s; }
         .legend-item:hover { background: rgba(255,255,255,0.05); }
-        .legend-color { width: 8px; height: 8px; border-radius: 2px; margin-right: 8px; margin-top: 2px; flex-shrink: 0; }
-        .legend-name { flex: 1; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .legend-value-last { width: 45px; text-align: right; font-size: 11px; color: var(--muted); }
-        .legend-value-max { width: 45px; text-align: right; font-size: 11px; color: var(--muted); }
-        .legend-item { display: flex; align-items: center; padding: 6px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); gap: 12px; }
-        .legend-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-        .legend-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; min-width: 80px; flex: 1; }
-        .legend-value { color: var(--muted); text-align: right; font-size: 12px; flex-shrink: 0; width: 50px; }
-        .legend-item { display: flex; align-items: center; padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.03); gap: 8px; }
-        .legend-color { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
-        .legend-name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px; min-width: 0; flex: 1; }
-        .legend-value { color: var(--muted); text-align: center; font-size: 11px; flex-shrink: 0; width: 45px; }
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-        .card-title { font-size: 14px; font-weight: 600; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
-        th { color: var(--muted); font-size: 11px; text-transform: uppercase; font-weight: 600; background: rgba(0,0,0,0.2); }
-        .btn { padding: 8px 16px; border-radius: 6px; border: none; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; transition: all 0.2s; }
-        .btn-primary { background: linear-gradient(135deg, #2c7bd9, #1a5fb4); color: white; box-shadow: 0 2px 8px rgba(44,123,217,0.4); }
-        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(44,123,217,0.6); }
-        .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); }
-        .btn-secondary:hover { background: rgba(255,255,255,0.12); }
+        .legend-color { width: 12px; height: 12px; border-radius: 3px; }
+        .legend-name { font-size: 12px; color: var(--text); }
+        .legend-value { font-size: 12px; color: var(--muted); font-weight: 600; }
+        
+        /* Server Cards */
+        .server-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; max-height: 600px; overflow-y: auto; padding-right: 8px; }
+        .server-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; transition: all 0.2s; cursor: pointer; }
+        .server-card:hover { border-color: var(--border-light); transform: translateY(-1px); }
+        .server-card.online { border-left: 3px solid var(--green); }
+        .server-card.offline { border-left: 3px solid var(--red); }
+        .server-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .server-name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+        .server-status { width: 8px; height: 8px; border-radius: 50%; }
+        .server-os { font-size: 11px; padding: 2px 8px; background: rgba(255,255,255,0.05); border-radius: 4px; color: var(--muted); }
+        .server-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .metric-box { background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; text-align: center; }
+        .metric-label { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+        .metric-value { font-size: 18px; font-weight: 600; }
+        .metric-progress { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+        .metric-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+        
+        /* Alert List */
+        .alert-list { max-height: 500px; overflow-y: auto; }
+        .alert-item { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; transition: background 0.2s; }
+        .alert-item:hover { background: rgba(255,255,255,0.02); }
+        .alert-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .alert-content { flex: 1; }
+        .alert-title { font-weight: 500; font-size: 13px; }
+        .alert-desc { color: var(--muted); font-size: 11px; margin-top: 2px; }
+        .alert-time { color: var(--muted-light); font-size: 11px; }
+        
+        /* Gauge */
+        .gauge-container { display: flex; justify-content: space-around; padding: 20px 0; }
+        .gauge-item { text-align: center; }
+        .gauge-value { font-size: 32px; font-weight: 700; color: var(--text); }
+        .gauge-label { color: var(--muted); font-size: 12px; margin-top: 8px; }
+        .gauge-bar { width: 120px; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; margin: 12px auto; overflow: hidden; }
+        .gauge-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+        
+        /* Search and Filters */
+        .toolbar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .search-box { flex: 1; min-width: 200px; position: relative; }
+        .search-box input { width: 100%; padding: 10px 16px 10px 40px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
+        .search-box input:focus { outline: none; border-color: var(--blue); }
+        .search-box i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+        .filter-btn { padding: 10px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; cursor: pointer; transition: all 0.2s; }
+        .filter-btn:hover { border-color: var(--border-light); }
+        .filter-btn.active { background: var(--blue); border-color: var(--blue); }
+        
+        /* Buttons */
+        .btn { padding: 10px 18px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+        .btn-primary { background: linear-gradient(135deg, #2c7bd9, #1a5fb4); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(44,123,217,0.4); }
+        .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--card-hover); }
         .btn-danger { background: linear-gradient(135deg, rgba(242,73,92,0.3), rgba(242,73,92,0.15)); color: var(--red); }
         .btn-danger:hover { background: linear-gradient(135deg, rgba(242,73,92,0.5), rgba(242,73,92,0.3)); }
         .btn-sm { padding: 6px 12px; font-size: 12px; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
+        
+        /* Table */
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { color: var(--muted); font-size: 11px; text-transform: uppercase; font-weight: 600; background: rgba(0,0,0,0.2); }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        
+        /* Status Badges */
+        .badge { padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .badge-success { background: var(--green-glow); color: var(--green); }
+        .badge-danger { background: var(--red-glow); color: var(--red); }
+        .badge-warning { background: var(--yellow-glow); color: var(--yellow); }
+        .badge-info { background: var(--blue-glow); color: var(--blue); }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+        
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; }
         .modal.active { display: flex; }
-        .modal-content { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 24px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+        .modal-title { font-size: 18px; font-weight: 600; }
+        .modal-close { background: none; border: none; color: var(--muted); font-size: 24px; cursor: pointer; }
+        
+        /* Form */
         .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; margin-bottom: 6px; color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 13px; }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--blue); }
+        .form-group label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; text-transform: uppercase; font-weight: 600; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--blue); }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-        .section-content { display: none; }
-        .section-content.active { display: block; }
-        .install-box { background: rgba(87,148,242,0.05); border: 1px solid rgba(87,148,242,0.2); border-radius: 4px; padding: 16px; margin-top: 12px; }
-        .install-box h4 { margin-bottom: 10px; color: var(--blue); font-size: 13px; font-weight: 600; }
-        .code-block { position: relative; background: #111217; border: 1px solid var(--border); border-radius: 4px; margin: 10px 0; }
-        .code-block code { display: block; padding: 12px; font-family: Monaco,Consolas,monospace; font-size: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; color: var(--text); }
-        .copy-btn { position: absolute; top: 8px; right: 8px; padding: 4px 8px; background: rgba(255,255,255,0.1); border: none; border-radius: 3px; color: var(--muted); font-size: 11px; cursor: pointer; }
-        .install-step { display: flex; gap: 12px; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 4px; border-left: 3px solid var(--blue); }
-        .step-number { width: 24px; height: 24px; background: var(--blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
-        .step-title { font-weight: 600; margin-bottom: 4px; font-size: 13px; }
-        .alert-rule { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 4px; padding: 16px; margin-bottom: 12px; }
-        .alert-rule-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .alert-rule-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
-        .alert-conditions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
-        .condition-box { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; font-size: 12px; }
-        .condition-label { color: var(--muted); margin-bottom: 4px; font-size: 11px; text-transform: uppercase; }
-        .condition-value { font-weight: 600; color: var(--text); font-size: 13px; }
-        .notification-tag { padding: 4px 10px; background: rgba(87,148,242,0.15); border-radius: 3px; font-size: 11px; color: var(--blue); margin-right: 6px; }
-        .tab-menu { display: flex; gap: 2px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-        .tab-item { padding: 8px 16px; cursor: pointer; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; }
-        .tab-item.active { color: var(--blue); border-bottom-color: var(--blue); }
-        .badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
-        .badge-success { background: linear-gradient(135deg, rgba(115,191,105,0.3), rgba(115,191,105,0.15)); color: var(--green); }
-        .badge-danger { background: linear-gradient(135deg, rgba(242,73,92,0.3), rgba(242,73,92,0.15)); color: var(--red); }
-        .badge-warning { background: linear-gradient(135deg, rgba(242,204,12,0.3), rgba(242,204,12,0.15)); color: var(--yellow); }
-        .badge-info { background: linear-gradient(135deg, rgba(87,148,242,0.3), rgba(87,148,242,0.15)); color: var(--blue); }
-        .raid-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-        .raid-card { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
-        .raid-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .raid-card-title { font-weight: 600; font-size: 13px; }
-        .raid-status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-        .raid-disks { margin-top: 8px; }
-        .raid-disk { display: flex; justify-content: space-between; padding: 6px 8px; background: rgba(0,0,0,0.2); border-radius: 3px; margin-bottom: 4px; font-size: 12px; }
-
-        /* Server Status Panel */
-        .server-panel { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
-        .server-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .metric-box { background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; text-align: center; }
-        .metric-label { color: var(--muted); font-size: 10px; text-transform: uppercase; }
-        .metric-value { font-weight: 600; font-size: 14px; }
+        
+        /* Tabs */
+        .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+        .tab { padding: 12px 20px; color: var(--muted); cursor: pointer; font-size: 13px; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab:hover { color: var(--text); }
+        .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+        
+        /* Animations */
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-pulse { animation: pulse 2s infinite; }
+        .animate-spin { animation: spin 1s linear infinite; }
+        
+        /* Responsive */
+        @media (max-width: 1200px) { .grid-item.col-4, .grid-item.col-6, .grid-item.col-8 { grid-column: span 12; } }
+        @media (max-width: 768px) { .nav-menu { display: none; } .stats-overview { grid-template-columns: 1fr; } .main { padding: 12px; } }
     </style>
 </head>
 <body>
@@ -409,1270 +453,527 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <button class="nav-item active" data-section="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button>
                 <button class="nav-item" data-section="servers"><i class="fas fa-server"></i> Servers</button>
                 <button class="nav-item" data-section="alerts"><i class="fas fa-bell"></i> Alerts</button>
+                <button class="nav-item" data-section="reports"><i class="fas fa-file-alt"></i> Reports</button>
                 <button class="nav-item" data-section="settings"><i class="fas fa-cog"></i> Settings</button>
             </div>
         </div>
         <div class="nav-right">
-            <button class="btn btn-secondary btn-sm" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            <div class="time-range">
+                <button class="time-btn" data-range="5m">5m</button>
+                <button class="time-btn" data-range="15m">15m</button>
+                <button class="time-btn active" data-range="1h">1h</button>
+                <button class="time-btn" data-range="6h">6h</button>
+                <button class="time-btn" data-range="24h">24h</button>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="refreshBtn"><i class="fas fa-sync"></i></button>
+            <button class="btn btn-secondary btn-sm" id="logoutBtn"><i class="fas fa-sign-out-alt"></i></button>
         </div>
     </nav>
+    
     <main class="main">
+        <!-- Dashboard Section -->
         <div id="section-dashboard" class="section-content active">
-            <div class="stats-row">
-                <div class="stat-card" data-filter="online" id="card-online"><div class="stat-icon" style="background: rgba(115,191,105,0.15); color: var(--green);"><i class="fas fa-check-circle"></i></div><div class="stat-content"><div class="stat-value" id="stat-online" style="color: var(--green);">0</div><div class="stat-label">Online</div></div></div>
-                <div class="stat-card" data-filter="offline" id="card-offline"><div class="stat-icon" style="background: rgba(242,73,92,0.15); color: var(--red);"><i class="fas fa-times-circle"></i></div><div class="stat-content"><div class="stat-value" id="stat-offline" style="color: var(--red);">0</div><div class="stat-label">Offline</div></div></div>
-                <div class="stat-card" data-filter="linux" id="card-linux"><div class="stat-icon" style="background: rgba(87,148,242,0.15); color: var(--blue);"><i class="fab fa-linux"></i></div><div class="stat-content"><div class="stat-value" id="stat-linux" style="color: var(--blue);">0</div><div class="stat-label">Linux</div></div></div>
-                <div class="stat-card" data-filter="windows" id="card-windows"><div class="stat-icon" style="background: rgba(242,204,12,0.15); color: var(--yellow);"><i class="fab fa-windows"></i></div><div class="stat-content"><div class="stat-value" id="stat-windows" style="color: var(--yellow);">0</div><div class="stat-label">Windows</div></div></div>
-            </div>
-            <div class="dashboard-toolbar">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="color: var(--muted); font-size: 13px;">Home / Dashboard</span>
-                    <select class="server-selector" id="dashboardServerSelector" onchange="filterDashboard()"><option value="">All Servers</option></select>
-                    <button class="btn btn-secondary btn-sm" onclick="clearFilter()" id="clearFilterBtn" style="display:none;"><i class="fas fa-times"></i> Clear</button>
-                    <button class="btn btn-primary btn-sm" onclick="refreshDashboard()"><i class="fas fa-sync"></i> Refresh</button>
-                </div>
-                <div class="time-range">
-                    <button class="time-btn" data-range="5m">5m</button>
-                    <button class="time-btn" data-range="15m">15m</button>
-                    <button class="time-btn active" data-range="1h">1h</button>
-                    <button class="time-btn" data-range="6h">6h</button>
-                    <button class="time-btn" data-range="24h">24h</button>
-                </div>
-            </div>
-
-            <!-- Resizable Panels -->
-            <div class="panels-grid" id="panelsGrid">
-                <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>CPU</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="cpuChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="cpuLegend"></div></div></div></div>
-                <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Memory</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="memoryChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="memoryLegend"></div></div></div></div>
-                <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Disk</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="diskChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="diskLegend"></div></div></div></div>
-                <div class="panel" style="min-height: 180px;"><div class="panel-header"><div class="panel-title"><span class="status-dot"></span>Network</div><div class="panel-resize" onclick="togglePanelSize(this)"><i class="fas fa-expand"></i></div></div><div class="panel-body"><div class="panel-chart"><canvas id="networkChart"></canvas></div><div class="panel-legend"><div class="legend-header"><span class="legend-header-name">Name</span><span class="legend-header-last">Last</span><span class="legend-header-max">Max</span></div><div id="networkLegend"></div></div></div></div>
-            </div>
-
-            <!-- RAID Status - Extended -->
-            <div class="card" style="margin-top: 16px;">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="fas fa-hdd"></i> RAID Arrays Status</h3>
-                    <button class="btn btn-secondary btn-sm" id="refreshRaidBtn"><i class="fas fa-sync"></i> Refresh</button>
-                </div>
-                <div id="raidStats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 6px; margin-bottom: 12px;">
-                    <div style="text-align: center;"><div style="font-size: 24px; color: var(--blue);" id="raidTotalServers">-</div><div style="color: var(--muted); font-size: 11px;">Servers with RAID</div></div>
-                    <div style="text-align: center;"><div style="font-size: 24px; color: var(--green);" id="raidHealthy">-</div><div style="color: var(--muted); font-size: 11px;">Healthy Arrays</div></div>
-                    <div style="text-align: center;"><div style="font-size: 24px; color: var(--red);" id="raidDegraded">-</div><div style="color: var(--muted); font-size: 11px;">Degraded Arrays</div></div>
-                    <div style="text-align: center;"><div style="font-size: 24px; color: var(--yellow);" id="raidTotalSize">-</div><div style="color: var(--muted); font-size: 11px;">Total Capacity</div></div>
-                </div>
-                <div id="raidStatusPanel" style="max-height: 400px; overflow-y: auto;">
-                    <p style="color: var(--muted); text-align: center; padding: 20px;">Loading RAID data...</p>
-                </div>
-            </div>
-        </div>
-        <div id="section-servers" class="section-content">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Monitored Servers</h3>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <input type="text" id="serverSearch" placeholder="Search name/host..." style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text); width: 140px;">
-                        <select id="filterStatus" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                            <option value="">All Status</option>
-                            <option value="up">Online</option>
-                            <option value="down">Offline</option>
-                        </select>
-                        <select id="filterOS" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                            <option value="">All OS</option>
-                            <option value="windows">Windows</option>
-                            <option value="linux">Linux</option>
-                        </select>
-                        <select id="filterCPU" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                            <option value="">CPU Any</option>
-                            <option value="90">CPU > 90%</option>
-                            <option value="80">CPU > 80%</option>
-                            <option value="70">CPU > 70%</option>
-                            <option value="50">CPU > 50%</option>
-                        </select>
-                        <select id="filterMemory" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                            <option value="">Memory Any</option>
-                            <option value="95">Memory > 95%</option>
-                            <option value="90">Memory > 90%</option>
-                            <option value="80">Memory > 80%</option>
-                            <option value="70">Memory > 70%</option>
-                        </select>
-                        <select id="filterDisk" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                            <option value="">Disk Any</option>
-                            <option value="95">Disk > 95%</option>
-                            <option value="90">Disk > 90%</option>
-                            <option value="80">Disk > 80%</option>
-                            <option value="70">Disk > 70%</option>
-                        </select>
-                        <select id="serverSortSelect" style="padding: 6px 12px; background: #111217; border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                            <option value="name">Sort: Name</option>
-                            <option value="status">Sort: Status</option>
-                            <option value="cpu">Sort: CPU</option>
-                            <option value="memory">Sort: Memory</option>
-                            <option value="disk">Sort: Disk</option>
-                        </select>
-                        <button class="btn btn-secondary btn-sm" id="clearFiltersBtn"><i class="fas fa-times"></i> Clear</button>
-                        <button class="btn btn-primary" id="addServerBtn"><i class="fas fa-plus"></i> Add</button>
+            <!-- Stats Overview -->
+            <div class="stats-overview">
+                <div class="stat-card" onclick="filterBy('online')" style="cursor:pointer;">
+                    <div class="stat-icon" style="background: var(--green-glow); color: var(--green);"><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-online">0</div>
+                        <div class="stat-label">Online Servers</div>
+                        <div class="stat-trend up" id="trend-online"><i class="fas fa-arrow-up"></i> All systems operational</div>
                     </div>
                 </div>
-                <div id="filterStats" style="padding: 8px 12px; background: rgba(0,0,0,0.2); font-size: 12px; color: var(--muted); margin-bottom: 8px;"></div>
-                <table><thead><tr><th>Status</th><th>Name</th><th>Host:Port</th><th>OS</th><th>CPU</th><th>Memory</th><th>Disk</th><th>Last Check</th><th>Actions</th></tr></thead><tbody id="servers-tbody"></tbody></table>
+                <div class="stat-card" onclick="filterBy('offline')" style="cursor:pointer;">
+                    <div class="stat-icon" style="background: var(--red-glow); color: var(--red);"><i class="fas fa-times-circle"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-offline">0</div>
+                        <div class="stat-label">Offline Servers</div>
+                        <div class="stat-trend down" id="trend-offline"></div>
+                    </div>
+                </div>
+                <div class="stat-card" style="cursor:pointer;">
+                    <div class="stat-icon" style="background: var(--blue-glow); color: var(--blue);"><i class="fas fa-microchip"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-cpu-avg">0%</div>
+                        <div class="stat-label">Avg CPU Usage</div>
+                    </div>
+                </div>
+                <div class="stat-card" style="cursor:pointer;">
+                    <div class="stat-icon" style="background: var(--yellow-glow); color: var(--yellow);"><i class="fas fa-memory"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-mem-avg">0%</div>
+                        <div class="stat-label">Avg Memory Usage</div>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div id="section-alerts" class="section-content">
-            <div class="tab-menu">
-                <div class="tab-item active" data-tab="global">Global Alerts</div>
-                <div class="tab-item" data-tab="server">Server Alerts</div>
+            
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <div class="search-box"><i class="fas fa-search"></i><input type="text" id="serverSearch" placeholder="Search servers..."></div>
+                <select id="filterStatus" class="filter-btn"><option value="">All Status</option><option value="up">Online</option><option value="down">Offline</option></select>
+                <select id="filterOS" class="filter-btn"><option value="">All OS</option><option value="linux">Linux</option><option value="windows">Windows</option></select>
+                <button class="btn btn-primary btn-sm" id="addServerBtn"><i class="fas fa-plus"></i> Add Server</button>
             </div>
-            <div class="card">
-                <div class="card-header"><h3 class="card-title">Alert Rules</h3><button class="btn btn-primary" id="addAlertBtn"><i class="fas fa-plus"></i> New Alert</button></div>
-                <p style="color: var(--muted); margin-bottom: 20px;">Configure alerts to receive notifications when metrics exceed thresholds.</p>
-                <div id="alertsList"></div>
-            </div>
-        </div>
-        <div id="section-settings" class="section-content">
-            <div class="tab-menu">
-                <div class="tab-item active" data-tab="notif">Notifications</div>
-                <div class="tab-item" data-tab="security">Security</div>
-                <div class="tab-item" data-tab="backups">Backups</div>
-                <div class="tab-item" data-tab="apikeys">API Keys</div>
-                <div class="tab-item" data-tab="audit">Audit Log</div>
-                <div class="tab-item" data-tab="maintenance">Maintenance</div>
-            </div>
-            <div id="settings-notif" class="tab-content">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div>
-                        <h4 style="font-size: 12px; color: #0088cc; margin-bottom: 10px;"><i class="fab fa-telegram"></i> TELEGRAM</h4>
-                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="telegram-enabled" style="width: auto;"> Enabled</label></div>
-                        <div id="telegram-config" style="display: none;">
-                            <div class="form-group"><label>Bot Token</label><input type="text" id="telegram-token" placeholder="123456789:ABCdef..."></div>
-                            <div class="form-group"><label>Chat ID</label><input type="text" id="telegram-chat" placeholder="-1001234567890"></div>
+            
+            <!-- Dashboard Grid -->
+            <div class="dashboard-grid">
+                <!-- CPU Usage Chart -->
+                <div class="grid-item col-6">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-microchip" style="color: var(--blue);"></i> CPU Usage</div>
+                            <div class="panel-actions"><button class="btn btn-secondary btn-sm" onclick="expandPanel('cpu')"><i class="fas fa-expand"></i></button></div>
                         </div>
-                    </div>
-                    <div>
-                        <h4 style="font-size: 12px; color: #5865F2; margin-bottom: 10px;"><i class="fab fa-discord"></i> DISCORD</h4>
-                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="discord-enabled" style="width: auto;"> Enable Discord</label></div>
-                        <div id="discord-config" style="display: none;"><div class="form-group"><label>Webhook URL</label><input type="text" id="discord-webhook" placeholder="https://discord.com/api/webhooks/..."></div></div>
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
-                    <div>
-                        <h4 style="font-size: 12px; color: #4A154B; margin-bottom: 10px;"><i class="fab fa-slack"></i> SLACK</h4>
-                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="slack-enabled" style="width: auto;"> Enabled</label></div>
-                        <div id="slack-config" style="display: none;"><div class="form-group"><label>Webhook URL</label><input type="text" id="slack-webhook" placeholder="https://hooks.slack.com/services/..."></div></div>
-                    </div>
-                    <div>
-                        <h4 style="font-size: 12px; color: var(--red); margin-bottom: 10px;"><i class="fas fa-envelope"></i> EMAIL</h4>
-                        <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="email-enabled" style="width: auto;"> Enabled</label></div>
-                        <div id="email-config" style="display: none;">
-                            <div class="form-row"><div class="form-group"><label>Host</label><input type="text" id="email-host" placeholder="smtp.gmail.com"></div><div class="form-group"><label>Port</label><input type="number" id="email-port" value="587"></div></div>
-                            <div class="form-group"><label>User</label><input type="text" id="email-user" placeholder="user@gmail.com"></div>
-                            <div class="form-group"><label>Password</label><input type="password" id="email-pass" placeholder="app password"></div>
+                        <div class="panel-body">
+                            <div class="chart-container"><canvas id="cpuChart"></canvas></div>
+                            <div class="chart-legend" id="cpuLegend"></div>
                         </div>
                     </div>
                 </div>
-                <button class="btn btn-primary" id="saveNotifyBtn" style="margin-top: 20px;"><i class="fas fa-save"></i> Save Settings</button>
-            </div>
-            <div id="settings-security" class="tab-content" style="display: none;">
-                <div class="form-row">
-                    <div class="form-group"><label>SSL Certificate Path</label><input type="text" id="ssl-cert" placeholder="/path/to/fullchain.pem"></div>
-                    <div class="form-group"><label>SSL Private Key Path</label><input type="text" id="ssl-key" placeholder="/path/to/privkey.pem"></div>
-                </div>
-                <div class="form-group"><label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="https-redirect" style="width: auto;"> Redirect HTTP to HTTPS</label></div>
-                <div class="form-group"><label>Listen Port</label><input type="number" id="listen-port" value="8090"></div>
-                <button class="btn btn-primary" id="saveSecurityBtn" style="margin-top: 20px;"><i class="fas fa-save"></i> Save Settings</button>
-            </div>
-            <div id="settings-backups" class="tab-content" style="display: none;">
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title"><i class="fas fa-database"></i> Backup & Restore</h3></div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-                        <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                            <h4 style="margin-bottom: 10px; color: var(--green);"><i class="fas fa-download"></i> Create Backup</h4>
-                            <div class="form-group"><label>Save to path:</label><input type="text" id="backupPath" placeholder="backups" style="width: 100%;"></div>
-                            <button class="btn btn-success" id="createBackupBtn" style="width: 100%;"><i class="fas fa-plus"></i> Create Full Backup</button>
+                
+                <!-- Memory Usage Chart -->
+                <div class="grid-item col-6">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-memory" style="color: var(--yellow);"></i> Memory Usage</div>
+                            <div class="panel-actions"><button class="btn btn-secondary btn-sm" onclick="expandPanel('memory')"><i class="fas fa-expand"></i></button></div>
                         </div>
-                        <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-                            <h4 style="margin-bottom: 10px; color: var(--yellow);"><i class="fas fa-upload"></i> Restore Backup</h4>
-                            <div class="form-group"><label>Backup file path:</label><input type="text" id="restorePath" placeholder="backups\pymon_full_xxx.zip" style="width: 100%;"></div>
-                            <div style="margin-bottom: 8px;">
-                                <label style="margin-right: 12px;"><input type="checkbox" id="restoreDb" checked> Database</label>
-                                <label style="margin-right: 12px;"><input type="checkbox" id="restoreConfig" checked> Config</label>
-                                <label><input type="checkbox" id="restoreSettings" checked> Settings</label>
+                        <div class="panel-body">
+                            <div class="chart-container"><canvas id="memoryChart"></canvas></div>
+                            <div class="chart-legend" id="memoryLegend"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Disk Usage Chart -->
+                <div class="grid-item col-6">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-hdd" style="color: var(--green);"></i> Disk Usage</div>
+                            <div class="panel-actions"><button class="btn btn-secondary btn-sm" onclick="expandPanel('disk')"><i class="fas fa-expand"></i></button></div>
+                        </div>
+                        <div class="panel-body">
+                            <div class="chart-container"><canvas id="diskChart"></canvas></div>
+                            <div class="chart-legend" id="diskLegend"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Network Traffic Chart -->
+                <div class="grid-item col-6">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-network-wired" style="color: var(--purple);"></i> Network Traffic</div>
+                            <div class="panel-actions"><button class="btn btn-secondary btn-sm" onclick="expandPanel('network')"><i class="fas fa-expand"></i></button></div>
+                        </div>
+                        <div class="panel-body">
+                            <div class="chart-container"><canvas id="networkChart"></canvas></div>
+                            <div class="chart-legend" id="networkLegend"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Server Map -->
+                <div class="grid-item col-8">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-server" style="color: var(--cyan);"></i> Server Map</div>
+                            <div class="panel-actions">
+                                <select id="serverSortSelect" class="filter-btn btn-sm"><option value="name">Sort by Name</option><option value="status">Sort by Status</option><option value="cpu">Sort by CPU</option><option value="memory">Sort by Memory</option></select>
                             </div>
-                            <button class="btn btn-warning" id="restoreBackupBtn" style="width: 100%;"><i class="fas fa-undo"></i> Restore from Backup</button>
+                        </div>
+                        <div class="panel-body">
+                            <div class="server-grid" id="serverGrid"></div>
                         </div>
                     </div>
-
-                    <h4 style="margin-bottom: 8px;"><i class="fas fa-list"></i> Backup Files</h4>
-                    <table><thead><tr><th>Filename</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead><tbody id="backups-tbody"></tbody></table>
+                </div>
+                
+                <!-- Alerts -->
+                <div class="grid-item col-4 row-2">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-bell" style="color: var(--orange);"></i> Recent Alerts</div>
+                            <div class="panel-actions"><button class="btn btn-secondary btn-sm" onclick="showSection('alerts')">View All</button></div>
+                        </div>
+                        <div class="panel-body" style="padding: 0;">
+                            <div class="alert-list" id="alertList"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- RAID Status -->
+                <div class="grid-item col-12">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-hdd" style="color: var(--green);"></i> RAID Arrays Status</div>
+                            <div class="panel-actions"><button class="btn btn-secondary btn-sm" onclick="refreshRAID()"><i class="fas fa-sync"></i></button></div>
+                        </div>
+                        <div class="panel-body">
+                            <div id="raidStatus"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div id="settings-apikeys" class="tab-content" style="display: none;">
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">API Keys</h3><button class="btn btn-primary" id="createApiKeyBtn"><i class="fas fa-plus"></i> Generate Key</button></div>
-                    <p style="color: var(--muted); margin-bottom: 16px;">API keys allow external systems to access PyMon API.</p>
-                    <table><thead><tr><th>Name</th><th>Key</th><th>Created</th><th>Last Used</th><th>Actions</th></tr></thead><tbody id="apikeys-tbody"></tbody></table>
+        </div>
+        
+        <!-- Servers Section -->
+        <div id="section-servers" class="section-content">
+            <div class="grid-item col-12">
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><i class="fas fa-server"></i> Monitored Servers</div>
+                        <div class="panel-actions"><button class="btn btn-primary btn-sm" id="addServerBtn2"><i class="fas fa-plus"></i> Add Server</button></div>
+                    </div>
+                    <div class="panel-body" style="padding:0;">
+                        <div class="table-container">
+                            <table>
+                                <thead><tr><th>Status</th><th>Name</th><th>Host:Port</th><th>OS</th><th>CPU</th><th>Memory</th><th>Disk</th><th>Last Check</th><th>Actions</th></tr></thead>
+                                <tbody id="serversTable"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div id="settings-audit" class="tab-content" style="display: none;">
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">Audit Log</h3><button class="btn btn-secondary btn-sm" id="refreshAuditBtn"><i class="fas fa-sync"></i> Refresh</button></div>
-                    <p style="color: var(--muted); margin-bottom: 16px;">Track all user actions and system events.</p>
-                    <table><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th><th>IP</th></tr></thead><tbody id="audit-tbody"></tbody></table>
+        </div>
+        
+        <!-- Alerts Section -->
+        <div id="section-alerts" class="section-content">
+            <div class="grid-item col-12">
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><i class="fas fa-bell"></i> Alert Rules</div>
+                        <div class="panel-actions"><button class="btn btn-primary btn-sm" id="addAlertBtn"><i class="fas fa-plus"></i> New Alert</button></div>
+                    </div>
+                    <div class="panel-body" style="padding:0;">
+                        <div class="alert-list" id="alertsList"></div>
+                    </div>
                 </div>
             </div>
-            <div id="settings-maintenance" class="tab-content" style="display: none;">
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">Maintenance Windows</h3><button class="btn btn-primary" id="addMaintenanceBtn"><i class="fas fa-plus"></i> Add Window</button></div>
-                    <p style="color: var(--muted); margin-bottom: 16px;">Define maintenance periods when alerts are suppressed.</p>
-                    <div id="maintenanceList"></div>
+        </div>
+        
+        <!-- Reports Section -->
+        <div id="section-reports" class="section-content">
+            <div class="grid-item col-12">
+                <div class="panel">
+                    <div class="panel-header"><div class="panel-title"><i class="fas fa-file-alt"></i> Reports</div></div>
+                    <div class="panel-body"><p style="color: var(--muted); text-align: center; padding: 40px;">Reports functionality coming soon...</p></div>
                 </div>
-                <div class="card" style="margin-top: 16px;">
-                    <div class="card-header"><h3 class="card-title">Data Retention</h3></div>
-                    <div class="form-group"><label>Keep metrics for (days)</label><input type="number" id="retention-days" value="30"></div>
-                    <div class="form-group"><label>Keep audit logs for (days)</label><input type="number" id="audit-retention-days" value="90"></div>
-                    <button class="btn btn-primary" id="saveRetentionBtn"><i class="fas fa-save"></i> Save</button>
+            </div>
+        </div>
+        
+        <!-- Settings Section -->
+        <div id="section-settings" class="section-content">
+            <div class="grid-item col-12">
+                <div class="panel">
+                    <div class="panel-header"><div class="panel-title"><i class="fas fa-cog"></i> Settings</div></div>
+                    <div class="panel-body"><p style="color: var(--muted); text-align: center; padding: 40px;">Settings functionality coming soon...</p></div>
                 </div>
             </div>
         </div>
     </main>
+    
+    <!-- Add Server Modal -->
     <div class="modal" id="addServerModal">
         <div class="modal-content">
-            <div class="modal-header"><h3>Add Server</h3><button class="modal-close" id="closeServerModal">&times;</button></div>
+            <div class="modal-header"><div class="modal-title">Add Server</div><button class="modal-close" id="closeServerModal">&times;</button></div>
             <form id="addServerForm">
                 <div class="form-group"><label>Server Name</label><input type="text" id="server-name" required placeholder="Production Server"></div>
                 <div class="form-group"><label>Host / IP Address</label><input type="text" id="server-host" required placeholder="192.168.1.100"></div>
                 <div class="form-row">
                     <div class="form-group"><label>Operating System</label><select id="server-os"><option value="linux">Linux</option><option value="windows">Windows</option></select></div>
-                    <div class="form-group"><label>Check Interval (sec)</label><input type="number" id="server-interval" value="15"></div>
+                    <div class="form-group"><label>Agent Port</label><input type="number" id="server-port" value="9100"></div>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width:100%">Add Server</button>
             </form>
         </div>
     </div>
+    
+    <!-- Alert Modal -->
     <div class="modal" id="alertModal">
         <div class="modal-content">
-            <div class="modal-header"><h3 id="alertModalTitle">Add Alert Rule</h3><button class="modal-close" id="closeAlertModal">&times;</button></div>
+            <div class="modal-header"><div class="modal-title" id="alertModalTitle">Add Alert Rule</div><button class="modal-close" id="closeAlertModal">&times;</button></div>
             <form id="alertForm">
                 <input type="hidden" id="alert-id">
-                <div class="form-group"><label>Alert Name</label><input type="text" id="alert-name" required placeholder="High CPU Alert"></div>
+                <div class="form-group"><label>Alert Name</label><input type="text" id="alert-name" required placeholder="High CPU"></div>
                 <div class="form-row">
-                    <div class="form-group"><label>Server (Global = none)</label><select id="alert-server"><option value="">Global (All Servers)</option></select></div>
-                    <div class="form-group"><label>Metric</label><select id="alert-metric"><option value="cpu">CPU Usage</option><option value="memory">Memory Usage</option><option value="disk">Disk Usage</option><option value="network">Network I/O</option><option value="exporter">Exporter Status</option><option value="raid">RAID Status</option></select></div>
+                    <div class="form-group"><label>Metric</label><select id="alert-metric"><option value="cpu">CPU Usage</option><option value="memory">Memory</option><option value="disk">Disk</option></select></div>
+                    <div class="form-group"><label>Threshold (%)</label><input type="number" id="alert-threshold" value="80"></div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group"><label>Condition</label><select id="alert-condition"><option value=">">Greater than (&gt;)</option><option value="<">Less than (&lt;)</option></select></div>
-                    <div class="form-group"><label>Threshold (%)</label><input type="number" id="alert-threshold" value="80" min="0" max="100"></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label>Duration</label><select id="alert-duration"><option value="0">Immediate</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option></select></div>
-                    <div class="form-group"><label>Severity</label><select id="alert-severity"><option value="critical">Critical</option><option value="warning">Warning</option></select></div>
-                </div>
-                <div class="form-group">
-                    <label>Notification Channels</label>
-                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 8px;">
-                        <label style="display: flex; align-items: center; gap: 5px;"><input type="checkbox" id="alert-notify-telegram"> Telegram</label>
-                        <label style="display: flex; align-items: center; gap: 5px;"><input type="checkbox" id="alert-notify-discord"> Discord</label>
-                        <label style="display: flex; align-items: center; gap: 5px;"><input type="checkbox" id="alert-notify-slack"> Slack</label>
-                        <label style="display: flex; align-items: center; gap: 5px;"><input type="checkbox" id="alert-notify-email"> Email</label>
-                    </div>
-                </div>
+                <div class="form-group"><label>Severity</label><select id="alert-severity"><option value="warning">Warning</option><option value="critical">Critical</option></select></div>
                 <button type="submit" class="btn btn-primary" style="width:100%">Save Alert</button>
             </form>
         </div>
     </div>
-    <script>
-    const token = localStorage.getItem('token');
-    if (!token) window.location.href = '/login';
 
-    let servers = [];
-    let alerts = [];
-    let charts = {};
-    let currentRange = '1h';
-    let currentFilter = '';
-    let currentServerFilter = '';
-    const grafanaColors = ["#73bf69", "#f2cc0c", "#5794f2", "#ff780a", "#b877d9", "#00d8d8", "#f2495c", "#9673b9"];
-    const colors = grafanaColors;
-    let currentAlertTab = 'global';
-    let legendSortBy = null;
-    let legendSortAsc = true;
-    let legendServerFilter = null;
+<script>
+const token = localStorage.getItem('token');
+if (!token) window.location.href = '/login';
 
-    // Filter functions
-    function filterBy(type) {
-        if (currentFilter === type) {
-            currentFilter = '';
-            document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
-        } else {
-            currentFilter = type;
-            document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
-            const card = document.getElementById('card-' + type);
-            if (card) card.classList.add('active');
-        }
-        initCharts();
-    }
+let servers = [];
+let charts = {};
+let currentRange = '1h';
+let currentFilter = '';
+const colors = ['#73bf69', '#f2cc0c', '#5794f2', '#ff780a', '#b877d9', '#00d8d8', '#f2495c', '#9673b9'];
 
-    function filterDashboard() {
-        currentServerFilter = document.getElementById('dashboardServerSelector').value;
-        legendServerFilter = currentServerFilter;
-        const btn = document.getElementById('clearFilterBtn');
-        btn.style.display = currentServerFilter ? 'inline-flex' : 'none';
-        initCharts();
-    }
-
-    function clearFilter() {
-        currentFilter = '';
-        currentServerFilter = '';
-        legendServerFilter = null;
-        document.getElementById('dashboardServerSelector').value = '';
-        document.getElementById('clearFilterBtn').style.display = 'none';
-        document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active'));
-        updateDashboard();
-    }
-
-    async function refreshDashboard() {
-        const btn = event.target.closest('button');
-        const icon = btn.querySelector('i');
-        icon.classList.add('fa-spin');
-        await loadServers();
-        initCharts();
-        setTimeout(() => icon.classList.remove('fa-spin'), 500);
-    }
-
-    function togglePanelSize(btn) {
-        const panel = btn.closest('.panel');
-        panel.classList.toggle('expanded');
-    }
-
-    function getFilteredServers() {
-        let filtered = [...servers];
-        if (currentServerFilter) {
-            filtered = filtered.filter(s => s.id == currentServerFilter);
-        }
-        if (currentFilter === 'online') filtered = filtered.filter(s => s.last_status === 'up');
-        if (currentFilter === 'offline') filtered = filtered.filter(s => s.last_status !== 'up');
-        if (currentFilter === 'linux') filtered = filtered.filter(s => s.os_type === 'linux');
-        if (currentFilter === 'windows') filtered = filtered.filter(s => s.os_type === 'windows');
-        return filtered;
-    }
-
-    function updateDashboard() {
-        const filtered = getFilteredServers();
-        updateCharts(filtered);
-        updateRAIDStatusPanel();
-    }
-
-    document.querySelectorAll(".nav-item").forEach(btn => {
-        btn.addEventListener("click", function() {
-            const section = this.dataset.section;
-            if (section) showSection(section);
-        });
+document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const section = this.dataset.section;
+        if (section) showSection(section);
     });
+});
 
-    // Tab switching for alerts
-    document.querySelectorAll("#section-alerts .tab-menu .tab-item").forEach(btn => {
-        btn.addEventListener("click", function() {
-            document.querySelectorAll("#section-alerts .tab-menu .tab-item").forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            currentAlertTab = this.dataset.tab;
-            loadAlerts();
-        });
+document.querySelectorAll('.time-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentRange = this.dataset.range;
+        loadData();
     });
+});
 
-    function showSection(section) {
-        document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        const sectionEl = document.getElementById('section-' + section);
-        if (sectionEl) sectionEl.classList.add('active');
-        document.querySelectorAll('.nav-item').forEach(el => {
-            if (el.dataset.section === section) el.classList.add('active');
-        });
-        if (section === 'dashboard') setTimeout(initCharts, 100);
-        if (section === 'servers') loadServers();
-        if (section === 'alerts') loadAlerts();
-        if (section === 'raid') loadRAID();
-        if (section === 'settings') { loadNotifications(); loadBackups(); }
-    }
-
-    document.getElementById('logoutBtn').addEventListener('click', function() {
-        localStorage.removeItem('token');
-        window.location.href = '/login';
+document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.removeItem('token'); window.location.href = '/login'; });
+document.getElementById('refreshBtn').addEventListener('click', () => { loadData(); });
+document.getElementById('addServerBtn').addEventListener('click', () => { document.getElementById('addServerModal').classList.add('active'); });
+document.getElementById('closeServerModal').addEventListener('click', () => { document.getElementById('addServerModal').classList.remove('active'); });
+document.getElementById('addServerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await fetch('/api/servers', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+        body: JSON.stringify({
+            name: document.getElementById('server-name').value,
+            host: document.getElementById('server-host').value,
+            os_type: document.getElementById('server-os').value,
+            agent_port: parseInt(document.getElementById('server-port').value) || 9100
+        })
     });
+    document.getElementById('addServerModal').classList.remove('active');
+    loadData();
+});
 
-    document.getElementById('addServerBtn').addEventListener('click', function() {
-        document.getElementById('addServerModal').classList.add('active');
+['serverSearch', 'filterStatus', 'filterOS'].forEach(id => {
+    document.getElementById(id).addEventListener('input', loadData);
+    document.getElementById(id).addEventListener('change', loadData);
+});
+
+function showSection(section) {
+    document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('section-' + section).classList.add('active');
+    document.querySelector(`.nav-item[data-section="${section}"]`)?.classList.add('active');
+}
+
+async function loadData() {
+    try {
+        const resp = await fetch('/api/servers', {headers: {'Authorization': 'Bearer ' + token}});
+        const data = await resp.json();
+        servers = data.servers || [];
+        updateStats();
+        updateCharts();
+        updateServerGrid();
+        updateServerTable();
+    } catch(e) { console.error(e); }
+}
+
+function updateStats() {
+    const online = servers.filter(s => s.last_status === 'up').length;
+    const offline = servers.length - online;
+    const cpuAvg = servers.length ? (servers.reduce((a, s) => a + (s.cpu_percent || 0), 0) / servers.length).toFixed(1) : 0;
+    const memAvg = servers.length ? (servers.reduce((a, s) => a + (s.memory_percent || 0), 0) / servers.length).toFixed(1) : 0;
+    
+    document.getElementById('stat-online').textContent = online;
+    document.getElementById('stat-offline').textContent = offline;
+    document.getElementById('stat-cpu-avg').textContent = cpuAvg + '%';
+    document.getElementById('stat-mem-avg').textContent = memAvg + '%';
+}
+
+function updateCharts() {
+    const labels = generateLabels();
+    const filtered = getFilteredServers();
+    
+    if (!charts.cpu) {
+        charts.cpu = new Chart(document.getElementById('cpuChart'), {type: 'line', data: {labels, datasets: []}, options: chartOpts('%', 0, 100)});
+        charts.memory = new Chart(document.getElementById('memoryChart'), {type: 'line', data: {labels, datasets: []}, options: chartOpts('%', 0, 100)});
+        charts.disk = new Chart(document.getElementById('diskChart'), {type: 'line', data: {labels, datasets: []}, options: chartOpts('%', 0, 100)});
+        charts.network = new Chart(document.getElementById('networkChart'), {type: 'line', data: {labels, datasets: []}, options: chartOpts(' MB/s', 0, null)});
+    }
+    
+    const getDatasets = (key, unit) => {
+        if (!filtered.length) return [{label: 'No Data', data: rand(12, 0, 10), borderColor: colors[0], backgroundColor: colors[0] + '20', fill: true, tension: 0.3}];
+        return filtered.map((s, i) => ({
+            label: s.name,
+            data: rand(12, s[key + '_percent'] || Math.random() * 50, 20),
+            borderColor: colors[i % colors.length],
+            backgroundColor: colors[i % colors.length] + '20',
+            fill: true,
+            tension: 0.3
+        }));
+    };
+    
+    charts.cpu.data.labels = labels;
+    charts.cpu.data.datasets = getDatasets('cpu', '%');
+    charts.cpu.update();
+    updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
+    
+    charts.memory.data.labels = labels;
+    charts.memory.data.datasets = getDatasets('memory', '%');
+    charts.memory.update();
+    updateLegend('memoryLegend', charts.memory.data.datasets, '%');
+    
+    charts.disk.data.labels = labels;
+    charts.disk.data.datasets = getDatasets('disk', '%');
+    charts.disk.update();
+    updateLegend('diskLegend', charts.disk.data.datasets, '%');
+    
+    charts.network.data.labels = labels;
+    charts.network.data.datasets = getDatasets('network', ' MB/s');
+    charts.network.update();
+    updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
+}
+
+function updateLegend(id, datasets, unit) {
+    const el = document.getElementById(id);
+    el.innerHTML = datasets.map((ds, i) => `
+        <div class="legend-item">
+            <div class="legend-color" style="background: ${ds.borderColor}"></div>
+            <div class="legend-name">${ds.label}</div>
+            <div class="legend-value">${ds.data[ds.data.length-1].toFixed(1)}${unit}</div>
+        </div>
+    `).join('');
+}
+
+function updateServerGrid() {
+    const el = document.getElementById('serverGrid');
+    el.innerHTML = servers.map(s => {
+        const status = s.last_status === 'up' ? 'online' : 'offline';
+        const statusColor = s.last_status === 'up' ? 'var(--green)' : 'var(--red)';
+        const cpuColor = (s.cpu_percent || 0) > 80 ? 'var(--red)' : (s.cpu_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
+        const memColor = (s.memory_percent || 0) > 80 ? 'var(--red)' : (s.memory_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
+        return `
+        <div class="server-card ${status}" onclick="window.location.href='/server/${s.id}'">
+            <div class="server-header">
+                <div class="server-name">
+                    <div class="server-status" style="background: ${statusColor}"></div>
+                    ${s.name}
+                </div>
+                <div class="server-os">${s.os_type}</div>
+            </div>
+            <div class="server-metrics">
+                <div class="metric-box">
+                    <div class="metric-label">CPU</div>
+                    <div class="metric-value" style="color: ${cpuColor}">${(s.cpu_percent || 0).toFixed(1)}%</div>
+                    <div class="metric-progress"><div class="metric-fill" style="width: ${s.cpu_percent || 0}%; background: ${cpuColor}"></div></div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Memory</div>
+                    <div class="metric-value" style="color: ${memColor}">${(s.memory_percent || 0).toFixed(1)}%</div>
+                    <div class="metric-progress"><div class="metric-fill" style="width: ${s.memory_percent || 0}%; background: ${memColor}"></div></div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Disk</div>
+                    <div class="metric-value" style="color: var(--blue)">${(s.disk_percent || 0).toFixed(1)}%</div>
+                </div>
+            </div>
+        </div>`;
+    }).join('') || '<p style="color: var(--muted); text-align: center; padding: 40px;">No servers configured</p>';
+}
+
+function updateServerTable() {
+    const el = document.getElementById('serversTable');
+    el.innerHTML = servers.map(s => {
+        const statusBadge = s.last_status === 'up' ? '<span class="badge badge-success"><i class="fas fa-circle"></i> Online</span>' : '<span class="badge badge-danger"><i class="fas fa-circle"></i> Offline</span>';
+        return `<tr>
+            <td>${statusBadge}</td>
+            <td><strong>${s.name}</strong></td>
+            <td style="color: var(--muted)">${s.host}:${s.agent_port || 9100}</td>
+            <td>${s.os_type}</td>
+            <td>${(s.cpu_percent || 0).toFixed(1)}%</td>
+            <td>${(s.memory_percent || 0).toFixed(1)}%</td>
+            <td>${(s.disk_percent || 0).toFixed(1)}%</td>
+            <td style="color: var(--muted)">${s.last_check ? s.last_check.substring(11, 19) : '-'}</td>
+            <td>
+                <button class="btn btn-secondary btn-sm" onclick="scrapeServer(${s.id})"><i class="fas fa-sync"></i></button>
+                <button class="btn btn-danger btn-sm" onclick="deleteServer(${s.id})"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--muted);">No servers</td></tr>';
+}
+
+function getFilteredServers() {
+    const search = document.getElementById('serverSearch').value.toLowerCase();
+    const status = document.getElementById('filterStatus').value;
+    const os = document.getElementById('filterOS').value;
+    return servers.filter(s => {
+        if (search && !s.name.toLowerCase().includes(search) && !s.host.toLowerCase().includes(search)) return false;
+        if (status && s.last_status !== status) return false;
+        if (os && s.os_type !== os) return false;
+        return true;
     });
-    document.getElementById('closeServerModal').addEventListener('click', function() {
-        document.getElementById('addServerModal').classList.remove('active');
-    });
-    document.getElementById('addServerForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        await fetch('/api/servers', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-            body: JSON.stringify({
-                name: document.getElementById('server-name').value,
-                host: document.getElementById('server-host').value,
-                os_type: document.getElementById('server-os').value,
-                check_interval: parseInt(document.getElementById('server-interval').value)
-            })
-        });
-        document.getElementById('addServerModal').classList.remove('active');
-        loadServers();
-    });
+}
 
-    document.querySelectorAll('.copy-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const target = this.getAttribute('data-target');
-            const text = document.getElementById(target).textContent;
-            navigator.clipboard.writeText(text);
-            this.textContent = 'Copied!';
-            setTimeout(() => this.textContent = 'Copy', 2000);
-        });
-    });
-
-    async function loadServers() {
-        try {
-            const resp = await fetch('/api/servers', {headers: {'Authorization': 'Bearer ' + token}});
-            const data = await resp.json();
-            let allServers = data.servers || [];
-
-            // Get filter values
-            const search = document.getElementById('serverSearch').value.toLowerCase();
-            const filterStatus = document.getElementById('filterStatus').value;
-            const filterOS = document.getElementById('filterOS').value;
-            const filterCPU = parseFloat(document.getElementById('filterCPU').value) || 0;
-            const filterMemory = parseFloat(document.getElementById('filterMemory').value) || 0;
-            const filterDisk = parseFloat(document.getElementById('filterDisk').value) || 0;
-            const sortBy = document.getElementById('serverSortSelect').value;
-
-            // Apply filters
-            servers = allServers.filter(s => {
-                // Search filter
-                if (search && !s.name.toLowerCase().includes(search) && !s.host.toLowerCase().includes(search)) {
-                    return false;
-                }
-                // Status filter
-                if (filterStatus && s.last_status !== filterStatus) {
-                    return false;
-                }
-                // OS filter
-                if (filterOS && s.os_type !== filterOS) {
-                    return false;
-                }
-                // CPU filter
-                if (filterCPU > 0 && (!s.cpu_percent || s.cpu_percent < filterCPU)) {
-                    return false;
-                }
-                // Memory filter
-                if (filterMemory > 0 && (!s.memory_percent || s.memory_percent < filterMemory)) {
-                    return false;
-                }
-                // Disk filter
-                if (filterDisk > 0 && (!s.disk_percent || s.disk_percent < filterDisk)) {
-                    return false;
-                }
-                return true;
-            });
-
-            // Sort servers
-            servers.sort((a, b) => {
-                if (sortBy === 'status') {
-                    if (a.last_status === 'up' && b.last_status !== 'up') return -1;
-                    if (a.last_status !== 'up' && b.last_status === 'up') return 1;
-                    return 0;
-                } else if (sortBy === 'cpu') {
-                    return (b.cpu_percent || 0) - (a.cpu_percent || 0);
-                } else if (sortBy === 'memory') {
-                    return (b.memory_percent || 0) - (a.memory_percent || 0);
-                } else if (sortBy === 'disk') {
-                    return (b.disk_percent || 0) - (a.disk_percent || 0);
-                }
-                return a.name.localeCompare(b.name);
-            });
-
-            // Update stats
-            let online = 0, offline = 0, linux = 0, windows = 0;
-            allServers.forEach(s => {
-                if (s.last_status === 'up') online++; else offline++;
-                if (s.os_type === 'linux') linux++; else windows++;
-            });
-
-            document.getElementById('dashboardServerSelector').innerHTML = '<option value="">All Servers</option>' + allServers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-            document.getElementById('alert-server').innerHTML = '<option value="">Global (All Servers)</option>' + allServers.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-
-            // Filter stats
-            const filterStats = document.getElementById('filterStats');
-            let statsText = 'Showing ' + servers.length + ' of ' + allServers.length + ' servers';
-            const activeFilters = [];
-            if (search) activeFilters.push('search:"' + search + '"');
-            if (filterStatus) activeFilters.push('status:' + filterStatus);
-            if (filterOS) activeFilters.push('OS:' + filterOS);
-            if (filterCPU > 0) activeFilters.push('CPU>' + filterCPU + '%');
-            if (filterMemory > 0) activeFilters.push('MEM>' + filterMemory + '%');
-            if (filterDisk > 0) activeFilters.push('DISK>' + filterDisk + '%');
-            if (activeFilters.length > 0) {
-                statsText += ' | Filters: ' + activeFilters.join(', ');
-            }
-            filterStats.textContent = statsText;
-
-            document.getElementById('servers-tbody').innerHTML = servers.map(s => {
-                const statusBadge = s.last_status === 'up' ? '<span class="badge badge-success">up</span>' : '<span class="badge badge-danger">offline</span>';
-
-                // Host with port
-                const hostDisplay = s.host + ':' + (s.agent_port || 9100);
-
-                // CPU with color
-                const cpuVal = s.cpu_percent ? s.cpu_percent.toFixed(1) : '-';
-                const cpuColor = s.cpu_percent > 90 ? 'var(--red)' : s.cpu_percent > 70 ? 'var(--yellow)' : 'var(--text)';
-                const cpuDisplay = s.cpu_percent ? '<span style="color:' + cpuColor + '">' + cpuVal + '%</span>' : '-';
-
-                // Memory with color
-                const memVal = s.memory_percent ? s.memory_percent.toFixed(1) : '-';
-                const memColor = s.memory_percent > 90 ? 'var(--red)' : s.memory_percent > 70 ? 'var(--yellow)' : 'var(--text)';
-                const memDisplay = s.memory_percent ? '<span style="color:' + memColor + '">' + memVal + '%</span>' : '-';
-
-                // Parse disk info - now it's already an object from API
-                let diskDisplay = '-';
-                if (s.disk_info) {
-                    try {
-                        // disk_info is now already parsed as object/array from API
-                        const disks = Array.isArray(s.disk_info) ? s.disk_info : (typeof s.disk_info === 'string' ? JSON.parse(s.disk_info) : null);
-                        if (disks && Array.isArray(disks) && disks.length > 0) {
-                            diskDisplay = disks.map(d => {
-                                const vol = d.volume ? d.volume.replace(':', '') : '?';
-                                const pct = d.percent ? d.percent.toFixed(0) : '?';
-                                const color = d.percent > 90 ? 'var(--red)' : d.percent > 80 ? 'var(--yellow)' : 'var(--green)';
-                                return '<span style="margin-right:4px;padding:2px 4px;background:rgba(0,0,0,0.3);border-radius:3px;font-size:11px;"><span style="color:' + color + '">' + vol + '</span>:' + pct + '%</span>';
-                            }).join('');
-                        }
-                    } catch(e) { console.log('Error parsing disk_info:', e); }
-                }
-
-                // Fallback if disk_info didn't work
-                if (diskDisplay === '-' && s.disk_percent) {
-                    const diskColor = s.disk_percent > 90 ? 'var(--red)' : s.disk_percent > 80 ? 'var(--yellow)' : 'var(--text)';
-                    diskDisplay = '<span style="color:' + diskColor + '">' + s.disk_percent.toFixed(1) + '%</span>';
-                }
-
-                // Last check time
-                const lastCheck = s.last_check ? s.last_check.substring(11, 19) : '-';
-
-                return '<tr><td>' + statusBadge + '</td><td><strong>' + s.name + '</strong></td><td style="font-size:11px;color:var(--muted);">' + hostDisplay + '</td><td>' + s.os_type + '</td><td>' + cpuDisplay + '</td><td>' + memDisplay + '</td><td>' + diskDisplay + '</td><td style="font-size:11px;color:var(--muted);">' + lastCheck + '</td><td><button class="btn btn-secondary btn-sm" onclick="scrapeServer(' + s.id + ')" title="Scrape now"><i class="fas fa-sync"></i></button> <button class="btn btn-danger btn-sm" onclick="deleteServer(' + s.id + ')" title="Delete"><i class="fas fa-trash"></i></button></td></tr>';
-            }).join('') || '<tr><td colspan="9" style="text-align:center;padding:40px;color:#999;">No servers match filters</td></tr>';
-
-            document.getElementById('stat-online').textContent = online;
-            document.getElementById('stat-offline').textContent = offline;
-            document.getElementById('stat-linux').textContent = linux;
-            document.getElementById('stat-windows').textContent = windows;
-            updateRAIDStatusPanel();
-        } catch(e) { console.error(e); }
+function generateLabels() {
+    const labels = [];
+    const now = new Date();
+    const pts = 12;
+    for (let i = pts-1; i >= 0; i--) {
+        const t = new Date(now.getTime() - i * 5 * 60000);
+        labels.push(t.getHours().toString().padStart(2,'0') + ':' + t.getMinutes().toString().padStart(2,'0'));
     }
+    return labels;
+}
 
-    // Filter event listeners
-    ['serverSearch', 'filterStatus', 'filterOS', 'filterCPU', 'filterMemory', 'filterDisk', 'serverSortSelect'].forEach(id => {
-        document.getElementById(id).addEventListener('change', loadServers);
-        document.getElementById(id).addEventListener('input', loadServers);
-    });
-
-    document.getElementById('clearFiltersBtn').addEventListener('click', function() {
-        document.getElementById('serverSearch').value = '';
-        document.getElementById('filterStatus').value = '';
-        document.getElementById('filterOS').value = '';
-        document.getElementById('filterCPU').value = '';
-        document.getElementById('filterMemory').value = '';
-        document.getElementById('filterDisk').value = '';
-        document.getElementById('serverSortSelect').value = 'name';
-        loadServers();
-    });
-
-    async function updateRAIDStatusPanel() {
-        const panel = document.getElementById('raidStatusPanel');
-        panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading RAID data...</p>';
-
-        try {
-            const resp = await fetch('/api/raid-status');
-            const data = await resp.json();
-            const raidData = data.raid_status || [];
-
-            if (!raidData.length) {
-                panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No RAID data available</p>';
-                document.getElementById('raidTotalServers').textContent = '0';
-                document.getElementById('raidHealthy').textContent = '0';
-                document.getElementById('raidDegraded').textContent = '0';
-                document.getElementById('raidTotalSize').textContent = '0 TB';
-                return;
-            }
-
-            // Calculate statistics
-            let totalRaids = 0, healthyRaids = 0, degradedRaids = 0, totalSizeGB = 0;
-            raidData.forEach(s => {
-                s.raids.forEach(r => {
-                    totalRaids++;
-                    if (r.healthy) healthyRaids++; else degradedRaids++;
-                    const size = parseInt(r.size) || 0;
-                    totalSizeGB += size;
-                });
-            });
-
-            // Update stats
-            document.getElementById('raidTotalServers').textContent = raidData.length;
-            document.getElementById('raidHealthy').textContent = healthyRaids;
-            document.getElementById('raidDegraded').textContent = degradedRaids;
-            document.getElementById('raidTotalSize').textContent = Math.round(totalSizeGB / 1024) + ' TB';
-
-            // Sort by health (degraded first)
-            raidData.sort((a, b) => a.healthy - b.healthy);
-
-            panel.innerHTML = raidData.map(s => {
-                const statusColor = s.healthy ? 'var(--green)' : 'var(--red)';
-                const statusIcon = s.healthy ? 'fa-check-circle' : 'fa-exclamation-triangle';
-                const borderColor = s.healthy ? 'rgba(115,191,105,0.3)' : 'rgba(242,73,92,0.5)';
-
-                // Calculate server totals
-                const serverSize = s.raids.reduce((sum, r) => sum + (parseInt(r.size) || 0), 0);
-
-                return '<div style="margin-bottom: 12px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid ' + borderColor + ';">' +
-                    '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">' +
-                    '<div><i class="fas fa-server" style="color: var(--muted); margin-right: 8px;"></i><strong style="font-size: 13px;">' + s.server + '</strong></div>' +
-                    '<div><span style="color: var(--muted); font-size: 11px; margin-right: 12px;">' + s.raids.length + ' arrays | ' + Math.round(serverSize/1024) + ' TB</span>' +
-                    '<span class="badge ' + (s.healthy ? 'badge-success' : 'badge-danger') + '"><i class="fas ' + statusIcon + '"></i> ' + (s.healthy ? 'Healthy' : 'Degraded') + '</span></div></div>' +
-                    '<table style="width: 100%; font-size: 11px; border-collapse: collapse;">' +
-                    '<tr style="color: var(--muted); border-bottom: 1px solid var(--border);"><th style="padding: 6px; text-align: left;">ID</th><th style="padding: 6px; text-align: left;">Type</th><th style="padding: 6px; text-align: right;">Size</th><th style="padding: 6px; text-align: center;">Status</th></tr>' +
-                    s.raids.map(r => {
-                        const rowBg = r.healthy ? '' : 'background: rgba(242,73,92,0.1);';
-                        return '<tr style="' + rowBg + ' border-bottom: 1px solid rgba(255,255,255,0.03);">' +
-                        '<td style="padding: 6px;"><span style="background: rgba(87,148,242,0.2); padding: 2px 6px; border-radius: 3px;">RAID' + r.id + '</span></td>' +
-                        '<td style="padding: 6px;"><span style="color: ' + (r.type.includes('10') ? 'var(--purple)' : r.type.includes('6') ? 'var(--blue)' : r.type.includes('5') ? 'var(--green)' : 'var(--yellow)') + ';">' + r.type + '</span></td>' +
-                        '<td style="padding: 6px; text-align: right; color: var(--muted);">' + r.size + '</td>' +
-                        '<td style="padding: 6px; text-align: center;"><span class="badge ' + (r.healthy ? 'badge-success' : 'badge-danger') + '" style="font-size: 10px;">' + (r.healthy ? 'OK' : 'FAILED') + '</span></td></tr>';
-                    }).join('') + '</table></div>';
-            }).join('');
-        } catch(e) {
-            panel.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">Error loading RAID data: ' + e.message + '</p>';
-        }
+function rand(n, base, variance) {
+    const arr = [];
+    let val = base;
+    for (let i = 0; i < n; i++) {
+        val = Math.max(0, Math.min(100, val + (Math.random() - 0.5) * variance));
+        arr.push(val);
     }
+    return arr;
+}
 
-    async function deleteServer(id) {
-        if (confirm('Delete server?')) {
-            await fetch('/api/servers/' + id, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
-            loadServers();
-        }
+function chartOpts(suffix, min, max) {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        scales: {
+            y: { min, max, grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#666', font: { size: 10 }, callback: v => v + suffix } },
+            x: { grid: { display: false }, ticks: { color: '#666', font: { size: 10 } } }
+        },
+        plugins: { legend: { display: false } }
+    };
+}
+
+function filterBy(type) {
+    document.getElementById('filterStatus').value = type === 'online' ? 'up' : type === 'offline' ? 'down' : '';
+    loadData();
+}
+
+async function scrapeServer(id) {
+    const btn = event.target.closest('button');
+    const icon = btn.querySelector('i');
+    icon.classList.add('animate-spin');
+    try {
+        await fetch(`/api/servers/${id}/scrape`, { method: 'POST', headers: {'Authorization': 'Bearer ' + token} });
+        loadData();
+    } catch(e) { alert('Error: ' + e.message); }
+    setTimeout(() => icon.classList.remove('animate-spin'), 500);
+}
+
+async function deleteServer(id) {
+    if (confirm('Delete this server?')) {
+        await fetch(`/api/servers/${id}`, { method: 'DELETE', headers: {'Authorization': 'Bearer ' + token} });
+        loadData();
     }
+}
 
-    async function scrapeServer(id) {
-        const btn = event.target.closest('button');
-        const icon = btn.querySelector('i');
-        icon.classList.add('fa-spin');
-        try {
-            const resp = await fetch('/api/servers/' + id + '/scrape', {method: 'POST', headers: {'Authorization': 'Bearer ' + token}});
-            const data = await resp.json();
-            if (data.status === 'ok') {
-                await loadServers();
-            } else {
-                alert('Scrape failed: ' + data.message);
-            }
-        } catch(e) {
-            alert('Scrape error: ' + e.message);
-        }
-        setTimeout(() => icon.classList.remove('fa-spin'), 500);
-    }
+// Auto-refresh
+let refreshInterval = setInterval(loadData, 30000);
 
-    async function fetchServerHistory(serverId) {
-        try {
-            const resp = await fetch(`/api/servers/${serverId}/history?range=${currentRange}`, {
-                headers: {'Authorization': 'Bearer ' + token}
-            });
-            const data = await resp.json();
-            return data.history || [];
-        } catch(e) {
-            console.error('Error fetching history:', e);
-            return [];
-        }
-    }
-
-    async function initCharts() {
-        Object.values(charts).forEach(c => c && c.destroy());
-        charts = {};
-        
-        const filtered = getFilteredServers();
-        if (!filtered.length) return;
-
-        // Fetch history for all filtered servers
-        const historyPromises = filtered.map(s => fetchServerHistory(s.id));
-        const allHistories = await Promise.all(historyPromises);
-        
-        const datasets = { cpu: [], memory: [], disk: [], network: [] };
-
-        filtered.forEach((server, idx) => {
-            const history = allHistories[idx];
-            const color = colors[idx % colors.length];
-            
-            const common = {
-                label: server.name,
-                borderColor: color,
-                backgroundColor: color + '15',
-                fill: true,
-                tension: 0.3,
-                borderWidth: 1.5,
-                pointRadius: 0
-            };
-
-            datasets.cpu.push({ ...common, data: history.map(h => h.cpu_percent) });
-            datasets.memory.push({ ...common, data: history.map(h => h.memory_percent) });
-            
-            // Multiple disks handling
-            const diskDataMap = {}; // {volume: [values]}
-            history.forEach(h => {
-                let info = null;
-                if (h.disk_info) {
-                    try {
-                        info = typeof h.disk_info === 'string' ? JSON.parse(h.disk_info) : h.disk_info;
-                    } catch(e) {}
-                }
-                
-                if (Array.isArray(info) && info.length > 0) {
-                    info.forEach(d => {
-                        const vol = d.volume || d.path || '?';
-                        if (!diskDataMap[vol]) diskDataMap[vol] = new Array(history.length).fill(null);
-                        const dataIdx = history.indexOf(h);
-                        diskDataMap[vol][dataIdx] = d.percent;
-                    });
-                }
-            });
-
-            const vols = Object.keys(diskDataMap);
-            if (vols.length > 0) {
-                vols.forEach((vol, vIdx) => {
-                    const vColor = colors[(idx * 3 + vIdx) % colors.length];
-                    datasets.disk.push({
-                        ...common,
-                        label: `${server.name} (${vol})`,
-                        borderColor: vColor,
-                        backgroundColor: vColor + '15',
-                        data: diskDataMap[vol]
-                    });
-                });
-            } else {
-                datasets.disk.push({ ...common, data: history.map(h => h.disk_percent) });
-            }
-
-            datasets.network.push({ ...common, data: history.map(h => h.network_rx / 1024 / 1024) }); // MB/s
-        });
-
-        // Use the timestamps from the first non-empty history as labels
-        let labels = [];
-        for (const h of allHistories) {
-            if (h.length > 0) {
-                labels = h.map(item => {
-                    const d = new Date(item.timestamp);
-                    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-                });
-                break;
-            }
-        }
-        if (labels.length === 0) labels = generateLabels();
-
-        charts.cpu = new Chart(document.getElementById('cpuChart'), {type:'line', data:{labels, datasets:datasets.cpu}, options:chartOpts('%',0,100)});
-        updateLegend('cpuLegend', charts.cpu.data.datasets, '%');
-
-        charts.memory = new Chart(document.getElementById('memoryChart'), {type:'line', data:{labels, datasets:datasets.memory}, options:chartOpts('%',0,100)});
-        updateLegend('memoryLegend', charts.memory.data.datasets, '%');
-
-        charts.disk = new Chart(document.getElementById('diskChart'), {type:'line', data:{labels, datasets:datasets.disk}, options:chartOpts('%',0,100)});
-        updateLegend('diskLegend', charts.disk.data.datasets, '%');
-
-        charts.network = new Chart(document.getElementById('networkChart'), {type:'line', data:{labels, datasets:datasets.network}, options:chartOpts(' MB/s', 0, null)});
-        updateLegend('networkLegend', charts.network.data.datasets, ' MB/s');
-    }
-
-    async function updateCharts(filtered) {
-        // For simplicity and to ensure data consistency, re-init charts on update
-        // but we could also just update the datasets if the lengths match.
-        initCharts();
-    }
-
-
-    function generateLabels() {
-        const labels = [];
-        const now = new Date();
-        const pts = 12;
-        let intv = 5;
-        if (currentRange === '5m') intv = 0.5;
-        else if (currentRange === '15m') intv = 1;
-        else if (currentRange === '6h') intv = 30;
-        else if (currentRange === '24h') intv = 120;
-        for (let i = pts-1; i >= 0; i--) {
-            const t = new Date(now.getTime() - i * intv * 60000);
-            labels.push(t.getHours().toString().padStart(2,'0') + ':' + t.getMinutes().toString().padStart(2,'0'));
-        }
-        return labels;
-    }
-
-    function rand(n, min, max) { return Array(n).fill(0).map(() => min + Math.random() * (max - min)); }
-
-    function chartOpts(suffix, min, max) {
-        return { responsive: true, maintainAspectRatio: false, interaction: {intersect: false, mode: 'index'}, scales: { y: {min:min, max:max, grid:{color:'rgba(255,255,255,0.03)'}, ticks:{color:'#666',font:{size:10},callback:v=>v+suffix}}, x: {grid:{display:false}, ticks:{color:'#666',font:{size:10}}}}, plugins: {legend:{display:false}} };
-    }
-
-    function updateLegend(id, datasets, suffix) {
-        const el = document.getElementById(id);
-        const parent = el.parentElement;
-        const header = parent.querySelector('.legend-header');
-
-        const sorted = [...datasets].sort((a, b) => {
-            if (!legendSortBy) return 0;
-            const aLast = a.data[a.data.length - 1];
-            const aMax = Math.max(...a.data);
-            const bLast = b.data[b.data.length - 1];
-            const bMax = Math.max(...b.data);
-            if (legendSortBy === 'last') {
-                return legendSortAsc ? aLast - bLast : bLast - aLast;
-            } else if (legendSortBy === 'max') {
-                return legendSortAsc ? aMax - bMax : bMax - aMax;
-            }
-            return 0;
-        });
-
-        el.innerHTML = sorted.map((ds, i) => {
-            const last = ds.data[ds.data.length-1];
-            const mx = Math.max(...ds.data);
-            const server = servers.find(s => s.name === ds.label);
-            const serverId = server ? server.id : null;
-            const isActive = legendServerFilter && legendServerFilter == serverId;
-            return '<div class="legend-item" data-server="'+serverId+'" data-name="'+ds.label+'" style="'+(isActive ? 'background: rgba(87,148,242,0.2); border-left: 2px solid var(--blue);' : '')+'"><div class="legend-color" style="background:'+ds.borderColor+'"></div><div class="legend-name">'+ds.label+'</div><div class="legend-value-last">'+last.toFixed(1)+suffix+'</div><div class="legend-value-max">'+mx.toFixed(1)+suffix+'</div></div>';
-        }).join('');
-
-        // Attach click handlers to legend items
-        el.querySelectorAll('.legend-item').forEach(item => {
-            item.addEventListener('click', function(e) {
-                e.stopPropagation();
-                const sid = this.dataset.server;
-                const name = this.dataset.name;
-
-                if (legendServerFilter == sid) {
-                    legendServerFilter = null;
-                    currentServerFilter = '';
-                    document.getElementById('dashboardServerSelector').value = '';
-                    document.getElementById('clearFilterBtn').style.display = 'none';
-                } else {
-                    legendServerFilter = sid;
-                    currentServerFilter = sid;
-                    document.getElementById('dashboardServerSelector').value = sid;
-                    document.getElementById('clearFilterBtn').style.display = 'inline-flex';
-                }
-
-                initCharts();
-            });
-
-            item.style.cursor = 'pointer';
-        });
-
-        // Attach click handlers to header for sorting
-        if (header) {
-            const lastHeader = header.querySelector('.legend-header-last');
-            const maxHeader = header.querySelector('.legend-header-max');
-
-            if (lastHeader) {
-                lastHeader.onclick = function(e) {
-                    e.stopPropagation();
-                    if (legendSortBy === 'last') {
-                        legendSortAsc = !legendSortAsc;
-                    } else {
-                        legendSortBy = 'last';
-                        legendSortAsc = true;
-                    }
-                    initCharts();
-                };
-                lastHeader.style.cursor = 'pointer';
-                lastHeader.title = 'Sort by Last value';
-                // Update indicator
-                if (legendSortBy === 'last') {
-                    lastHeader.innerHTML = 'Last ' + (legendSortAsc ? '&#9650;' : '&#9660;');
-                } else {
-                    lastHeader.innerHTML = 'Last';
-                }
-            }
-
-            if (maxHeader) {
-                maxHeader.onclick = function(e) {
-                    e.stopPropagation();
-                    if (legendSortBy === 'max') {
-                        legendSortAsc = !legendSortAsc;
-                    } else {
-                        legendSortBy = 'max';
-                        legendSortAsc = true;
-                    }
-                    initCharts();
-                };
-                maxHeader.style.cursor = 'pointer';
-                maxHeader.title = 'Sort by Max value';
-                // Update indicator
-                if (legendSortBy === 'max') {
-                    maxHeader.innerHTML = 'Max ' + (legendSortAsc ? '&#9650;' : '&#9660;');
-                } else {
-                    maxHeader.innerHTML = 'Max';
-                }
-            }
-        }
-    }
-
-    document.getElementById('addAlertBtn').addEventListener('click', function() {
-        document.getElementById('alert-id').value = '';
-        document.getElementById('alertForm').reset();
-        document.getElementById('alertModalTitle').textContent = 'Add Alert Rule';
-        document.getElementById('alertModal').classList.add('active');
-    });
-
-    document.getElementById('closeAlertModal').addEventListener('click', function() {
-        document.getElementById('alertModal').classList.remove('active');
-    });
-
-    document.getElementById('alertForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const id = document.getElementById('alert-id').value;
-        const alertData = {
-            name: document.getElementById('alert-name').value,
-            metric: document.getElementById('alert-metric').value,
-            condition: document.getElementById('alert-condition').value,
-            threshold: parseInt(document.getElementById('alert-threshold').value),
-            duration: parseInt(document.getElementById('alert-duration').value),
-            severity: document.getElementById('alert-severity').value,
-            server_id: document.getElementById('alert-server').value || null,
-            notify_telegram: document.getElementById('alert-notify-telegram').checked,
-            notify_discord: document.getElementById('alert-notify-discord').checked,
-            notify_slack: document.getElementById('alert-notify-slack').checked,
-            notify_email: document.getElementById('alert-notify-email').checked,
-            enabled: true
-        };
-        const url = id ? '/api/alerts/' + id : '/api/alerts';
-        const method = id ? 'PUT' : 'POST';
-        await fetch(url, { method, headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify(alertData) });
-        document.getElementById('alertModal').classList.remove('active');
-        loadAlerts();
-    });
-
-    async function loadAlerts() {
-        try {
-            const resp = await fetch('/api/alerts', {headers: {'Authorization': 'Bearer ' + token}});
-            const data = await resp.json();
-            alerts = data.alerts || [];
-            const metricIcons = {cpu: 'fa-microchip', memory: 'fa-memory', disk: 'fa-hdd', network: 'fa-network-wired'};
-            const metricColors = {cpu: 'var(--blue)', memory: 'var(--green)', disk: 'var(--yellow)', network: 'var(--purple)'};
-            const filtered = alerts.filter(a => {
-                if (currentAlertTab === 'global') return a.server_id === null || a.server_id === 0;
-                if (currentAlertTab === 'server') return a.server_id !== null && a.server_id !== 0;
-                return true;
-            });
-            document.getElementById('alertsList').innerHTML = filtered.map(a => {
-                const notifyTags = [];
-                if (a.notify_telegram) notifyTags.push('<span class="notification-tag"><i class="fab fa-telegram"></i></span>');
-                if (a.notify_discord) notifyTags.push('<span class="notification-tag"><i class="fab fa-discord"></i></span>');
-                if (a.notify_slack) notifyTags.push('<span class="notification-tag"><i class="fab fa-slack"></i></span>');
-                if (a.notify_email) notifyTags.push('<span class="notification-tag"><i class="fas fa-envelope"></i></span>');
-                const serverName = a.server_id ? servers.find(s => s.id == a.server_id)?.name || 'Server ' + a.server_id : 'Global';
-                const severityBadge = a.severity === 'critical' ? 'badge-danger' : 'badge-warning';
-                return '<div class="alert-rule"><div class="alert-rule-header"><div class="alert-rule-title"><i class="fas ' + (metricIcons[a.metric] || 'fa-bell') + '" style="color: ' + (metricColors[a.metric] || 'var(--blue)') + ';"></i> ' + a.name + ' <span class="badge ' + severityBadge + '">' + a.severity + '</span></div><div><button class="btn btn-danger btn-sm" onclick="deleteAlert(' + a.id + ')">Delete</button></div></div><div class="alert-conditions"><div class="condition-box"><div class="condition-label">Scope</div><div class="condition-value">' + serverName + '</div></div><div class="condition-box"><div class="condition-label">Metric</div><div class="condition-value">' + a.metric.toUpperCase() + '</div></div><div class="condition-box"><div class="condition-label">Condition</div><div class="condition-value">' + a.condition + ' ' + a.threshold + '%</div></div></div><div class="alert-notifications">' + (notifyTags.length ? notifyTags.join('') : '<span style="color: var(--muted);">No notifications</span>') + '</div></div>';
-            }).join('') || '<p style="color: var(--muted); text-align: center; padding: 40px;">No alert rules configured.</p>';
-        } catch(e) { console.error(e); }
-    }
-
-    async function deleteAlert(id) {
-        if (confirm('Delete this alert?')) {
-            await fetch('/api/alerts/' + id, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
-            loadAlerts();
-        }
-    }
-
-    document.getElementById('refreshRaidBtn').addEventListener('click', updateRAIDStatusPanel);
-
-    ['telegram', 'discord', 'slack', 'email'].forEach(ch => {
-        const enabled = document.getElementById(ch + '-enabled');
-        if (enabled) {
-            enabled.addEventListener('change', function() {
-                document.getElementById(ch + '-config').style.display = this.checked ? 'block' : 'none';
-            });
-        }
-    });
-
-    async function loadNotifications() {
-        try {
-            const resp = await fetch('/api/notifications', {headers: {'Authorization': 'Bearer ' + token}});
-            const data = await resp.json();
-            data.notifications.forEach(n => {
-                const enabled = document.getElementById(n.channel + '-enabled');
-                if (enabled) { enabled.checked = n.enabled; document.getElementById(n.channel + '-config').style.display = n.enabled ? 'block' : 'none'; }
-                if (n.channel === 'telegram') { document.getElementById('telegram-token').value = n.telegram_bot_token || ''; document.getElementById('telegram-chat').value = n.telegram_chat_id || ''; }
-                if (n.channel === 'discord') document.getElementById('discord-webhook').value = n.discord_webhook || '';
-                if (n.channel === 'slack') document.getElementById('slack-webhook').value = n.slack_webhook || '';
-                if (n.channel === 'email') { document.getElementById('email-host').value = n.email_smtp_host || ''; document.getElementById('email-port').value = n.email_smtp_port || 587; document.getElementById('email-user').value = n.email_user || ''; document.getElementById('email-pass').value = n.email_pass || ''; }
-            });
-        } catch(e) { console.error(e); }
-    }
-
-    document.getElementById('saveNotifyBtn').addEventListener('click', async function() {
-        const channels = {
-            telegram: {enabled: document.getElementById('telegram-enabled').checked, telegram_bot_token: document.getElementById('telegram-token').value, telegram_chat_id: document.getElementById('telegram-chat').value},
-            discord: {enabled: document.getElementById('discord-enabled').checked, discord_webhook: document.getElementById('discord-webhook').value},
-            slack: {enabled: document.getElementById('slack-enabled').checked, slack_webhook: document.getElementById('slack-webhook').value},
-            email: {enabled: document.getElementById('email-enabled').checked, email_smtp_host: document.getElementById('email-host').value, email_smtp_port: parseInt(document.getElementById('email-port').value)||587, email_user: document.getElementById('email-user').value, email_pass: document.getElementById('email-pass').value}
-        };
-        for (const [channel, config] of Object.entries(channels)) {
-            await fetch('/api/notifications/' + channel, {method: 'PUT', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify(config)});
-        }
-        alert('Settings saved!');
-    });
-
-    async function loadBackups() {
-        try {
-            const resp = await fetch('/api/backup/list', {headers: {'Authorization': 'Bearer ' + token}});
-            const data = await resp.json();
-            const files = data.files || [];
-            if (data.backup_path) {
-                document.getElementById('backupPath').value = data.backup_path;
-            }
-            window.backupFiles = files;
-            let html = '';
-            for (let i = 0; i < files.length; i++) {
-                const b = files[i];
-                const size = b.size ? (b.size/1024).toFixed(1) + ' KB' : '-';
-                const created = b.created ? b.created.substring(0, 19) : '-';
-                html += '<tr><td>' + b.filename + '</td><td>' + size + '</td><td>' + created + '</td><td><button class="btn btn-danger btn-sm" data-idx="' + i + '" onclick="deleteBackupByIndex(' + i + ')"><i class="fas fa-trash"></i></button> <button class="btn btn-secondary btn-sm" data-idx="' + i + '" onclick="restoreByIndex(' + i + ')"><i class="fas fa-undo"></i></button></td></tr>';
-            }
-            document.getElementById('backups-tbody').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#999;">No backups</td></tr>';
-        } catch(e) { console.error(e); }
-    }
-
-    function deleteBackupByIndex(idx) {
-        const file = window.backupFiles[idx];
-        if (!file) return;
-        if (!confirm('Delete ' + file.filename + '?')) return;
-        deleteBackupFile(file.path);
-    }
-
-    function restoreByIndex(idx) {
-        const file = window.backupFiles[idx];
-        if (!file) return;
-        restoreThisBackup(file.path);
-    }
-
-    function restoreThisBackup(path) {
-        document.getElementById('restorePath').value = path;
-        document.getElementById('restorePath').scrollIntoView();
-    }
-
-    async function deleteBackupFile(path) {
-        if (!confirm('Delete this backup file?')) return;
-        try {
-            await fetch('/api/backup/file', {
-                method: 'DELETE',
-                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-                body: JSON.stringify({path: path})
-            });
-            loadBackups();
-        } catch(e) { alert('Error: ' + e.message); }
-    }
-
-    document.getElementById('createBackupBtn').addEventListener('click', async function() {
-        const btn = this;
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
-        btn.disabled = true;
-        try {
-            const backupPath = document.getElementById('backupPath').value || '';
-            const resp = await fetch('/api/backup/create', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-                body: JSON.stringify({path: backupPath})
-            });
-            const data = await resp.json();
-            if (data.status === 'ok') {
-                alert('Backup created!\nFile: ' + data.filename + '\nSize: ' + (data.size/1024).toFixed(1) + ' KB\nPath: ' + data.path);
-                loadBackups();
-            } else {
-                alert('Error: ' + (data.detail || 'Unknown error'));
-            }
-        } catch(e) {
-            alert('Error: ' + e.message);
-        }
-        btn.innerHTML = orig;
-        btn.disabled = false;
-    });
-
-    document.getElementById('restoreBackupBtn').addEventListener('click', async function() {
-        const filePath = document.getElementById('restorePath').value;
-        if (!filePath) {
-            alert('Please enter backup file path');
-            return;
-        }
-        if (!confirm('Restore from backup?\n\nThis will overwrite current data!\nFile: ' + filePath)) {
-            return;
-        }
-
-        const btn = this;
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Restoring...';
-        btn.disabled = true;
-
-        try {
-            const resp = await fetch('/api/backup/restore', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-                body: JSON.stringify({
-                    file: filePath,
-                    restore_db: document.getElementById('restoreDb').checked,
-                    restore_config: document.getElementById('restoreConfig').checked,
-                    restore_settings: document.getElementById('restoreSettings').checked
-                })
-            });
-            const data = await resp.json();
-            if (data.status === 'ok') {
-                alert('Backup restored successfully!\nPlease restart the server to apply changes.');
-            } else {
-                alert('Error: ' + (data.detail || 'Unknown error'));
-            }
-        } catch(e) {
-            alert('Error: ' + e.message);
-        }
-        btn.innerHTML = orig;
-        btn.disabled = false;
-    });
-
-    // API Keys
-    async function loadApiKeys() {
-        try {
-            const resp = await fetch('/api/api-keys', {headers: {'Authorization': 'Bearer ' + token}});
-            const data = await resp.json();
-            document.getElementById('apikeys-tbody').innerHTML = (data.keys || []).map(k =>
-                '<tr><td>' + k.name + '</td><td><code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:3px;">****</code></td><td>' + (k.created_at || '-') + '</td><td>' + (k.last_used || 'Never') + '</td><td><button class="btn btn-danger btn-sm" onclick="deleteApiKey(' + k.id + ')"><i class="fas fa-trash"></i></button></td></tr>'
-            ).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;">No API keys</td></tr>';
-        } catch(e) { console.error(e); }
-    }
-
-    document.getElementById('createApiKeyBtn').addEventListener('click', async function() {
-        const name = prompt('Enter API key name:');
-        if (name) {
-            const resp = await fetch('/api/api-keys', {method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify({name})});
-            const data = await resp.json();
-            if (data.key) {
-                alert('API Key created! Copy it now (shown once):\\n\\n' + data.key);
-                loadApiKeys();
-            }
-        }
-    });
-
-    async function deleteApiKey(id) {
-        if (confirm('Delete this API key?')) {
-            await fetch('/api/api-keys/' + id, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
-            loadApiKeys();
-        }
-    }
-
-    // Audit Log
-    async function loadAuditLog() {
-        try {
-            const resp = await fetch('/api/audit-log', {headers: {'Authorization': 'Bearer ' + token}});
-            const data = await resp.json();
-            document.getElementById('audit-tbody').innerHTML = (data.logs || []).map(l =>
-                '<tr><td>' + (l.created_at || '-') + '</td><td>' + (l.user_id || 'System') + '</td><td>' + l.action + '</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + (l.details || '-') + '</td><td>' + (l.ip_address || '-') + '</td></tr>'
-            ).join('') || '<tr><td colspan="5" style="text-align:center;color:#999;">No audit logs</td></tr>';
-        } catch(e) { console.error(e); }
-    }
-
-    document.getElementById('refreshAuditBtn').addEventListener('click', loadAuditLog);
-
-    // Maintenance
-    async function loadMaintenance() {
-        try {
-            const resp = await fetch('/api/maintenance', {headers: {'Authorization': 'Bearer ' + token}});
-            const data = await resp.json();
-            document.getElementById('maintenanceList').innerHTML = (data.windows || []).map(w =>
-                '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:8px;">' +
-                '<div><strong>' + w.name + '</strong><br><span style="color:var(--muted);font-size:11px;">' + w.start_time + ' - ' + w.end_time + '</span></div>' +
-                '<span class="badge ' + (w.enabled ? 'badge-success' : 'badge-warning') + '">' + (w.enabled ? 'Active' : 'Disabled') + '</span>' +
-                '</div>'
-            ).join('') || '<p style="color:var(--muted);text-align:center;padding:20px;">No maintenance windows configured</p>';
-        } catch(e) { console.error(e); }
-    }
-
-    document.getElementById('addMaintenanceBtn').addEventListener('click', async function() {
-        const name = prompt('Maintenance window name:');
-        if (name) {
-            const start = prompt('Start time (YYYY-MM-DD HH:MM):');
-            const end = prompt('End time (YYYY-MM-DD HH:MM):');
-            if (start && end) {
-                await fetch('/api/maintenance', {method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify({name, start_time: start, end_time: end})});
-                loadMaintenance();
-            }
-        }
-    });
-
-    // Settings tabs
-    document.querySelectorAll("#section-settings .tab-menu .tab-item").forEach(btn => {
-        btn.addEventListener("click", function() {
-            document.querySelectorAll("#section-settings .tab-menu .tab-item").forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            const tab = this.dataset.tab;
-            document.querySelectorAll("#section-settings .tab-content").forEach(c => c.style.display = 'none');
-            document.getElementById('settings-' + tab).style.display = 'block';
-            if (tab === 'apikeys') loadApiKeys();
-            if (tab === 'audit') loadAuditLog();
-            if (tab === 'maintenance') loadMaintenance();
-        });
-    });
-
-    let refreshInterval = null;
-
-    function startAutoRefresh() {
-        if (refreshInterval) clearInterval(refreshInterval);
-        refreshInterval = setInterval(async () => {
-            await loadServers();
-            updateRAIDStatusPanel();
-            if (document.getElementById('section-dashboard').classList.contains('active')) {
-                initCharts();
-            }
-        }, 30000);
-    }
-
-    function stopAutoRefresh() {
-        if (refreshInterval) {
-            clearInterval(refreshInterval);
-            refreshInterval = null;
-        }
-    }
-
-    // Initialize event listeners
-    document.addEventListener('DOMContentLoaded', function() {
-        // Stat cards click
-        document.querySelectorAll('.stat-card[data-filter]').forEach(card => {
-            card.style.cursor = 'pointer';
-            card.addEventListener('click', function() {
-                filterBy(this.dataset.filter);
-            });
-        });
-
-        // Server selector change
-        document.getElementById('dashboardServerSelector').addEventListener('change', function() {
-            filterDashboard();
-        });
-
-        // Time range buttons
-        document.querySelectorAll('.time-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                currentRange = this.dataset.range;
-                initCharts();
-            });
-        });
-    });
-
-    loadServers();
-    updateRAIDStatusPanel();
-    setTimeout(() => {
-        initCharts();
-        startAutoRefresh();
-    }, 100);
-    </script>
+// Initial load
+loadData();
+</script>
 </body>
 </html>"""
 
