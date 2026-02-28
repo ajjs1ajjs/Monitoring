@@ -193,6 +193,7 @@ def init_web_tables():
             disk_percent REAL,
             network_rx REAL,
             network_tx REAL,
+            disk_info TEXT,
             timestamp TEXT NOT NULL,
             FOREIGN KEY (server_id) REFERENCES servers (id)
         )""")
@@ -1122,24 +1123,27 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
             // Multiple disks handling
             const diskDataMap = {}; // {volume: [values]}
             history.forEach(h => {
+                let info = null;
                 if (h.disk_info) {
                     try {
-                        const info = typeof h.disk_info === 'string' ? JSON.parse(h.disk_info) : h.disk_info;
-                        if (Array.isArray(info)) {
-                            info.forEach(d => {
-                                const vol = d.volume || d.path || '?';
-                                if (!diskDataMap[vol]) diskDataMap[vol] = [];
-                                diskDataMap[vol].push(d.percent);
-                            });
-                        }
+                        info = typeof h.disk_info === 'string' ? JSON.parse(h.disk_info) : h.disk_info;
                     } catch(e) {}
+                }
+                
+                if (Array.isArray(info) && info.length > 0) {
+                    info.forEach(d => {
+                        const vol = d.volume || d.path || '?';
+                        if (!diskDataMap[vol]) diskDataMap[vol] = new Array(history.length).fill(null);
+                        const dataIdx = history.indexOf(h);
+                        diskDataMap[vol][dataIdx] = d.percent;
+                    });
                 }
             });
 
             const vols = Object.keys(diskDataMap);
             if (vols.length > 0) {
                 vols.forEach((vol, vIdx) => {
-                    const vColor = colors[(idx + vIdx) % colors.length];
+                    const vColor = colors[(idx * 3 + vIdx) % colors.length];
                     datasets.disk.push({
                         ...common,
                         label: `${server.name} (${vol})`,
@@ -1996,9 +2000,9 @@ async def scrape_server(server_id: int):
 
                 # Add to metrics history
                 conn.execute(
-                    """INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, timestamp)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    (server_id, cpu, memory, disk, network_rx, network_tx, now),
+                    """INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (server_id, cpu, memory, disk, network_rx, network_tx, disk_info_json, now),
                 )
 
                 # Cleanup old history (keep 7 days)
