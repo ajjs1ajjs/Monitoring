@@ -12,7 +12,7 @@ import httpx
 
 from pymon.config import PyMonConfig, ScrapeConfig, StaticConfig
 from pymon.metrics.collector import Counter, Gauge, Histogram, registry
-from pymon.metrics.models import Label
+from pymon.metrics.models import Label, MetricType
 from pymon.storage import get_storage
 
 
@@ -467,8 +467,19 @@ class ScrapeManager:
                                 metrics["windows_logical_disk_free_bytes"] = info["free"]
                                 metrics["windows_logical_disk_size_bytes"] = info["size"]
 
-                    import json
+                    # Publish per-disk usage as Prometheus metrics with volume label
+                    try:
+                        from pymon.metrics.models import MetricType, Label
+                        # Ensure the metric exists; we reuse the same metric name with per-disk labels
+                        registry.register("disk_usage_percent", MetricType.GAUGE, "Disk usage percent per volume", None)
+                        for vol, info in disk_info.items():
+                            vol_label = Label("volume", vol)
+                            percent = info.get("percent", 0)
+                            registry.set("disk_usage_percent", percent, [vol_label])
+                    except Exception as e:
+                        print(f"[DEBUG] failed to publish per-disk metric: {e}")
 
+                    
                     metrics["_disk_info_json"] = json.dumps(disks_list) if disks_list else None
 
                     self._update_server_status(target.target, metrics, True, server_id=target.server_id)
