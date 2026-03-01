@@ -473,6 +473,59 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                         </div>
                     </div>
                 </div>
+                
+                <!-- RAID Status Panel -->
+                <div class="grid-item col-12">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-hdd" style="color: var(--green);"></i> RAID Arrays Status</div>
+                            <button class="btn btn-secondary btn-sm" onclick="loadRAID()"><i class="fas fa-sync"></i></button>
+                        </div>
+                        <div class="panel-body">
+                            <div id="raidPanel" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Server Detail Section -->
+        <div id="section-server-detail" class="section-content">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-server"></i> <span id="serverDetailName">Server Details</span></div>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-secondary btn-sm" onclick="showSection('dashboard')"><i class="fas fa-arrow-left"></i> Back</button>
+                        <button class="btn btn-primary btn-sm" onclick="scrapeServer(currentServerId)"><i class="fas fa-sync"></i> Refresh</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+                        <div class="metric-box" style="padding: 20px;"><div class="metric-label">Status</div><div class="metric-value" id="detailStatus">-</div></div>
+                        <div class="metric-box" style="padding: 20px;"><div class="metric-label">CPU</div><div class="metric-value" id="detailCPU">-</div></div>
+                        <div class="metric-box" style="padding: 20px;"><div class="metric-label">Memory</div><div class="metric-value" id="detailMemory">-</div></div>
+                        <div class="metric-box" style="padding: 20px;"><div class="metric-label">Uptime</div><div class="metric-value" id="detailUptime">-</div></div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div class="panel" style="border: 1px solid var(--border); border-radius: 8px;">
+                            <div class="panel-header"><div class="panel-title"><i class="fas fa-microchip"></i> CPU History</div></div>
+                            <div class="panel-body"><div class="chart-container" style="height: 200px;"><canvas id="detailCPUChart"></canvas></div></div>
+                        </div>
+                        <div class="panel" style="border: 1px solid var(--border); border-radius: 8px;">
+                            <div class="panel-header"><div class="panel-title"><i class="fas fa-memory"></i> Memory History</div></div>
+                            <div class="panel-body"><div class="chart-container" style="height: 200px;"><canvas id="detailMemoryChart"></canvas></div></div>
+                        </div>
+                        <div class="panel" style="border: 1px solid var(--border); border-radius: 8px;">
+                            <div class="panel-header"><div class="panel-title"><i class="fas fa-hdd"></i> Disk Usage by Partition</div></div>
+                            <div class="panel-body"><div id="detailDisks" style="display: grid; gap: 8px;"></div></div>
+                        </div>
+                        <div class="panel" style="border: 1px solid var(--border); border-radius: 8px;">
+                            <div class="panel-header"><div class="panel-title"><i class="fas fa-network-wired"></i> Network I/O</div></div>
+                            <div class="panel-body"><div class="chart-container" style="height: 200px;"><canvas id="detailNetworkChart"></canvas></div></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -530,6 +583,21 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                                     <div class="form-group"><label style="display: flex; gap: 8px; align-items: center;"><input type="checkbox" id="discord-enabled"> Enabled</label></div>
                                     <div class="form-group"><label>Webhook URL</label><input type="text" id="discord-webhook" placeholder="https://discord.com/api/webhooks/..."></div>
                                 </div>
+                                <div style="padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                                    <h4 style="margin-bottom: 12px; color: #6264A7;"><i class="fab fa-microsoft"></i> MS Teams</h4>
+                                    <div class="form-group"><label style="display: flex; gap: 8px; align-items: center;"><input type="checkbox" id="teams-enabled"> Enabled</label></div>
+                                    <div class="form-group"><label>Webhook URL</label><input type="text" id="teams-webhook" placeholder="https://outlook.office.com/webhook/..."></div>
+                                </div>
+                                <div style="padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                                    <h4 style="margin-bottom: 12px; color: var(--red);"><i class="fas fa-envelope"></i> Email (SMTP)</h4>
+                                    <div class="form-group"><label style="display: flex; gap: 8px; align-items: center;"><input type="checkbox" id="email-enabled"> Enabled</label></div>
+                                    <div class="form-row">
+                                        <div class="form-group"><label>SMTP Host</label><input type="text" id="email-host" placeholder="smtp.gmail.com"></div>
+                                        <div class="form-group"><label>Port</label><input type="number" id="email-port" value="587"></div>
+                                    </div>
+                                    <div class="form-group"><label>Username</label><input type="text" id="email-user" placeholder="user@gmail.com"></div>
+                                    <div class="form-group"><label>Password</label><input type="password" id="email-pass" placeholder="app password"></div>
+                                </div>
                             </div>
                             <button class="btn btn-primary" style="margin-top: 16px;" id="saveNotifyBtn"><i class="fas fa-save"></i> Save Settings</button>
                         </div>
@@ -555,7 +623,11 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <div class="form-group"><label>Server Name</label><input type="text" id="server-name" required placeholder="Production Server"></div>
                 <div class="form-group"><label>Host / IP Address</label><input type="text" id="server-host" required placeholder="192.168.1.100"></div>
                 <div class="form-row">
-                    <div class="form-group"><label>Operating System</label><select id="server-os"><option value="linux">Linux (node_exporter:9100)</option><option value="windows">Windows (windows_exporter:9182)</option></select></div>
+                    <div class="form-group"><label>Data Source</label><select id="server-os" onchange="updatePortHint()">
+                        <option value="linux">Linux (node_exporter:9100)</option>
+                        <option value="windows">Windows (windows_exporter:9182)</option>
+                        <option value="telegraf">Telegraf (telegraf:9273)</option>
+                    </select></div>
                     <div class="form-group"><label>Agent Port</label><input type="number" id="server-port" value="9100"></div>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%;">Add Server</button>
@@ -601,10 +673,24 @@ document.getElementById('closeServerModal').addEventListener('click', () => docu
 document.getElementById('serverSearch').addEventListener('input', updateServerGrid);
 document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', function() { document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); this.classList.add('active'); document.querySelectorAll('[id^="tab-"]').forEach(d => d.style.display = 'none'); document.getElementById('tab-' + this.dataset.tab).style.display = 'block'; }));
 
+function updatePortHint() {
+    const os = document.getElementById('server-os').value;
+    const portInput = document.getElementById('server-port');
+    if (os === 'windows') portInput.value = 9182;
+    else if (os === 'telegraf') portInput.value = 9273;
+    else portInput.value = 9100;
+}
+
 document.getElementById('addServerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const port = parseInt(document.getElementById('server-port').value) || (document.getElementById('server-os').value === 'windows' ? 9182 : 9100);
-    await fetch('/api/servers', { method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify({ name: document.getElementById('server-name').value, host: document.getElementById('server-host').value, os_type: document.getElementById('server-os').value, agent_port: port }) });
+    const os = document.getElementById('server-os').value;
+    let port = parseInt(document.getElementById('server-port').value);
+    if (!port) {
+        if (os === 'windows') port = 9182;
+        else if (os === 'telegraf') port = 9273;
+        else port = 9100;
+    }
+    await fetch('/api/servers', { method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify({ name: document.getElementById('server-name').value, host: document.getElementById('server-host').value, os_type: os, agent_port: port }) });
     document.getElementById('addServerModal').classList.remove('active');
     document.getElementById('addServerForm').reset();
     loadData();
@@ -613,7 +699,15 @@ document.getElementById('addServerForm').addEventListener('submit', async (e) =>
 document.getElementById('saveNotifyBtn').addEventListener('click', async () => {
     const config = {
         telegram: { enabled: document.getElementById('telegram-enabled').checked, telegram_bot_token: document.getElementById('telegram-token').value, telegram_chat_id: document.getElementById('telegram-chat').value },
-        discord: { enabled: document.getElementById('discord-enabled').checked, discord_webhook: document.getElementById('discord-webhook').value }
+        discord: { enabled: document.getElementById('discord-enabled').checked, discord_webhook: document.getElementById('discord-webhook').value },
+        teams: { enabled: document.getElementById('teams-enabled').checked, teams_webhook: document.getElementById('teams-webhook').value },
+        email: { 
+            enabled: document.getElementById('email-enabled').checked, 
+            email_smtp_host: document.getElementById('email-host').value, 
+            email_smtp_port: parseInt(document.getElementById('email-port').value) || 587, 
+            email_user: document.getElementById('email-user').value, 
+            email_pass: document.getElementById('email-pass').value 
+        }
     };
     for (const [channel, cfg] of Object.entries(config)) {
         await fetch('/api/notifications/' + channel, { method: 'PUT', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify(cfg) });
@@ -767,11 +861,29 @@ function updateServerGrid() {
         const statusColor = s.last_status === 'up' ? 'var(--green)' : 'var(--red)';
         const cpuColor = (s.cpu_percent || 0) > 80 ? 'var(--red)' : (s.cpu_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
         const memColor = (s.memory_percent || 0) > 80 ? 'var(--red)' : (s.memory_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
+        
+        // Parse disk info
+        let disks = [];
+        try {
+            disks = s.disk_info ? (typeof s.disk_info === 'string' ? JSON.parse(s.disk_info) : s.disk_info) : [];
+        } catch(e) {}
+        
+        const diskDisplay = Array.isArray(disks) && disks.length > 0 
+            ? disks.slice(0, 3).map(d => {
+                const pct = d.percent || 0;
+                const color = pct > 90 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : 'var(--green)';
+                return `<span style="margin-right: 8px; font-size: 11px;"><span style="color: ${color}; font-weight: 600;">${d.volume || d.path || '?'}</span>: ${pct.toFixed(0)}%</span>`;
+            }).join('') 
+            : (s.disk_percent || 0).toFixed(1) + '%';
+        
         return `
-        <div class="server-card ${status}" onclick="scrapeServer(${s.id})">
+        <div class="server-card ${status}" onclick="showServerDetail(${s.id})" style="position: relative;">
             <div class="server-header">
                 <div class="server-name"><div class="server-status" style="background: ${statusColor}"></div>${s.name}</div>
-                <span style="color: var(--muted); font-size: 11px;">${s.os_type}</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="color: var(--muted); font-size: 11px;">${s.os_type}</span>
+                    <button class="btn btn-secondary btn-sm" onclick="scrapeServer(${s.id}); event.stopPropagation();" style="padding: 4px 8px;"><i class="fas fa-sync"></i></button>
+                </div>
             </div>
             <div class="server-metrics">
                 <div class="metric-box">
@@ -786,7 +898,7 @@ function updateServerGrid() {
                 </div>
                 <div class="metric-box">
                     <div class="metric-label">Disk</div>
-                    <div class="metric-value" style="color: var(--blue)">${(s.disk_percent || 0).toFixed(1)}%</div>
+                    <div class="metric-value" style="color: var(--blue); font-size: ${(Array.isArray(disks) && disks.length > 1) ? '11px' : '18px'};">${diskDisplay}</div>
                 </div>
             </div>
         </div>`;
@@ -851,6 +963,17 @@ async function loadNotifications() {
             document.getElementById('discord-enabled').checked = n.enabled;
             document.getElementById('discord-webhook').value = n.discord_webhook || '';
         }
+        if (n.channel === 'teams') {
+            document.getElementById('teams-enabled').checked = n.enabled;
+            document.getElementById('teams-webhook').value = n.teams_webhook || '';
+        }
+        if (n.channel === 'email') {
+            document.getElementById('email-enabled').checked = n.enabled;
+            document.getElementById('email-host').value = n.email_smtp_host || '';
+            document.getElementById('email-port').value = n.email_smtp_port || 587;
+            document.getElementById('email-user').value = n.email_user || '';
+            document.getElementById('email-pass').value = n.email_pass || '';
+        }
     });
 }
 
@@ -903,6 +1026,172 @@ async function deleteApiKey(id) {
 function filterBy(type) {
     if (type === 'online') { document.getElementById('serverSearch').value = ''; }
     else if (type === 'offline') { document.getElementById('serverSearch').value = ''; }
+}
+
+let currentServerId = null;
+let detailCharts = {};
+
+function showServerDetail(id) {
+    currentServerId = id;
+    const server = servers.find(s => s.id === id);
+    if (!server) return;
+    
+    document.getElementById('serverDetailName').textContent = server.name;
+    document.getElementById('detailStatus').innerHTML = server.last_status === 'up' ? '<span class="badge badge-success">Online</span>' : '<span class="badge badge-danger">Offline</span>';
+    document.getElementById('detailCPU').textContent = (server.cpu_percent || 0).toFixed(1) + '%';
+    document.getElementById('detailMemory').textContent = (server.memory_percent || 0).toFixed(1) + '%';
+    document.getElementById('detailUptime').textContent = server.uptime || '-';
+    
+    // Load server disk details
+    loadServerDisks(server);
+    
+    // Load detailed charts
+    loadServerDetailCharts(id);
+    
+    // Show detail section
+    document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+    document.getElementById('section-server-detail').classList.add('active');
+}
+
+async function loadServerDisks(server) {
+    const el = document.getElementById('detailDisks');
+    let disks = [];
+    
+    if (server.disk_info) {
+        try {
+            disks = typeof server.disk_info === 'string' ? JSON.parse(server.disk_info) : server.disk_info;
+        } catch(e) {}
+    }
+    
+    if (Array.isArray(disks) && disks.length > 0) {
+        el.innerHTML = disks.map(d => {
+            const pct = d.percent || 0;
+            const barColor = pct > 90 ? 'var(--red)' : pct > 80 ? 'var(--yellow)' : 'var(--green)';
+            return `
+            <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 6px; border-left: 3px solid ${barColor};">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="font-weight: 600;">${d.volume || d.path || 'Disk'}</span>
+                    <span style="color: ${barColor};">${pct.toFixed(1)}%</span>
+                </div>
+                <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: ${pct}%; background: ${barColor}; transition: width 0.3s;"></div>
+                </div>
+                <div style="color: var(--muted); font-size: 11px; margin-top: 6px;">
+                    ${d.used_gb ? d.used_gb.toFixed(1) + ' GB / ' + d.size_gb.toFixed(1) + ' GB' : ''}
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        el.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No disk information available</p>';
+    }
+}
+
+async function loadServerDetailCharts(serverId) {
+    const history = await fetchServerHistory(serverId);
+    const labels = history.length ? history.map(h => {
+        const d = new Date(h.timestamp);
+        return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+    }) : generateLabels();
+    
+    // Destroy old charts
+    Object.values(detailCharts).forEach(c => c?.destroy());
+    detailCharts = {};
+    
+    // CPU Chart
+    detailCharts.cpu = new Chart(document.getElementById('detailCPUChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'CPU',
+                data: history.length ? history.map(h => h.cpu_percent) : [],
+                borderColor: '#5794f2',
+                backgroundColor: 'rgba(87,148,242,0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: chartOpts('%', 0, 100)
+    });
+    
+    // Memory Chart
+    detailCharts.memory = new Chart(document.getElementById('detailMemoryChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Memory',
+                data: history.length ? history.map(h => h.memory_percent) : [],
+                borderColor: '#f2cc0c',
+                backgroundColor: 'rgba(242,204,12,0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: chartOpts('%', 0, 100)
+    });
+    
+    // Network Chart
+    detailCharts.network = new Chart(document.getElementById('detailNetworkChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'RX (MB/s)',
+                    data: history.length ? history.map(h => (h.network_rx || 0) / 1024 / 1024) : [],
+                    borderColor: '#73bf69',
+                    backgroundColor: 'rgba(115,191,105,0.1)',
+                    fill: true,
+                    tension: 0.3
+                },
+                {
+                    label: 'TX (MB/s)',
+                    data: history.length ? history.map(h => (h.network_tx || 0) / 1024 / 1024) : [],
+                    borderColor: '#b877d9',
+                    backgroundColor: 'rgba(184,119,217,0.1)',
+                    fill: true,
+                    tension: 0.3
+                }
+            ]
+        },
+        options: chartOpts(' MB/s', 0, null)
+    });
+}
+
+async function loadRAID() {
+    const el = document.getElementById('raidPanel');
+    el.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading...</p>';
+    
+    try {
+        const resp = await fetch('/api/raid-status', {headers: {'Authorization': 'Bearer ' + token}});
+        const data = await resp.json();
+        const raids = data.raid_status || [];
+        
+        if (raids.length === 0) {
+            el.innerHTML = '<p style="color: var(--muted); text-align: center; padding: 20px;">No RAID arrays detected</p>';
+            return;
+        }
+        
+        el.innerHTML = raids.map(server => {
+            consthealthy = server.raids.every(r => r.healthy);
+            return `
+            <div style="background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid ${healthy ? 'var(--green)' : 'var(--red)'}; padding: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-weight: 600;"><i class="fas fa-server" style="color: var(--muted); margin-right: 6px;"></i>${server.server}</span>
+                    <span class="badge ${healthy ? 'badge-success' : 'badge-danger'}">${healthy ? 'Healthy' : 'Degraded'}</span>
+                </div>
+                ${server.raids.map(raid => `
+                    <div style="display: flex; justify-content: space-between; padding: 4px 8px; background: rgba(255,255,255,0.02); border-radius: 4px; margin-top: 4px; font-size: 12px;">
+                        <span>RAID ${raid.id} (${raid.type})</span>
+                        <span style="color: var(--muted);">${raid.size}</span>
+                    </div>
+                `).join('')}
+            </div>`;
+        }).join('');
+    } catch(e) {
+        el.innerHTML = '<p style="color: var(--red); text-align: center; padding: 20px;">Error loading RAID status</p>';
+    }
 }
 
 function generateLabels() {
