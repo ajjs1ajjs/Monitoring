@@ -683,6 +683,8 @@ function updatePortHint() {
 
 document.getElementById('addServerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const name = document.getElementById('server-name').value;
+    const host = document.getElementById('server-host').value;
     const os = document.getElementById('server-os').value;
     let port = parseInt(document.getElementById('server-port').value);
     if (!port) {
@@ -690,10 +692,19 @@ document.getElementById('addServerForm').addEventListener('submit', async (e) =>
         else if (os === 'telegraf') port = 9273;
         else port = 9100;
     }
-    await fetch('/api/servers', { method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify({ name: document.getElementById('server-name').value, host: document.getElementById('server-host').value, os_type: os, agent_port: port }) });
-    document.getElementById('addServerModal').classList.remove('active');
-    document.getElementById('addServerForm').reset();
-    loadData();
+    try {
+        const resp = await fetch('/api/servers', { 
+            method: 'POST', 
+            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, 
+            body: JSON.stringify({ name, host, os_type: os, agent_port: port }) 
+        });
+        if (!resp.ok) throw new Error('Failed to add server');
+        document.getElementById('addServerModal').classList.remove('active');
+        document.getElementById('addServerForm').reset();
+        loadData();
+    } catch(e) {
+        alert('Error adding server: ' + e.message);
+    }
 });
 
 document.getElementById('saveNotifyBtn').addEventListener('click', async () => {
@@ -882,7 +893,7 @@ function updateServerGrid() {
                 <div class="server-name"><div class="server-status" style="background: ${statusColor}"></div>${s.name}</div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="color: var(--muted); font-size: 11px;">${s.os_type}</span>
-                    <button class="btn btn-secondary btn-sm" onclick="scrapeServer(${s.id}); event.stopPropagation();" style="padding: 4px 8px;"><i class="fas fa-sync"></i></button>
+                    <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); scrapeServer(${s.id})" style="padding: 4px 8px;"><i class="fas fa-sync"></i></button>
                 </div>
             </div>
             <div class="server-metrics">
@@ -919,8 +930,8 @@ function updateServerTable() {
             <td>${(s.disk_percent || 0).toFixed(1)}%</td>
             <td style="color: var(--muted)">${s.last_check ? s.last_check.substring(11, 19) : '-'}</td>
             <td>
-                <button class="btn btn-secondary btn-sm" onclick="scrapeServer(${s.id}); event.stopPropagation();"><i class="fas fa-sync"></i></button>
-                <button class="btn btn-danger btn-sm" onclick="deleteServer(${s.id}); event.stopPropagation();"><i class="fas fa-trash"></i></button>
+                <button class="btn btn-secondary btn-sm" onclick="scrapeServer(${s.id})"><i class="fas fa-sync"></i></button>
+                <button class="btn btn-danger btn-sm" onclick="deleteServer(${s.id})"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`;
     }).join('') || '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--muted);">No servers configured</td></tr>';
@@ -993,19 +1004,23 @@ async function loadApiKeys() {
 
 async function scrapeServer(id) {
     try {
-        const btn = event?.target?.closest('button') || document.body;
-        const icon = btn.querySelector('i');
-        if (icon) icon.classList.add('animate-spin');
         await fetch(`/api/servers/${id}/scrape`, { method: 'POST', headers: {'Authorization': 'Bearer ' + token} });
         loadData();
-        setTimeout(() => icon?.classList.remove('animate-spin'), 500);
-    } catch(e) { alert('Error: ' + e.message); }
+    } catch(e) { 
+        console.error('Scrape error:', e); 
+        alert('Error scraping server: ' + e.message);
+    }
 }
 
 async function deleteServer(id) {
     if (confirm('Delete this server?')) {
-        await fetch(`/api/servers/${id}`, { method: 'DELETE', headers: {'Authorization': 'Bearer ' + token} });
-        loadData();
+        try {
+            await fetch(`/api/servers/${id}`, { method: 'DELETE', headers: {'Authorization': 'Bearer ' + token} });
+            loadData();
+        } catch(e) { 
+            console.error('Delete error:', e); 
+            alert('Error deleting server: ' + e.message);
+        }
     }
 }
 
@@ -1032,25 +1047,30 @@ let currentServerId = null;
 let detailCharts = {};
 
 function showServerDetail(id) {
-    currentServerId = id;
-    const server = servers.find(s => s.id === id);
-    if (!server) return;
-    
-    document.getElementById('serverDetailName').textContent = server.name;
-    document.getElementById('detailStatus').innerHTML = server.last_status === 'up' ? '<span class="badge badge-success">Online</span>' : '<span class="badge badge-danger">Offline</span>';
-    document.getElementById('detailCPU').textContent = (server.cpu_percent || 0).toFixed(1) + '%';
-    document.getElementById('detailMemory').textContent = (server.memory_percent || 0).toFixed(1) + '%';
-    document.getElementById('detailUptime').textContent = server.uptime || '-';
-    
-    // Load server disk details
-    loadServerDisks(server);
-    
-    // Load detailed charts
-    loadServerDetailCharts(id);
-    
-    // Show detail section
-    document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
-    document.getElementById('section-server-detail').classList.add('active');
+    try {
+        currentServerId = id;
+        const server = servers.find(s => s.id == id);
+        if (!server) {
+            console.error('Server not found:', id);
+            alert('Server not found');
+            return;
+        }
+        
+        document.getElementById('serverDetailName').textContent = server.name;
+        document.getElementById('detailStatus').innerHTML = server.last_status === 'up' ? '<span class="badge badge-success">Online</span>' : '<span class="badge badge-danger">Offline</span>';
+        document.getElementById('detailCPU').textContent = (server.cpu_percent || 0).toFixed(1) + '%';
+        document.getElementById('detailMemory').textContent = (server.memory_percent || 0).toFixed(1) + '%';
+        document.getElementById('detailUptime').textContent = server.uptime || '-';
+        
+        loadServerDisks(server);
+        loadServerDetailCharts(id);
+        
+        document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
+        document.getElementById('section-server-detail').classList.add('active');
+    } catch (e) {
+        console.error('Error showing server detail:', e);
+        alert('Error loading server details');
+    }
 }
 
 async function loadServerDisks(server) {
