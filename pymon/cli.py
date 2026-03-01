@@ -124,6 +124,8 @@ def create_app():
     from fastapi import FastAPI
     from fastapi.responses import HTMLResponse, RedirectResponse
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
     
     from pymon.api.endpoints import api
     from pymon import web_dashboard
@@ -154,6 +156,20 @@ def create_app():
 
     app.include_router(api, prefix="/api/v1")
     app.include_router(web_dashboard.router)
+
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+    @app.get("/favicon.ico")
+    async def favicon():
+        ico_path = os.path.join(static_dir, "favicon.ico")
+        svg_path = os.path.join(static_dir, "favicon.svg")
+        if os.path.exists(ico_path):
+            return FileResponse(ico_path)
+        elif os.path.exists(svg_path):
+            return FileResponse(svg_path)
+        return None
 
     @app.get("/")
     async def root():

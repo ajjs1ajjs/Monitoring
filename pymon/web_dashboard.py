@@ -275,6 +275,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <title>PyMon Enterprise</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
