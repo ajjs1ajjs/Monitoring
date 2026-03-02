@@ -58,6 +58,7 @@ class ServerModel(BaseModel):
     agent_port: int | None = None
     check_interval: int = 15
     enabled: bool = True
+    server_group: str = "default"
     notify_telegram: bool = False
     notify_discord: bool = False
     notify_slack: bool = False
@@ -81,6 +82,7 @@ def init_web_tables():
             agent_port INTEGER DEFAULT 9100,
             check_interval INTEGER DEFAULT 15,
             enabled BOOLEAN DEFAULT 1,
+            server_group TEXT DEFAULT 'default',
             notify_telegram BOOLEAN DEFAULT 0,
             notify_discord BOOLEAN DEFAULT 0,
             notify_slack BOOLEAN DEFAULT 0,
@@ -206,10 +208,15 @@ def init_web_tables():
         )""")
 
         c.execute("""CREATE TABLE IF NOT EXISTS settings (
-
             key TEXT PRIMARY KEY,
             value TEXT
         )""")
+
+        # Migration: Add server_group column if not exists
+        try:
+            c.execute("ALTER TABLE servers ADD COLUMN server_group TEXT DEFAULT 'default'")
+        except:
+            pass
 
         conn.commit()
         conn.close()
@@ -518,6 +525,9 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <div class="header">
                     <h2>Dashboard</h2>
                     <div class="header-actions">
+                        <select id="groupSelect" class="form-control" style="width: 140px;" onchange="Dashboard.onGroupChange()">
+                            <option value="">All Groups</option>
+                        </select>
                         <select id="serverSelect" class="form-control" style="width: 150px;" onchange="Dashboard.onServerChange()">
                             <option value="">All Servers</option>
                         </select>
@@ -638,6 +648,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 <tr>
                                     <th>Status</th>
                                     <th>Name</th>
+                                    <th>Group</th>
                                     <th>Host</th>
                                     <th>OS</th>
                                     <th>CPU</th>
@@ -716,6 +727,18 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <div class="modal-body">
                     <div class="form-group"><label>Server Name</label><input type="text" id="server-name" class="form-control" required></div>
                     <div class="form-group"><label>Host / IP</label><input type="text" id="server-host" class="form-control" required></div>
+                    <div class="form-group">
+                        <label>Group</label>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="server-group" class="form-control" style="flex: 1;">
+                                <option value="default">Default</option>
+                                <option value="production">Production</option>
+                                <option value="development">Development</option>
+                                <option value="test">Test</option>
+                            </select>
+                            <button type="button" class="btn btn-secondary" onclick="Servers.addGroup()" title="Add new group"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
                     <div class="form-group">
                         <label>Type</label>
                         <select id="server-os" class="form-control" onchange="Servers.updatePort()">
@@ -808,19 +831,25 @@ const Modal = {
 const Dashboard = {
     charts: {},
     selectedServerId: localStorage.getItem('dashboard_selected_server') || '',
+    selectedGroup: localStorage.getItem('dashboard_selected_group') || '',
 
     async loadData() {
         try {
             const data = await API.get('/api/servers');
             const servers = data.servers || [];
             
-            // Populate server select dropdown
+            // Load and populate groups
+            await Dashboard.loadGroups();
             Dashboard.populateServerSelect(servers);
             
-            // Filter by selected server
-            const filtered = Dashboard.selectedServerId 
-                ? servers.filter(s => s.id == Dashboard.selectedServerId)
-                : servers;
+            // Filter by selected group first, then by server
+            let filtered = servers;
+            if (Dashboard.selectedGroup) {
+                filtered = filtered.filter(s => s.server_group === Dashboard.selectedGroup);
+            }
+            if (Dashboard.selectedServerId) {
+                filtered = filtered.filter(s => s.id == Dashboard.selectedServerId);
+            }
             
             Dashboard.updateStats(filtered);
             Dashboard.renderServerGrid(servers);
@@ -834,6 +863,28 @@ const Dashboard = {
                 document.getElementById('exporter-charts-section').style.display = 'none';
             }
         } catch (e) { console.error(e); }
+    },
+
+    async loadGroups() {
+        try {
+            const data = await API.get('/api/groups');
+            const groups = data.groups || [];
+            const select = document.getElementById('groupSelect');
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">All Groups</option>' + 
+                groups.map(g => `<option value="${g}">${g}</option>`).join('');
+            select.value = currentValue || Dashboard.selectedGroup;
+        } catch (e) { console.error(e); }
+    },
+
+    onGroupChange() {
+        const select = document.getElementById('groupSelect');
+        Dashboard.selectedGroup = select.value;
+        Dashboard.selectedServerId = ''; // Reset server selection when group changes
+        document.getElementById('serverSelect').value = '';
+        localStorage.setItem('dashboard_selected_group', Dashboard.selectedGroup);
+        localStorage.setItem('dashboard_selected_server', '');
+        Dashboard.loadData();
     },
 
     showExporterInfo(server) {
@@ -966,8 +1017,12 @@ const Dashboard = {
     populateServerSelect(servers) {
         const select = document.getElementById('serverSelect');
         const currentValue = select.value;
+        // Filter servers by selected group
+        const filtered = Dashboard.selectedGroup 
+            ? servers.filter(s => s.server_group === Dashboard.selectedGroup)
+            : servers;
         select.innerHTML = '<option value="">All Servers</option>' + 
-            servers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            filtered.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
         select.value = currentValue || Dashboard.selectedServerId;
     },
 
@@ -1001,10 +1056,11 @@ const Dashboard = {
             const status = s.last_status === 'up';
             const netUp = (s.network_tx || 0) / 1024 / 1024;
             const netDown = (s.network_rx || 0) / 1024 / 1024;
+            const group = s.server_group || 'default';
             return `<div class="server-card ${status ? 'online' : 'offline'}">
                 <div class="server-header">
                     <div class="server-name"><span class="status-dot" style="background: ${status ? 'var(--success)' : 'var(--danger)'}"></span>${s.name}</div>
-                    <span class="text-muted">${s.os_type}</span>
+                    <span class="text-muted" style="font-size: 11px; padding: 2px 6px; background: var(--bg-tertiary); border-radius: 4px;">${group}</span>
                 </div>
                 <div class="metrics-row">
                     <div class="metric"><div class="metric-label">CPU</div><div class="metric-value">${(s.cpu_percent || 0).toFixed(1)}%</div></div>
@@ -1110,9 +1166,11 @@ const Servers = {
             const tbody = document.querySelector('#servers-table tbody');
             tbody.innerHTML = servers.map(s => {
                 const status = s.last_status === 'up';
+                const group = s.server_group || 'default';
                 return `<tr>
                     <td><span class="badge ${status ? 'badge-success' : 'badge-danger'}">${status ? 'Online' : 'Offline'}</span></td>
                     <td><strong>${s.name}</strong></td>
+                    <td><span style="font-size: 11px; padding: 2px 6px; background: var(--bg-tertiary); border-radius: 4px;">${group}</span></td>
                     <td class="text-muted">${s.host}:${s.agent_port || 9100}</td>
                     <td>${s.os_type}</td>
                     <td>${(s.cpu_percent || 0).toFixed(1)}%</td>
@@ -1124,7 +1182,7 @@ const Servers = {
                         <button class="btn btn-danger btn-sm" onclick="Servers.delete(${s.id})"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
-            }).join('') || '<tr><td colspan="9" class="text-muted" style="text-align: center; padding: 40px;">No servers</td></tr>';
+            }).join('') || '<tr><td colspan="11" class="text-muted" style="text-align: center; padding: 40px;">No servers</td></tr>';
         } catch (e) { console.error(e); }
     },
 
@@ -1136,11 +1194,31 @@ const Servers = {
 
     async create(e) {
         e.preventDefault();
-        const data = { name: document.getElementById('server-name').value, host: document.getElementById('server-host').value, os_type: document.getElementById('server-os').value, agent_port: parseInt(document.getElementById('server-port').value) };
+        const data = { 
+            name: document.getElementById('server-name').value, 
+            host: document.getElementById('server-host').value, 
+            os_type: document.getElementById('server-os').value, 
+            agent_port: parseInt(document.getElementById('server-port').value),
+            server_group: document.getElementById('server-group').value 
+        };
         await API.post('/api/servers', data);
         Modal.hide('server');
         document.getElementById('form-server').reset();
         Servers.load();
+        Dashboard.loadData();
+    },
+
+    async addGroup() {
+        const newGroup = prompt('Enter new group name:');
+        if (newGroup && newGroup.trim()) {
+            const select = document.getElementById('server-group');
+            const groupName = newGroup.trim().toLowerCase().replace(/\s+/g, '-');
+            const option = document.createElement('option');
+            option.value = groupName;
+            option.textContent = newGroup.trim();
+            option.selected = true;
+            select.appendChild(option);
+        }
     },
 
     async scrape(id) { await API.post(`/api/servers/${id}/scrape`); Servers.load(); },
@@ -1269,6 +1347,14 @@ async def list_servers():
     return {"servers": result}
 
 
+@router.get("/api/groups")
+async def list_groups():
+    conn = get_db()
+    groups = conn.execute("SELECT DISTINCT server_group FROM servers ORDER BY server_group").fetchall()
+    conn.close()
+    return {"groups": [g["server_group"] for g in groups]}
+
+
 @router.post("/api/servers")
 async def create_server(server: ServerModel):
     conn = get_db()
@@ -1278,8 +1364,8 @@ async def create_server(server: ServerModel):
         server.agent_port = 9182 if server.os_type == "windows" else 9100
 
     c.execute(
-        """INSERT INTO servers (name, host, os_type, agent_port, check_interval, enabled, notify_telegram, notify_discord, notify_slack, notify_email, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO servers (name, host, os_type, agent_port, check_interval, enabled, server_group, notify_telegram, notify_discord, notify_slack, notify_email, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             server.name,
             server.host,
@@ -1287,6 +1373,7 @@ async def create_server(server: ServerModel):
             server.agent_port,
             server.check_interval,
             int(server.enabled),
+            server.server_group,
             int(server.notify_telegram),
             int(server.notify_discord),
             int(server.notify_slack),
