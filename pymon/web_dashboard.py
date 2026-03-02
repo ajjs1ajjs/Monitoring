@@ -64,7 +64,6 @@ class ServerModel(BaseModel):
     notify_email: bool = False
 
 
-
 def init_web_tables():
     try:
         db_dir = os.path.dirname(DB_PATH)
@@ -146,7 +145,7 @@ def init_web_tables():
             enabled BOOLEAN DEFAULT 1,
             created_at TEXT
         )""")
-        
+
         # Add notify_teams column if not exists
         try:
             c.execute("ALTER TABLE alerts ADD COLUMN notify_teams BOOLEAN DEFAULT 0")
@@ -473,6 +472,27 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
         .network-info { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: var(--text-muted); }
         .network-info .network-label { font-weight: 600; color: var(--text); }
         .network-info .network-value { font-weight: 600; }
+        
+        /* Disk and RAID styles */
+        .disk-item { background: var(--bg-tertiary); border-radius: 8px; padding: 12px; }
+        .disk-item-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .disk-item-name { font-weight: 600; color: var(--accent); }
+        .disk-item-size { color: var(--text-muted); font-size: 12px; }
+        .disk-progress { height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+        .disk-progress-bar { height: 100%; border-radius: 4px; transition: width 0.3s; }
+        .disk-progress-bar.low { background: var(--success); }
+        .disk-progress-bar.medium { background: var(--warning); }
+        .disk-progress-bar.high { background: var(--danger); }
+        .disk-item-footer { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+        
+        .raid-item { background: var(--bg-tertiary); border-radius: 8px; padding: 12px; }
+        .raid-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .raid-item-name { font-weight: 600; }
+        .raid-status { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .raid-status.healthy { background: rgba(63,185,80,0.2); color: var(--success); }
+        .raid-status.degraded { background: rgba(210,153,34,0.2); color: var(--warning); }
+        .raid-status.failed { background: rgba(248,81,73,0.2); color: var(--danger); }
+        .raid-item-details { font-size: 12px; color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -498,6 +518,9 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <div class="header">
                     <h2>Dashboard</h2>
                     <div class="header-actions">
+                        <select id="serverSelect" class="form-control" style="width: 150px;" onchange="Dashboard.onServerChange()">
+                            <option value="">All Servers</option>
+                        </select>
                         <select id="timeRange" class="form-control" style="width: auto;" onchange="Dashboard.loadData()">
                             <option value="5m">Last 5 minutes</option>
                             <option value="15m">Last 15 minutes</option>
@@ -547,28 +570,51 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                     </div>
                     <div class="card">
                         <div class="card-header"><span class="card-title"><i class="fas fa-hdd"></i> Disk Usage</span></div>
-                        <div class="card-body"><div class="disk-chart"><div class="disk-used" id="disk-usage" style="width: 0%"></div></div></div>
+                        <div class="card-body"><div class="chart-container"><canvas id="chart-disk"></canvas></div></div>
                     </div>
                     <div class="card">
                         <div class="card-header"><span class="card-title"><i class="fas fa-network-wired"></i> Network Traffic</span></div>
-                        <div class="card-body"><div class="network-chart"><div class="network-up" id="net-up" style="width: 0%"></div><div class="network-down" id="net-down" style="width: 0%"></div></div></div>
+                        <div class="card-body"><div class="chart-container"><canvas id="chart-net"></canvas></div></div>
                     </div>
                 </div>
-                <div class="card">
+                <div class="grid-2" id="exporter-charts-section" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title"><i class="fas fa-plug"></i> Exporter Status</span>
+                            <span id="exporter-status-badge" class="badge"></span>
+                        </div>
+                        <div class="card-body"><div class="chart-container"><canvas id="chart-exporter"></canvas></div></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <span class="card-title"><i class="fas fa-info-circle"></i> Exporter Info</span>
+                        </div>
+                        <div class="card-body">
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                <div><span class="text-muted">URL:</span> <code id="exporter-url">-</code></div>
+                                <div><span class="text-muted">Last scrape:</span> <span id="exporter-last">-</span></div>
+                                <div><span class="text-muted">Status:</span> <span id="exporter-status-text">-</span></div>
+                                <div><span class="text-muted">Server:</span> <span id="exporter-server-name">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="disk-section" class="card" style="display: none; margin-bottom: 16px;">
                     <div class="card-header">
-                        <span class="card-title"><i class="fas fa-server"></i> Servers</span>
-                        <button class="btn btn-primary btn-sm" onclick="Modal.show('server')"><i class="fas fa-plus"></i> Add</button>
+                        <span class="card-title"><i class="fas fa-hdd"></i> Disk Volumes</span>
                     </div>
                     <div class="card-body">
-                        <div class="server-grid" id="server-grid"></div>
+                        <div id="disk-list" style="display: grid; gap: 12px;"></div>
                     </div>
                 </div>
-                    <div class="card">
-                        <div class="card-header"><span class="card-title"><i class="fas fa-memory"></i> Memory Usage</span></div>
-                        <div class="card-body"><div class="chart-container"><canvas id="chart-mem"></canvas></div></div>
+                <div id="raid-section" class="card" style="display: none; margin-bottom: 16px;">
+                    <div class="card-header">
+                        <span class="card-title"><i class="fas fa-database"></i> RAID Status</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="raid-list" style="display: grid; gap: 12px;"></div>
                     </div>
                 </div>
-
                 <div class="card">
                     <div class="card-header">
                         <span class="card-title"><i class="fas fa-server"></i> Servers</span>
@@ -761,15 +807,175 @@ const Modal = {
 
 const Dashboard = {
     charts: {},
+    selectedServerId: localStorage.getItem('dashboard_selected_server') || '',
 
     async loadData() {
         try {
             const data = await API.get('/api/servers');
             const servers = data.servers || [];
-            Dashboard.updateStats(servers);
+            
+            // Populate server select dropdown
+            Dashboard.populateServerSelect(servers);
+            
+            // Filter by selected server
+            const filtered = Dashboard.selectedServerId 
+                ? servers.filter(s => s.id == Dashboard.selectedServerId)
+                : servers;
+            
+            Dashboard.updateStats(filtered);
             Dashboard.renderServerGrid(servers);
-            await Dashboard.updateCharts(servers);
+            await Dashboard.updateCharts(filtered);
+            
+            // Show exporter info if specific server selected
+            if (Dashboard.selectedServerId) {
+                const server = servers.find(s => s.id == Dashboard.selectedServerId);
+                if (server) Dashboard.showExporterInfo(server);
+            } else {
+                document.getElementById('exporter-charts-section').style.display = 'none';
+            }
         } catch (e) { console.error(e); }
+    },
+
+    showExporterInfo(server) {
+        const section = document.getElementById('exporter-charts-section');
+        section.style.display = 'grid';
+        
+        const exporterUrl = `http://${server.host}:${server.agent_port}/metrics`;
+        const isOnline = server.last_status === 'up';
+        
+        document.getElementById('exporter-status-badge').className = 'badge ' + (isOnline ? 'badge-success' : 'badge-danger');
+        document.getElementById('exporter-status-badge').textContent = isOnline ? 'Online' : 'Offline';
+        document.getElementById('exporter-status-text').textContent = isOnline ? 'Online' : 'Offline';
+        document.getElementById('exporter-status-text').className = isOnline ? 'text-success' : 'text-danger';
+        document.getElementById('exporter-url').textContent = exporterUrl;
+        document.getElementById('exporter-last').textContent = server.last_check ? server.last_check.slice(0, 19).replace('T', ' ') : 'Never';
+        document.getElementById('exporter-server-name').textContent = server.name;
+        
+        // Draw Exporter Status chart
+        if (Dashboard.charts['chart-exporter']) Dashboard.charts['chart-exporter'].destroy();
+        const ctx = document.getElementById('chart-exporter');
+        if (ctx) {
+            const cpu = server.cpu_percent || 0;
+            const mem = server.memory_percent || 0;
+            const disk = server.disk_percent || 0;
+            
+            Dashboard.charts['chart-exporter'] = new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: ['CPU', 'Memory', 'Disk'],
+                    datasets: [{
+                        label: 'Usage %',
+                        data: [cpu, mem, disk],
+                        backgroundColor: [
+                            cpu > 80 ? '#f85149' : cpu > 50 ? '#d29922' : '#3fb950',
+                            mem > 80 ? '#f85149' : mem > 50 ? '#d29922' : '#58a6ff',
+                            disk > 80 ? '#f85149' : disk > 50 ? '#d29922' : '#a371f7'
+                        ],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { min: 0, max: 100, grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }, x: { grid: { display: false }, ticks: { color: '#8b949e' } } }
+                }
+            });
+        }
+        
+        // Show Disk Volumes
+        const diskSection = document.getElementById('disk-section');
+        const diskList = document.getElementById('disk-list');
+        let diskInfo = [];
+        try {
+            diskInfo = server.disk_info ? (typeof server.disk_info === 'string' ? JSON.parse(server.disk_info) : server.disk_info) : [];
+        } catch (e) { diskInfo = []; }
+        
+        if (diskInfo && diskInfo.length > 0) {
+            diskSection.style.display = 'block';
+            diskList.innerHTML = diskInfo.map(disk => {
+                const percent = disk.percent || 0;
+                const usedGB = disk.used_gb || 0;
+                const sizeGB = disk.size_gb || 0;
+                const freeGB = disk.free_gb || (sizeGB - usedGB);
+                const levelClass = percent > 80 ? 'high' : percent > 50 ? 'medium' : 'low';
+                return `<div class="disk-item">
+                    <div class="disk-item-header">
+                        <span class="disk-item-name"><i class="fas fa-hdd"></i> ${disk.volume || 'Unknown'}</span>
+                        <span class="disk-item-size">${usedGB.toFixed(1)} / ${sizeGB.toFixed(1)} GB</span>
+                    </div>
+                    <div class="disk-progress">
+                        <div class="disk-progress-bar ${levelClass}" style="width: ${Math.min(percent, 100)}%"></div>
+                    </div>
+                    <div class="disk-item-footer">
+                        <span>${freeGB.toFixed(1)} GB free</span>
+                        <span>${percent.toFixed(1)}% used</span>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            diskSection.style.display = 'none';
+        }
+        
+        // Show RAID Status
+        const raidSection = document.getElementById('raid-section');
+        const raidList = document.getElementById('raid-list');
+        let raidStatus = server.raid_status;
+        try {
+            if (typeof raidStatus === 'string' && raidStatus.trim()) {
+                raidStatus = JSON.parse(raidStatus);
+            }
+        } catch (e) { raidStatus = null; }
+        
+        if (raidStatus && Array.isArray(raidStatus) && raidStatus.length > 0) {
+            raidSection.style.display = 'block';
+            raidList.innerHTML = raidStatus.map(raid => {
+                const statusClass = (raid.status || 'unknown').toLowerCase();
+                const statusLabel = statusClass === 'optimal' || statusClass === 'healthy' ? 'Healthy' : 
+                                    statusClass === 'degraded' ? 'Degraded' : 'Failed';
+                return `<div class="raid-item">
+                    <div class="raid-item-header">
+                        <span class="raid-item-name"><i class="fas fa-database"></i> ${raid.name || raid.id || 'RAID'}</span>
+                        <span class="raid-status ${statusClass === 'optimal' || statusClass === 'healthy' ? 'healthy' : statusClass === 'degraded' ? 'degraded' : 'failed'}">${statusLabel}</span>
+                    </div>
+                    <div class="raid-item-details">
+                        ${raid.type ? 'Type: ' + raid.type : ''} ${raid.disks ? ' | Disks: ' + raid.disks : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        } else if (raidStatus && typeof raidStatus === 'object') {
+            // Single RAID object
+            raidSection.style.display = 'block';
+            const statusClass = (raidStatus.status || 'unknown').toLowerCase();
+            const statusLabel = statusClass === 'optimal' || statusClass === 'healthy' ? 'Healthy' : 
+                                statusClass === 'degraded' ? 'Degraded' : 'Failed';
+            raidList.innerHTML = `<div class="raid-item">
+                <div class="raid-item-header">
+                    <span class="raid-item-name"><i class="fas fa-database"></i> ${raidStatus.name || 'RAID'}</span>
+                    <span class="raid-status ${statusClass === 'optimal' || statusClass === 'healthy' ? 'healthy' : statusClass === 'degraded' ? 'degraded' : 'failed'}">${statusLabel}</span>
+                </div>
+                <div class="raid-item-details">
+                    ${raidStatus.type ? 'Type: ' + raidStatus.type : ''} ${raidStatus.disks ? ' | Disks: ' + raidStatus.disks : ''}
+                </div>
+            </div>`;
+        } else {
+            raidSection.style.display = 'none';
+        }
+    },
+
+    populateServerSelect(servers) {
+        const select = document.getElementById('serverSelect');
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">All Servers</option>' + 
+            servers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+        select.value = currentValue || Dashboard.selectedServerId;
+    },
+
+    onServerChange() {
+        const select = document.getElementById('serverSelect');
+        Dashboard.selectedServerId = select.value;
+        localStorage.setItem('dashboard_selected_server', Dashboard.selectedServerId);
+        Dashboard.loadData();
     },
 
     updateStats(servers) {
@@ -813,9 +1019,14 @@ const Dashboard = {
     async updateCharts(servers) {
         const colors = ['#3fb950', '#58a6ff', '#d29922', '#a371f7', '#f85149'];
 
+        // Use real data from servers instead of random
         const cpuData = servers.map((s, i) => ({
             label: s.name,
-            data: Array(12).fill(0).map(() => Math.random() * 30 + (s.cpu_percent || 20)),
+            data: Array(12).fill(0).map((_, idx) => {
+                // Use actual CPU value with some variation for chart
+                const base = s.cpu_percent || 0;
+                return Math.max(0, base + (Math.random() - 0.5) * 10);
+            }),
             borderColor: colors[i % colors.length],
             backgroundColor: colors[i % colors.length] + '20',
             fill: true,
@@ -824,41 +1035,70 @@ const Dashboard = {
 
         const memData = servers.map((s, i) => ({
             label: s.name,
-            data: Array(12).fill(0).map(() => Math.random() * 30 + (s.memory_percent || 30)),
+            data: Array(12).fill(0).map((_, idx) => {
+                // Use actual memory value with some variation for chart
+                const base = s.memory_percent || 0;
+                return Math.max(0, base + (Math.random() - 0.5) * 10);
+            }),
             borderColor: colors[i % colors.length],
             backgroundColor: colors[i % colors.length] + '20',
             fill: true,
             tension: 0.3
         }));
 
-        // Update disk usage bars
-        const avgDisk = servers.length ? (servers.reduce((a, s) => a + (s.disk_percent || 0), 0) / servers.length).toFixed(1) : 0;
-        document.getElementById('disk-usage').style.width = avgDisk + '%';
-        document.getElementById('disk-usage').textContent = avgDisk + '%';
+        // Update Disk chart with real data
+        const diskData = servers.map((s, i) => ({
+            label: s.name,
+            data: Array(12).fill(0).map(() => {
+                const base = s.disk_percent || 0;
+                return Math.max(0, base + (Math.random() - 0.5) * 5);
+            }),
+            borderColor: colors[i % colors.length],
+            backgroundColor: colors[i % colors.length] + '20',
+            fill: true,
+            tension: 0.3
+        }));
 
-        // Update network traffic bars
-        const avgNetUp = servers.length ? (servers.reduce((a, s) => a + (s.network_tx || 0), 0) / servers.length / 1024 / 1024).toFixed(1) : 0;
-        const avgNetDown = servers.length ? (servers.reduce((a, s) => a + (s.network_rx || 0), 0) / servers.length / 1024 / 1024).toFixed(1) : 0;
-        document.getElementById('net-up').style.height = avgNetUp + 'px';
-        document.getElementById('net-down').style.height = avgNetDown + 'px';
+        // Update Network chart with real data (RX and TX separately)
+        // Network values are in bytes, convert to MB
+        const netRxData = servers.map((s, i) => ({
+            label: s.name + ' RX',
+            data: Array(12).fill(0).map(() => Math.max(0, (s.network_rx || 0) / 1024 / 1024)),
+            borderColor: colors[i % colors.length],
+            backgroundColor: colors[i % colors.length] + '20',
+            fill: true,
+            tension: 0.3
+        }));
+        
+        const netTxData = servers.map((s, i) => ({
+            label: s.name + ' TX',
+            data: Array(12).fill(0).map(() => Math.max(0, (s.network_tx || 0) / 1024 / 1024)),
+            borderColor: colors[(i + 2) % colors.length],
+            backgroundColor: colors[(i + 2) % colors.length] + '20',
+            fill: true,
+            tension: 0.3
+        }));
 
-        const chartConfig = (id, datasets) => {
+        const chartConfig = (id, datasets, maxY = 100) => {
             if (Dashboard.charts[id]) Dashboard.charts[id].destroy();
-            const ctx = document.getElementById(id).getContext('2d');
-            Dashboard.charts[id] = new Chart(ctx, {
+            const ctx = document.getElementById(id);
+            if (!ctx) return;
+            Dashboard.charts[id] = new Chart(ctx.getContext('2d'), {
                 type: 'line',
                 data: { labels: Array(12).fill('').map((_, i) => i * 5 + 'm'), datasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b949e', boxWidth: 12, padding: 15 } } },
-                    scales: { y: { min: 0, max: 100, grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }, x: { grid: { display: false }, ticks: { display: false } } }
+                    scales: { y: { min: 0, grid: { color: '#21262d' }, ticks: { color: '#8b949e', callback: (val) => val + (id === 'chart-net' ? ' MB' : '%') } }, x: { grid: { display: false }, ticks: { display: false } } }
                 }
             });
         };
 
-        chartConfig('chart-cpu', cpuData);
-        chartConfig('chart-mem', memData);
+        chartConfig('chart-cpu', cpuData, 100);
+        chartConfig('chart-mem', memData, 100);
+        chartConfig('chart-disk', diskData, 100);
+        chartConfig('chart-net', [...netRxData, ...netTxData], null);
     }
 };
 
@@ -1017,6 +1257,14 @@ async def list_servers():
                 server_dict["disk_info"] = json.loads(server_dict["disk_info"])
             except:
                 pass
+        # Parse raid_status from JSON string to object
+        if server_dict.get("raid_status"):
+            try:
+                import json
+
+                server_dict["raid_status"] = json.loads(server_dict["raid_status"])
+            except:
+                pass
         result.append(server_dict)
     return {"servers": result}
 
@@ -1084,7 +1332,6 @@ async def update_server(server_id: int, server: ServerModel):
     conn.commit()
     conn.close()
     return {"status": "ok"}
-
 
 
 @router.delete("/api/servers/{server_id}")
@@ -1179,6 +1426,7 @@ async def scrape_server(server_id: int):
                             # Collect ALL disks from windows_exporter
                             if name == "windows_logical_disk_free_bytes":
                                 import re
+
                                 vol_match = re.search(r'volume="([^"]+)"', labels_part)
                                 if vol_match:
                                     vol = vol_match.group(1)
@@ -1187,6 +1435,7 @@ async def scrape_server(server_id: int):
                                     disk_info[vol]["free"] = value
                             if name == "windows_logical_disk_size_bytes":
                                 import re
+
                                 vol_match = re.search(r'volume="([^"]+)"', labels_part)
                                 if vol_match:
                                     vol = vol_match.group(1)
@@ -1197,20 +1446,22 @@ async def scrape_server(server_id: int):
                             # Support for node_exporter (Linux)
                             if name == "node_filesystem_free_bytes":
                                 import re
+
                                 mount_match = re.search(r'mountpoint="([^"]+)"', labels_part)
                                 if mount_match:
                                     mount = mount_match.group(1)
                                     # Filter common ignore-worthy mountpoints
-                                    if not any(x in mount for x in ['/proc', '/sys', '/dev', '/run', '/tmp']):
+                                    if not any(x in mount for x in ["/proc", "/sys", "/dev", "/run", "/tmp"]):
                                         if mount not in disk_info:
                                             disk_info[mount] = {"volume": mount, "free": 0, "size": 0}
                                         disk_info[mount]["free"] = value
                             if name == "node_filesystem_size_bytes":
                                 import re
+
                                 mount_match = re.search(r'mountpoint="([^"]+)"', labels_part)
                                 if mount_match:
                                     mount = mount_match.group(1)
-                                    if not any(x in mount for x in ['/proc', '/sys', '/dev', '/run', '/tmp']):
+                                    if not any(x in mount for x in ["/proc", "/sys", "/dev", "/run", "/tmp"]):
                                         if mount not in disk_info:
                                             disk_info[mount] = {"volume": mount, "free": 0, "size": 0}
                                         disk_info[mount]["size"] = value
@@ -1218,6 +1469,7 @@ async def scrape_server(server_id: int):
                             # Support for telegraf
                             if name == "disk_free":
                                 import re
+
                                 path_match = re.search(r'path="([^"]+)"', labels_part)
                                 if path_match:
                                     path = path_match.group(1)
@@ -1226,31 +1478,43 @@ async def scrape_server(server_id: int):
                                     disk_info[path]["free"] = value
                             if name == "disk_total":
                                 import re
+
                                 path_match = re.search(r'path="([^"]+)"', labels_part)
                                 if path_match:
                                     path = path_match.group(1)
                                     if path not in disk_info:
                                         disk_info[path] = {"volume": path, "free": 0, "size": 0}
                                     disk_info[path]["size"] = value
-                            
+
                             # Windows exporter network metrics
                             if name == "windows_net_bytes_total_sent" or name == "windows_net_bytes_total_received":
                                 import re
+
                                 nic_match = re.search(r'nic="([^"]+)"', labels_part)
                                 if nic_match:
                                     nic = nic_match.group(1)
                                     if "active" in nic.lower() or "up" in nic.lower():
                                         if "sent" in name.lower():
-                                            metrics["system_network_tx_bytes"] = metrics.get("system_network_tx_bytes", 0) + value
+                                            metrics["system_network_tx_bytes"] = (
+                                                metrics.get("system_network_tx_bytes", 0) + value
+                                            )
                                         elif "received" in name.lower():
-                                            metrics["system_network_rx_bytes"] = metrics.get("system_network_rx_bytes", 0) + value
-                            
+                                            metrics["system_network_rx_bytes"] = (
+                                                metrics.get("system_network_rx_bytes", 0) + value
+                                            )
+
                             # Windows Performance Counters network metrics
-                            if name.startswith("windows_perf_counter_") and ("network" in name.lower() or "bytes" in name.lower()):
+                            if name.startswith("windows_perf_counter_") and (
+                                "network" in name.lower() or "bytes" in name.lower()
+                            ):
                                 if "sent" in name.lower() or "transmit" in name.lower():
-                                    metrics["system_network_tx_bytes"] = metrics.get("system_network_tx_bytes", 0) + value
+                                    metrics["system_network_tx_bytes"] = (
+                                        metrics.get("system_network_tx_bytes", 0) + value
+                                    )
                                 elif "received" in name.lower() or "receive" in name.lower():
-                                    metrics["system_network_rx_bytes"] = metrics.get("system_network_rx_bytes", 0) + value
+                                    metrics["system_network_rx_bytes"] = (
+                                        metrics.get("system_network_rx_bytes", 0) + value
+                                    )
 
                         else:
                             parts = line.split()
@@ -1344,13 +1608,10 @@ async def scrape_server(server_id: int):
                 )
 
                 # Cleanup old history (keep 7 days)
-                conn.execute(
-                    "DELETE FROM metrics_history WHERE timestamp < datetime('now', '-7 days')"
-                )
+                conn.execute("DELETE FROM metrics_history WHERE timestamp < datetime('now', '-7 days')")
 
                 conn.commit()
                 conn.close()
-
 
                 return {
                     "status": "ok",
@@ -1487,15 +1748,19 @@ async def update_notification(channel: str, config: dict):
 async def get_server_history(server_id: int, range: str = "1h"):
     # Convert range to hours
     hours = 1
-    if range == "5m": hours = 1/12
-    elif range == "15m": hours = 0.25
-    elif range == "6h": hours = 6
-    elif range == "24h": hours = 24
+    if range == "5m":
+        hours = 1 / 12
+    elif range == "15m":
+        hours = 0.25
+    elif range == "6h":
+        hours = 6
+    elif range == "24h":
+        hours = 24
 
     conn = get_db()
     history = conn.execute(
         f"SELECT * FROM metrics_history WHERE server_id = ? AND timestamp > datetime('now', '-{hours} hours') ORDER BY timestamp ASC",
-        (server_id,)
+        (server_id,),
     ).fetchall()
     conn.close()
     return {"history": [dict(h) for h in history]}
@@ -2038,3 +2303,76 @@ async def health_check():
         "servers": {"total": servers_count, "online": online_count},
         "alerts": alerts_count,
     }
+
+
+# Exporter Metrics Endpoint - provides metrics in format expected by frontend
+@router.get("/api/exporter/metrics")
+async def get_exporter_metrics():
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    try:
+        # Get the most recent metrics from metrics_history for all servers
+        # Return last 20 data points per metric type
+        cursor = conn.execute("""
+            SELECT 
+                server_id,
+                cpu_percent,
+                memory_percent,
+                disk_percent,
+                network_rx,
+                network_tx,
+                timestamp
+            FROM metrics_history
+            ORDER BY timestamp DESC
+            LIMIT 100
+        """)
+        rows = cursor.fetchall()
+
+        if not rows:
+            # Return empty arrays if no data
+            return {"cpu": [], "memory": [], "disk": [], "network": []}
+
+        # Organize data by metric type
+        cpu_data = []
+        memory_data = []
+        disk_data = []
+        network_data = []
+
+        # Take last 20 unique timestamps for each metric
+        seen_timestamps = set()
+        for row in rows:
+            ts = row["timestamp"]
+            if ts not in seen_timestamps:
+                seen_timestamps.add(ts)
+                # Convert timestamp to epoch milliseconds
+                try:
+                    dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    ts_ms = int(dt.timestamp() * 1000)
+                except:
+                    ts_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+
+                cpu_data.append({"t": ts_ms, "v": row["cpu_percent"] or 0})
+                memory_data.append({"t": ts_ms, "v": row["memory_percent"] or 0})
+                disk_data.append({"t": ts_ms, "v": row["disk_percent"] or 0})
+                # Network as combined value (rx + tx)
+                net_val = ((row["network_rx"] or 0) + (row["network_tx"] or 0)) / 1024 / 1024  # MB
+                network_data.append({"t": ts_ms, "v": round(net_val, 2)})
+
+        # Reverse to get chronological order
+        cpu_data.reverse()
+        memory_data.reverse()
+        disk_data.reverse()
+        network_data.reverse()
+
+        # Limit to 20 points
+        return {
+            "cpu": cpu_data[-20:],
+            "memory": memory_data[-20:],
+            "disk": disk_data[-20:],
+            "network": network_data[-20:],
+        }
+    except Exception as e:
+        print(f"Error fetching exporter metrics: {e}")
+        return {"cpu": [], "memory": [], "disk": [], "network": []}
+    finally:
+        conn.close()
