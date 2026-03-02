@@ -587,6 +587,15 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                         <div class="card-body"><div class="chart-container"><canvas id="chart-net"></canvas></div></div>
                     </div>
                 </div>
+                <div id="raid-section" class="card" style="margin-bottom: 16px;">
+                    <div class="card-header">
+                        <span class="card-title"><i class="fas fa-database"></i> RAID Status</span>
+                        <button class="btn btn-secondary btn-sm" onclick="Dashboard.loadData()"><i class="fas fa-sync"></i></button>
+                    </div>
+                    <div class="card-body">
+                        <div id="raid-list" style="display: grid; gap: 12px;"></div>
+                    </div>
+                </div>
                 <div class="grid-2" id="exporter-charts-section" style="display: none;">
                     <div class="card">
                         <div class="card-header">
@@ -615,14 +624,6 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                     </div>
                     <div class="card-body">
                         <div id="disk-list" style="display: grid; gap: 12px;"></div>
-                    </div>
-                </div>
-                <div id="raid-section" class="card" style="display: none; margin-bottom: 16px;">
-                    <div class="card-header">
-                        <span class="card-title"><i class="fas fa-database"></i> RAID Status</span>
-                    </div>
-                    <div class="card-body">
-                        <div id="raid-list" style="display: grid; gap: 12px;"></div>
                     </div>
                 </div>
                 <div class="card">
@@ -854,6 +855,7 @@ const Dashboard = {
             Dashboard.updateStats(filtered);
             Dashboard.renderServerGrid(servers);
             await Dashboard.updateCharts(filtered);
+            Dashboard.renderRAID(servers);
             
             // Show exporter info if specific server selected
             if (Dashboard.selectedServerId) {
@@ -861,6 +863,7 @@ const Dashboard = {
                 if (server) Dashboard.showExporterInfo(server);
             } else {
                 document.getElementById('exporter-charts-section').style.display = 'none';
+                document.getElementById('disk-section').style.display = 'none';
             }
         } catch (e) { console.error(e); }
     },
@@ -1014,6 +1017,61 @@ const Dashboard = {
         }
     },
 
+    renderRAID(servers) {
+        const raidSection = document.getElementById('raid-section');
+        const raidList = document.getElementById('raid-list');
+        let hasRaid = false;
+        let html = '';
+        
+        servers.forEach(server => {
+            let raidStatus = server.raid_status;
+            try {
+                if (typeof raidStatus === 'string' && raidStatus.trim()) {
+                    raidStatus = JSON.parse(raidStatus);
+                }
+            } catch (e) { raidStatus = null; }
+            
+            if (raidStatus && Array.isArray(raidStatus) && raidStatus.length > 0) {
+                hasRaid = true;
+                raidStatus.forEach(raid => {
+                    const statusClass = (raid.status || 'unknown').toLowerCase();
+                    const statusLabel = statusClass === 'optimal' || statusClass === 'healthy' ? 'Healthy' : 
+                                        statusClass === 'degraded' ? 'Degraded' : 'Failed';
+                    html += `<div class="raid-item">
+                        <div class="raid-item-header">
+                            <span class="raid-item-name"><i class="fas fa-database"></i> ${server.name} - ${raid.name || raid.id || 'RAID'}</span>
+                            <span class="raid-status ${statusClass === 'optimal' || statusClass === 'healthy' ? 'healthy' : statusClass === 'degraded' ? 'degraded' : 'failed'}">${statusLabel}</span>
+                        </div>
+                        <div class="raid-item-details">
+                            ${raid.type ? 'Type: ' + raid.type : ''} ${raid.disks ? ' | Disks: ' + raid.disks : ''}
+                        </div>
+                    </div>`;
+                });
+            } else if (raidStatus && typeof raidStatus === 'object') {
+                hasRaid = true;
+                const statusClass = (raidStatus.status || 'unknown').toLowerCase();
+                const statusLabel = statusClass === 'optimal' || statusClass === 'healthy' ? 'Healthy' : 
+                                    statusClass === 'degraded' ? 'Degraded' : 'Failed';
+                html += `<div class="raid-item">
+                    <div class="raid-item-header">
+                        <span class="raid-item-name"><i class="fas fa-database"></i> ${server.name} - ${raidStatus.name || 'RAID'}</span>
+                        <span class="raid-status ${statusClass === 'optimal' || statusClass === 'healthy' ? 'healthy' : statusClass === 'degraded' ? 'degraded' : 'failed'}">${statusLabel}</span>
+                    </div>
+                    <div class="raid-item-details">
+                        ${raidStatus.type ? 'Type: ' + raidStatus.type : ''} ${raidStatus.disks ? ' | Disks: ' + raidStatus.disks : ''}
+                    </div>
+                </div>`;
+            }
+        });
+        
+        if (hasRaid) {
+            raidSection.style.display = 'block';
+            raidList.innerHTML = html;
+        } else {
+            raidSection.style.display = 'none';
+        }
+    },
+
     populateServerSelect(servers) {
         const select = document.getElementById('serverSelect');
         const currentValue = select.value;
@@ -1115,33 +1173,32 @@ const Dashboard = {
             tension: 0.3
         }));
 
-        // Update Network chart with real data (RX and TX separately)
-        // Network values are in bytes, convert to MB
+        // Update Network chart - show as bar chart with current values
+        // Network is total bytes, show in MB
         const netRxData = servers.map((s, i) => ({
             label: s.name + ' RX',
-            data: Array(12).fill(0).map(() => Math.max(0, (s.network_rx || 0) / 1024 / 1024)),
-            borderColor: colors[i % colors.length],
-            backgroundColor: colors[i % colors.length] + '20',
-            fill: true,
-            tension: 0.3
+            data: [(s.network_rx || 0) / 1024 / 1024],
+            backgroundColor: colors[i % colors.length],
+            borderRadius: 4
         }));
         
         const netTxData = servers.map((s, i) => ({
             label: s.name + ' TX',
-            data: Array(12).fill(0).map(() => Math.max(0, (s.network_tx || 0) / 1024 / 1024)),
-            borderColor: colors[(i + 2) % colors.length],
-            backgroundColor: colors[(i + 2) % colors.length] + '20',
-            fill: true,
-            tension: 0.3
+            data: [(s.network_tx || 0) / 1024 / 1024],
+            backgroundColor: colors[(i + 2) % colors.length],
+            borderRadius: 4
         }));
 
-        const chartConfig = (id, datasets, maxY = 100) => {
+        const chartConfig = (id, datasets, maxY = 100, chartType = 'line') => {
             if (Dashboard.charts[id]) Dashboard.charts[id].destroy();
             const ctx = document.getElementById(id);
             if (!ctx) return;
+            const labels = chartType === 'bar' && id === 'chart-net' 
+                ? datasets.map(d => d.label) 
+                : Array(12).fill('').map((_, i) => i * 5 + 'm');
             Dashboard.charts[id] = new Chart(ctx.getContext('2d'), {
-                type: 'line',
-                data: { labels: Array(12).fill('').map((_, i) => i * 5 + 'm'), datasets },
+                type: chartType,
+                data: { labels, datasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -1151,10 +1208,10 @@ const Dashboard = {
             });
         };
 
-        chartConfig('chart-cpu', cpuData, 100);
-        chartConfig('chart-mem', memData, 100);
-        chartConfig('chart-disk', diskData, 100);
-        chartConfig('chart-net', [...netRxData, ...netTxData], null);
+        chartConfig('chart-cpu', cpuData, 100, 'line');
+        chartConfig('chart-mem', memData, 100, 'line');
+        chartConfig('chart-disk', diskData, 100, 'line');
+        chartConfig('chart-net', [...netRxData, ...netTxData], null, 'bar');
     }
 };
 
