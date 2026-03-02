@@ -6,11 +6,15 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 router = APIRouter()
+
+# FastAPI app wrapper to mount the router
+app = FastAPI()
+app.include_router(router)
 
 DB_PATH = os.getenv("DB_PATH", "pymon.db")
 
@@ -692,9 +696,10 @@ def dashboard(request: Request):
         "</script>",
         "</body>",
         "</html>"
-    ])
+    ]))
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(router, host="0.0.0.0", port=8080)
+    # Run the FastAPI application, not the router directly
+    uvicorn.run(app, host="0.0.0.0", port=8080)
