@@ -628,6 +628,12 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 </div>
                 <div class="card">
                     <div class="card-header">
+                        <span class="card-title"><i class="fas fa-database"></i> RAID Status</span>
+                    </div>
+                    <div class="card-body"><div class="chart-container"><canvas id="chart-raid"></canvas></div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
                         <span class="card-title"><i class="fas fa-server"></i> Servers</span>
                         <button class="btn btn-primary btn-sm" onclick="Modal.show('server')"><i class="fas fa-plus"></i> Add</button>
                     </div>
@@ -1022,6 +1028,7 @@ const Dashboard = {
         const raidList = document.getElementById('raid-list');
         let hasRaid = false;
         let html = '';
+        const raidData = [];
         
         servers.forEach(server => {
             let raidStatus = server.raid_status;
@@ -1037,6 +1044,16 @@ const Dashboard = {
                     const statusClass = (raid.status || 'unknown').toLowerCase();
                     const statusLabel = statusClass === 'optimal' || statusClass === 'healthy' ? 'Healthy' : 
                                         statusClass === 'degraded' ? 'Degraded' : 'Failed';
+                    const statusValue = statusClass === 'optimal' || statusClass === 'healthy' ? 100 : 
+                                       statusClass === 'degraded' ? 50 : 0;
+                    raidData.push({
+                        label: server.name + ' - ' + (raid.name || raid.id || 'RAID'),
+                        status: statusLabel,
+                        statusClass: statusClass,
+                        statusValue: statusValue,
+                        type: raid.type,
+                        disks: raid.disks
+                    });
                     html += `<div class="raid-item">
                         <div class="raid-item-header">
                             <span class="raid-item-name"><i class="fas fa-database"></i> ${server.name} - ${raid.name || raid.id || 'RAID'}</span>
@@ -1052,6 +1069,16 @@ const Dashboard = {
                 const statusClass = (raidStatus.status || 'unknown').toLowerCase();
                 const statusLabel = statusClass === 'optimal' || statusClass === 'healthy' ? 'Healthy' : 
                                     statusClass === 'degraded' ? 'Degraded' : 'Failed';
+                const statusValue = statusClass === 'optimal' || statusClass === 'healthy' ? 100 : 
+                                   statusClass === 'degraded' ? 50 : 0;
+                raidData.push({
+                    label: server.name + ' - ' + (raidStatus.name || 'RAID'),
+                    status: statusLabel,
+                    statusClass: statusClass,
+                    statusValue: statusValue,
+                    type: raidStatus.type,
+                    disks: raidStatus.disks
+                });
                 html += `<div class="raid-item">
                     <div class="raid-item-header">
                         <span class="raid-item-name"><i class="fas fa-database"></i> ${server.name} - ${raidStatus.name || 'RAID'}</span>
@@ -1066,7 +1093,34 @@ const Dashboard = {
         
         if (hasRaid) {
             raidSection.style.display = 'block';
-            raidList.innerHTML = html;
+            if (raidList) raidList.innerHTML = html;
+            
+            // Draw RAID chart
+            if (Dashboard.charts['chart-raid']) Dashboard.charts['chart-raid'].destroy();
+            const ctx = document.getElementById('chart-raid');
+            if (ctx && raidData.length > 0) {
+                Dashboard.charts['chart-raid'] = new Chart(ctx.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: raidData.map(r => r.label),
+                        datasets: [{
+                            label: 'Status %',
+                            data: raidData.map(r => r.statusValue),
+                            backgroundColor: raidData.map(r => 
+                                r.statusClass === 'optimal' || r.statusClass === 'healthy' ? '#3fb950' : 
+                                r.statusClass === 'degraded' ? '#d29922' : '#f85149'
+                            ),
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: { y: { min: 0, max: 100, grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }, x: { grid: { display: false }, ticks: { color: '#8b949e' } } }
+                    }
+                });
+            }
         } else {
             raidSection.style.display = 'none';
         }
@@ -1175,19 +1229,27 @@ const Dashboard = {
 
         // Update Network chart - show as bar chart with current values
         // Network is total bytes, show in MB
-        const netRxData = servers.map((s, i) => ({
-            label: s.name + ' RX',
-            data: [(s.network_rx || 0) / 1024 / 1024],
-            backgroundColor: colors[i % colors.length],
-            borderRadius: 4
-        }));
+        const netLabels = servers.map(s => s.name);
+        const netRxValues = servers.map(s => (s.network_rx || 0) / 1024 / 1024);
+        const netTxValues = servers.map(s => (s.network_tx || 0) / 1024 / 1024);
         
-        const netTxData = servers.map((s, i) => ({
-            label: s.name + ' TX',
-            data: [(s.network_tx || 0) / 1024 / 1024],
-            backgroundColor: colors[(i + 2) % colors.length],
-            borderRadius: 4
-        }));
+        const netData = {
+            labels: netLabels,
+            datasets: [
+                {
+                    label: 'RX (MB)',
+                    data: netRxValues,
+                    backgroundColor: '#58a6ff',
+                    borderRadius: 4
+                },
+                {
+                    label: 'TX (MB)',
+                    data: netTxValues,
+                    backgroundColor: '#a371f7',
+                    borderRadius: 4
+                }
+            ]
+        };
 
         const chartConfig = (id, datasets, maxY = 100, chartType = 'line') => {
             if (Dashboard.charts[id]) Dashboard.charts[id].destroy();
@@ -1211,7 +1273,22 @@ const Dashboard = {
         chartConfig('chart-cpu', cpuData, 100, 'line');
         chartConfig('chart-mem', memData, 100, 'line');
         chartConfig('chart-disk', diskData, 100, 'line');
-        chartConfig('chart-net', [...netRxData, ...netTxData], null, 'bar');
+        
+        // Network chart - use special netData object
+        if (Dashboard.charts['chart-net']) Dashboard.charts['chart-net'].destroy();
+        const netCtx = document.getElementById('chart-net');
+        if (netCtx) {
+            Dashboard.charts['chart-net'] = new Chart(netCtx.getContext('2d'), {
+                type: 'bar',
+                data: netData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, position: 'bottom', labels: { color: '#8b949e', boxWidth: 12, padding: 15 } } },
+                    scales: { y: { min: 0, grid: { color: '#21262d' }, ticks: { color: '#8b949e', callback: (val) => val + ' MB' } }, x: { grid: { display: false }, ticks: { color: '#8b949e' } } }
+                }
+            });
+        }
     }
 };
 
