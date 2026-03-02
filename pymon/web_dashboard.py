@@ -456,6 +456,23 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
         .empty-state i { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+
+        /* New styles for disk and network */
+        .disk-card { background: linear-gradient(135deg, rgba(210,153,34,0.1), rgba(210,153,34,0.05)); border-left: 4px solid var(--warning); }
+        .disk-card .stat-icon { background: rgba(210,153,34,0.2); color: var(--warning); }
+        .network-card { background: linear-gradient(135deg, rgba(88,166,255,0.1), rgba(88,166,255,0.05)); border-left: 4px solid var(--accent); }
+        .network-card .stat-icon { background: rgba(88,166,255,0.2); color: var(--accent); }
+        .disk-chart { height: 200px; background: var(--bg); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        .disk-chart .disk-used { height: 100%; background: var(--warning); border-radius: 4px; transition: width 0.3s ease; }
+        .network-chart { height: 200px; background: var(--bg); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        .network-chart .network-up { height: 50%; background: var(--accent); border-radius: 4px 4px 0 0; }
+        .network-chart .network-down { height: 50%; background: var(--success); border-radius: 0 0 4px 4px; }
+        .disk-info { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: var(--text-muted); }
+        .disk-info .disk-label { font-weight: 600; color: var(--text); }
+        .disk-info .disk-percent { font-weight: 600; }
+        .network-info { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: var(--text-muted); }
+        .network-info .network-label { font-weight: 600; color: var(--text); }
+        .network-info .network-value { font-weight: 600; }
     </style>
 </head>
 <body>
@@ -509,13 +526,43 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                         <div class="stat-icon" style="background: rgba(210,153,34,0.2); color: var(--warning);"><i class="fas fa-memory"></i></div>
                         <div><div class="stat-value" id="stat-mem">0%</div><div class="stat-label">Avg Memory</div></div>
                     </div>
+                    <div class="stat-card disk-card">
+                        <div class="stat-icon"><i class="fas fa-hdd"></i></div>
+                        <div><div class="stat-value" id="stat-disk">0%</div><div class="stat-label">Avg Disk</div></div>
+                    </div>
+                    <div class="stat-card network-card">
+                        <div class="stat-icon"><i class="fas fa-network-wired"></i></div>
+                        <div><div class="stat-value" id="stat-net">0/0 MB</div><div class="stat-label">Network</div></div>
+                    </div>
                 </div>
 
-                <div class="grid-2">
+        <div class="grid-2">
                     <div class="card">
                         <div class="card-header"><span class="card-title"><i class="fas fa-microchip"></i> CPU Usage</span></div>
                         <div class="card-body"><div class="chart-container"><canvas id="chart-cpu"></canvas></div></div>
                     </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title"><i class="fas fa-memory"></i> Memory Usage</span></div>
+                        <div class="card-body"><div class="chart-container"><canvas id="chart-mem"></canvas></div></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title"><i class="fas fa-hdd"></i> Disk Usage</span></div>
+                        <div class="card-body"><div class="disk-chart"><div class="disk-used" id="disk-usage" style="width: 0%"></div></div></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><span class="card-title"><i class="fas fa-network-wired"></i> Network Traffic</span></div>
+                        <div class="card-body"><div class="network-chart"><div class="network-up" id="net-up" style="width: 0%"></div><div class="network-down" id="net-down" style="width: 0%"></div></div></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title"><i class="fas fa-server"></i> Servers</span>
+                        <button class="btn btn-primary btn-sm" onclick="Modal.show('server')"><i class="fas fa-plus"></i> Add</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="server-grid" id="server-grid"></div>
+                    </div>
+                </div>
                     <div class="card">
                         <div class="card-header"><span class="card-title"><i class="fas fa-memory"></i> Memory Usage</span></div>
                         <div class="card-body"><div class="chart-container"><canvas id="chart-mem"></canvas></div></div>
@@ -550,6 +597,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                                     <th>CPU</th>
                                     <th>Memory</th>
                                     <th>Disk</th>
+                                    <th>Network</th>
                                     <th>Last Check</th>
                                     <th>Actions</th>
                                 </tr>
@@ -729,10 +777,15 @@ const Dashboard = {
         const offline = servers.length - online;
         const cpu = servers.length ? (servers.reduce((a, s) => a + (s.cpu_percent || 0), 0) / servers.length).toFixed(1) : 0;
         const mem = servers.length ? (servers.reduce((a, s) => a + (s.memory_percent || 0), 0) / servers.length).toFixed(1) : 0;
+        const disk = servers.length ? (servers.reduce((a, s) => a + (s.disk_percent || 0), 0) / servers.length).toFixed(1) : 0;
+        const netUp = servers.length ? (servers.reduce((a, s) => a + (s.network_tx || 0), 0) / servers.length / 1024 / 1024).toFixed(1) : 0;
+        const netDown = servers.length ? (servers.reduce((a, s) => a + (s.network_rx || 0), 0) / servers.length / 1024 / 1024).toFixed(1) : 0;
         document.getElementById('stat-online').textContent = online;
         document.getElementById('stat-offline').textContent = offline;
         document.getElementById('stat-cpu').textContent = cpu + '%';
         document.getElementById('stat-mem').textContent = mem + '%';
+        document.getElementById('stat-disk').textContent = disk + '%';
+        document.getElementById('stat-net').textContent = netUp + '/' + netDown + ' MB';
     },
 
     renderServerGrid(servers) {
@@ -740,6 +793,8 @@ const Dashboard = {
         if (!servers.length) { grid.innerHTML = '<div class="empty-state"><i class="fas fa-server"></i><p>No servers configured</p></div>'; return; }
         grid.innerHTML = servers.map(s => {
             const status = s.last_status === 'up';
+            const netUp = (s.network_tx || 0) / 1024 / 1024;
+            const netDown = (s.network_rx || 0) / 1024 / 1024;
             return `<div class="server-card ${status ? 'online' : 'offline'}">
                 <div class="server-header">
                     <div class="server-name"><span class="status-dot" style="background: ${status ? 'var(--success)' : 'var(--danger)'}"></span>${s.name}</div>
@@ -749,6 +804,7 @@ const Dashboard = {
                     <div class="metric"><div class="metric-label">CPU</div><div class="metric-value">${(s.cpu_percent || 0).toFixed(1)}%</div></div>
                     <div class="metric"><div class="metric-label">Memory</div><div class="metric-value">${(s.memory_percent || 0).toFixed(1)}%</div></div>
                     <div class="metric"><div class="metric-label">Disk</div><div class="metric-value">${(s.disk_percent || 0).toFixed(1)}%</div></div>
+                    <div class="metric"><div class="metric-label">Network</div><div class="metric-value">${netUp.toFixed(1)}/${netDown.toFixed(1)} MB</div></div>
                 </div>
             </div>`;
         }).join('');
@@ -774,6 +830,17 @@ const Dashboard = {
             fill: true,
             tension: 0.3
         }));
+
+        // Update disk usage bars
+        const avgDisk = servers.length ? (servers.reduce((a, s) => a + (s.disk_percent || 0), 0) / servers.length).toFixed(1) : 0;
+        document.getElementById('disk-usage').style.width = avgDisk + '%';
+        document.getElementById('disk-usage').textContent = avgDisk + '%';
+
+        // Update network traffic bars
+        const avgNetUp = servers.length ? (servers.reduce((a, s) => a + (s.network_tx || 0), 0) / servers.length / 1024 / 1024).toFixed(1) : 0;
+        const avgNetDown = servers.length ? (servers.reduce((a, s) => a + (s.network_rx || 0), 0) / servers.length / 1024 / 1024).toFixed(1) : 0;
+        document.getElementById('net-up').style.height = avgNetUp + 'px';
+        document.getElementById('net-down').style.height = avgNetDown + 'px';
 
         const chartConfig = (id, datasets) => {
             if (Dashboard.charts[id]) Dashboard.charts[id].destroy();
@@ -930,7 +997,6 @@ setInterval(() => { if (!document.getElementById('view-dashboard').classList.con
 
 
 @router.get("/dashboard/", response_class=HTMLResponse)
-        @router.get("/dashboard/", response_class=HTMLResponse)
 async def dashboard():
     return DASHBOARD_HTML
 
@@ -1166,6 +1232,25 @@ async def scrape_server(server_id: int):
                                     if path not in disk_info:
                                         disk_info[path] = {"volume": path, "free": 0, "size": 0}
                                     disk_info[path]["size"] = value
+                            
+                            # Windows exporter network metrics
+                            if name == "windows_net_bytes_total_sent" or name == "windows_net_bytes_total_received":
+                                import re
+                                nic_match = re.search(r'nic="([^"]+)"', labels_part)
+                                if nic_match:
+                                    nic = nic_match.group(1)
+                                    if "active" in nic.lower() or "up" in nic.lower():
+                                        if "sent" in name.lower():
+                                            metrics["system_network_tx_bytes"] = metrics.get("system_network_tx_bytes", 0) + value
+                                        elif "received" in name.lower():
+                                            metrics["system_network_rx_bytes"] = metrics.get("system_network_rx_bytes", 0) + value
+                            
+                            # Windows Performance Counters network metrics
+                            if name.startswith("windows_perf_counter_") and ("network" in name.lower() or "bytes" in name.lower()):
+                                if "sent" in name.lower() or "transmit" in name.lower():
+                                    metrics["system_network_tx_bytes"] = metrics.get("system_network_tx_bytes", 0) + value
+                                elif "received" in name.lower() or "receive" in name.lower():
+                                    metrics["system_network_rx_bytes"] = metrics.get("system_network_rx_bytes", 0) + value
 
                         else:
                             parts = line.split()

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "command": {},
+  "plugin": [],
+  "snapshot": false,
+  "share": "auto",
+  "autoupdate": true,
+  "username": "Admin",
+  "mode": {},
+  "agent": {}
+}

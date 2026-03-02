@@ -15,6 +15,7 @@ scrape_manager = None
 
 
 def main():
+    print(">>> main() started")
     parser = argparse.ArgumentParser(description="PyMon - Python Monitoring System", prog="pymon")
     parser.add_argument("--version", action="version", version=f"PyMon {__version__}")
     
@@ -47,6 +48,7 @@ def main():
 
             print(f"Initializing storage...", file=sys.stderr)
             from pymon.auth import init_auth_tables, auth_config as auth_cfg
+            from pymon import web_dashboard
             from pymon.storage import init_storage
 
             init_storage(backend=storage, db_path=db_path)
@@ -70,6 +72,9 @@ def main():
             
             print(f"Initializing auth tables...", file=sys.stderr)
             init_auth_tables()
+            
+            print("Initializing web tables...", file=sys.stderr)
+            web_dashboard.init_web_tables()
 
             print(f"Starting PyMon server on {host}:{port}")
             print(f"Dashboard: http://{host}:{port}/dashboard/")
@@ -121,6 +126,7 @@ async def lifespan(app):
 
 
 def create_app():
+    print(">>> create_app() started")
     from fastapi import FastAPI
     from fastapi.responses import HTMLResponse, RedirectResponse
     from fastapi.middleware.cors import CORSMiddleware
@@ -129,7 +135,6 @@ def create_app():
     
     from pymon.api.endpoints import api
     from pymon import web_dashboard
-    from pymon.auth import init_auth_tables
 
     print("Creating FastAPI app...", file=sys.stderr)
     
@@ -142,17 +147,6 @@ def create_app():
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    try:
-        print("Initializing auth tables...", file=sys.stderr)
-        init_auth_tables()
-        print("Initializing web tables...", file=sys.stderr)
-        web_dashboard.init_web_tables()
-        print("All tables initialized", file=sys.stderr)
-    except Exception as e:
-        print(f"Error initializing tables: {e}", file=sys.stderr)
-        traceback.print_exc()
-        raise
 
     app.include_router(api, prefix="/api/v1")
     app.include_router(web_dashboard.router)
