@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
+venv/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -20,37 +23,21 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
-.venv/
-venv/
-ENV/
-env/
-
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
-
-# Testing
-.tox/
-.nox/
-.coverage
-.coverage.*
-htmlcov/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Logs
-*.log
-logs/
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
+
+# Logs
+*.log
+logs/
 
 # Environment
 .env
@@ -60,15 +47,16 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Project specific
-pymon.db
+# Backups
 backups/
-data/
-config/
-config.yml
+*.bak
+*.backup
 
-# Additional
-.venv-1/
-test_registry.py
-pymon_err.log
-pymon_out.log
+# Config (keep examples)
+config.yml
+settings.json
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
