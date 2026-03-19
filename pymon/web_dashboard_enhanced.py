@@ -635,6 +635,21 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .section-content { display: none; }
         .section-content.active { display: block; }
 
+        /* Theme Toggle */
+        .theme-toggle { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .theme-toggle:hover { background: var(--card-hover); }
+        .theme-icon { font-size: 16px; }
+
+        /* Light theme */
+        body.light-theme {
+            --bg: #f5f5f5; --bg-secondary: #ffffff; --bg-tertiary: #e8e8e8; --border: #d0d0d0; --border-light: #c0c0c0;
+            --text: #1a1a1a; --muted: #666666; --muted-light: #888888;
+            --blue-glow: rgba(87,148,242,0.1); --green-glow: rgba(115,191,105,0.1);
+            --red-glow: rgba(242,73,92,0.1); --yellow-glow: rgba(242,204,12,0.1); --purple-glow: rgba(184,119,217,0.1);
+        }
+        body.light-theme .panel { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        body.light-theme .stat-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+
         /* Table */
         .table-container { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; }
@@ -686,6 +701,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <button class="time-btn" data-range="6h">6h</button>
                 <button class="time-btn" data-range="24h">24h</button>
             </div>
+            <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+                <span class="theme-icon">🌙</span>
+            </button>
             <button class="btn btn-secondary btn-sm" id="refreshBtn" title="Refresh (30s auto)"><i class="fas fa-sync"></i></button>
             <button class="btn btn-secondary btn-sm" id="logoutBtn"><i class="fas fa-sign-out-alt"></i></button>
         </div>
@@ -805,6 +823,34 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     </div>
                 </div>
 
+                <!-- Gauge Charts -->
+                <div class="grid-item col-12">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-tachometer-alt" style="color: var(--cyan);"></i> Real-time Gauges</div>
+                        </div>
+                        <div class="panel-body">
+                            <div class="gauge-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; padding: 20px;">
+                                <div class="gauge-item">
+                                    <canvas id="gaugeCpu" width="200" height="100"></canvas>
+                                    <div class="gauge-label">CPU Usage</div>
+                                    <div class="gauge-value" id="gaugeCpuValue">0%</div>
+                                </div>
+                                <div class="gauge-item">
+                                    <canvas id="gaugeMemory" width="200" height="100"></canvas>
+                                    <div class="gauge-label">Memory Usage</div>
+                                    <div class="gauge-value" id="gaugeMemoryValue">0%</div>
+                                </div>
+                                <div class="gauge-item">
+                                    <canvas id="gaugeDisk" width="200" height="100"></canvas>
+                                    <div class="gauge-label">Disk Usage</div>
+                                    <div class="gauge-value" id="gaugeDiskValue">0%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Uptime Timeline -->
                 <div class="grid-item col-6">
                     <div class="panel">
@@ -916,10 +962,34 @@ if (!token) window.location.href = '/login';
 
 let servers = [];
 let charts = {};
+let gaugeCharts = {};
 let currentRange = '1h';
 let autoRefreshInterval;
+let isLightTheme = localStorage.getItem('theme') === 'light';
 
 const colors = ['#73bf69', '#f2cc0c', '#5794f2', '#ff780a', '#b877d9', '#00d8d8', '#f2495c', '#9673b9'];
+
+// Initialize theme
+if (isLightTheme) {
+    document.body.classList.add('light-theme');
+}
+
+// Theme toggle handler
+document.addEventListener('DOMContentLoaded', () => {
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = themeToggle.querySelector('.theme-icon');
+    themeIcon.textContent = isLightTheme ? '☀️' : '🌙';
+
+    themeToggle.addEventListener('click', () => {
+        isLightTheme = !isLightTheme;
+        document.body.classList.toggle('light-theme');
+        themeIcon.textContent = isLightTheme ? '☀️' : '🌙';
+        localStorage.setItem('theme', isLightTheme ? 'light' : 'dark');
+
+        // Update chart colors
+        updateChartsWithRealData();
+    });
+});
 
 // Initialize navigation
 document.querySelectorAll('.nav-item').forEach(btn => {
@@ -991,6 +1061,7 @@ async function loadData() {
         servers = data.servers || [];
 
         updateStats();
+        updateGauges();  // Update gauge charts
         await updateChartsWithRealData();
         updateServerGrid();
         updateServerTable();
@@ -1050,6 +1121,78 @@ function updateTrend(elementId, data) {
     } else {
         el.innerHTML = `<i class="fas fa-minus"></i> Stable`;
         el.className = 'stat-trend';
+    }
+}
+
+// Gauge Charts
+let gaugeCharts = {};
+
+function createGaugeChart(ctx, value, color) {
+    const normalizedValue = value / 2; // Normalize for semicircle
+
+    return new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [value, 100 - value],
+                backgroundColor: [color, 'rgba(255,255,255,0.1)'],
+                borderWidth: 0,
+                circumference: 180,
+                rotation: 270,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '75%',
+            plugins: {
+                tooltip: { enabled: false },
+                legend: { display: false }
+            }
+        }
+    });
+}
+
+function updateGauges() {
+    if (!servers.length) return;
+
+    const cpuAvg = servers.reduce((a, s) => a + (s.cpu_percent || 0), 0) / servers.length;
+    const memAvg = servers.reduce((a, s) => a + (s.memory_percent || 0), 0) / servers.length;
+    const diskAvg = servers.reduce((a, s) => a + (s.disk_percent || 0), 0) / servers.length;
+
+    // Update gauge values
+    document.getElementById('gaugeCpuValue').textContent = cpuAvg.toFixed(1) + '%';
+    document.getElementById('gaugeMemoryValue').textContent = memAvg.toFixed(1) + '%';
+    document.getElementById('gaugeDiskValue').textContent = diskAvg.toFixed(1) + '%';
+
+    // Get colors based on value
+    const getCaugeColor = (value) => {
+        if (value < 60) return '#73bf69';
+        if (value < 80) return '#f2cc0c';
+        return '#f2495c';
+    };
+
+    // Create or update gauges
+    const cpuCtx = document.getElementById('gaugeCpu').getContext('2d');
+    const memCtx = document.getElementById('gaugeMemory').getContext('2d');
+    const diskCtx = document.getElementById('gaugeDisk').getContext('2d');
+
+    if (!gaugeCharts.cpu) {
+        gaugeCharts.cpu = createGaugeChart(cpuCtx, cpuAvg, getCaugeColor(cpuAvg));
+        gaugeCharts.memory = createGaugeChart(memCtx, memAvg, getCaugeColor(memAvg));
+        gaugeCharts.disk = createGaugeChart(diskCtx, diskAvg, getCaugeColor(diskAvg));
+    } else {
+        gaugeCharts.cpu.data.datasets[0].data = [cpuAvg, 100 - cpuAvg];
+        gaugeCharts.cpu.data.datasets[0].backgroundColor = [getCaugeColor(cpuAvg), 'rgba(255,255,255,0.1)'];
+        gaugeCharts.cpu.update();
+
+        gaugeCharts.memory.data.datasets[0].data = [memAvg, 100 - memAvg];
+        gaugeCharts.memory.data.datasets[0].backgroundColor = [getCaugeColor(memAvg), 'rgba(255,255,255,0.1)'];
+        gaugeCharts.memory.update();
+
+        gaugeCharts.disk.data.datasets[0].data = [diskAvg, 100 - diskAvg];
+        gaugeCharts.disk.data.datasets[0].backgroundColor = [getCaugeColor(diskAvg), 'rgba(255,255,255,0.1)'];
+        gaugeCharts.disk.update();
     }
 }
 

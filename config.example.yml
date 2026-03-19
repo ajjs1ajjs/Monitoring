@@ -1,28 +1,37 @@
-# PyMon Configuration
+# PyMon Configuration Example
+# Copy this file to config.yml and customize for your environment
 
-# Server settings
+# =============================================================================
+# Server Settings
+# =============================================================================
 server:
-  port: 8090
-  host: 0.0.0.0
-  domain: localhost
+  host: 0.0.0.0 # Bind address (0.0.0.0 = all interfaces)
+  port: 8090 # Dashboard port
+  domain: localhost # Domain or IP for external access
 
-# Storage backend
+# =============================================================================
+# Storage Settings
+# =============================================================================
 storage:
-  backend: sqlite  # memory or sqlite
-  path: /var/lib/pymon/pymon.db
-  retention_hours: 168
+  backend: sqlite # Options: sqlite, memory
+  path: /var/lib/pymon/pymon.db # Database path
+  retention_hours: 168 # Data retention (168 = 7 days)
 
-# Authentication
+# =============================================================================
+# Authentication Settings
+# =============================================================================
 auth:
   admin_username: admin
-  admin_password: admin
-  jwt_expire_hours: 24
+  admin_password: admin # ⚠️ CHANGE THIS AFTER FIRST LOGIN!
+  jwt_expire_hours: 24 # Token expiration time
 
-# Scrape configuration (Prometheus-style)
+# =============================================================================
+# Scrape Configuration (Prometheus-style)
+# =============================================================================
 scrape_configs:
-  # Monitor local services
+  # Self-monitoring
   - job_name: pymon_self
-    scrape_interval: 15s
+    scrape_interval: 30s
     scrape_timeout: 10s
     metrics_path: /metrics
     static_configs:
@@ -32,74 +41,242 @@ scrape_configs:
           env: production
           service: pymon
 
-  # HTTP endpoints monitoring
-  - job_name: http_endpoints
-    scrape_interval: 30s
+  # Windows Servers (windows_exporter)
+  - job_name: windows_servers
+    scrape_interval: 15s
     scrape_timeout: 10s
+    metrics_path: /metrics
     static_configs:
       - targets:
-          - https://example.com
-          - https://api.example.com/health
+          - 192.168.1.100:9182
+          - 192.168.1.101:9182
         labels:
-          type: http
+          os: windows
+          team: infrastructure
 
-  # Custom metrics push
-  - job_name: push_metrics
-    honor_labels: true
+  # Linux Servers (node_exporter)
+  - job_name: linux_servers
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /metrics
     static_configs:
       - targets:
-          - localhost:9091
+          - 192.168.1.102:9100
+          - 192.168.1.103:9100
+        labels:
+          os: linux
+          team: infrastructure
 
-# Alerting rules
+  # RAID Monitoring (Telegraf)
+  - job_name: raid_monitoring
+    scrape_interval: 60s
+    scrape_timeout: 10s
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - localhost:9273
+        labels:
+          type: raid
+
+# =============================================================================
+# Alerting Rules
+# =============================================================================
 alerting:
   enabled: true
   evaluation_interval: 30s
   rules:
+    # High CPU Usage
     - name: HighCPU
-      expr: system_cpu_usage_percent
+      expr: cpu_percent
       threshold: 80
-      duration: 60s
+      duration: 300 # 5 minutes
       severity: warning
-      message: "CPU usage is {{ value }}%"
+      message: "CPU usage is {{ value }}% on {{ server }}"
 
-    - name: HighMemory
-      expr: system_memory_usage_percent
-      threshold: 90
-      duration: 30s
+    # Critical CPU Usage
+    - name: CriticalCPU
+      expr: cpu_percent
+      threshold: 95
+      duration: 60 # 1 minute
       severity: critical
-      message: "Memory usage is {{ value }}%"
+      message: "CRITICAL: CPU usage is {{ value }}% on {{ server }}"
 
-# Notifications
+    # High Memory Usage
+    - name: HighMemory
+      expr: memory_percent
+      threshold: 85
+      duration: 300
+      severity: warning
+      message: "Memory usage is {{ value }}% on {{ server }}"
+
+    # High Disk Usage
+    - name: HighDisk
+      expr: disk_percent
+      threshold: 80
+      duration: 600 # 10 minutes
+      severity: warning
+      message: "Disk usage is {{ value }}% on {{ server }}"
+
+    # Critical Disk Usage
+    - name: CriticalDisk
+      expr: disk_percent
+      threshold: 95
+      duration: 300
+      severity: critical
+      message: "CRITICAL: Disk usage is {{ value }}% on {{ server }}"
+
+    # Server Down
+    - name: ServerDown
+      expr: exporter_available
+      threshold: 1
+      condition: less_than
+      duration: 60
+      severity: critical
+      message: "Server {{ server }} is DOWN"
+
+# =============================================================================
+# Notification Channels
+# =============================================================================
 notifications:
+  # Email Notifications
   email:
     enabled: false
     smtp_server: smtp.example.com
     smtp_port: 587
-    smtp_user: ""
-    smtp_pass: ""
-    to: ""
+    smtp_user: notifications@example.com
+    smtp_pass: your_password_here
+    to: admin@example.com
+    from: PyMon <pymon@example.com>
+    use_tls: true
 
+  # Telegram Notifications
   telegram:
     enabled: false
-    bot_token: ""
-    chat_id: ""
+    bot_token: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
+    chat_id: "-1001234567890" # Can be group/channel ID
+    parse_mode: HTML
 
-  slack:
-    enabled: false
-    webhook_url: ""
-
+  # Discord Notifications
   discord:
     enabled: false
-    webhook_url: ""
+    webhook_url: "https://discord.com/api/webhooks/..."
+    username: PyMon
+    avatar_url: ""
 
+  # Slack Notifications
+  slack:
+    enabled: false
+    webhook_url: "https://hooks.slack.com/services/..."
+    channel: "#monitoring"
+    username: PyMon
+
+  # Microsoft Teams Notifications
+  teams:
+    enabled: false
+    webhook_url: "https://outlook.office.com/webhook/..."
+
+  # Generic Webhook (for custom integrations)
   webhook:
     enabled: false
-    url: ""
-    headers: {}
+    url: "https://your-api.com/webhook"
+    method: POST
+    headers:
+      Content-Type: application/json
+      Authorization: "Bearer your_token"
 
-# Backup settings
+# =============================================================================
+# Backup Settings
+# =============================================================================
 backup:
   enabled: true
-  max_backups: 10
-  backup_dir: /etc/pymon/backups
-  schedule: "0 2 * * *"  # Daily at 2 AM
+  auto: true
+  schedule: "0 2 * * *" # Daily at 2:00 AM (cron format)
+  path: /var/backups/pymon
+  keep_days: 30 # Keep backups for 30 days
+  max_backups: 10 # Maximum number of backups to keep
+  compress: true # Compress backups (ZIP)
+
+# =============================================================================
+# Enhanced Dashboard Settings (v2.0.0+)
+# =============================================================================
+dashboard:
+  # Auto-refresh interval in seconds
+  refresh_interval: 30
+
+  # Default time range for charts
+  default_time_range: 1h # Options: 5m, 15m, 1h, 6h, 24h, 7d
+
+  # Chart settings
+  charts:
+    # Threshold lines (percentage)
+    cpu_warning_threshold: 80
+    memory_warning_threshold: 80
+    disk_warning_threshold: 80
+
+    # Colors (hex)
+    cpu_color: "#73bf69"
+    memory_color: "#f2cc0c"
+    disk_color: "#f2495c"
+    network_color: "#b877d9"
+
+  # Uptime timeline settings
+  uptime:
+    default_days: 7 # Show last 7 days
+    max_days: 30 # Maximum allowed days
+
+  # Disk breakdown settings
+  disk:
+    show_all_volumes: true # Show all volumes or just C:
+    min_size_gb: 10 # Hide volumes smaller than this
+
+# =============================================================================
+# Logging Settings
+# =============================================================================
+logging:
+  level: INFO # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: /var/log/pymon/pymon.log
+  max_size_mb: 100 # Rotate log file at 100 MB
+  backup_count: 5 # Keep 5 backup log files
+
+# =============================================================================
+# Security Settings
+# =============================================================================
+security:
+  # HTTPS/SSL (optional)
+  ssl:
+    enabled: false
+    cert_path: /etc/pymon/ssl/cert.pem
+    key_path: /etc/pymon/ssl/key.pem
+
+  # CORS settings
+  cors:
+    enabled: true
+    allow_origins:
+      - "http://localhost:8090"
+      - "https://monitoring.example.com"
+    allow_credentials: true
+
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests_per_minute: 100
+    requests_per_hour: 1000
+
+# =============================================================================
+# Advanced Settings
+# =============================================================================
+advanced:
+  # Database connection pool
+  db_pool_size: 10
+
+  # Metrics scrape concurrency
+  max_concurrent_scrapes: 10
+
+  # Alert cooldown (prevent spam)
+  alert_cooldown_seconds: 300
+
+  # Health check endpoint
+  health_check:
+    enabled: true
+    path: /api/health
