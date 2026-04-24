@@ -94,7 +94,6 @@ def main():
             sys.exit(1)
     elif args.command == "reset-admin":
         try:
-            import os
             import sqlite3
 
             from pymon.auth import init_auth_tables
