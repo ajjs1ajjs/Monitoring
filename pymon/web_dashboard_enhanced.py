@@ -406,13 +406,9 @@ async def get_server_uptime_timeline(server_id: int, days: int = Query(7, ge=1, 
     conn = get_db()
 
     try:
-        # Get status changes from status_history or metrics_history
+        # Get status changes from metrics_history
         cursor = conn.execute(
             """
-            SELECT timestamp, last_status as status
-            FROM servers
-            WHERE id = ?
-            UNION ALL
             SELECT timestamp,
                    CASE WHEN cpu_percent IS NOT NULL THEN 'up' ELSE 'down' END as status
             FROM metrics_history
@@ -420,7 +416,7 @@ async def get_server_uptime_timeline(server_id: int, days: int = Query(7, ge=1, 
             AND timestamp > datetime('now', ?)
             ORDER BY timestamp
         """,
-            (server_id, server_id, f"-{days} days"),
+            (server_id, f"-{days} days"),
         )
 
         rows = cursor.fetchall()
