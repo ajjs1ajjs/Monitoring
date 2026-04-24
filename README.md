@@ -59,7 +59,7 @@
 # Clone and run
 git clone https://github.com/ajjs1ajjs/Monitoring.git
 cd Monitoring
-run.bat
+.\run.bat  # For PowerShell, or just 'run.bat' for CMD
 ```
 
 ### Manual Installation

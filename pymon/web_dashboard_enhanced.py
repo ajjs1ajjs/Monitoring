@@ -121,9 +121,89 @@ class UptimeEntry(BaseModel):
     status: str  # 'up' or 'down'
 
 
+class ServerModel(BaseModel):
+    name: str
+    host: str
+    os_type: str = "linux"
+    agent_port: int | None = None
+    check_interval: int = 15
+    enabled: bool = True
+    notify_telegram: bool = False
+    notify_discord: bool = False
+    notify_slack: bool = False
+    notify_email: bool = False
+
+
 # ============================================================================
 # API Endpoints for Enhanced Dashboard
 # ============================================================================
+
+
+@router.get("/api/servers")
+async def list_servers():
+    conn = get_db()
+    servers = conn.execute("SELECT * FROM servers ORDER BY name").fetchall()
+    conn.close()
+    result = []
+    for s in servers:
+        server_dict = dict(s)
+        if server_dict.get("disk_info"):
+            try:
+                server_dict["disk_info"] = json.loads(server_dict["disk_info"])
+            except:
+                pass
+        result.append(server_dict)
+    return {"servers": result}
+
+
+@router.post("/api/servers")
+async def create_server(server: ServerModel):
+    conn = get_db()
+    c = conn.cursor()
+    if server.agent_port is None:
+        server.agent_port = 9182 if server.os_type == "windows" else 9100
+    c.execute(
+        """INSERT INTO servers (name, host, os_type, agent_port, check_interval, enabled, notify_telegram, notify_discord, notify_slack, notify_email, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            server.name,
+            server.host,
+            server.os_type,
+            server.agent_port,
+            server.check_interval,
+            int(server.enabled),
+            int(server.notify_telegram),
+            int(server.notify_discord),
+            int(server.notify_slack),
+            int(server.notify_email),
+            datetime.now(timezone.utc).isoformat(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+
+@router.delete("/api/servers/{server_id}")
+async def delete_server_api(server_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM servers WHERE id=?", (server_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+
+@router.post("/api/servers/{server_id}/scrape")
+async def scrape_server_api(server_id: int):
+    conn = get_db()
+    server = conn.execute("SELECT * FROM servers WHERE id=?", (server_id,)).fetchone()
+    conn.close()
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+
+    # Trigger manual scrape - for now just return ok as background scraper will pick it up
+    # In a real scenario we might want to trigger the ScrapeManager directly
+    return {"status": "ok", "message": "Scrape triggered"}
 
 
 @router.get("/api/servers/metrics-history")
@@ -1125,11 +1205,7 @@ function updateTrend(elementId, data) {
 }
 
 // Gauge Charts
-let gaugeCharts = {};
-
 function createGaugeChart(ctx, value, color) {
-    const normalizedValue = value / 2; // Normalize for semicircle
-
     return new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -1196,283 +1272,30 @@ function updateGauges() {
     }
 }
 
-// Update charts with REAL data from API
-async function updateChartsWithRealData() {
-    try {
-        // Get aggregated metrics for all servers
-        const resp = await fetch(`/api/servers/metrics-history?range=${currentRange}`, {
-            headers: {'Authorization': 'Bearer ' + token}
-        });
-        const data = await resp.json();
-
-        const labels = data.labels || [];
-        const datasets = data.datasets || [];
-
-        // Destroy existing charts
-        Object.values(charts).forEach(chart => chart?.destroy());
-
-        // Create new charts with real data
-        if (labels.length > 0) {
-            charts.cpu = createChart('cpuChart', {
-                labels,
-                datasets: [datasets[0] || createPlaceholderDataset('CPU', '#73bf69')]
-            }, '%');
-
-            charts.memory = createChart('memoryChart', {
-                labels,
-                datasets: [datasets[1] || createPlaceholderDataset('Memory', '#f2cc0c')]
-            }, '%');
-
-            charts.disk = createChart('diskChart', {
-                labels,
-                datasets: [datasets[2] || createPlaceholderDataset('Disk', '#f2495c')]
-            }, '%');
-        } else {
-            // No data - show placeholder
-            charts.cpu = createChart('cpuChart', {labels: ['No data'], datasets: [createPlaceholderDataset('No data available', '#73bf69')]}, '%');
-            charts.memory = createChart('memoryChart', {labels: ['No data'], datasets: [createPlaceholderDataset('No data available', '#f2cc0c')]}, '%');
-            charts.disk = createChart('diskChart', {labels: ['No data'], datasets: [createPlaceholderDataset('No data available', '#f2495c')]}, '%');
-        }
-
-        // Network chart (placeholder for now)
-        charts.network = createChart('networkChart', {
-            labels: labels || ['No data'],
-            datasets: [{
-                label: 'Network RX',
-                data: labels ? Array(labels.length).fill(0).map(() => Math.random() * 100) : [0],
-                borderColor: '#b877d9',
-                backgroundColor: 'rgba(184,119,217,0.2)',
-                fill: true,
-                tension: 0.3
-            }, {
-                label: 'Network TX',
-                data: labels ? Array(labels.length).fill(0).map(() => Math.random() * 100) : [0],
-                borderColor: '#00d8d8',
-                backgroundColor: 'rgba(0,216,216,0.2)',
-                fill: true,
-                tension: 0.3
-            }]
-        }, ' MB/s');
-
-    } catch(e) {
-        console.error('Error updating charts:', e);
-    }
-}
-
-function createChart(canvasId, data, suffix) {
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    return new Chart(ctx, {
-        type: 'line',
-        data,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { intersect: false, mode: 'index' },
-            scales: {
-                y: {
-                    min: 0,
-                    max: suffix === '%' ? 100 : null,
-                    grid: { color: 'rgba(255,255,255,0.03)' },
-                    ticks: { color: '#666', font: { size: 10 }, callback: v => v + suffix }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#666', font: { size: 10 } }
-                }
-            },
-            plugins: {
-                legend: { display: true, position: 'top', labels: { color: '#8b8d98', usePointStyle: true } },
-                annotation: {
-                    annotations: {
-                        threshold80: {
-                            type: 'line',
-                            yMin: 80,
-                            yMax: 80,
-                            borderColor: 'rgba(242,73,92,0.5)',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            label: { display: true, content: '80% Threshold', position: 'end' }
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-function createPlaceholderDataset(label, color) {
-    return {
-        label,
-        data: [0],
-        borderColor: color,
-        backgroundColor: color + '20',
-        fill: true,
-        tension: 0.3
-    };
-}
-
-// Load disk breakdown
-async function loadDiskBreakdown() {
-    if (servers.length === 0) {
-        document.getElementById('diskBreakdownContent').innerHTML =
-            '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers with disk data</p>';
-        return;
-    }
-
-    // Get disk data for first server (or aggregate)
-    const server = servers[0];
-    try {
-        const resp = await fetch(`/api/servers/${server.id}/disk-breakdown`, {
-            headers: {'Authorization': 'Bearer ' + token}
-        });
-        const data = await resp.json();
-
-        if (data.disks && data.disks.length > 0) {
-            document.getElementById('diskBreakdownContent').innerHTML = data.disks.map(d => `
-                <div class="disk-item">
-                    <div class="disk-header">
-                        <div class="disk-volume">${d.volume}</div>
-                        <div class="disk-percent" style="color: ${getDiskColor(d.percent)}">${d.percent}%</div>
-                    </div>
-                    <div class="disk-bar">
-                        <div class="disk-fill" style="width: ${d.percent}%; background: ${getDiskColor(d.percent)}"></div>
-                    </div>
-                    <div class="disk-details">
-                        <span>Used: ${d.used_gb} GB</span>
-                        <span>Total: ${d.size_gb} GB</span>
-                    </div>
-                </div>
-            `).join('');
-        } else {
-            document.getElementById('diskBreakdownContent').innerHTML =
-                '<p style="color: var(--muted); text-align: center; padding: 20px;">No disk data available</p>';
-        }
-    } catch(e) {
-        console.error('Error loading disk data:', e);
-    }
-}
-
-function getDiskColor(percent) {
-    if (percent > 80) return 'var(--red)';
-    if (percent > 60) return 'var(--yellow)';
-    return 'var(--green)';
-}
-
-// Load uptime timeline
-async function loadUptimeTimeline() {
-    if (servers.length === 0) {
-        document.getElementById('uptimeTimeline').innerHTML = '';
-        return;
-    }
-
-    const server = servers[0];
-    try {
-        const resp = await fetch(`/api/servers/${server.id}/uptime-timeline?days=7`, {
-            headers: {'Authorization': 'Bearer ' + token}
-        });
-        const data = await resp.json();
-
-        document.getElementById('uptimePercent').textContent = (data.uptime_percent || 100) + '%';
-
-        // Count incidents (transitions from up to down)
-        let incidents = 0;
-        for (let i = 1; i < (data.timeline || []).length; i++) {
-            if (data.timeline[i].status === 'down' && data.timeline[i-1].status === 'up') {
-                incidents++;
-            }
-        }
-        document.getElementById('downtimeCount').textContent = incidents;
-
-        // Build timeline visualization
-        if (data.timeline && data.timeline.length > 0) {
-            const timelineHtml = data.timeline.map(entry =>
-                `<div class="uptime-segment ${entry.status}" style="width: ${100 / data.timeline.length}%"></div>`
-            ).join('');
-            document.getElementById('uptimeTimeline').innerHTML = timelineHtml;
-        }
-    } catch(e) {
-        console.error('Error loading uptime:', e);
-    }
-}
-
-// Update server grid
-function updateServerGrid() {
-    const el = document.getElementById('serverGrid');
-    el.innerHTML = servers.map(s => {
-        const status = s.last_status === 'up' ? 'online' : 'offline';
-        const statusColor = s.last_status === 'up' ? 'var(--green)' : 'var(--red)';
-        const cpuColor = (s.cpu_percent || 0) > 80 ? 'var(--red)' : (s.cpu_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
-        const memColor = (s.memory_percent || 0) > 80 ? 'var(--red)' : (s.memory_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
-
-        return `
-        <div class="server-card ${status}" onclick="window.location.href='/server/${s.id}'">
-            <div class="server-header">
-                <div class="server-name">
-                    <div class="server-status" style="background: ${statusColor}"></div>
-                    ${s.name}
-                </div>
-                <div class="server-os">${s.os_type}</div>
-            </div>
-            <div class="server-metrics" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-                <div class="metric-box" style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; text-align: center;">
-                    <div class="metric-label" style="font-size: 10px; color: var(--muted); text-transform: uppercase;">CPU</div>
-                    <div class="metric-value" style="font-size: 18px; font-weight: 600; color: ${cpuColor}">${(s.cpu_percent || 0).toFixed(1)}%</div>
-                </div>
-                <div class="metric-box" style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; text-align: center;">
-                    <div class="metric-label" style="font-size: 10px; color: var(--muted); text-transform: uppercase;">Memory</div>
-                    <div class="metric-value" style="font-size: 18px; font-weight: 600; color: ${memColor}">${(s.memory_percent || 0).toFixed(1)}%</div>
-                </div>
-                <div class="metric-box" style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; text-align: center;">
-                    <div class="metric-label" style="font-size: 10px; color: var(--muted); text-transform: uppercase;">Disk</div>
-                    <div class="metric-value" style="font-size: 18px; font-weight: 600; color: var(--blue)">${(s.disk_percent || 0).toFixed(1)}%</div>
-                </div>
-            </div>
-        </div>`;
-    }).join('') || '<p style="color: var(--muted); text-align: center; padding: 40px;">No servers configured</p>';
-}
-
-// Update server table
-function updateServerTable() {
-    const el = document.getElementById('serversTable');
-    el.innerHTML = servers.map(s => {
-        const statusBadge = s.last_status === 'up'
-            ? '<span class="badge badge-success"><i class="fas fa-circle"></i> Online</span>'
-            : '<span class="badge badge-danger"><i class="fas fa-circle"></i> Offline</span>';
-
-        return `<tr>
-            <td>${statusBadge}</td>
-            <td><strong>${s.name}</strong></td>
-            <td style="color: var(--muted)">${s.host}:${s.agent_port || 9100}</td>
-            <td>${s.os_type}</td>
-            <td>${(s.cpu_percent || 0).toFixed(1)}%</td>
-            <td>${(s.memory_percent || 0).toFixed(1)}%</td>
-            <td>${(s.disk_percent || 0).toFixed(1)}%</td>
-            <td style="color: var(--muted)">${s.last_check ? s.last_check.substring(11, 19) : '-'}</td>
-            <td>
-                <button class="btn btn-secondary btn-sm" onclick="scrapeServer(${s.id})"><i class="fas fa-sync"></i></button>
-                <button class="btn btn-danger btn-sm" onclick="deleteServer(${s.id})"><i class="fas fa-trash"></i></button>
-            </td>
-        </tr>`;
-    }).join('') || '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--muted);">No servers</td></tr>';
-}
-
 // Export chart data
 function exportChart(metric) {
     const url = `/api/servers/metrics-history?range=${currentRange}&metric=${metric}`;
     window.open(url, '_blank');
 }
 
-// Filter servers
+// Filter servers (simple implementation for stats cards)
 function filterBy(type) {
-    document.getElementById('filterStatus').value = type === 'online' ? 'up' : type === 'offline' ? 'down' : '';
-    loadData();
+    // In this dashboard, we just highlight or filter the server list
+    const online = type === 'online';
+    const serverCards = document.querySelectorAll('.server-card');
+    serverCards.forEach(card => {
+        if (type === 'all') {
+            card.style.display = 'block';
+        } else if (online) {
+            card.style.display = card.classList.contains('online') ? 'block' : 'none';
+        } else {
+            card.style.display = card.classList.contains('offline') ? 'block' : 'none';
+        }
+    });
 }
 
 // Scrape server
 async function scrapeServer(id) {
-    const btn = event.target.closest('button');
-    const icon = btn.querySelector('i');
-    icon.classList.add('animate-spin');
     try {
         await fetch(`/api/servers/${id}/scrape`, {
             method: 'POST',
@@ -1480,19 +1303,22 @@ async function scrapeServer(id) {
         });
         loadData();
     } catch(e) {
-        alert('Error: ' + e.message);
+        console.error('Error scraping server:', e);
     }
-    setTimeout(() => icon.classList.remove('animate-spin'), 500);
 }
 
 // Delete server
 async function deleteServer(id) {
-    if (confirm('Delete this server?')) {
-        await fetch(`/api/servers/${id}`, {
-            method: 'DELETE',
-            headers: {'Authorization': 'Bearer ' + token}
-        });
-        loadData();
+    if (confirm('Are you sure you want to delete this server?')) {
+        try {
+            await fetch(`/api/servers/${id}`, {
+                method: 'DELETE',
+                headers: {'Authorization': 'Bearer ' + token}
+            });
+            loadData();
+        } catch(e) {
+            console.error('Error deleting server:', e);
+        }
     }
 }
 
