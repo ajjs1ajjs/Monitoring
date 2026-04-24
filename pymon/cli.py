@@ -28,6 +28,8 @@ def main():
     server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite"], help="Storage backend")
     server_parser.add_argument("--db", default=None, help="Database path (defaults to config value)")
 
+    subparsers.add_parser("reset-admin", help="Reset admin password to 'changeme'")
+
     args = parser.parse_args()
 
     if args.command == "server":
@@ -89,6 +91,30 @@ def main():
         except Exception as e:
             print(f"ERROR: {e}", file=sys.stderr)
             traceback.print_exc()
+            sys.exit(1)
+    elif args.command == "reset-admin":
+        try:
+            import os
+            import sqlite3
+
+            from pymon.auth import init_auth_tables
+
+            db_path = os.getenv("DB_PATH", "pymon.db")
+            if os.path.exists(db_path):
+                conn = sqlite3.connect(db_path)
+                conn.execute("DELETE FROM users WHERE username='admin'")
+                conn.commit()
+                conn.close()
+                print(f"Deleted existing admin from {db_path}")
+
+            init_auth_tables()
+            print("--------------------------------------------------")
+            print("SUCCESS: Admin password has been reset!")
+            print("Login: admin")
+            print("Password: changeme")
+            print("--------------------------------------------------")
+        except Exception as e:
+            print(f"ERROR: Failed to reset admin: {e}")
             sys.exit(1)
     else:
         parser.print_help()
