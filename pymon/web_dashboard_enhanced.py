@@ -1134,14 +1134,29 @@ function showSection(section) {
 
 // Main data loading function
 async function loadData() {
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
     try {
-        // Load servers
-        const resp = await fetch('/api/servers', {headers: {'Authorization': 'Bearer ' + token}});
+        const resp = await fetch('/api/servers', {
+            headers: {'Authorization': 'Bearer ' + token}
+        });
+
+        if (resp.status === 401) {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+            return;
+        }
+
+        if (!resp.ok) throw new Error('Failed to fetch servers');
+
         const data = await resp.json();
         servers = data.servers || [];
 
         updateStats();
-        updateGauges();  // Update gauge charts
+        updateGauges();
         await updateChartsWithRealData();
         updateServerGrid();
         updateServerTable();
