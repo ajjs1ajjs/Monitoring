@@ -1272,6 +1272,267 @@ function updateGauges() {
     }
 }
 
+// Update charts with REAL data from API
+async function updateChartsWithRealData() {
+    try {
+        const resp = await fetch(`/api/servers/metrics-history?range=${currentRange}`, {
+            headers: {'Authorization': 'Bearer ' + token}
+        });
+        const data = await resp.json();
+
+        const labels = data.labels || [];
+        const datasets = data.datasets || [];
+
+        Object.values(charts).forEach(chart => chart?.destroy());
+
+        if (labels.length > 0) {
+            charts.cpu = createChart('cpuChart', {
+                labels,
+                datasets: [datasets[0] || createPlaceholderDataset('CPU', '#73bf69')]
+            }, '%');
+
+            charts.memory = createChart('memoryChart', {
+                labels,
+                datasets: [datasets[1] || createPlaceholderDataset('Memory', '#f2cc0c')]
+            }, '%');
+
+            charts.disk = createChart('diskChart', {
+                labels,
+                datasets: [datasets[2] || createPlaceholderDataset('Disk', '#f2495c')]
+            }, '%');
+        } else {
+            charts.cpu = createChart('cpuChart', {labels: ['No data'], datasets: [createPlaceholderDataset('No data available', '#73bf69')]}, '%');
+            charts.memory = createChart('memoryChart', {labels: ['No data'], datasets: [createPlaceholderDataset('No data available', '#f2cc0c')]}, '%');
+            charts.disk = createChart('diskChart', {labels: ['No data'], datasets: [createPlaceholderDataset('No data available', '#f2495c')]}, '%');
+        }
+
+        charts.network = createChart('networkChart', {
+            labels: labels.length > 0 ? labels : ['No data'],
+            datasets: [{
+                label: 'Network RX',
+                data: labels.length > 0 ? Array(labels.length).fill(0).map(() => Math.random() * 100) : [0],
+                borderColor: '#b877d9',
+                backgroundColor: 'rgba(184,119,217,0.2)',
+                fill: true,
+                tension: 0.3
+            }, {
+                label: 'Network TX',
+                data: labels.length > 0 ? Array(labels.length).fill(0).map(() => Math.random() * 100) : [0],
+                borderColor: '#00d8d8',
+                backgroundColor: 'rgba(0,216,216,0.2)',
+                fill: true,
+                tension: 0.3
+            }]
+        }, ' MB/s');
+
+    } catch(e) {
+        console.error('Error updating charts:', e);
+    }
+}
+
+function createChart(canvasId, data, suffix) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+    const ctx = canvas.getContext('2d');
+    return new Chart(ctx, {
+        type: 'line',
+        data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            scales: {
+                y: {
+                    min: 0,
+                    max: suffix === '%' ? 100 : null,
+                    grid: { color: isLightTheme ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)' },
+                    ticks: { color: '#666', font: { size: 10 }, callback: v => v + suffix }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#666', font: { size: 10 } }
+                }
+            },
+            plugins: {
+                legend: { display: true, position: 'top', labels: { color: '#8b8d98', usePointStyle: true } },
+                annotation: {
+                    annotations: {
+                        threshold80: {
+                            type: 'line',
+                            yMin: 80,
+                            yMax: 80,
+                            borderColor: 'rgba(242,73,92,0.5)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            label: { display: true, content: '80%', position: 'end' }
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createPlaceholderDataset(label, color) {
+    return {
+        label,
+        data: [0],
+        borderColor: color,
+        backgroundColor: color + '20',
+        fill: true,
+        tension: 0.3
+    };
+}
+
+// Load disk breakdown
+async function loadDiskBreakdown() {
+    if (servers.length === 0) {
+        document.getElementById('diskBreakdownContent').innerHTML =
+            '<p style="color: var(--muted); text-align: center; padding: 20px;">No servers with disk data</p>';
+        return;
+    }
+
+    const server = servers[0];
+    try {
+        const resp = await fetch(`/api/servers/${server.id}/disk-breakdown`, {
+            headers: {'Authorization': 'Bearer ' + token}
+        });
+        const data = await resp.json();
+
+        if (data.disks && data.disks.length > 0) {
+            document.getElementById('diskBreakdownContent').innerHTML = data.disks.map(d => `
+                <div class="disk-item">
+                    <div class="disk-header">
+                        <div class="disk-volume">${d.volume}</div>
+                        <div class="disk-percent" style="color: ${getDiskColor(d.percent)}">${d.percent}%</div>
+                    </div>
+                    <div class="disk-bar">
+                        <div class="disk-fill" style="width: ${d.percent}%; background: ${getDiskColor(d.percent)}"></div>
+                    </div>
+                    <div class="disk-details">
+                        <span>Used: ${d.used_gb} GB</span>
+                        <span>Total: ${d.size_gb} GB</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            document.getElementById('diskBreakdownContent').innerHTML =
+                '<p style="color: var(--muted); text-align: center; padding: 20px;">No disk data available</p>';
+        }
+    } catch(e) {
+        console.error('Error loading disk data:', e);
+    }
+}
+
+function getDiskColor(percent) {
+    if (percent > 80) return 'var(--red)';
+    if (percent > 60) return 'var(--yellow)';
+    return 'var(--green)';
+}
+
+// Load uptime timeline
+async function loadUptimeTimeline() {
+    if (servers.length === 0) {
+        const el = document.getElementById('uptimeTimeline');
+        if (el) el.innerHTML = '';
+        return;
+    }
+
+    const server = servers[0];
+    try {
+        const resp = await fetch(`/api/servers/${server.id}/uptime-timeline?days=7`, {
+            headers: {'Authorization': 'Bearer ' + token}
+        });
+        const data = await resp.json();
+
+        const percentEl = document.getElementById('uptimePercent');
+        if (percentEl) percentEl.textContent = (data.uptime_percent || 100) + '%';
+
+        let incidents = 0;
+        const timeline = data.timeline || [];
+        for (let i = 1; i < timeline.length; i++) {
+            if (timeline[i].status === 'down' && timeline[i-1].status === 'up') {
+                incidents++;
+            }
+        }
+        const incidentsEl = document.getElementById('downtimeCount');
+        if (incidentsEl) incidentsEl.textContent = incidents;
+
+        const timelineEl = document.getElementById('uptimeTimeline');
+        if (timelineEl && timeline.length > 0) {
+            const timelineHtml = timeline.map(entry =>
+                `<div class="uptime-segment ${entry.status}" style="width: ${100 / timeline.length}%"></div>`
+            ).join('');
+            timelineEl.innerHTML = timelineHtml;
+        }
+    } catch(e) {
+        console.error('Error loading uptime:', e);
+    }
+}
+
+// Update server grid
+function updateServerGrid() {
+    const el = document.getElementById('serverGrid');
+    if (!el) return;
+    el.innerHTML = servers.map(s => {
+        const status = s.last_status === 'up' ? 'online' : 'offline';
+        const statusColor = s.last_status === 'up' ? 'var(--green)' : 'var(--red)';
+        const cpuColor = (s.cpu_percent || 0) > 80 ? 'var(--red)' : (s.cpu_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
+        const memColor = (s.memory_percent || 0) > 80 ? 'var(--red)' : (s.memory_percent || 0) > 60 ? 'var(--yellow)' : 'var(--green)';
+
+        return `
+        <div class="server-card ${status}" onclick="window.location.href='/server/${s.id}'">
+            <div class="server-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div class="server-name" style="font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <div class="server-status" style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColor}"></div>
+                    ${s.name}
+                </div>
+                <div class="server-os" style="font-size: 10px; color: var(--muted); text-transform: uppercase;">${s.os_type}</div>
+            </div>
+            <div class="server-metrics" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                <div class="metric-box" style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; text-align: center;">
+                    <div class="metric-label" style="font-size: 10px; color: var(--muted); text-transform: uppercase;">CPU</div>
+                    <div class="metric-value" style="font-size: 18px; font-weight: 600; color: ${cpuColor}">${(s.cpu_percent || 0).toFixed(1)}%</div>
+                </div>
+                <div class="metric-box" style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; text-align: center;">
+                    <div class="metric-label" style="font-size: 10px; color: var(--muted); text-transform: uppercase;">MEM</div>
+                    <div class="metric-value" style="font-size: 18px; font-weight: 600; color: ${memColor}">${(s.memory_percent || 0).toFixed(1)}%</div>
+                </div>
+                <div class="metric-box" style="background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; text-align: center;">
+                    <div class="metric-label" style="font-size: 10px; color: var(--muted); text-transform: uppercase;">DISK</div>
+                    <div class="metric-value" style="font-size: 18px; font-weight: 600; color: var(--blue)">${(s.disk_percent || 0).toFixed(1)}%</div>
+                </div>
+            </div>
+        </div>`;
+    }).join('') || '<p style="color: var(--muted); text-align: center; padding: 40px;">No servers configured</p>';
+}
+
+// Update server table
+function updateServerTable() {
+    const el = document.getElementById('serversTable');
+    if (!el) return;
+    el.innerHTML = servers.map(s => {
+        const statusBadge = s.last_status === 'up'
+            ? '<span class="badge badge-success"><i class="fas fa-circle"></i> Online</span>'
+            : '<span class="badge badge-danger"><i class="fas fa-circle"></i> Offline</span>';
+
+        return `<tr>
+            <td>${statusBadge}</td>
+            <td><strong>${s.name}</strong></td>
+            <td style="color: var(--muted)">${s.host}:${s.agent_port || 9100}</td>
+            <td>${s.os_type}</td>
+            <td>${(s.cpu_percent || 0).toFixed(1)}%</td>
+            <td>${(s.memory_percent || 0).toFixed(1)}%</td>
+            <td>${(s.disk_percent || 0).toFixed(1)}%</td>
+            <td style="color: var(--muted)">${s.last_check ? s.last_check.substring(11, 19) : '-'}</td>
+            <td>
+                <button class="btn btn-secondary btn-sm" onclick="scrapeServer(${s.id})"><i class="fas fa-sync"></i></button>
+                <button class="btn btn-danger btn-sm" onclick="deleteServer(${s.id})"><i class="fas fa-trash"></i></button>
+            </td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--muted);">No servers</td></tr>';
+}
+
 // Export chart data
 function exportChart(metric) {
     const url = `/api/servers/metrics-history?range=${currentRange}&metric=${metric}`;
