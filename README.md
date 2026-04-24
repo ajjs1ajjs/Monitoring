@@ -50,7 +50,7 @@
 
 ### Prerequisites
 
-- Python 3.10+ (recommended: Python 3.14)
+- Python 3.10+
 - pip package manager
 
 ### Windows Quick Start

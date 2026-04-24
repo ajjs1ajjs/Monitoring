@@ -10,7 +10,7 @@ REM Check Python
 python --version >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Python not found!
-    echo Please install Python 3.14+ from https://python.org
+    echo Please install Python 3.10+ from https://python.org
     pause
     exit /b 1
 )
@@ -23,6 +23,6 @@ if not exist "pymon.db" (
 )
 
 REM Start server
-python -m pymon.cli server --host 127.0.0.1 --port 8090
+python -m pymon.cli server --host 0.0.0.0 --port 8090
 
 pause

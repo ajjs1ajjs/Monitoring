@@ -114,42 +114,42 @@ class ScrapeManager:
         return result
 
     async def _parse_prometheus_response(self, content: str, target: ScrapeTarget) -> dict:
-        # Fallback: Get disk info via PowerShell if exporter doesn't provide it
+        # Fallback: Get disk info via PowerShell only for LOCAL target if exporter doesn't provide it
         disk_info = {}
-        try:
-            import subprocess
+        is_local = any(x in target.target for x in ["localhost", "127.0.0.1", "::1"])
 
-            ps = subprocess.run(
-                [
-                    "powershell",
-                    "-NoProfile",
-                    "-Command",
-                    "Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID,Size,FreeSpace | ConvertTo-Json",
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if ps.returncode == 0 and ps.stdout.strip():
-                try:
-                    disks = json.loads(ps.stdout)
-                    if isinstance(disks, dict) and "DeviceID" in disks:
-                        disks = [disks]
-                    for d in disks:
-                        vol = d.get("DeviceID", "")
-                        if vol and d.get("Size"):
-                            disk_info[vol] = {
-                                "volume": vol,
-                                "free": float(d.get("FreeSpace", 0)),
-                                "size": float(d.get("Size", 0)),
-                            }
-                    print(f"[DEBUG] Got disk_info from PowerShell: {disk_info}")
-                except Exception as e:
-                    print(f"[DEBUG] Error parsing disk info: {e}")
-                    pass
-        except Exception as e:
-            print(f"[DEBUG] Error running PowerShell: {e}")
-            pass
+        if is_local:
+            try:
+                import subprocess
+
+                ps = subprocess.run(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-Command",
+                        "Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID,Size,FreeSpace | ConvertTo-Json",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+                if ps.returncode == 0 and ps.stdout.strip():
+                    try:
+                        disks = json.loads(ps.stdout)
+                        if isinstance(disks, dict) and "DeviceID" in disks:
+                            disks = [disks]
+                        for d in disks:
+                            vol = d.get("DeviceID", "")
+                            if vol and d.get("Size"):
+                                disk_info[vol] = {
+                                    "volume": vol,
+                                    "free": float(d.get("FreeSpace", 0)),
+                                    "size": float(d.get("Size", 0)),
+                                }
+                    except Exception as e:
+                        pass
+            except Exception as e:
+                pass
 
         metrics = {}
         storage = get_storage()
@@ -207,8 +207,8 @@ class ScrapeManager:
     def _update_server_status(
         self, target: str, metrics: dict, success: bool, error: str = "", server_id: Optional[int] = None
     ):
-        import sqlite3
         import os
+        import sqlite3
 
         try:
             db_path = os.getenv("DB_PATH", "pymon.db")
@@ -272,7 +272,7 @@ class ScrapeManager:
                     disk_info_json = metrics.get("_disk_info_json")
 
                     c.execute(
-                        """UPDATE servers SET 
+                        """UPDATE servers SET
                         last_check = ?, last_status = 'up',
                         cpu_percent = ?, memory_percent = ?, disk_percent = ?,
                         network_rx = ?, network_tx = ?, uptime = ?, disk_info = ?
@@ -281,7 +281,7 @@ class ScrapeManager:
                     )
                 else:
                     c.execute(
-                        """UPDATE servers SET 
+                        """UPDATE servers SET
                         last_check = ?, last_status = 'down'
                         WHERE id = ?""",
                         (now, sid),
@@ -342,9 +342,10 @@ class ScrapeManager:
 
     def _scrape_thread(self, target: ScrapeTarget):
         """Run scrape loop in a separate thread using synchronous httpx"""
-        import httpx
         import time
         from datetime import datetime
+
+        import httpx
 
         client = httpx.Client(timeout=target.timeout)
 
@@ -368,39 +369,42 @@ class ScrapeManager:
                     self.scrape_success.inc()
                     self.up_gauge.set(1, labels)
 
-                    # Fallback: Get disk info via PowerShell if exporter doesn't provide it
+                    # Fallback: Get disk info via PowerShell only for LOCAL target if exporter doesn't provide it
                     disk_info = {}
-                    try:
-                        import subprocess
+                    is_local = any(x in target.target for x in ["localhost", "127.0.0.1", "::1"])
 
-                        ps = subprocess.run(
-                            [
-                                "powershell",
-                                "-NoProfile",
-                                "-Command",
-                                "Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID,Size,FreeSpace | ConvertTo-Json",
-                            ],
-                            capture_output=True,
-                            text=True,
-                            timeout=10,
-                        )
-                        if ps.returncode == 0 and ps.stdout.strip():
-                            try:
-                                disks = json.loads(ps.stdout)
-                                if isinstance(disks, dict) and "DeviceID" in disks:
-                                    disks = [disks]
-                                for d in disks:
-                                    vol = d.get("DeviceID", "")
-                                    if vol and d.get("Size"):
-                                        disk_info[vol] = {
-                                            "volume": vol,
-                                            "free": float(d.get("FreeSpace", 0)),
-                                            "size": float(d.get("Size", 0)),
-                                        }
-                            except:
-                                pass
-                    except:
-                        pass
+                    if is_local:
+                        try:
+                            import subprocess
+
+                            ps = subprocess.run(
+                                [
+                                    "powershell",
+                                    "-NoProfile",
+                                    "-Command",
+                                    "Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID,Size,FreeSpace | ConvertTo-Json",
+                                ],
+                                capture_output=True,
+                                text=True,
+                                timeout=10,
+                            )
+                            if ps.returncode == 0 and ps.stdout.strip():
+                                try:
+                                    disks = json.loads(ps.stdout)
+                                    if isinstance(disks, dict) and "DeviceID" in disks:
+                                        disks = [disks]
+                                    for d in disks:
+                                        vol = d.get("DeviceID", "")
+                                        if vol and d.get("Size"):
+                                            disk_info[vol] = {
+                                                "volume": vol,
+                                                "free": float(d.get("FreeSpace", 0)),
+                                                "size": float(d.get("Size", 0)),
+                                            }
+                                except:
+                                    pass
+                        except:
+                            pass
 
                     # Parse metrics - support both node_exporter and windows_exporter
                     metrics = {}
@@ -469,7 +473,8 @@ class ScrapeManager:
 
                     # Publish per-disk usage as Prometheus metrics with volume label
                     try:
-                        from pymon.metrics.models import MetricType, Label
+                        from pymon.metrics.models import Label, MetricType
+
                         # Ensure the metric exists; we reuse the same metric name with per-disk labels
                         registry.register("disk_usage_percent", MetricType.GAUGE, "Disk usage percent per volume", None)
                         for vol, info in disk_info.items():
@@ -479,7 +484,6 @@ class ScrapeManager:
                     except Exception as e:
                         print(f"[DEBUG] failed to publish per-disk metric: {e}")
 
-                    
                     metrics["_disk_info_json"] = json.dumps(disks_list) if disks_list else None
 
                     self._update_server_status(target.target, metrics, True, server_id=target.server_id)
