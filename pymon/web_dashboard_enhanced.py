@@ -211,6 +211,7 @@ async def get_notifications():
     result = []
     for r in rows:
         import json
+
         cfg = json.loads(r["config"]) if r["config"] else {}
         result.append({"channel": r["channel"], "enabled": bool(r["enabled"]), "config": cfg})
     return {"notifications": result}
@@ -220,9 +221,10 @@ async def get_notifications():
 async def update_notification(channel: str, data: dict):
     conn = get_db()
     import json
+
     conn.execute(
         "UPDATE notifications SET enabled = ?, config = ? WHERE channel = ?",
-        (int(data.get("enabled", 0)), json.dumps(data.get("config", {})), channel)
+        (int(data.get("enabled", 0)), json.dumps(data.get("config", {})), channel),
     )
     conn.commit()
     conn.close()
@@ -243,7 +245,8 @@ async def create_backup():
     return {"status": "ok", "filename": filename}
 
 
-@router.get("/api/servers/metrics-history")async def get_servers_metrics_history(
+@router.get("/api/servers/metrics-history")
+async def get_servers_metrics_history(
     server_id: Optional[int] = Query(None),
     range: str = Query("1h", regex="^(5m|15m|1h|6h|24h|7d)$"),
     metric: Optional[str] = Query(None, regex="^(cpu|memory|disk|network)$"),
