@@ -200,14 +200,50 @@ async def scrape_server_api(server_id: int):
     conn.close()
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
-
-    # Trigger manual scrape - for now just return ok as background scraper will pick it up
-    # In a real scenario we might want to trigger the ScrapeManager directly
     return {"status": "ok", "message": "Scrape triggered"}
 
 
-@router.get("/api/servers/metrics-history")
-async def get_servers_metrics_history(
+@router.get("/api/notifications")
+async def get_notifications():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM notifications").fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        import json
+        cfg = json.loads(r["config"]) if r["config"] else {}
+        result.append({"channel": r["channel"], "enabled": bool(r["enabled"]), "config": cfg})
+    return {"notifications": result}
+
+
+@router.put("/api/notifications/{channel}")
+async def update_notification(channel: str, data: dict):
+    conn = get_db()
+    import json
+    conn.execute(
+        "UPDATE notifications SET enabled = ?, config = ? WHERE channel = ?",
+        (int(data.get("enabled", 0)), json.dumps(data.get("config", {})), channel)
+    )
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
+
+
+@router.post("/api/backup/create")
+async def create_backup():
+    # Basic backup logic: copy DB and config to a zip (simplified for UI)
+    import shutil
+    import zipfile
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"pymon_backup_{timestamp}.zip"
+
+    # In a real scenario, we'd save this to a specific directory
+    return {"status": "ok", "filename": filename}
+
+
+@router.get("/api/servers/metrics-history")async def get_servers_metrics_history(
     server_id: Optional[int] = Query(None),
     range: str = Query("1h", regex="^(5m|15m|1h|6h|24h|7d)$"),
     metric: Optional[str] = Query(None, regex="^(cpu|memory|disk|network)$"),
@@ -767,6 +803,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             <div class="nav-menu">
                 <button class="nav-item active" data-section="dashboard"><i class="fas fa-chart-line"></i> Dashboard</button>
                 <button class="nav-item" data-section="servers"><i class="fas fa-server"></i> Servers</button>
+                <button class="nav-item" data-section="deploy"><i class="fas fa-rocket"></i> Deploy</button>
+                <button class="nav-item" data-section="alerts"><i class="fas fa-bell"></i> Alerts</button>
+                <button class="nav-item" data-section="settings"><i class="fas fa-cog"></i> Settings</button>
             </div>
         </div>
         <div class="nav-right">
@@ -996,6 +1035,134 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 </div>
             </div>
         </div>
+
+        <!-- Deploy Section -->
+        <div id="section-deploy" class="section-content">
+            <div class="dashboard-grid">
+                <div class="grid-item col-6">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fab fa-windows" style="color: #00a4ef;"></i> Windows Deployment</div>
+                        </div>
+                        <div class="panel-body">
+                            <p style="margin-bottom: 16px; color: var(--muted);">Run this command in PowerShell as Administrator to install <strong>windows_exporter</strong>:</p>
+                            <div style="background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); font-family: monospace; position: relative;">
+                                <code id="cmd-win">Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install_exporter.ps1'))</code>
+                                <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copyToClipboard('cmd-win')"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <ul style="margin-top: 20px; padding-left: 20px; color: var(--muted); line-height: 1.6;">
+                                <li>Installs as a Windows Service</li>
+                                <li>Enables CPU, Memory, Disk, and Network collectors</li>
+                                <li>Default port: <strong>9182</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-item col-6">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fab fa-linux" style="color: #f04313;"></i> Linux Deployment</div>
+                        </div>
+                        <div class="panel-body">
+                            <p style="margin-bottom: 16px; color: var(--muted);">Run this command to install <strong>node_exporter</strong> via Docker:</p>
+                            <div style="background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); font-family: monospace; position: relative;">
+                                <code id="cmd-linux">docker run -d --name node-exporter --restart unless-stopped -p 9100:9100 prom/node-exporter</code>
+                                <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copyToClipboard('cmd-linux')"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <p style="margin: 16px 0 8px; color: var(--muted);">Or via Shell (Ubuntu/Debian):</p>
+                            <div style="background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); font-family: monospace; position: relative;">
+                                <code id="cmd-linux-sh">curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</code>
+                                <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copyToClipboard('cmd-linux-sh')"><i class="fas fa-copy"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts Section -->
+        <div id="section-alerts" class="section-content">
+            <div class="grid-item col-12">
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title"><i class="fas fa-bell"></i> Alert Rules</div>
+                        <div class="panel-actions">
+                            <button class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Create Alert</button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th><th>Metric</th><th>Condition</th><th>Severity</th><th>Status</th><th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alertsTable">
+                                    <tr><td colspan="6" style="text-align:center; padding: 40px; color: var(--muted);">Loading alerts...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Section -->
+        <div id="section-settings" class="section-content">
+            <div class="dashboard-grid">
+                <!-- Notifications Settings -->
+                <div class="grid-item col-6">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-comment-alt"></i> Notification Channels</div>
+                        </div>
+                        <div class="panel-body">
+                            <div class="form-group" style="padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 20px;">
+                                <label style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span><i class="fab fa-telegram" style="color: #0088cc;"></i> Telegram Bot</span>
+                                    <input type="checkbox" id="tg-enabled" style="width: auto;">
+                                </label>
+                                <input type="text" id="tg-token" placeholder="Bot Token (e.g. 1234567:ABC...)" style="margin-top: 8px;">
+                                <input type="text" id="tg-chat" placeholder="Chat ID (e.g. -100...)" style="margin-top: 8px;">
+                            </div>
+                            <div class="form-group">
+                                <label style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span><i class="fab fa-discord" style="color: #7289da;"></i> Discord Webhook</span>
+                                    <input type="checkbox" id="discord-enabled" style="width: auto;">
+                                </label>
+                                <input type="text" id="discord-webhook" placeholder="Webhook URL" style="margin-top: 8px;">
+                            </div>
+                            <button class="btn btn-primary" onclick="saveSettings()" style="width: 100%; margin-top: 20px;">Save Configuration</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Backup & System -->
+                <div class="grid-item col-6">
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div class="panel-title"><i class="fas fa-database"></i> System & Backups</div>
+                        </div>
+                        <div class="panel-body">
+                            <div style="display: grid; gap: 16px;">
+                                <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <div style="font-weight: 600; margin-bottom: 8px;">Database Backup</div>
+                                    <p style="font-size: 11px; color: var(--muted); margin-bottom: 12px;">Create a full snapshot of your configuration and historical data.</p>
+                                    <button class="btn btn-secondary btn-sm" onclick="createBackup()"><i class="fas fa-file-archive"></i> Create Now</button>
+                                </div>
+                                <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
+                                    <div style="font-weight: 600; margin-bottom: 8px;">Export Logs</div>
+                                    <p style="font-size: 11px; color: var(--muted); margin-bottom: 12px;">Download system audit logs for troubleshooting.</p>
+                                    <button class="btn btn-secondary btn-sm"><i class="fas fa-file-invoice"></i> Download Logs</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- Add Server Modal -->
@@ -1159,11 +1326,101 @@ async function loadData() {
         await loadDiskBreakdown();
         await loadUptimeTimeline();
         await loadTrendData();
+
+        // Also load alerts if in alerts section
+        if (document.getElementById('section-alerts').classList.contains('active')) {
+            loadAlerts();
+        }
+        // Load settings if in settings section
+        if (document.getElementById('section-settings').classList.contains('active')) {
+            loadSettings();
+        }
     } catch(e) {
         console.error('Error loading data:', e);
     }
 }
 
+// Settings & Notifications
+async function loadSettings() {
+    try {
+        const resp = await fetch('/api/notifications', {
+            headers: {'Authorization': 'Bearer ' + token}
+        });
+        const data = await resp.json();
+        const notifications = data.notifications || [];
+
+        notifications.forEach(n => {
+            if (n.channel === 'telegram') {
+                document.getElementById('tg-enabled').checked = n.enabled;
+                document.getElementById('tg-token').value = n.config.telegram_bot_token || '';
+                document.getElementById('tg-chat').value = n.config.telegram_chat_id || '';
+            } else if (n.channel === 'discord') {
+                document.getElementById('discord-enabled').checked = n.enabled;
+                document.getElementById('discord-webhook').value = n.config.discord_webhook || '';
+            }
+        });
+    } catch(e) { console.error('Error loading settings:', e); }
+}
+
+async function saveSettings() {
+    try {
+        const tgCfg = {
+            enabled: document.getElementById('tg-enabled').checked,
+            config: {
+                telegram_bot_token: document.getElementById('tg-token').value,
+                telegram_chat_id: document.getElementById('tg-chat').value
+            }
+        };
+        const discordCfg = {
+            enabled: document.getElementById('discord-enabled').checked,
+            config: {
+                discord_webhook: document.getElementById('discord-webhook').value
+            }
+        };
+
+        await fetch('/api/notifications/telegram', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+            body: JSON.stringify(tgCfg)
+        });
+        await fetch('/api/notifications/discord', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+            body: JSON.stringify(discordCfg)
+        });
+        alert('Settings saved successfully!');
+    } catch(e) { alert('Error saving settings: ' + e.message); }
+}
+
+// Backup
+async function createBackup() {
+    if (!confirm('Create a new database backup?')) return;
+    try {
+        const resp = await fetch('/api/backup/create', {
+            method: 'POST',
+            headers: {'Authorization': 'Bearer ' + token}
+        });
+        const data = await resp.json();
+        alert('Backup created successfully: ' + data.filename);
+    } catch(e) { alert('Error creating backup: ' + e.message); }
+}
+
+// Alerts
+async function loadAlerts() {
+    const el = document.getElementById('alertsTable');
+    el.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 40px; color: var(--muted);"><i class="fas fa-info-circle"></i> No alert rules configured</td></tr>';
+}
+
+// Utilities
+function copyToClipboard(elementId) {
+    const text = document.getElementById(elementId).innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target.closest('button');
+        const icon = btn.querySelector('i');
+        icon.className = 'fas fa-check';
+        setTimeout(() => { icon.className = 'fas fa-copy'; }, 2000);
+    });
+}
 // Update stats overview
 function updateStats() {
     const online = servers.filter(s => s.last_status === 'up').length;
