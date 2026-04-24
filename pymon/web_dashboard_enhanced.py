@@ -184,13 +184,35 @@ async def create_server(server: ServerModel):
     return {"status": "ok"}
 
 
+# Helper: Check if user is admin
+def check_admin(request: Request):
+    # This assumes we have a way to identify the user, e.g., via a dependency or header
+    # Simplified check for now
+    return True
+
+def log_action(username, action, target=''):
+    conn = get_db()
+    conn.execute('INSERT INTO audit_log (username, action, target, timestamp) VALUES (?, ?, ?, ?)',
+                 (username, action, target, datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+    conn.close()
+
 @router.delete("/api/servers/{server_id}")
-async def delete_server_api(server_id: int):
+async def delete_server_api(server_id: int, request: Request):
+    # In a real app, get user from JWT
+    log_action("admin", "delete_server", str(server_id))
     conn = get_db()
     conn.execute("DELETE FROM servers WHERE id=?", (server_id,))
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
+@router.get("/api/audit-log")
+async def get_audit_log():
+    conn = get_db()
+    logs = conn.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT 100").fetchall()
+    conn.close()
+    return {"logs": [dict(l) for l in logs]}
 
 
 @router.post("/api/servers/{server_id}/scrape")
@@ -640,6 +662,8 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
     <title>PyMon - Enhanced Enterprise Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gridstack@10.1.1/dist/gridstack-all.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/gridstack@10.1.1/dist/gridstack.min.css" rel="stylesheet"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -808,7 +832,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <button class="nav-item" data-section="servers"><i class="fas fa-server"></i> Servers</button>
                 <button class="nav-item" data-section="deploy"><i class="fas fa-rocket"></i> Deploy</button>
                 <button class="nav-item" data-section="alerts"><i class="fas fa-bell"></i> Alerts</button>
+                <button class="nav-item" data-section="databases"><i class="fas fa-database"></i> Databases</button>
                 <button class="nav-item" data-section="settings"><i class="fas fa-cog"></i> Settings</button>
+                <button class="nav-item" data-section="audit"><i class="fas fa-history"></i> Audit Log</button>
             </div>
         </div>
         <div class="nav-right">
@@ -1112,53 +1138,41 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Settings Section -->
-        <div id="section-settings" class="section-content">
-            <div class="dashboard-grid">
-                <!-- Notifications Settings -->
-                <div class="grid-item col-6">
-                    <div class="panel">
-                        <div class="panel-header">
-                            <div class="panel-title"><i class="fas fa-comment-alt"></i> Notification Channels</div>
-                        </div>
-                        <div class="panel-body">
-                            <div class="form-group" style="padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 20px;">
-                                <label style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span><i class="fab fa-telegram" style="color: #0088cc;"></i> Telegram Bot</span>
-                                    <input type="checkbox" id="tg-enabled" style="width: auto;">
-                                </label>
-                                <input type="text" id="tg-token" placeholder="Bot Token (e.g. 1234567:ABC...)" style="margin-top: 8px;">
-                                <input type="text" id="tg-chat" placeholder="Chat ID (e.g. -100...)" style="margin-top: 8px;">
+        <!-- Databases Section -->
+        <div id="section-databases" class="section-content">
+            <div class="grid-stack">
+                <div class="grid-stack-item" gs-w="12" gs-h="2">
+                    <div class="grid-stack-item-content">
+                        <div class="panel">
+                            <div class="panel-header">
+                                <div class="panel-title"><i class="fas fa-database"></i> MSSQL Server Performance</div>
                             </div>
-                            <div class="form-group">
-                                <label style="display: flex; justify-content: space-between; align-items: center;">
-                                    <span><i class="fab fa-discord" style="color: #7289da;"></i> Discord Webhook</span>
-                                    <input type="checkbox" id="discord-enabled" style="width: auto;">
-                                </label>
-                                <input type="text" id="discord-webhook" placeholder="Webhook URL" style="margin-top: 8px;">
-                            </div>
-                            <button class="btn btn-primary" onclick="saveSettings()" style="width: 100%; margin-top: 20px;">Save Configuration</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Backup & System -->
-                <div class="grid-item col-6">
-                    <div class="panel">
-                        <div class="panel-header">
-                            <div class="panel-title"><i class="fas fa-database"></i> System & Backups</div>
-                        </div>
-                        <div class="panel-body">
-                            <div style="display: grid; gap: 16px;">
-                                <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
-                                    <div style="font-weight: 600; margin-bottom: 8px;">Database Backup</div>
-                                    <p style="font-size: 11px; color: var(--muted); margin-bottom: 12px;">Create a full snapshot of your configuration and historical data.</p>
-                                    <button class="btn btn-secondary btn-sm" onclick="createBackup()"><i class="fas fa-file-archive"></i> Create Now</button>
-                                </div>
-                                <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
-                                    <div style="font-weight: 600; margin-bottom: 8px;">Export Logs</div>
-                                    <p style="font-size: 11px; color: var(--muted); margin-bottom: 12px;">Download system audit logs for troubleshooting.</p>
-                                    <button class="btn btn-secondary btn-sm"><i class="fas fa-file-invoice"></i> Download Logs</button>
+                            <div class="panel-body">
+                                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
+                                    <div class="stat-card">
+                                        <div class="stat-content">
+                                            <div class="stat-value" id="db-conn">0</div>
+                                            <div class="stat-label">Active Connections</div>
+                                        </div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-content">
+                                            <div class="stat-value" id="db-lat">0ms</div>
+                                            <div class="stat-label">Page Life Expectancy</div>
+                                        </div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-content">
+                                            <div class="stat-value" id="db-trans">0</div>
+                                            <div class="stat-label">Transactions/sec</div>
+                                        </div>
+                                    </div>
+                                    <div class="stat-card">
+                                        <div class="stat-content">
+                                            <div class="stat-value" id="db-lock">0</div>
+                                            <div class="stat-label">Lock Waits</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1173,37 +1187,61 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title">Add Server</div>
-                <button class="modal-close" id="closeServerModal">&times;</button>
+                <button class="modal-close" onclick="document.getElementById('addServerModal').classList.remove('active')">&times;</button>
             </div>
             <form id="addServerForm">
-                <div class="form-group">
-                    <label>Server Name</label>
-                    <input type="text" id="server-name" required placeholder="Production Server">
-                </div>
-                <div class="form-group">
-                    <label>Host / IP Address</label>
-                    <input type="text" id="server-host" required placeholder="192.168.1.100">
-                </div>
+                <div class="form-group"><label>Server Name</label><input type="text" id="server-name" required placeholder="Production Server"></div>
+                <div class="form-group"><label>Host / IP Address</label><input type="text" id="server-host" required placeholder="192.168.1.100"></div>
                 <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div class="form-group">
-                        <label>Operating System</label>
-                        <select id="server-os">
-                            <option value="linux">Linux</option>
-                            <option value="windows">Windows</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Agent Port</label>
-                        <input type="number" id="server-port" value="9100">
-                    </div>
+                    <div class="form-group"><label>OS</label><select id="server-os"><option value="linux">Linux</option><option value="windows">Windows</option></select></div>
+                    <div class="form-group"><label>Agent Port</label><input type="number" id="server-port" value="9100"></div>
                 </div>
-                <button type="submit" class="btn btn-primary" style="width:100%">Add Server</button>
+                <button type="submit" class="btn btn-primary" style="width:100%">Save Server</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Alert Modal -->
+    <div class="modal" id="addAlertModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Create New Alert</div>
+                <button class="modal-close" onclick="document.getElementById('addAlertModal').classList.remove('active')">&times;</button>
+            </div>
+            <form id="addAlertForm">
+                <div class="form-group"><label>Alert Name</label><input type="text" id="alert-name" required></div>
+                <div class="form-group">
+                    <label>Metric</label>
+                    <select id="alert-metric">
+                        <option value="cpu_percent">CPU Usage</option>
+                        <option value="memory_percent">Memory Usage</option>
+                        <option value="disk_percent">Disk Usage</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Threshold (%)</label><input type="number" id="alert-threshold" value="90"></div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Create Alert</button>
             </form>
         </div>
     </div>
 
 <script>
-const token = localStorage.getItem('token');
+document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await fetch('/api/alerts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+        body: JSON.stringify({
+            name: document.getElementById('alert-name').value,
+            metric: document.getElementById('alert-metric').value,
+            condition: 'greater_than',
+            threshold: parseInt(document.getElementById('alert-threshold').value),
+            duration: 0,
+            severity: 'warning'
+        })
+    });
+    document.getElementById('addAlertModal').classList.remove('active');
+    loadAlerts();
+});
 if (!token) window.location.href = '/login';
 
 let servers = [];
@@ -1245,6 +1283,24 @@ document.querySelectorAll('.nav-item').forEach(btn => {
     });
 });
 
+// Initialize Gridstack
+const grid = GridStack.init({
+    margin: 10,
+    cellHeight: '250px',
+    disableOneColumnMode: true,
+    float: true
+});
+
+// Load and Save layout
+grid.on('change', function(event, items) {
+    localStorage.setItem('dashboard-layout', JSON.stringify(grid.save()));
+});
+
+const savedLayout = localStorage.getItem('dashboard-layout');
+if (savedLayout) {
+    grid.load(JSON.parse(savedLayout));
+}
+
 // Time range selector
 document.querySelectorAll('.time-btn').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -1277,8 +1333,12 @@ document.getElementById('closeServerModal').addEventListener('click', () => {
 
 document.getElementById('addServerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    await fetch('/api/servers', {
-        method: 'POST',
+    const id = document.getElementById('addServerForm').dataset.editId;
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/servers/${id}` : '/api/servers';
+
+    await fetch(url, {
+        method: method,
         headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
         body: JSON.stringify({
             name: document.getElementById('server-name').value,
@@ -1287,6 +1347,8 @@ document.getElementById('addServerForm').addEventListener('submit', async (e) =>
             agent_port: parseInt(document.getElementById('server-port').value) || 9100
         })
     });
+    delete document.getElementById('addServerForm').dataset.editId;
+    document.getElementById('addServerForm').reset();
     document.getElementById('addServerModal').classList.remove('active');
     loadData();
 });
@@ -1367,30 +1429,28 @@ async function loadSettings() {
 
 async function saveSettings() {
     try {
-        const tgCfg = {
-            enabled: document.getElementById('tg-enabled').checked,
-            config: {
-                telegram_bot_token: document.getElementById('tg-token').value,
-                telegram_chat_id: document.getElementById('tg-chat').value
+        const configs = [
+            {
+                id: 'telegram',
+                data: { enabled: document.getElementById('tg-enabled').checked, config: { telegram_bot_token: document.getElementById('tg-token').value, telegram_chat_id: document.getElementById('tg-chat').value } }
+            },
+            {
+                id: 'email',
+                data: { enabled: document.getElementById('email-enabled').checked, config: { to: document.getElementById('email-to').value } }
+            },
+            {
+                id: 'teams',
+                data: { enabled: document.getElementById('teams-enabled').checked, config: { webhook_url: document.getElementById('teams-webhook').value } }
             }
-        };
-        const discordCfg = {
-            enabled: document.getElementById('discord-enabled').checked,
-            config: {
-                discord_webhook: document.getElementById('discord-webhook').value
-            }
-        };
+        ];
 
-        await fetch('/api/notifications/telegram', {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-            body: JSON.stringify(tgCfg)
-        });
-        await fetch('/api/notifications/discord', {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-            body: JSON.stringify(discordCfg)
-        });
+        for (const ch of configs) {
+            await fetch(`/api/notifications/${ch.id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                body: JSON.stringify(ch.data)
+            });
+        }
         alert('Settings saved successfully!');
     } catch(e) { alert('Error saving settings: ' + e.message); }
 }
@@ -1519,27 +1579,24 @@ function updateGauges() {
         return '#f2495c';
     };
 
-    // Create or update gauges
-    const cpuCtx = document.getElementById('gaugeCpu').getContext('2d');
-    const memCtx = document.getElementById('gaugeMemory').getContext('2d');
-    const diskCtx = document.getElementById('gaugeDisk').getContext('2d');
+    const updateGauge = (chart, value, color) => {
+        chart.data.datasets[0].data = [value, 100 - value];
+        chart.data.datasets[0].backgroundColor = [color, 'rgba(255,255,255,0.1)'];
+        chart.update('none'); // 'none' mode prevents animation flickering
+    };
 
     if (!gaugeCharts.cpu) {
+        const cpuCtx = document.getElementById('gaugeCpu').getContext('2d');
+        const memCtx = document.getElementById('gaugeMemory').getContext('2d');
+        const diskCtx = document.getElementById('gaugeDisk').getContext('2d');
+
         gaugeCharts.cpu = createGaugeChart(cpuCtx, cpuAvg, getCaugeColor(cpuAvg));
         gaugeCharts.memory = createGaugeChart(memCtx, memAvg, getCaugeColor(memAvg));
         gaugeCharts.disk = createGaugeChart(diskCtx, diskAvg, getCaugeColor(diskAvg));
     } else {
-        gaugeCharts.cpu.data.datasets[0].data = [cpuAvg, 100 - cpuAvg];
-        gaugeCharts.cpu.data.datasets[0].backgroundColor = [getCaugeColor(cpuAvg), 'rgba(255,255,255,0.1)'];
-        gaugeCharts.cpu.update();
-
-        gaugeCharts.memory.data.datasets[0].data = [memAvg, 100 - memAvg];
-        gaugeCharts.memory.data.datasets[0].backgroundColor = [getCaugeColor(memAvg), 'rgba(255,255,255,0.1)'];
-        gaugeCharts.memory.update();
-
-        gaugeCharts.disk.data.datasets[0].data = [diskAvg, 100 - diskAvg];
-        gaugeCharts.disk.data.datasets[0].backgroundColor = [getCaugeColor(diskAvg), 'rgba(255,255,255,0.1)'];
-        gaugeCharts.disk.update();
+        updateGauge(gaugeCharts.cpu, cpuAvg, getCaugeColor(cpuAvg));
+        updateGauge(gaugeCharts.memory, memAvg, getCaugeColor(memAvg));
+        updateGauge(gaugeCharts.disk, diskAvg, getCaugeColor(diskAvg));
     }
 }
 
@@ -1797,11 +1854,24 @@ function updateServerTable() {
             <td>${(s.disk_percent || 0).toFixed(1)}%</td>
             <td style="color: var(--muted)">${s.last_check ? s.last_check.substring(11, 19) : '-'}</td>
             <td>
+                <button class="btn btn-secondary btn-sm" onclick="editServer(${s.id})"><i class="fas fa-edit"></i></button>
                 <button class="btn btn-secondary btn-sm" onclick="scrapeServer(${s.id})"><i class="fas fa-sync"></i></button>
                 <button class="btn btn-danger btn-sm" onclick="deleteServer(${s.id})"><i class="fas fa-trash"></i></button>
             </td>
         </tr>`;
     }).join('') || '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--muted);">No servers</td></tr>';
+}
+
+// Edit server logic
+function editServer(id) {
+    const s = servers.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('server-name').value = s.name;
+    document.getElementById('server-host').value = s.host;
+    document.getElementById('server-os').value = s.os_type;
+    document.getElementById('server-port').value = s.agent_port;
+    document.getElementById('addServerForm').dataset.editId = id;
+    document.getElementById('addServerModal').classList.add('active');
 }
 
 // Export chart data
@@ -1866,3 +1936,41 @@ startAutoRefresh();
 </script>
 </body>
 </html>"""
+@ r o u t e r . g e t ( ' / a p i / a l e r t s ' ) 
+ a s y n c   d e f   g e t _ a l e r t s ( ) : 
+         c o n n   =   g e t _ d b ( ) 
+         a l e r t s   =   c o n n . e x e c u t e ( ' S E L E C T   *   F R O M   a l e r t s ' ) . f e t c h a l l ( ) 
+         c o n n . c l o s e ( ) 
+         r e t u r n   { ' a l e r t s ' :   [ d i c t ( a )   f o r   a   i n   a l e r t s ] } 
+ 
+ @ r o u t e r . p o s t ( ' / a p i / a l e r t s ' ) 
+ a s y n c   d e f   c r e a t e _ a l e r t ( a l e r t :   d i c t ) : 
+         c o n n   =   g e t _ d b ( ) 
+         c o n n . e x e c u t e ( ' I N S E R T   I N T O   a l e r t s   ( n a m e ,   m e t r i c ,   c o n d i t i o n ,   t h r e s h o l d ,   d u r a t i o n ,   s e v e r i t y ,   s e r v e r _ i d ,   d e s c r i p t i o n )   V A L U E S   ( ? ,   ? ,   ? ,   ? ,   ? ,   ? ,   ? ,   ? ) ' , 
+                                   ( a l e r t [ ' n a m e ' ] ,   a l e r t [ ' m e t r i c ' ] ,   a l e r t [ ' c o n d i t i o n ' ] ,   a l e r t [ ' t h r e s h o l d ' ] ,   a l e r t [ ' d u r a t i o n ' ] ,   a l e r t [ ' s e v e r i t y ' ] ,   a l e r t . g e t ( ' s e r v e r _ i d ' ) ,   a l e r t . g e t ( ' d e s c r i p t i o n ' ) ) ) 
+         c o n n . c o m m i t ( ) 
+         c o n n . c l o s e ( ) 
+         r e t u r n   { ' s t a t u s ' :   ' o k ' } 
+ 
+ 
+ @ r o u t e r . p u t ( ' / a p i / s e r v e r s / { s e r v e r _ i d } ' ) 
+ a s y n c   d e f   u p d a t e _ s e r v e r _ a p i ( s e r v e r _ i d :   i n t ,   s e r v e r :   S e r v e r M o d e l ) : 
+         c o n n   =   g e t _ d b ( ) 
+         c o n n . e x e c u t e ( 
+                 ' U P D A T E   s e r v e r s   S E T   n a m e = ? ,   h o s t = ? ,   o s _ t y p e = ? ,   a g e n t _ p o r t = ?   W H E R E   i d = ? ' , 
+                 ( s e r v e r . n a m e ,   s e r v e r . h o s t ,   s e r v e r . o s _ t y p e ,   s e r v e r . a g e n t _ p o r t ,   s e r v e r _ i d ) , 
+         ) 
+         c o n n . c o m m i t ( ) 
+         c o n n . c l o s e ( ) 
+         r e t u r n   { ' s t a t u s ' :   ' o k ' } 
+ 
+ 
+
+ d e f   l o g _ a c t i o n ( u s e r n a m e ,   a c t i o n ,   t a r g e t = ' ' ) : 
+         c o n n   =   g e t _ d b ( ) 
+         c o n n . e x e c u t e ( ' I N S E R T   I N T O   a u d i t _ l o g   ( u s e r n a m e ,   a c t i o n ,   t a r g e t ,   t i m e s t a m p )   V A L U E S   ( ? ,   ? ,   ? ,   ? ) ' , 
+                                   ( u s e r n a m e ,   a c t i o n ,   t a r g e t ,   d a t e t i m e . n o w ( t i m e z o n e . u t c ) . i s o f o r m a t ( ) ) ) 
+         c o n n . c o m m i t ( ) 
+         c o n n . c l o s e ( ) 
+ 
+ 
