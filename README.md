@@ -47,43 +47,34 @@
 ---
 
 ## Quick Start
-
-### One Command (Recommended)
-
-```batch
-git clone https://github.com/ajjs1ajjs/Monitoring.git
-cd Monitoring
-run.bat
-```
-
-### Linux/Mac
+## Quick Start (Linux)
 
 ```bash
 git clone https://github.com/ajjs1ajjs/Monitoring.git
 cd Monitoring
+chmod +x run.sh
 ./run.sh
 ```
 
-### Manual Installation
+## Manual Installation
 
 ```bash
 # Clone repository
 git clone https://github.com/ajjs1ajjs/Monitoring.git
 cd Monitoring
 
-# Create virtual environment (recommended)
-python -m venv .venv
-.venv\Scripts\activate     # Windows
-source .venv/bin/activate  # Linux
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Install PyMon in editable mode
+# Install PyMon
 pip install -e . --no-deps
 
 # Start server
-python -m pymon.cli server
+python3 -m pymon server
 ```
 
 **Access dashboard:** http://localhost:8090/dashboard/

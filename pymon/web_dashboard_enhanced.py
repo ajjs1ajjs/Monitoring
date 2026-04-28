@@ -1076,30 +1076,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         <!-- Deploy Section -->
         <div id="section-deploy" class="section-content">
             <div class="dashboard-grid">
-                <div class="grid-item col-6">
+                <div class="grid-item col-12">
                     <div class="panel">
                         <div class="panel-header">
-                            <div class="panel-title"><i class="fab fa-windows" style="color: #00a4ef;"></i> Windows Deployment</div>
-                        </div>
-                        <div class="panel-body">
-                            <p style="margin-bottom: 16px; color: var(--muted);">Run this command in PowerShell as Administrator to install <strong>windows_exporter</strong>:</p>
-                            <div style="background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); font-family: monospace; position: relative;">
-                                <code id="cmd-win">Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install_exporter.ps1'))</code>
-                                <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copyToClipboard('cmd-win')"><i class="fas fa-copy"></i></button>
-                            </div>
-                            <ul style="margin-top: 20px; padding-left: 20px; color: var(--muted); line-height: 1.6;">
-                                <li>Installs as a Windows Service</li>
-                                <li>Enables CPU, Memory, Disk, and Network collectors</li>
-                                <li>Default port: <strong>9182</strong></li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid-item col-6">
-                    <div class="panel">
-                        <div class="panel-header">
-                            <div class="panel-title"><i class="fab fa-linux" style="color: #f04313;"></i> Linux Deployment</div>
+                            <div class="panel-title"><i class="fab fa-linux" style="color: #f04313;"></i> Linux Deployment (Recommended)</div>
                         </div>
                         <div class="panel-body">
                             <p style="margin-bottom: 16px; color: var(--muted);">Run this command to install <strong>node_exporter</strong> via Docker:</p>
@@ -1107,11 +1087,16 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 <code id="cmd-linux">docker run -d --name node-exporter --restart unless-stopped -p 9100:9100 prom/node-exporter</code>
                                 <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copyToClipboard('cmd-linux')"><i class="fas fa-copy"></i></button>
                             </div>
-                            <p style="margin: 16px 0 8px; color: var(--muted);">Or via Shell (Ubuntu/Debian):</p>
+                            <p style="margin: 16px 0 8px; color: var(--muted);">Or via Shell (Ubuntu/Debian/CentOS):</p>
                             <div style="background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); font-family: monospace; position: relative;">
                                 <code id="cmd-linux-sh">curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</code>
                                 <button class="btn btn-secondary btn-sm" style="position: absolute; top: 8px; right: 8px;" onclick="copyToClipboard('cmd-linux-sh')"><i class="fas fa-copy"></i></button>
                             </div>
+                            <ul style="margin-top: 20px; padding-left: 20px; color: var(--muted); line-height: 1.6;">
+                                <li>Installs node_exporter as a systemd service</li>
+                                <li>Exposes full system metrics (CPU, Mem, Disk, Net)</li>
+                                <li>Default port: <strong>9100</strong></li>
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -1201,7 +1186,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <div class="form-group"><label>Server Name</label><input type="text" id="server-name" required placeholder="Production Server"></div>
                 <div class="form-group"><label>Host / IP Address</label><input type="text" id="server-host" required placeholder="192.168.1.100"></div>
                 <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <div class="form-group"><label>OS</label><select id="server-os"><option value="linux">Linux</option><option value="windows">Windows</option></select></div>
+                    <div class="form-group"><label>OS</label><select id="server-os"><option value="linux">Linux</option></select></div>
                     <div class="form-group"><label>Agent Port</label><input type="number" id="server-port" value="9100"></div>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width:100%">Save Server</button>
