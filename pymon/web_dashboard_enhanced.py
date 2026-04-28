@@ -1335,24 +1335,32 @@ window.logout = function() {
 window.loadData = loadData;
 window.showSection = showSection;
 
-// Button handlers
-document.getElementById('logoutBtn').addEventListener('click', () => {
+// Button handlers (with null checks)
+const logoutBtn = document.getElementById('logoutBtn');
+if (logoutBtn) logoutBtn.addEventListener('click', () => {
     localStorage.removeItem('token');
     window.location.href = '/login';
 });
 
-document.getElementById('refreshBtn').addEventListener('click', () => loadData());
+const refreshBtn = document.getElementById('refreshBtn');
+if (refreshBtn) refreshBtn.addEventListener('click', () => loadData());
 
-document.getElementById('addServerBtn').addEventListener('click', () => {
-    document.getElementById('addServerModal').classList.add('active');
+const addServerBtn = document.getElementById('addServerBtn');
+if (addServerBtn) addServerBtn.addEventListener('click', () => {
+    const modal = document.getElementById('addServerModal');
+    if (modal) modal.classList.add('active');
 });
 
-document.getElementById('addServerBtn2').addEventListener('click', () => {
-    document.getElementById('addServerModal').classList.add('active');
+const addServerBtn2 = document.getElementById('addServerBtn2');
+if (addServerBtn2) addServerBtn2.addEventListener('click', () => {
+    const modal = document.getElementById('addServerModal');
+    if (modal) modal.classList.add('active');
 });
 
-document.getElementById('closeServerModal').addEventListener('click', () => {
-    document.getElementById('addServerModal').classList.remove('active');
+const closeServerModal = document.getElementById('closeServerModal');
+if (closeServerModal) closeServerModal.addEventListener('click', () => {
+    const modal = document.getElementById('addServerModal');
+    if (modal) modal.classList.remove('active');
 });
 
 document.getElementById('addServerForm').addEventListener('submit', async (e) => {
