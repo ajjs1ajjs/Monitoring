@@ -55,7 +55,8 @@ class APIKeyCreate(BaseModel):
 class AuthConfig:
     db_path: str = "pymon.db"
     admin_username: str = "admin"
-    admin_password: str = "admin"
+    # Default admin password set to a non-empty change-me value to encourage rotation
+    admin_password: str = "changeme"
 
 
 auth_config = AuthConfig()

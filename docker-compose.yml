@@ -19,8 +19,9 @@ services:
       - ./config.yml:/config/config.yml
     environment:
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
-      - CONFIG_PATH=/config/config.json
+      - CONFIG_PATH=/config/config.yml
       - DATA_DIR=/data
+      - PYMON_ALLOWED_ORIGINS=http://localhost:8090,https://monitoring.example.com
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/api/v1/health')"]

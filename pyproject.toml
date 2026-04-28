@@ -36,6 +36,7 @@ dependencies = [
     "pyjwt>=2.8.0",
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.0",
+    "slowapi>=0.1.9",
 ]
 
 [project.optional-dependencies]

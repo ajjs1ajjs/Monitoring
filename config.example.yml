@@ -22,7 +22,7 @@ storage:
 # =============================================================================
 auth:
   admin_username: admin
-  admin_password: admin # ⚠️ CHANGE THIS AFTER FIRST LOGIN!
+  admin_password: changeme # ⚠️ CHANGE THIS AFTER FIRST LOGIN!
   jwt_expire_hours: 24 # Token expiration time
 
 # =============================================================================
@@ -195,6 +195,16 @@ backup:
   keep_days: 30 # Keep backups for 30 days
   max_backups: 10 # Maximum number of backups to keep
   compress: true # Compress backups (ZIP)
+
+# PostgreSQL (Phase 4, optional)
+postgres:
+  dsn: postgres://user:password@localhost:5432/pymon
+
+# TLS/SSL (optional for Phase 4)
+tls:
+  enabled: false
+  cert_path: /path/to/cert.pem
+  key_path: /path/to/key.pem
 
 # =============================================================================
 # Enhanced Dashboard Settings (v2.0.0+)

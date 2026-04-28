@@ -2,8 +2,8 @@
 
 import os
 from dataclasses import dataclass, field
-from typing import Any, Optional
 from pathlib import Path
+from typing import Any, Optional
 
 import yaml
 
@@ -37,24 +37,24 @@ class AlertRule:
 @dataclass
 class NotificationConfig:
     enabled: bool = False
-    
+
     # Email
     smtp_server: str = ""
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_pass: str = ""
     email_to: str = ""
-    
+
     # Telegram
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
-    
+
     # Slack
     slack_webhook_url: str = ""
-    
+
     # Discord
     discord_webhook_url: str = ""
-    
+
     # Generic webhook
     webhook_url: str = ""
     webhook_headers: dict = field(default_factory=dict)
@@ -98,17 +98,17 @@ class PyMonConfig:
     scrape_configs: list[ScrapeConfig] = field(default_factory=list)
     alerting_rules: list[AlertRule] = field(default_factory=list)
     notifications: NotificationConfig = field(default_factory=NotificationConfig)
-    
+
     @classmethod
     def from_yaml(cls, path: str) -> "PyMonConfig":
         with open(path) as f:
             data = yaml.safe_load(f) or {}
         return cls.from_dict(data)
-    
+
     @classmethod
     def from_dict(cls, data: dict) -> "PyMonConfig":
         config = cls()
-        
+
         if "server" in data:
             s = data["server"]
             config.server = ServerConfig(
@@ -116,7 +116,7 @@ class PyMonConfig:
                 host=s.get("host", "0.0.0.0"),
                 domain=s.get("domain", "localhost"),
             )
-        
+
         if "storage" in data:
             st = data["storage"]
             config.storage = StorageConfig(
@@ -124,7 +124,7 @@ class PyMonConfig:
                 path=st.get("path", "pymon.db"),
                 retention_hours=st.get("retention_hours", 168),
             )
-        
+
         if "auth" in data:
             a = data["auth"]
             config.auth = AuthConfig(
@@ -133,7 +133,7 @@ class PyMonConfig:
                 admin_password=a.get("admin_password", "changeme"),
                 jwt_expire_hours=a.get("jwt_expire_hours", 24),
             )
-        
+
         if "backup" in data:
             b = data["backup"]
             config.backup = BackupConfig(
@@ -142,37 +142,43 @@ class PyMonConfig:
                 backup_dir=b.get("backup_dir", "/etc/pymon/backups"),
                 schedule=b.get("schedule", "0 2 * * *"),
             )
-        
+
         if "scrape_configs" in data:
             for sc in data["scrape_configs"]:
                 static_configs = []
                 for ssc in sc.get("static_configs", []):
-                    static_configs.append(StaticConfig(
-                        targets=ssc.get("targets", []),
-                        labels=ssc.get("labels", {}),
-                    ))
-                
-                config.scrape_configs.append(ScrapeConfig(
-                    job_name=sc.get("job_name", "default"),
-                    scrape_interval=_parse_duration(sc.get("scrape_interval", "15s")),
-                    scrape_timeout=_parse_duration(sc.get("scrape_timeout", "10s")),
-                    metrics_path=sc.get("metrics_path", "/metrics"),
-                    honor_labels=sc.get("honor_labels", False),
-                    static_configs=static_configs,
-                ))
-        
+                    static_configs.append(
+                        StaticConfig(
+                            targets=ssc.get("targets", []),
+                            labels=ssc.get("labels", {}),
+                        )
+                    )
+
+                config.scrape_configs.append(
+                    ScrapeConfig(
+                        job_name=sc.get("job_name", "default"),
+                        scrape_interval=_parse_duration(sc.get("scrape_interval", "15s")),
+                        scrape_timeout=_parse_duration(sc.get("scrape_timeout", "10s")),
+                        metrics_path=sc.get("metrics_path", "/metrics"),
+                        honor_labels=sc.get("honor_labels", False),
+                        static_configs=static_configs,
+                    )
+                )
+
         if "alerting" in data:
             alerting = data["alerting"]
             for rule in alerting.get("rules", []):
-                config.alerting_rules.append(AlertRule(
-                    name=rule.get("name", ""),
-                    expr=rule.get("expr", ""),
-                    threshold=rule.get("threshold", 0),
-                    duration=_parse_duration(rule.get("duration", "0s")),
-                    severity=rule.get("severity", "warning"),
-                    message=rule.get("message", ""),
-                ))
-        
+                config.alerting_rules.append(
+                    AlertRule(
+                        name=rule.get("name", ""),
+                        expr=rule.get("expr", ""),
+                        threshold=rule.get("threshold", 0),
+                        duration=_parse_duration(rule.get("duration", "0s")),
+                        severity=rule.get("severity", "warning"),
+                        message=rule.get("message", ""),
+                    )
+                )
+
         if "notifications" in data:
             n = data["notifications"]
             config.notifications = NotificationConfig(
@@ -189,14 +195,14 @@ class PyMonConfig:
                 webhook_url=n.get("webhook", {}).get("url", ""),
                 webhook_headers=n.get("webhook", {}).get("headers", {}),
             )
-        
+
         return config
-    
+
     def to_yaml(self, path: str) -> None:
         data = self.to_dict()
         with open(path, "w") as f:
             yaml.dump(data, f, default_flow_style=False, sort_keys=False)
-    
+
     def to_dict(self) -> dict:
         return {
             "server": {
@@ -227,10 +233,7 @@ class PyMonConfig:
                     "scrape_timeout": f"{sc.scrape_timeout}s",
                     "metrics_path": sc.metrics_path,
                     "honor_labels": sc.honor_labels,
-                    "static_configs": [
-                        {"targets": ssc.targets, "labels": ssc.labels}
-                        for ssc in sc.static_configs
-                    ],
+                    "static_configs": [{"targets": ssc.targets, "labels": ssc.labels} for ssc in sc.static_configs],
                 }
                 for sc in self.scrape_configs
             ],
@@ -254,7 +257,7 @@ class PyMonConfig:
 def _parse_duration(value: str | int) -> int:
     if isinstance(value, int):
         return value
-    
+
     value = str(value).strip()
     if value.endswith("s"):
         return int(value[:-1])
@@ -269,18 +272,26 @@ def _parse_duration(value: str | int) -> int:
 
 
 def load_config(path: str | None = None) -> PyMonConfig:
+    import json
+
     if path and os.path.exists(path):
         if path.endswith((".yml", ".yaml")):
             return PyMonConfig.from_yaml(path)
-    
+        if path.endswith(".json"):
+            with open(path) as f:
+                return PyMonConfig.from_dict(json.load(f))
+
     config_path = path or os.getenv("CONFIG_PATH", "config.yml")
-    
+
     for ext in [".yml", ".yaml", ".json"]:
         test_path = config_path
         if not test_path.endswith(ext):
-            test_path = Path(config_path).stem + ext
+            test_path = str(Path(config_path).with_suffix(ext))
         if os.path.exists(test_path):
             if ext in [".yml", ".yaml"]:
                 return PyMonConfig.from_yaml(test_path)
-    
+            if ext == ".json":
+                with open(test_path) as f:
+                    return PyMonConfig.from_dict(json.load(f))
+
     return PyMonConfig()

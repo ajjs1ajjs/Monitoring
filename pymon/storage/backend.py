@@ -147,4 +147,7 @@ class SQLiteStorage(StorageBackend):
 
         async with aiosqlite.connect(self._db_path) as db:
             async with db.execute("SELECT DISTINCT name FROM metrics") as cursor:
-                return [row[0] async for row in cursor]
+                names: list[str] = []
+                async for row in cursor:
+                    names.append(row[0])
+                return names

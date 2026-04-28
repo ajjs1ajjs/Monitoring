@@ -64,7 +64,6 @@ class ServerModel(BaseModel):
     notify_email: bool = False
 
 
-
 def init_web_tables():
     try:
         db_dir = os.path.dirname(DB_PATH)
@@ -97,6 +96,20 @@ def init_web_tables():
             uptime TEXT,
             raid_status TEXT,
             disk_info TEXT
+        )""")
+        # Add indexes to improve query performance on common filters
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_servers_last_status ON servers(last_status)")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_servers_name ON servers(name)")
+        except Exception:
+            pass
+
+        c.execute("""CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            action TEXT,
+            target TEXT,
+            timestamp TEXT
         )""")
 
         c.execute("""CREATE TABLE IF NOT EXISTS notifications (
@@ -146,7 +159,7 @@ def init_web_tables():
             enabled BOOLEAN DEFAULT 1,
             created_at TEXT
         )""")
-        
+
         # Add notify_teams column if not exists
         try:
             c.execute("ALTER TABLE alerts ADD COLUMN notify_teams BOOLEAN DEFAULT 0")
@@ -1086,7 +1099,6 @@ async def update_server(server_id: int, server: ServerModel):
     return {"status": "ok"}
 
 
-
 @router.delete("/api/servers/{server_id}")
 async def delete_server(server_id: int):
     conn = get_db()
@@ -1179,6 +1191,7 @@ async def scrape_server(server_id: int):
                             # Collect ALL disks from windows_exporter
                             if name == "windows_logical_disk_free_bytes":
                                 import re
+
                                 vol_match = re.search(r'volume="([^"]+)"', labels_part)
                                 if vol_match:
                                     vol = vol_match.group(1)
@@ -1187,6 +1200,7 @@ async def scrape_server(server_id: int):
                                     disk_info[vol]["free"] = value
                             if name == "windows_logical_disk_size_bytes":
                                 import re
+
                                 vol_match = re.search(r'volume="([^"]+)"', labels_part)
                                 if vol_match:
                                     vol = vol_match.group(1)
@@ -1197,20 +1211,22 @@ async def scrape_server(server_id: int):
                             # Support for node_exporter (Linux)
                             if name == "node_filesystem_free_bytes":
                                 import re
+
                                 mount_match = re.search(r'mountpoint="([^"]+)"', labels_part)
                                 if mount_match:
                                     mount = mount_match.group(1)
                                     # Filter common ignore-worthy mountpoints
-                                    if not any(x in mount for x in ['/proc', '/sys', '/dev', '/run', '/tmp']):
+                                    if not any(x in mount for x in ["/proc", "/sys", "/dev", "/run", "/tmp"]):
                                         if mount not in disk_info:
                                             disk_info[mount] = {"volume": mount, "free": 0, "size": 0}
                                         disk_info[mount]["free"] = value
                             if name == "node_filesystem_size_bytes":
                                 import re
+
                                 mount_match = re.search(r'mountpoint="([^"]+)"', labels_part)
                                 if mount_match:
                                     mount = mount_match.group(1)
-                                    if not any(x in mount for x in ['/proc', '/sys', '/dev', '/run', '/tmp']):
+                                    if not any(x in mount for x in ["/proc", "/sys", "/dev", "/run", "/tmp"]):
                                         if mount not in disk_info:
                                             disk_info[mount] = {"volume": mount, "free": 0, "size": 0}
                                         disk_info[mount]["size"] = value
@@ -1218,6 +1234,7 @@ async def scrape_server(server_id: int):
                             # Support for telegraf
                             if name == "disk_free":
                                 import re
+
                                 path_match = re.search(r'path="([^"]+)"', labels_part)
                                 if path_match:
                                     path = path_match.group(1)
@@ -1226,31 +1243,43 @@ async def scrape_server(server_id: int):
                                     disk_info[path]["free"] = value
                             if name == "disk_total":
                                 import re
+
                                 path_match = re.search(r'path="([^"]+)"', labels_part)
                                 if path_match:
                                     path = path_match.group(1)
                                     if path not in disk_info:
                                         disk_info[path] = {"volume": path, "free": 0, "size": 0}
                                     disk_info[path]["size"] = value
-                            
+
                             # Windows exporter network metrics
                             if name == "windows_net_bytes_total_sent" or name == "windows_net_bytes_total_received":
                                 import re
+
                                 nic_match = re.search(r'nic="([^"]+)"', labels_part)
                                 if nic_match:
                                     nic = nic_match.group(1)
                                     if "active" in nic.lower() or "up" in nic.lower():
                                         if "sent" in name.lower():
-                                            metrics["system_network_tx_bytes"] = metrics.get("system_network_tx_bytes", 0) + value
+                                            metrics["system_network_tx_bytes"] = (
+                                                metrics.get("system_network_tx_bytes", 0) + value
+                                            )
                                         elif "received" in name.lower():
-                                            metrics["system_network_rx_bytes"] = metrics.get("system_network_rx_bytes", 0) + value
-                            
+                                            metrics["system_network_rx_bytes"] = (
+                                                metrics.get("system_network_rx_bytes", 0) + value
+                                            )
+
                             # Windows Performance Counters network metrics
-                            if name.startswith("windows_perf_counter_") and ("network" in name.lower() or "bytes" in name.lower()):
+                            if name.startswith("windows_perf_counter_") and (
+                                "network" in name.lower() or "bytes" in name.lower()
+                            ):
                                 if "sent" in name.lower() or "transmit" in name.lower():
-                                    metrics["system_network_tx_bytes"] = metrics.get("system_network_tx_bytes", 0) + value
+                                    metrics["system_network_tx_bytes"] = (
+                                        metrics.get("system_network_tx_bytes", 0) + value
+                                    )
                                 elif "received" in name.lower() or "receive" in name.lower():
-                                    metrics["system_network_rx_bytes"] = metrics.get("system_network_rx_bytes", 0) + value
+                                    metrics["system_network_rx_bytes"] = (
+                                        metrics.get("system_network_rx_bytes", 0) + value
+                                    )
 
                         else:
                             parts = line.split()
@@ -1344,13 +1373,10 @@ async def scrape_server(server_id: int):
                 )
 
                 # Cleanup old history (keep 7 days)
-                conn.execute(
-                    "DELETE FROM metrics_history WHERE timestamp < datetime('now', '-7 days')"
-                )
+                conn.execute("DELETE FROM metrics_history WHERE timestamp < datetime('now', '-7 days')")
 
                 conn.commit()
                 conn.close()
-
 
                 return {
                     "status": "ok",
@@ -1487,15 +1513,19 @@ async def update_notification(channel: str, config: dict):
 async def get_server_history(server_id: int, range: str = "1h"):
     # Convert range to hours
     hours = 1
-    if range == "5m": hours = 1/12
-    elif range == "15m": hours = 0.25
-    elif range == "6h": hours = 6
-    elif range == "24h": hours = 24
+    if range == "5m":
+        hours = 1 / 12
+    elif range == "15m":
+        hours = 0.25
+    elif range == "6h":
+        hours = 6
+    elif range == "24h":
+        hours = 24
 
     conn = get_db()
     history = conn.execute(
         f"SELECT * FROM metrics_history WHERE server_id = ? AND timestamp > datetime('now', '-{hours} hours') ORDER BY timestamp ASC",
-        (server_id,)
+        (server_id,),
     ).fetchall()
     conn.close()
     return {"history": [dict(h) for h in history]}
