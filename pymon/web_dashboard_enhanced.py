@@ -12,11 +12,9 @@ from pydantic import BaseModel
 
 router = APIRouter()
 
-DB_PATH = os.getenv("DB_PATH", "pymon.db")
-
-
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -1125,7 +1123,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <div class="panel-header">
                         <div class="panel-title"><i class="fas fa-bell"></i> Alert Rules</div>
                         <div class="panel-actions">
-                            <button class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Create Alert</button>
+                            <button class="btn btn-primary btn-sm" onclick="showAlertModal()"><i class="fas fa-plus"></i> Create Alert</button>
                         </div>
                     </div>
                     <div class="panel-body">
@@ -1320,6 +1318,22 @@ document.querySelectorAll('.time-btn').forEach(btn => {
         loadData();
     });
 });
+
+// Refresh dashboard data (global)
+window.refreshDashboard = function() {
+    loadData();
+    console.log('Dashboard refreshed');
+}
+
+// Logout function (global)
+window.logout = function() {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+}
+
+// Make sure these are available globally
+window.loadData = loadData;
+window.showSection = showSection;
 
 // Button handlers
 document.getElementById('logoutBtn').addEventListener('click', () => {
@@ -1932,6 +1946,11 @@ async function deleteServer(id) {
             console.error('Error deleting server:', e);
         }
     }
+}
+
+// Refresh dashboard
+function refreshDashboard() {
+    loadData();
 }
 
 // Auto-refresh every 30 seconds

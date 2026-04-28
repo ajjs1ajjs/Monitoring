@@ -16,7 +16,8 @@ DB_PATH = os.getenv("DB_PATH", "pymon.db")
 
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 

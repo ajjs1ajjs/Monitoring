@@ -6,8 +6,8 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 
 import aiosqlite
-from fastapi import Query, Request
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse, Response
 
 try:
     from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
@@ -16,8 +16,6 @@ try:
     _PROM_SERVER_COUNT = Gauge("pymon_servers_total", "Total number of servers")
 except Exception:
     _PROM_METRICS_ENABLED = False
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -43,6 +41,14 @@ from pymon.storage import get_storage
 _limiter = Limiter(key_func=get_remote_address)
 
 api = APIRouter()
+
+
+def get_db():
+    """Get database connection - reads DB_PATH from environment each time"""
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 class MetricPayload(BaseModel):
@@ -239,7 +245,7 @@ async def healthz():
 
 
 # Phase 2.9: Reinstate single history endpoint with proper typing (Phase 2.10 API contract)
-@api.get("/servers/{server_id}/history", response_model=api_models.HistoryResponse)
+@api.get("/servers/{server_id}/history-detail", response_model=api_models.HistoryResponse)
 async def get_server_history(
     server_id: int,
     range: str = Query("1h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
@@ -488,7 +494,7 @@ async def export_all_servers(
         conn.close()
 
 
-@api.get("/servers/metrics/history", response_model=api_models.HistoryAllResponse)
+@api.get("/servers/metrics-history", response_model=api_models.HistoryAllResponse)
 async def get_all_servers_metrics_history(
     range: str = Query("1h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
     metric: str | None = Query(None, pattern="^(cpu|memory|disk|network)$"),
@@ -512,19 +518,33 @@ async def get_all_servers_metrics_history(
 
         servers = conn.execute("SELECT id FROM servers").fetchall()
         results = []
+        # Whitelist of allowed column names to prevent SQL injection
+        allowed_columns = {
+            "cpu": "cpu_percent",
+            "memory": "memory_percent",
+            "disk": "disk_percent",
+        }
+        # Network requires special handling
         for s in servers:
             sid = s[0]
             if metric:
-                col = {
-                    "cpu": "cpu_percent",
-                    "memory": "memory_percent",
-                    "disk": "disk_percent",
-                    "network": "(network_rx + network_tx) / 2.0",
-                }.get(metric, "cpu_percent")
-                rows = conn.execute(
-                    f"SELECT timestamp, {col} as value FROM metrics_history WHERE server_id = ? AND timestamp > datetime('now', ?) ORDER BY timestamp",
-                    (sid, time_filter),
-                ).fetchall()
+                if metric in allowed_columns:
+                    col = allowed_columns[metric]
+                    rows = conn.execute(
+                        f"SELECT timestamp, {col} as value FROM metrics_history WHERE server_id = ? AND timestamp > datetime('now', ?) ORDER BY timestamp",
+                        (sid, time_filter),
+                    ).fetchall()
+                elif metric == "network":
+                    rows = conn.execute(
+                        "SELECT timestamp, (network_rx + network_tx) / 2.0 as value FROM metrics_history WHERE server_id = ? AND timestamp > datetime('now', ?) ORDER BY timestamp",
+                        (sid, time_filter),
+                    ).fetchall()
+                else:
+                    col = "cpu_percent"
+                    rows = conn.execute(
+                        "SELECT timestamp, cpu_percent as value FROM metrics_history WHERE server_id = ? AND timestamp > datetime('now', ?) ORDER BY timestamp",
+                        (sid, time_filter),
+                    ).fetchall()
                 values = [r[1] for r in rows]
                 results.append(
                     {"server_id": sid, "metric": metric.upper(), "data": values, "labels": [r[0] for r in rows]}
@@ -545,7 +565,7 @@ async def get_all_servers_metrics_history(
                         "labels": [r[0] for r in rows],
                     }
                 )
-        return {"servers": results}
+        return {"range": range, "servers": results}
     finally:
         conn.close()
 

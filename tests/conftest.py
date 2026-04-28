@@ -1,52 +1,78 @@
+"""Shared fixtures for all tests"""
 import os
-import sqlite3
 import tempfile
-from pathlib import Path
-from datetime import datetime, timezone, timedelta
+import sqlite3
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
-from fastapi import FastAPI
+
+from pymon.cli import create_app
 
 
-def create_test_db(db_path: str):
+@pytest.fixture(scope="session")
+def db_path():
+    """Create a shared test database path"""
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        path = f.name
+    yield path
+    if os.path.exists(path):
+        os.unlink(path)
+
+
+@pytest.fixture(scope="session")
+def init_database(db_path):
+    """Initialize the test database with all required tables and test data"""
+    os.environ["DB_PATH"] = db_path
+    os.environ["STORAGE_BACKEND"] = "sqlite"
+
+    # Initialize all tables
+    from pymon.auth import init_auth_tables
+    from pymon.storage import init_storage
+    from pymon.web_dashboard import init_web_tables
+
+    init_storage(backend="sqlite", db_path=db_path)
+    init_auth_tables()
+    init_web_tables()
+
+    # Add test data
     conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = ON;")
     conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute(
-        "CREATE TABLE IF NOT EXISTS servers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, host TEXT NOT NULL, os_type TEXT DEFAULT 'linux', agent_port INTEGER DEFAULT 9100, last_status TEXT DEFAULT 'unknown', cpu_percent REAL, memory_percent REAL, disk_percent REAL, disk_info TEXT, created_at TEXT)"
-    )
-    c.execute(
-        "CREATE TABLE IF NOT EXISTS metrics_history (id INTEGER PRIMARY KEY AUTOINCREMENT, server_id INTEGER NOT NULL, cpu_percent REAL, memory_percent REAL, disk_percent REAL, network_rx REAL, network_tx REAL, timestamp TEXT)"
-    )
-    c.execute("INSERT INTO servers (id, name, host, os_type, agent_port, last_status) VALUES (1, 'Test Server', '127.0.0.1', 'linux', 9100, 'up')")
     now = datetime.now(timezone.utc)
-    for i in range(6):
-        ts = (now - timedelta(minutes=i*5)).isoformat()
-        c.execute("INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  (1, 40+i, 50+i, 60+i, 1000+i*100, 500+i*50, ts))
-    # Add a second server for aggregation tests
-    c.execute("INSERT INTO servers (id, name, host, os_type, agent_port, last_status) VALUES (2, 'Test Server 2', '127.0.0.2', 'linux', 9101, 'up')")
-    now2 = now
-    for i in range(3):
-        ts2 = (now2 - timedelta(minutes=i*7)).isoformat()
-        c.execute("INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                  (2, 25+i, 35+i, 45+i, 800+i*120, 300+i*50, ts2))
+
+    # Insert test servers
+    conn.execute(
+        "INSERT INTO servers (name, host, os_type, agent_port, last_status, cpu_percent, memory_percent, disk_percent, disk_info, last_check, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("Test Server 1", "192.168.1.100", "linux", 9100, "up", 45.5, 62.3, 78.1,
+         '[{"volume": "C:", "size": 500000000000, "free": 250000000000}, {"volume": "D:", "size": 1000000000000, "free": 600000000000}]',
+         now.isoformat(), now.isoformat()),
+    )
+    conn.execute(
+        "INSERT INTO servers (name, host, os_type, agent_port, last_status, cpu_percent, memory_percent, disk_percent, disk_info, last_check, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("Test Server 2", "192.168.1.101", "windows", 9182, "up", 55.0, 72.0, 68.0,
+         "[]", now.isoformat(), now.isoformat()),
+    )
+
+    # Insert metrics history for server 1
+    for i in range(10):
+        ts = (now - timedelta(minutes=i * 5)).isoformat()
+        conn.execute(
+            "INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (1, 40 + i, 60 + i, 75 + i, 1000000 + i * 100000, 500000 + i * 50000, ts),
+        )
+
     conn.commit()
     conn.close()
 
+    yield
 
-@pytest.fixture
-def test_app():
-    # Prepare a temporary DB for tests
-    with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = Path(tmpdir) / "test_pymon.db"
-        create_test_db(str(db_path))
-        os.environ["DB_PATH"] = str(db_path)
-        from pymon.api.endpoints import api as api_router
-        app = FastAPI()
-        app.include_router(api_router, prefix="/api/v1")
-        from fastapi.testclient import TestClient
-        client = TestClient(app)
-        yield client
+    # Cleanup is handled by db_path fixture
+
+
+@pytest.fixture(scope="function")
+def client(init_database, db_path):
+    """Create test client with the shared database"""
+    os.environ["DB_PATH"] = db_path
+    app = create_app()
+    with TestClient(app) as c:
+        yield c
