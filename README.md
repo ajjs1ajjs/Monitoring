@@ -46,8 +46,14 @@
 
 ---
 
-## Quick Start
-## Quick Start (Linux)
+## Deployment Information
+
+**Server:** Linux-exclusive (Ubuntu, Debian, CentOS, etc.)
+**Agents:** Linux (node_exporter) & Windows (windows_exporter)
+
+---
+
+## Quick Start (Linux Server)
 
 ```bash
 git clone https://github.com/ajjs1ajjs/Monitoring.git
