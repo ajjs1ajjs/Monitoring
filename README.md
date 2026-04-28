@@ -51,27 +51,17 @@
 ### One Command (Recommended)
 
 ```batch
-# Clone and run - single command installs deps + runs server
 git clone https://github.com/ajjs1ajjs/Monitoring.git
 cd Monitoring
 run.bat
 ```
 
-**Modes:**
-```batch
-run.bat              # SQLite (default)
-run.bat postgres    # PostgreSQL
-run.bat tls         # TLS/HTTPS
-run.bat full        # PostgreSQL + TLS
-```
-
 ### Linux/Mac
 
 ```bash
-./run.sh           # SQLite (default)
-./run.sh postgres  # PostgreSQL
-./run.sh tls       # TLS
-./run.sh full     # PostgreSQL + TLS
+git clone https://github.com/ajjs1ajjs/Monitoring.git
+cd Monitoring
+./run.sh
 ```
 
 ### Manual Installation
@@ -630,11 +620,9 @@ Compatible with:
 ### Run Modes
 
 | Mode | Command | Description |
-|------|---------|------------|
+|------|---------|-------------|
 | SQLite | `run.bat` | Default, no setup |
-| PostgreSQL | `run.bat postgres` | For high load |
-| TLS | `run.bat tls` | HTTPS enabled |
-| Full | `run.bat full` | PostgreSQL + TLS |
+| PostgreSQL | `run.bat -postgres` | For high load |
 
 ### Environment Variables
 
