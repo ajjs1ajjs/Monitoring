@@ -129,7 +129,8 @@ class PyMonConfig:
             a = data["auth"]
             config.auth = AuthConfig(
                 admin_username=a.get("admin_username", "admin"),
-                admin_password=a.get("admin_password", "admin"),
+                # If not provided, default to a secure placeholder to avoid weak defaults
+                admin_password=a.get("admin_password", "changeme"),
                 jwt_expire_hours=a.get("jwt_expire_hours", 24),
             )
         

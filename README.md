@@ -48,18 +48,30 @@
 
 ## Quick Start
 
-### Prerequisites
-
-- Python 3.10+
-- pip package manager
-
-### Windows Quick Start
+### One Command (Recommended)
 
 ```batch
-# Clone and run
+# Clone and run - single command installs deps + runs server
 git clone https://github.com/ajjs1ajjs/Monitoring.git
 cd Monitoring
-.\run.bat  # For PowerShell, or just 'run.bat' for CMD
+run.bat
+```
+
+**Modes:**
+```batch
+run.bat              # SQLite (default)
+run.bat postgres    # PostgreSQL
+run.bat tls         # TLS/HTTPS
+run.bat full        # PostgreSQL + TLS
+```
+
+### Linux/Mac
+
+```bash
+./run.sh           # SQLite (default)
+./run.sh postgres  # PostgreSQL
+./run.sh tls       # TLS
+./run.sh full     # PostgreSQL + TLS
 ```
 
 ### Manual Installation
@@ -137,13 +149,13 @@ server:
   port: 8090
 
 storage:
-  backend: sqlite
+  backend: sqlite   # sqlite, memory, postgres
   path: pymon.db
   retention_hours: 168  # 7 days
 
 auth:
   admin_username: admin
-  admin_password: admin
+  admin_password: changeme  # ⚠️ CHANGE THIS AFTER FIRST LOGIN!
   jwt_expire_hours: 24
 
 scrape_configs:
@@ -440,8 +452,8 @@ python -m pymon.cli server
 netstat -an | findstr :8090    # Windows
 netstat -tulpn | grep 8090     # Linux
 
-# Check logs
-python -m pymon.cli server 2>&1 | tee server.log
+# Run with verbose output
+python -m pymon.cli server 2>&1
 ```
 
 ### Charts not showing data
@@ -467,6 +479,19 @@ curl http://server-ip:9273/metrics     # Telegraf
 # Check firewall
 # Windows: Allow port 9182 in Windows Firewall
 # Linux: sudo ufw allow 9100
+```
+
+### PostgreSQL Connection
+
+```bash
+# Set PostgreSQL DSN
+set PG_DSN=postgresql://user:password@localhost:5432/pymon
+
+# Or use run.bat postgres mode
+run.bat postgres
+
+# Test connection
+python -c "import asyncpg; asyncpg.connect('postgresql://user:password@localhost/pymon')"
 ```
 
 ---
@@ -601,6 +626,26 @@ Compatible with:
 |----------|--------|
 | `R` | Refresh dashboard |
 | `?` | Show keyboard shortcuts |
+
+### Run Modes
+
+| Mode | Command | Description |
+|------|---------|------------|
+| SQLite | `run.bat` | Default, no setup |
+| PostgreSQL | `run.bat postgres` | For high load |
+| TLS | `run.bat tls` | HTTPS enabled |
+| Full | `run.bat full` | PostgreSQL + TLS |
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `STORAGE_BACKEND` | sqlite | Storage type (sqlite, memory, postgres) |
+| `PG_DSN` | - | PostgreSQL connection string |
+| `TLS_ENABLED` | false | Enable TLS/HTTPS |
+| `TLS_CERT` | - | TLS certificate path |
+| `TLS_KEY` | - | TLS key path |
+| `JWT_SECRET` | auto | JWT signing secret |
 
 ---
 

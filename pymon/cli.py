@@ -8,6 +8,9 @@ import traceback
 from contextlib import asynccontextmanager
 
 import uvicorn
+import logging
+from logging.handlers import RotatingFileHandler
+import os
 
 from pymon import __version__
 
@@ -25,8 +28,9 @@ def main():
     server_parser.add_argument("--host", default="0.0.0.0", help="Host to bind")
     server_parser.add_argument("--port", type=int, default=8090, help="Port to bind")
     server_parser.add_argument("--config", "-c", default=None, help="Path to config file")
-    server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite"], help="Storage backend")
+    server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite", "postgres"], help="Storage backend")
     server_parser.add_argument("--db", default=None, help="Database path (defaults to config value)")
+    server_parser.add_argument("--pg-dsn", default=None, help="PostgreSQL DSN (postgresql://user:pass@host/db)")
 
     subparsers.add_parser("reset-admin", help="Reset admin password to 'changeme'")
 
@@ -36,6 +40,19 @@ def main():
         try:
             config_path = args.config or os.getenv("CONFIG_PATH", "config.yml")
 
+            # Auto-generate a default config if it does not exist
+            if not os.path.exists(config_path):
+                try:
+                    from pymon.config import PyMonConfig
+                    cfg = PyMonConfig()
+                    # Ensure directory exists for the config path
+                    cfg_dir = os.path.dirname(os.path.abspath(config_path)) or "."
+                    os.makedirs(cfg_dir, exist_ok=True)
+                    cfg.to_yaml(config_path)
+                    print(f"Generated default config at {config_path}", file=sys.stderr)
+                except Exception as e:
+                    print(f"Warning: could not generate default config: {e}", file=sys.stderr)
+
             from pymon.config import load_config
 
             config = load_config(config_path)
@@ -44,8 +61,9 @@ def main():
             port = args.port or config.server.port
             storage = args.storage or config.storage.backend
             db_path = args.db or config.storage.path
+            pg_dsn = args.pg_dsn or os.getenv("PG_DSN")
 
-            os.environ.setdefault("STORAGE_BACKEND", storage)
+os.environ.setdefault("STORAGE_BACKEND", storage)
             os.environ.setdefault("DB_PATH", db_path)
             os.environ.setdefault("CONFIG_PATH", config_path)
 
@@ -55,7 +73,7 @@ def main():
             from pymon.auth import init_auth_tables
             from pymon.storage import init_storage
 
-            init_storage(backend=storage, db_path=db_path)
+            init_storage(backend=storage, db_path=db_path, dsn=pg_dsn)
 
             print(f"Setting auth_config.db_path to: {db_path}", file=sys.stderr)
             auth_cfg.db_path = db_path
@@ -86,8 +104,15 @@ def main():
             print(f"Starting PyMon server on {host}:{port}")
             print(f"Dashboard: http://{host}:{port}/dashboard/")
 
-            app = create_app()
-            uvicorn.run(app, host=host, port=port)
+    app = create_app()
+    # Prefer TLS settings from env, but also allow TLS config from config.yml via TLS envs
+    tls_enabled = os.getenv("TLS_ENABLED", "false").lower() in ("1", "true", "yes", "on")
+    tls_cert = os.getenv("TLS_CERT") or os.getenv("TLS_CERT_PATH") or (os.getenv("TLS_CERT_PATH") if tls_enabled else None)
+    tls_key = os.getenv("TLS_KEY") or os.getenv("TLS_KEY_PATH") or (os.getenv("TLS_KEY_PATH") if tls_enabled else None)
+    if tls_enabled and tls_cert and tls_key:
+        uvicorn.run(app, host=host, port=port, ssl_certfile=tls_cert, ssl_keyfile=tls_key)
+    else:
+        uvicorn.run(app, host=host, port=port)
         except Exception as e:
             print(f"ERROR: {e}", file=sys.stderr)
             traceback.print_exc()
@@ -170,11 +195,28 @@ def create_app():
 
     print("Creating FastAPI app with ENHANCED dashboard...", file=sys.stderr)
 
+    # Setup basic rotating logger for prod-like environments
+    log_dir = os.path.join('.', 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    logfile = os.path.join(log_dir, 'pymon.log')
+    try:
+        handler = RotatingFileHandler(logfile, maxBytes=10*1024*1024, backupCount=5)
+        logging.basicConfig(handlers=[handler], level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    except Exception:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
     app = FastAPI(title="PyMon", version=__version__, lifespan=lifespan)
+
+    # Configure CORS origins from environment so prod can lock down access
+    raw_origins = os.getenv("PYMON_ALLOWED_ORIGINS")
+    if raw_origins:
+        origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+    else:
+        origins = ["http://localhost:8090"]
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

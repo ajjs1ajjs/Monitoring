@@ -846,3 +846,27 @@ const metrics = await axios.get(
 For issues or questions:
 - **GitHub Issues**: https://github.com/ajjs1ajjs/Monitoring/issues
 - **Discussions**: https://github.com/ajjs1ajjs/Monitoring/discussions
+---
+
+## Additional Endpoints (Phase 2.8+)
+
+- Export All Servers
+  - Endpoint: GET /servers/export
+  - Query params: format=json|csv, range=5m|15m|1h|6h|24h|7d
+  - Description: Exports metrics for all servers aggregated into a list per server. Returns JSON or CSV attachment.
+
+- Aggregate Metrics History (All Servers)
+  - Endpoint: GET /servers/metrics/history
+  - Query params: range=5m|15m|1h|6h|24h|7d, metric (cpu|memory|disk|network) optional
+  - Description: Returns aggregated history data across all servers. If metric is provided, returns series per metric; else returns per-server histories for CPU/Memory/Disk/Network.
+
+- Server Summary (All Servers)
+  - Endpoint: GET /servers/summary
+  - Description: Returns a high-level summary across all monitored servers: total, online, offline, avg_cpu, avg_memory, avg_disk.
+
+- Micro Endpoints for Admin/Backups
+  - GET /backup/list: List available backups
+  - POST /backup/create: Create a new backup (zip)
+
+- Admin Events
+  - GET /servers/{server_id}/events: Recent audit events for a server
