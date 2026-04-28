@@ -275,8 +275,8 @@ async def create_backup():
 @router.get("/api/servers/metrics-history")
 async def get_servers_metrics_history(
     server_id: Optional[int] = Query(None),
-    range: str = Query("1h", regex="^(5m|15m|1h|6h|24h|7d)$"),
-    metric: Optional[str] = Query(None, regex="^(cpu|memory|disk|network)$"),
+    range: str = Query("1h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
+    metric: Optional[str] = Query(None, pattern="^(cpu|memory|disk|network)$"),
 ):
     """Get historical metrics for charts with real data from metrics_history"""
     conn = get_db()
@@ -516,8 +516,8 @@ async def get_server_uptime_timeline(server_id: int, days: int = Query(7, ge=1, 
 @router.get("/api/servers/{server_id}/export")
 async def export_server_data(
     server_id: int,
-    format: str = Query("json", regex="^(json|csv)$"),
-    range: str = Query("24h", regex="^(5m|15m|1h|6h|24h|7d)$"),
+    format: str = Query("json", pattern="^(json|csv)$"),
+    range: str = Query("24h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
 ):
     """Export server metrics data as JSON or CSV"""
     conn = get_db()
@@ -595,8 +595,8 @@ async def export_server_data(
 @router.get("/api/servers/compare")
 async def compare_time_ranges(
     server_id: Optional[int] = Query(None),
-    metric: str = Query("cpu", regex="^(cpu|memory|disk|network)$"),
-    range: str = Query("1h", regex="^(5m|15m|1h|6h|24h|7d)$"),
+    metric: str = Query("cpu", pattern="^(cpu|memory|disk|network)$"),
+    range: str = Query("1h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
 ):
     """Compare current period vs previous period"""
     conn = get_db()

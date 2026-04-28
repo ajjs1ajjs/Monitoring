@@ -242,7 +242,7 @@ async def healthz():
 @api.get("/servers/{server_id}/history", response_model=api_models.HistoryResponse)
 async def get_server_history(
     server_id: int,
-    range: str = Query("1h", regex="^(5m|15m|1h|6h|24h|7d)$"),
+    range: str = Query("1h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
 ):
     """Return per-server historical metrics for UI history charts"""
     time_ranges = {
@@ -343,8 +343,8 @@ async def get_server_summary(server_id: int):
 @api.get("/servers/{server_id}/export", response_model=api_models.AllServersExportResponse)
 async def export_server_data_json(
     server_id: int,
-    format: str = Query("json", regex="^(json|csv)$"),
-    range: str = Query("24h", regex="^(5m|15m|1h|6h|24h|7d)$"),
+    format: str = Query("json", pattern="^(json|csv)$"),
+    range: str = Query("24h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
     current_user: User = Depends(get_current_user),
 ):
     """Export server metrics as JSON or CSV for a given range"""
@@ -416,8 +416,8 @@ async def export_server_data_json(
 
 @api.get("/servers/export")
 async def export_all_servers(
-    format: str = Query("json", regex="^(json|csv)$"),
-    range: str = Query("24h", regex="^(5m|15m|1h|6h|24h|7d)$"),
+    format: str = Query("json", pattern="^(json|csv)$"),
+    range: str = Query("24h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
     current_user: User = Depends(get_current_user),
 ):
     """Export metrics for all servers (aggregated per-server data)"""
@@ -490,8 +490,8 @@ async def export_all_servers(
 
 @api.get("/servers/metrics/history", response_model=api_models.HistoryAllResponse)
 async def get_all_servers_metrics_history(
-    range: str = Query("1h", regex="^(5m|15m|1h|6h|24h|7d)$"),
-    metric: str | None = Query(None, regex="^(cpu|memory|disk|network)$"),
+    range: str = Query("1h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
+    metric: str | None = Query(None, pattern="^(cpu|memory|disk|network)$"),
 ):
     """Aggregate metrics history across all servers per server"""
     db_path = os.getenv("DB_PATH", "pymon.db")
