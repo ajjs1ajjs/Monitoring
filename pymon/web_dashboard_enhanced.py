@@ -190,12 +190,16 @@ def check_admin(request: Request):
     # Simplified check for now
     return True
 
-def log_action(username, action, target=''):
+
+def log_action(username, action, target=""):
     conn = get_db()
-    conn.execute('INSERT INTO audit_log (username, action, target, timestamp) VALUES (?, ?, ?, ?)',
-                 (username, action, target, datetime.now(timezone.utc).isoformat()))
+    conn.execute(
+        "INSERT INTO audit_log (username, action, target, timestamp) VALUES (?, ?, ?, ?)",
+        (username, action, target, datetime.now(timezone.utc).isoformat()),
+    )
     conn.commit()
     conn.close()
+
 
 @router.delete("/api/servers/{server_id}")
 async def delete_server_api(server_id: int, request: Request):
@@ -206,6 +210,7 @@ async def delete_server_api(server_id: int, request: Request):
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
 
 @router.get("/api/audit-log")
 async def get_audit_log():
@@ -292,16 +297,16 @@ async def get_servers_metrics_history(
         if server_id:
             # Single server metrics
             if metric:
-                if metric == 'cpu':
-                    field = 'cpu_percent'
-                elif metric == 'memory':
-                    field = 'memory_percent'
-                elif metric == 'disk':
-                    field = 'disk_percent'
-                elif metric == 'network':
-                    field = '(network_rx + network_tx) / 2.0'
+                if metric == "cpu":
+                    field = "cpu_percent"
+                elif metric == "memory":
+                    field = "memory_percent"
+                elif metric == "disk":
+                    field = "disk_percent"
+                elif metric == "network":
+                    field = "(network_rx + network_tx) / 2.0"
                 else:
-                    field = 'cpu_percent'
+                    field = "cpu_percent"
                 cursor = conn.execute(
                     f"""
                     SELECT timestamp, {field} as value
@@ -326,16 +331,16 @@ async def get_servers_metrics_history(
         else:
             # Aggregated metrics for all servers
             if metric:
-                if metric == 'cpu':
-                    field = 'AVG(cpu_percent) as value'
-                elif metric == 'memory':
-                    field = 'AVG(memory_percent) as value'
-                elif metric == 'disk':
-                    field = 'AVG(disk_percent) as value'
-                elif metric == 'network':
-                    field = 'AVG((network_rx + network_tx) / 2.0) as value'
+                if metric == "cpu":
+                    field = "AVG(cpu_percent) as value"
+                elif metric == "memory":
+                    field = "AVG(memory_percent) as value"
+                elif metric == "disk":
+                    field = "AVG(disk_percent) as value"
+                elif metric == "network":
+                    field = "AVG((network_rx + network_tx) / 2.0) as value"
                 else:
-                    field = 'AVG(cpu_percent) as value'
+                    field = "AVG(cpu_percent) as value"
                 cursor = conn.execute(
                     f"""
                     SELECT timestamp, {field}
@@ -1228,6 +1233,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
     </div>
 
 <script>
+const token = localStorage.getItem('token');
+if (!token) window.location.href = '/login';
+
 document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     await fetch('/api/alerts', {
@@ -1245,7 +1253,6 @@ document.getElementById('addAlertForm').addEventListener('submit', async (e) => 
     document.getElementById('addAlertModal').classList.remove('active');
     loadAlerts();
 });
-if (!token) window.location.href = '/login';
 
 let servers = [];
 let charts = {};
@@ -1939,41 +1946,54 @@ startAutoRefresh();
 </script>
 </body>
 </html>"""
-@router.get('/api/alerts')
+
+
+@router.get("/api/alerts")
 async def get_alerts():
     conn = get_db()
-    alerts = conn.execute('SELECT * FROM alerts').fetchall()
+    alerts = conn.execute("SELECT * FROM alerts").fetchall()
     conn.close()
-    return {'alerts': [dict(a) for a in alerts]}
+    return {"alerts": [dict(a) for a in alerts]}
 
-@router.post('/api/alerts')
+
+@router.post("/api/alerts")
 async def create_alert(alert: dict):
     conn = get_db()
-    conn.execute('INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                 (alert['name'], alert['metric'], alert['condition'], alert['threshold'], alert['duration'], alert['severity'], alert.get('server_id'), alert.get('description')))
+    conn.execute(
+        "INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            alert["name"],
+            alert["metric"],
+            alert["condition"],
+            alert["threshold"],
+            alert["duration"],
+            alert["severity"],
+            alert.get("server_id"),
+            alert.get("description"),
+        ),
+    )
     conn.commit()
     conn.close()
-    return {'status': 'ok'}
+    return {"status": "ok"}
 
 
-@router.put('/api/servers/{server_id}')
+@router.put("/api/servers/{server_id}")
 async def update_server_api(server_id: int, server: ServerModel):
     conn = get_db()
     conn.execute(
-        'UPDATE servers SET name=?, host=?, os_type=?, agent_port=? WHERE id=?',
+        "UPDATE servers SET name=?, host=?, os_type=?, agent_port=? WHERE id=?",
         (server.name, server.host, server.os_type, server.agent_port, server_id),
     )
     conn.commit()
     conn.close()
-    return {'status': 'ok'}
+    return {"status": "ok"}
 
 
-
-def log_action(username, action, target=''):
+def log_action(username, action, target=""):
     conn = get_db()
-    conn.execute('INSERT INTO audit_log (username, action, target, timestamp) VALUES (?, ?, ?, ?)',
-                 (username, action, target, datetime.now(timezone.utc).isoformat()))
+    conn.execute(
+        "INSERT INTO audit_log (username, action, target, timestamp) VALUES (?, ?, ?, ?)",
+        (username, action, target, datetime.now(timezone.utc).isoformat()),
+    )
     conn.commit()
     conn.close()
-
-
