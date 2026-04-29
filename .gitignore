@@ -60,3 +60,7 @@ settings.json
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Test databases
+test_*.db
+test*.db

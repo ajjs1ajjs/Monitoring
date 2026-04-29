@@ -86,9 +86,6 @@ def main():
                 print(f"Creating DB directory: {abs_db_dir}", file=sys.stderr)
                 os.makedirs(abs_db_dir, exist_ok=True)
             db_path = os.path.abspath(db_path)
-            auth_cfg.db_path = db_path
-
-            print(f"DB Path in auth_config: {auth_cfg.db_path}", file=sys.stderr)
 
             print(f"Initializing auth tables...", file=sys.stderr)
             init_auth_tables()

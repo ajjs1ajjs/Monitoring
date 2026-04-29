@@ -17,16 +17,6 @@ try:
     _PROM_SERVER_COUNT = Gauge("pymon_servers_total", "Total number of servers")
 except Exception:
     _PROM_METRICS_ENABLED = False
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-
-try:
-    from prometheus_client import CONTENT_TYPE_LATEST, Gauge, generate_latest
-
-    _PROM_METRICS_ENABLED = True
-    _PROM_SERVER_COUNT = Gauge("pymon_servers_total", "Total number of servers")
-except Exception:
-    _PROM_METRICS_ENABLED = False
 
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -42,6 +32,7 @@ from pymon.auth import (
     change_password,
     create_api_key,
     delete_api_key,
+    get_admin_user,
     get_current_user,
     list_api_keys,
 )
@@ -255,12 +246,25 @@ async def create_alert(data: AlertCreate, current_user: User = Depends(get_curre
 
 @api.get("/health")
 async def health():
-    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
+    db_status = "healthy"
+    try:
+        import sqlite3
+        db_path = os.getenv("DB_PATH", "pymon.db")
+        conn = sqlite3.connect(db_path, timeout=2)
+        conn.execute("SELECT 1")
+        conn.close()
+    except Exception:
+        db_status = "unhealthy"
+
+    return {
+        "status": "healthy",
+        "database": db_status,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 
 @api.get("/healthz")
 async def healthz():
-    # Lightweight alias for health checks in some environments
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 

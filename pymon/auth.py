@@ -312,6 +312,3 @@ def delete_api_key(user_id: int, key_id: int) -> bool:
     conn.commit()
     conn.close()
     return deleted
-
-
-import sqlite3
