@@ -277,7 +277,10 @@ async def get_servers_metrics_history(
     metric: Optional[str] = Query(None, pattern="^(cpu|memory|disk|network)$"),
 ):
     """Get historical metrics for charts with real data from metrics_history"""
-    conn = get_db()
+    try:
+        conn = get_db()
+    except Exception as e:
+        return {"labels": [], "datasets": []}
 
     # Time range mapping
     time_ranges = {
@@ -292,16 +295,19 @@ async def get_servers_metrics_history(
     time_filter = time_ranges.get(range, "-1 hour")
 
     try:
-        # Check if any servers exist
-        server_count = conn.execute("SELECT COUNT(*) FROM servers").fetchone()[0]
-        if not server_count:
-            conn.close()
-            return {"labels": [], "datasets": []}
-        
-        # Check if metrics_history table exists and has data
+        # Check if any servers exist and has data
         try:
-            test = conn.execute("SELECT COUNT(*) FROM metrics_history LIMIT 1").fetchone()
-        except:
+            server_count = conn.execute("SELECT COUNT(*) FROM servers").fetchone()
+            if not server_count or server_count[0] == 0:
+                conn.close()
+                return {"labels": [], "datasets": []}
+            
+            # Check if metrics_history table has any data
+            data_count = conn.execute("SELECT COUNT(*) FROM metrics_history").fetchone()
+            if not data_count or data_count[0] == 0:
+                conn.close()
+                return {"labels": [], "datasets": []}
+        except Exception as e:
             conn.close()
             return {"labels": [], "datasets": []}
         
@@ -422,8 +428,9 @@ async def get_servers_metrics_history(
         return {"labels": labels, "datasets": datasets}
 
     except Exception as e:
-        conn.close()
-        raise HTTPException(status_code=500, detail=str(e))
+        try: conn.close()
+        except: pass
+        return {"labels": [], "datasets": []}
 
 
 @router.get("/api/servers/{server_id}/disk-breakdown")
