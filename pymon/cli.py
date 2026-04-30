@@ -224,6 +224,7 @@ def create_app():
 
     app.include_router(api, prefix="/api/v1")
     from pymon import web_dashboard_simple
+
     app.include_router(web_dashboard_simple.router)
 
     static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -243,15 +244,15 @@ def create_app():
     @app.get("/dashboard", response_class=HTMLResponse)
     @app.get("/dashboard/", response_class=HTMLResponse)
     async def dashboard():
-        return HTMLResponse(content=web_dashboard_simple.SIMPLE_DASHBOARD_HTML)
+        return HTMLResponse(content=web_dashboard.ENHANCED_DASHBOARD_HTML)
 
-    @app.get("/")
+    @app.get("/", response_class=HTMLResponse)
     async def root():
         return RedirectResponse(url="/dashboard/")
 
     @app.get("/login", response_class=HTMLResponse)
     async def login_page():
-        return web_dashboard_simple.SIMPLE_DASHBOARD_HTML
+        return HTMLResponse(content=web_dashboard.LOGIN_HTML)
 
     return app
 

@@ -244,11 +244,64 @@ async def create_alert(data: AlertCreate, current_user: User = Depends(get_curre
     return {"status": "ok", "id": alert_id}
 
 
+@api.get("/audit-log")
+async def get_audit_log(limit: int = 100):
+    """Return recent actions from the audit log"""
+    import sqlite3
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        logs = conn.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return {"logs": [dict(l) for l in logs]}
+    finally:
+        conn.close()
+
+
+@api.get("/notifications")
+async def get_notifications():
+    """Return notification channels configuration"""
+    import sqlite3
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute("SELECT * FROM notifications").fetchall()
+        result = []
+        for r in rows:
+            cfg = json.loads(r["config"]) if r["config"] else {}
+            result.append({"channel": r["channel"], "enabled": bool(r["enabled"]), "config": cfg})
+        return {"notifications": result}
+    finally:
+        conn.close()
+
+
+@api.put("/notifications/{channel}")
+async def update_notification(channel: str, data: dict):
+    """Update notification channel configuration"""
+    import sqlite3
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE notifications SET enabled = ?, config = ? WHERE channel = ?",
+            (int(data.get("enabled", 0)), json.dumps(data.get("config", {})), channel),
+        )
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        conn.close()
+
+
 @api.get("/health")
 async def health():
     db_status = "healthy"
     try:
         import sqlite3
+
         db_path = os.getenv("DB_PATH", "pymon.db")
         conn = sqlite3.connect(db_path, timeout=2)
         conn.execute("SELECT 1")
@@ -256,11 +309,7 @@ async def health():
     except Exception:
         db_status = "unhealthy"
 
-    return {
-        "status": "healthy",
-        "database": db_status,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
+    return {"status": "healthy", "database": db_status, "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @api.get("/healthz")
@@ -518,7 +567,8 @@ async def export_all_servers(
         conn.close()
 
 
-@api.get("/servers/metrics-history", response_model=api_models.HistoryAllResponse)
+# Phase 2.9: Reinstate single history endpoint with proper typing (Phase 2.10 API contract)
+@api.get("/servers/history", response_model=api_models.HistoryAllResponse)
 async def get_all_servers_metrics_history(
     range: str = Query("1h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
     metric: str | None = Query(None, pattern="^(cpu|memory|disk|network)$"),
@@ -541,10 +591,10 @@ async def get_all_servers_metrics_history(
         time_filter = time_ranges.get(range, "-1 hour")
 
         servers = conn.execute("SELECT id FROM servers").fetchall()
-        
+
         if not servers:
             return {"range": range, "servers": []}
-        
+
         results = []
         # Whitelist of allowed column names to prevent SQL injection
         allowed_columns = {
@@ -718,6 +768,83 @@ async def get_server_disk_breakdown_endpoint(server_id: int):
                     }
                 )
         return {"disks": sorted(disks, key=lambda x: x["volume"])}
+    finally:
+        conn.close()
+
+
+@api.get("/servers/compare")
+async def compare_time_ranges(
+    server_id: int | None = Query(None),
+    metric: str = Query("cpu", pattern="^(cpu|memory|disk|network)$"),
+    range: str = Query("1h", pattern="^(5m|15m|1h|6h|24h|7d)$"),
+):
+    """Compare current period vs previous period for trends"""
+    import sqlite3
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+
+    time_ranges = {"5m": 5, "15m": 15, "1h": 60, "6h": 360, "24h": 1440, "7d": 10080}
+    minutes = time_ranges.get(range, 60)
+
+    try:
+        # Current period
+        cursor = conn.execute(
+            f"""
+            SELECT AVG(cpu_percent) as cpu, AVG(memory_percent) as mem,
+                   AVG(disk_percent) as disk, AVG(network_rx) as rx, AVG(network_tx) as tx
+            FROM metrics_history
+            WHERE (? IS NULL OR server_id = ?)
+            AND timestamp > datetime('now', '-{minutes} minutes')
+            AND timestamp <= datetime('now')
+            """,
+            (server_id, server_id),
+        )
+        current = cursor.fetchone()
+
+        # Previous period
+        cursor = conn.execute(
+            f"""
+            SELECT AVG(cpu_percent) as cpu, AVG(memory_percent) as mem,
+                   AVG(disk_percent) as disk, AVG(network_rx) as rx, AVG(network_tx) as tx
+            FROM metrics_history
+            WHERE (? IS NULL OR server_id = ?)
+            AND timestamp > datetime('now', '-{minutes * 2} minutes')
+            AND timestamp <= datetime('now', '-{minutes} minutes')
+            """,
+            (server_id, server_id),
+        )
+        previous = cursor.fetchone()
+
+        metric_map = {"cpu": 0, "memory": 1, "disk": 2, "network": 3}
+        idx = metric_map.get(metric, 0)
+
+        current_val = 0.0
+        previous_val = 0.0
+
+        if current:
+            if idx < 3:
+                current_val = float(current[idx] or 0)
+            else:
+                current_val = (float(current[3] or 0) + float(current[4] or 0)) / 2.0
+
+        if previous:
+            if idx < 3:
+                previous_val = float(previous[idx] or 0)
+            else:
+                previous_val = (float(previous[3] or 0) + float(previous[4] or 0)) / 2.0
+
+        delta = current_val - previous_val
+        delta_percent = round((delta / previous_val * 100) if previous_val > 0 else 0, 2)
+
+        return {
+            "current": round(current_val, 2),
+            "previous": round(previous_val, 2),
+            "delta": round(delta, 2),
+            "delta_percent": delta_percent,
+            "trend": "up" if delta > 0.5 else "down" if delta < -0.5 else "stable",
+        }
     finally:
         conn.close()
 
