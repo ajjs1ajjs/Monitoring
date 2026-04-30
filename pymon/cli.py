@@ -63,7 +63,7 @@ def main():
 
             os.environ.setdefault("STORAGE_BACKEND", storage)
             os.environ.setdefault("DB_PATH", db_path)
-os.environ.setdefault("CONFIG_PATH", config_path)
+            os.environ.setdefault("CONFIG_PATH", config_path)
 
             print(f"Initializing storage (SQLite)...", file=sys.stderr)
             from pymon import web_dashboard_simple
@@ -91,10 +91,7 @@ os.environ.setdefault("CONFIG_PATH", config_path)
             init_auth_tables()
 
             print("Initializing web tables (simple dashboard)...", file=sys.stderr)
-            # Enhanced dashboard uses same table structure
-            from pymon import web_dashboard as legacy_web_dashboard
-
-            legacy_web_dashboard.init_web_tables()
+            web_dashboard_simple.init_web_tables()
 
             print(f"Starting PyMon server on {host}:{port}")
             print(f"Dashboard: http://{host}:{port}/dashboard/")

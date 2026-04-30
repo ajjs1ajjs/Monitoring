@@ -20,6 +20,27 @@ def get_db():
     return conn
 
 
+def init_web_tables():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""CREATE TABLE IF NOT EXISTS servers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        host TEXT NOT NULL,
+        os_type TEXT DEFAULT 'windows',
+        agent_port INTEGER DEFAULT 9182,
+        enabled INTEGER DEFAULT 1,
+        created_at TEXT,
+        last_status TEXT DEFAULT 'unknown',
+        cpu_percent REAL DEFAULT 0,
+        memory_percent REAL DEFAULT 0,
+        disk_percent REAL DEFAULT 0,
+        last_updated TEXT
+    )""")
+    conn.commit()
+    conn.close()
+
+
 SIMPLE_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html>
 <head>
