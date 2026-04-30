@@ -292,6 +292,19 @@ async def get_servers_metrics_history(
     time_filter = time_ranges.get(range, "-1 hour")
 
     try:
+        # Check if any servers exist
+        server_count = conn.execute("SELECT COUNT(*) FROM servers").fetchone()[0]
+        if not server_count:
+            conn.close()
+            return {"labels": [], "datasets": []}
+        
+        # Check if metrics_history table exists and has data
+        try:
+            test = conn.execute("SELECT COUNT(*) FROM metrics_history LIMIT 1").fetchone()
+        except:
+            conn.close()
+            return {"labels": [], "datasets": []}
+        
         if server_id:
             # Single server metrics
             if metric:
