@@ -65,8 +65,8 @@ def main():
             os.environ.setdefault("DB_PATH", db_path)
             os.environ.setdefault("CONFIG_PATH", config_path)
 
-            print(f"Initializing storage (SQLite)...", file=sys.stderr)
-from pymon import web_dashboard_simple
+print(f"Initializing storage (SQLite)...", file=sys.stderr)
+            from pymon import web_dashboard_simple
             from pymon.auth import auth_config as auth_cfg
             from pymon.auth import init_auth_tables
             from pymon.storage import init_storage
