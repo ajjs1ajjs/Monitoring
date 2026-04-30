@@ -1424,14 +1424,20 @@ async function loadData() {
         const data = await resp.json();
         servers = data.servers || [];
 
-        updateStats();
-        updateGauges();
-        await updateChartsWithRealData();
-        updateServerGrid();
-        updateServerTable();
-        await loadDiskBreakdown();
-        await loadUptimeTimeline();
-        await loadTrendData();
+        if (servers && servers.length > 0) {
+            updateStats();
+            updateGauges();
+            await updateChartsWithRealData();
+            updateServerGrid();
+            updateServerTable();
+            await loadDiskBreakdown();
+            await loadUptimeTimeline();
+            await loadTrendData();
+        } else {
+            // Reset display when no servers
+            updateStats();
+            updateGauges(); // Will show 0%
+        }
 
         // Also load alerts if in alerts section (check if element exists first)
         const alertsSection = document.getElementById('section-alerts');
