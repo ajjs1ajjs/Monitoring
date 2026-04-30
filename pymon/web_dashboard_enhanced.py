@@ -701,7 +701,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .time-btn.active { background: var(--blue); color: white; }
 
         /* Main Content */
-        .main { padding: 20px; max-width: 1920px; margin: 0 auto; }
+        .main { padding: 20px; max-width: 1920px; margin: 0 auto; overflow-x: hidden; }
 
         /* Stats Overview */
         .stats-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px; }
@@ -729,10 +729,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
         .panel-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
         .panel-actions { display: flex; gap: 8px; }
-        .panel-body { flex: 1; padding: 16px; min-height: 200px; position: relative; }
+        .panel-body { flex: 1; padding: 16px; min-height: 200px; position: relative; overflow: hidden; }
 
         /* Chart Container */
-        .chart-container { width: 100%; height: 280px; position: relative; }
+        .chart-container { width: 100%; height: 280px; position: relative; overflow: hidden; }
 
         /* Disk Breakdown */
         .disk-breakdown { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; padding: 16px; }
