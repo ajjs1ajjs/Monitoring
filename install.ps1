@@ -79,10 +79,10 @@ Write-Info "Using Python: $pythonCmd"
 Write-Success "Python check passed"
 
 # Check pip
-& $pythonCmd -m pip --version 2>$null
+& $pythonCmd -m pip --version | Out-Null
 if ($LASTEXITCODE -ne 0) {
     Write-Info "Installing pip..."
-    & $pythonCmd -m ensurepip --upgrade 2>$null
+    & $pythonCmd -m ensurepip --upgrade | Out-Null
 }
 
 # Create directories
@@ -127,9 +127,22 @@ Write-Info "Creating virtual environment..."
 Set-Location $InstallDir
 & $pythonCmd -m venv "$InstallDir\venv"
 
-$venvPip = "$InstallDir\venv\Scripts\pip"
-& $venvPip install --upgrade pip 2>&1 | Out-Null
-& $venvPip install -r "$InstallDir\requirements.txt" 2>&1 | Out-Null
+# Install dependencies
+Write-Info "Installing Python packages..."
+$pipExe = "$InstallDir\venv\Scripts\pip.exe"
+
+# Upgrade pip first
+$pipUpgrade = Start-Process -FilePath $pipExe -ArgumentList "install","--upgrade","pip" -NoNewWindow -Wait -PassThru
+if ($pipUpgrade.ExitCode -ne 0) {
+    Write-Warn "pip upgrade had issues, continuing..."
+}
+
+# Install requirements
+$pipInstall = Start-Process -FilePath $pipExe -ArgumentList "install","-r","requirements.txt" -NoNewWindow -Wait -PassThru
+if ($pipInstall.ExitCode -ne 0) {
+    Write-Error "Failed to install requirements"
+    exit 1
+}
 
 # Create config
 Write-Info "Creating configuration..."
