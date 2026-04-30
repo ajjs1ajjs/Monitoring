@@ -1604,16 +1604,24 @@ function createGaugeChart(ctx, value, color) {
 }
 
 function updateGauges() {
+    const gaugeCpuEl = document.getElementById('gaugeCpu');
+    const gaugeMemEl = document.getElementById('gaugeMemory');
+    const gaugeDiskEl = document.getElementById('gaugeDisk');
+    
+    if (!gaugeCpuEl || !gaugeMemEl || !gaugeDiskEl) return;
     if (!servers.length) return;
 
     const cpuAvg = servers.reduce((a, s) => a + (s.cpu_percent || 0), 0) / servers.length;
     const memAvg = servers.reduce((a, s) => a + (s.memory_percent || 0), 0) / servers.length;
     const diskAvg = servers.reduce((a, s) => a + (s.disk_percent || 0), 0) / servers.length;
 
-    // Update gauge values
-    document.getElementById('gaugeCpuValue').textContent = cpuAvg.toFixed(1) + '%';
-    document.getElementById('gaugeMemoryValue').textContent = memAvg.toFixed(1) + '%';
-    document.getElementById('gaugeDiskValue').textContent = diskAvg.toFixed(1) + '%';
+    const gaugeCpuValueEl = document.getElementById('gaugeCpuValue');
+    const gaugeMemValueEl = document.getElementById('gaugeMemoryValue');
+    const gaugeDiskValueEl = document.getElementById('gaugeDiskValue');
+    
+    if (gaugeCpuValueEl) gaugeCpuValueEl.textContent = cpuAvg.toFixed(1) + '%';
+    if (gaugeMemValueEl) gaugeMemValueEl.textContent = memAvg.toFixed(1) + '%';
+    if (gaugeDiskValueEl) gaugeDiskValueEl.textContent = diskAvg.toFixed(1) + '%';
 
     // Get colors based on value
     const getCaugeColor = (value) => {
@@ -1629,13 +1637,13 @@ function updateGauges() {
     };
 
     if (!gaugeCharts.cpu) {
-        const cpuCtx = document.getElementById('gaugeCpu').getContext('2d');
-        const memCtx = document.getElementById('gaugeMemory').getContext('2d');
-        const diskCtx = document.getElementById('gaugeDisk').getContext('2d');
+        const cpuCtx = document.getElementById('gaugeCpu')?.getContext('2d');
+        const memCtx = document.getElementById('gaugeMemory')?.getContext('2d');
+        const diskCtx = document.getElementById('gaugeDisk')?.getContext('2d');
 
-        gaugeCharts.cpu = createGaugeChart(cpuCtx, cpuAvg, getCaugeColor(cpuAvg));
-        gaugeCharts.memory = createGaugeChart(memCtx, memAvg, getCaugeColor(memAvg));
-        gaugeCharts.disk = createGaugeChart(diskCtx, diskAvg, getCaugeColor(diskAvg));
+        if (cpuCtx) gaugeCharts.cpu = createGaugeChart(cpuCtx, cpuAvg, getCaugeColor(cpuAvg));
+        if (memCtx) gaugeCharts.memory = createGaugeChart(memCtx, memAvg, getCaugeColor(memAvg));
+        if (diskCtx) gaugeCharts.disk = createGaugeChart(diskCtx, diskAvg, getCaugeColor(diskAvg));
     } else {
         updateGauge(gaugeCharts.cpu, cpuAvg, getCaugeColor(cpuAvg));
         updateGauge(gaugeCharts.memory, memAvg, getCaugeColor(memAvg));
