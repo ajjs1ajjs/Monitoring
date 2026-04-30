@@ -226,7 +226,8 @@ def create_app():
     )
 
     app.include_router(api, prefix="/api/v1")
-    app.include_router(web_dashboard.router)
+    from pymon import web_dashboard_simple
+    app.include_router(web_dashboard_simple.router)
 
     static_dir = os.path.join(os.path.dirname(__file__), "static")
     if os.path.exists(static_dir):
