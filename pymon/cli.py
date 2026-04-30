@@ -66,7 +66,7 @@ def main():
             os.environ.setdefault("CONFIG_PATH", config_path)
 
             print(f"Initializing storage (SQLite)...", file=sys.stderr)
-            from pymon import web_dashboard_enhanced as web_dashboard
+from pymon import web_dashboard_simple
             from pymon.auth import auth_config as auth_cfg
             from pymon.auth import init_auth_tables
             from pymon.storage import init_storage
@@ -90,7 +90,7 @@ def main():
             print(f"Initializing auth tables...", file=sys.stderr)
             init_auth_tables()
 
-            print("Initializing web tables (enhanced dashboard)...", file=sys.stderr)
+            print("Initializing web tables (simple dashboard)...", file=sys.stderr)
             # Enhanced dashboard uses same table structure
             from pymon import web_dashboard as legacy_web_dashboard
 
@@ -246,7 +246,7 @@ def create_app():
     @app.get("/dashboard", response_class=HTMLResponse)
     @app.get("/dashboard/", response_class=HTMLResponse)
     async def dashboard():
-        return HTMLResponse(content=web_dashboard.ENHANCED_DASHBOARD_HTML)
+        return HTMLResponse(content=web_dashboard_simple.SIMPLE_DASHBOARD_HTML)
 
     @app.get("/")
     async def root():
@@ -254,7 +254,7 @@ def create_app():
 
     @app.get("/login", response_class=HTMLResponse)
     async def login_page():
-        return web_dashboard.LOGIN_HTML
+        return web_dashboard_simple.SIMPLE_DASHBOARD_HTML
 
     return app
 
