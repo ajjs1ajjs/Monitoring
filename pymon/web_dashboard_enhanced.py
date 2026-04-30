@@ -1,7 +1,5 @@
 """Modern Enhanced Dashboard for PyMon"""
 
-import os
-
 from fastapi import APIRouter
 
 router = APIRouter()

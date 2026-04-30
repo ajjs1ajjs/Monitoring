@@ -14,3 +14,5 @@ pyjwt>=2.8.0
 python-dotenv>=1.0.0
 pyyaml>=6.0.0
 slowapi>=0.1.9
+aioredis>=2.0.1  # Async Redis для кешування асинхронних операцій
+redis>=5.0.4    # Синхронний Redis для загальних операцій з кешем

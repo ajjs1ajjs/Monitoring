@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyMon - Modern Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js 4.x CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Alpine.js for reactive UI -->
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#10b981',
+                        accent: '#f59e0b',
+                        darkBg: '#0f172a',
+                        cardBg: '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Glassmorphism effects */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Gradient backgrounds */
+        .gradient-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .gradient-card {
+            background: linear-gradient(145deg, rgba(59, 130, 246, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%);
+        }
+
+        /* Smooth transitions */
+        .transition-all-300 { transition: all 0.3s ease; }
+        .hover-lift:hover { transform: translateY(-2px); }
+        .hover-glow:hover { box-shadow: 0 0 25px rgba(59, 130, 246, 0.4); }
+
+        /* Animated chart containers */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+
+        /* Loading animation */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.2); opacity: 0; }
+        }
+
+        .loading-spinner {
+            animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        /* Status dot animations */
+        @keyframes blink-green {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.3; }
+        }
+
+        .status-dot-live {
+            animation: blink-green 2s ease-in-out infinite;
+        }
+
+        /* Custom select */
+        .custom-select {
+            position: relative;
+        }
+
+        .custom-select::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: 12px;
+            transform: translateY(-50%);
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 6px solid currentColor;
+            pointer-events: none;
+        }
+
+        /* Skeleton loading */
+        .skeleton {
+            background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite linear;
+        }
+
+        @keyframes skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+
+<body class="bg-darkBg text-slate-300 min-h-screen font-sans antialiased" x-data="dashboardApp()">
+
+    <!-- Navigation Sidebar -->
+    <div class="fixed inset-y-0 left-0 w-64 glass-panel border-r border-slate-700/50 z-50 transform transition-transform duration-300 ease-in-out" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'" @click.away="sidebarOpen = false">
+        <!-- Logo -->
+        <div class="h-16 flex items-center px-6 border-b border-slate-700/50">
+            <div class="flex items-center gap-3 text-white font-bold text-xl tracking-tight">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+                    <i data-lucide="activity" class="text-white w-6 h-6"></i>
+                </div>
+                PyMon
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="p-4 space-y-1">
+            <template x-for="(item, index) in navigationItems" :key="index">
+                <a href="#"
+                   @click.prevent="currentPage = item.id"
+                   :class="[
+                       'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all-300',
+                       currentPage === item.id ? 'bg-primary/15 text-white border border-primary/20 shadow-lg shadow-primary/10' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                   ]"
+                   x-text="item.icon + '  ' + item.label">
+                    <i data-lucide :name="item.icon" class="w-5 h-5"></i>
+                </a>
+            </template>
+
+            <!-- Settings -->
+            <a href="#"
+               @click.prevent="currentPage = 'settings'"
+               :class="[
+                   'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all-300 w-full',
+                   currentPage === 'settings' ? 'bg-accent/15 text-white border border-accent/20 shadow-lg shadow-accent/10' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+               ]"
+               x-text="'⚙️  Settings'">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+            </a>
+        </nav>
+
+        <!-- User Profile -->
+        <div class="absolute bottom-0 w-full p-4 border-t border-slate-700/50">
+            <div class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/50 transition-all-300 cursor-pointer" @click="showProfile = !showProfile">
+                <img src="https://ui-avatars.com/api/?name=Admin&background=random&size=128" alt="User avatar" class="w-10 h-10 rounded-full ring-2 ring-slate-700/50">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-white truncate" x-text="currentUser?.name || 'Admin User'"></p>
+                    <p class="text-xs text-slate-400 truncate" x-text="'admin@example.com'"></p>
+                </div>
+                <i data-lucide="chevron-right" :class="showProfile ? 'rotate-90' : ''" class="w-4 h-4 text-slate-500"></i>
+            </div>
+
+            <!-- Profile Dropdown -->
+            <transition enter="transition ease-out duration-200" enter-start="opacity-0 translate-y-2" enter-end="opacity-100 translate-y-0" leave="transition ease-in duration-150" leave-start="opacity-100 translate-y-0" leave-end="opacity-0 translate-y-2">
+                <div x-show="showProfile" class="mt-3 ml-4 space-y-2 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 shadow-xl">
+                    <a href="#" @click.prevent="logout()" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-500/10 text-sm text-slate-400 hover:text-white transition-all-300">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        Sign Out
+                    </a>
+                </div>
+            </transition>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="md:ml-64 min-h-screen transition-all-300" x-show="!mobileMenuOpen" @click.self="sidebarOpen = false; mobileMenuOpen = false">
+
+        <!-- Top Header -->
+        <header class="h-16 glass-panel border-b border-slate-700/50 flex items-center justify-between px-6 sticky top-0 z-40 backdrop-blur-xl bg-darkBg/80">
+            <button @click="sidebarOpen = !sidebarOpen" class="md:hidden p-2 rounded-lg text-slate-400 hover:bg-slate-800/50 transition-all-300">
+                <i data-lucide="menu" :class="sidebarOpen ? 'rotate-90' : ''" class="w-6 h-6"></i>
+            </button>
+
+            <!-- Search -->
+            <div class="relative w-full max-w-md hidden md:block">
+                <input type="text"
+                       placeholder="Search metrics, servers..."
+                       x-model="searchQuery"
+                       @keyup.enter="handleSearch()"
+                       class="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all-300 placeholder:text-slate-500"
+                       :class="searchQuery ? 'border-primary ring-1 ring-primary/20' : ''">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></i>
+
+                <!-- Search Results -->
+                <transition enter="transition ease-out duration-200" enter-start="opacity-0 translate-y-2" enter-end="opacity-100 translate-y-0">
+                    <div x-show="searchQuery && searchResults.length > 0" class="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto">
+                        <template x-for="(result, index) in searchResults" :key="index">
+                            <a href="#" @click.prevent="handleSearchResult(index)"
+                               class="flex items-center gap-3 px-4 py-3 hover:bg-slate-800/50 transition-all-300 border-b last:border-0"
+                               :class="searchResults[selectedIndex] === result ? 'bg-primary/15' : ''">
+                                <i data-lucide :name="result.icon" class="w-4 h-4 text-slate-400"></i>
+                                <span x-text="result.label" class="text-sm font-medium"></span>
+                            </a>
+                        </template>
+                    </div>
+                </transition>
+            </div>
+
+            <!-- Right Actions -->
+            <div class="flex items-center gap-4">
+                <!-- Refresh Button -->
+                <button @click="refreshData" :disabled="isLoading"
+                        class="p-2.5 rounded-xl bg-slate-900/50 border border-slate-700 hover:border-primary hover:text-white transition-all-300 disabled:opacity-50 disabled:hover:bg-slate-900/50">
+                    <i data-lucide="refresh-cw" :class="isLoading ? 'animate-spin' : ''" class="w-4 h-4"></i>
+                </button>
+
+                <!-- Time Range Selector -->
+                <div x-data="{ open: false }" @click.outside="open = false">
+                    <select x-model="selectedRange" @change="handleRangeChange()"
+                            :class="[
+                                'custom-select pr-8 py-2 pl-3 bg-slate-900/50 border border-slate-700 rounded-xl text-sm focus:outline-none focus:border-primary transition-all-300',
+                                open ? 'ring-1 ring-primary/20' : ''
+                            ]">
+                        <template x-for="range in rangeOptions" :key="range.value">
+                            <option :value="range.value" x-text="range.label"></option>
+                        </template>
+                    </select>
+                    <i data-lucide="chevron-down" class="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none"></i>
+
+                    <!-- Dropdown -->
+                    <transition enter="transition ease-out duration-200" enter-start="opacity-0 scale-95" enter-end="opacity-100 scale-100">
+                        <div x-show="open" @click.stop class="absolute right-0 top-full mt-1 w-48 bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl z-50 p-1 space-y-1">
+                            <template x-for="range in rangeOptions" :key="range.value">
+                                <button @click.stop="open = false; selectedRange = range.value"
+                                        class="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/50 transition-all-300 text-sm"
+                                        :class="selectedRange === range.value ? 'text-white font-medium' : 'text-slate-400'">
+                                    <template x-text="range.label"></template>
+                                </button>
+                            </template>
+                        </div>
+                    </transition>
+                </div>
+
+                <!-- Notification Bell -->
+                <button @click="notificationsOpen = !notificationsOpen" class="relative p-2.5 rounded-xl bg-slate-900/50 border border-slate-700 hover:border-accent hover:text-white transition-all-300">
+                    <i data-lucide="bell" class="w-4 h-4"></i>
+                    <span x-show="notificationCount > 0" class="absolute -top-0.5 -right-0.5 w-4 h-4 bg-accent text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg">
+                        <template x-text="notificationCount"></template>
+                    </span>
+                </button>
+
+                <!-- Notifications Dropdown -->
+                <transition enter="transition ease-out duration-200" enter-start="opacity-0 translate-y-2" enter-end="opacity-100 translate-y-0">
+                    <div x-show="notificationsOpen" @click.stop class="absolute right-0 top-full mt-1 w-80 max-w-[calc(100vw-8rem)] bg-slate-900/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl z-50 p-3 space-y-2" style="display: none;">
+                        <div class="flex items-center justify-between px-2 pb-2">
+                            <h3 class="font-semibold text-white text-sm">Notifications</h3>
+                            <button @click="notificationCount = 0; notificationsOpen = false"
+                                    class="text-xs text-slate-400 hover:text-accent transition-all-300">
+                                Mark all read
+                            </button>
+                        </div>
+
+                        <template x-for="(notif, index) in notifications" :key="index">
+                            <div class="flex items-start gap-3 p-2 rounded-lg hover:bg-slate-800/50 transition-all-300 cursor-pointer group">
+                                <span class="w-2 h-2 mt-1.5 flex-shrink-0" :class="notif.type === 'alert' ? 'bg-red-500' : notif.type === 'info' ? 'bg-blue-500' : 'bg-green-500'" x-text=""></span>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-slate-300 group-hover:text-white transition-colors" x-text="notif.title"></p>
+                                    <p class="text-xs text-slate-400 mt-0.5 truncate" x-text="notif.message"></p>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div x-show="notificationCount === 0" class="p-3 text-center border-t border-slate-700/50">
+                            <i data-lucide="check-circle" class="w-8 h-8 mx-auto mb-2 text-green-500"></i>
+                            <p class="text-sm text-slate-400">All caught up!</p>
+                        </div>
+                    </div>
+                </transition>
+
+                <!-- Settings Button -->
+                <button @click="showSettings = !showSettings"
+                        :class="[
+                            'p-2.5 rounded-xl border transition-all-300',
+                            showSettings ? 'bg-accent/15 text-accent border-accent/20 shadow-lg shadow-accent/10' : 'bg-slate-900/50 border-slate-700 hover:border-primary hover:text-white'
+                        ]">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="p-6 space-y-6">
+
+            <!-- Page Header -->
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-white tracking-tight" x-text="pageTitles[currentPage]"></h1>
+                    <p class="text-slate-400 text-sm mt-1" x-show="currentPage !== 'settings'">
+                        Real-time monitoring of your servers with Grafana-style visualizations
+                    </p>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="flex items-center gap-2">
+                    <template x-for="action in quickActions[currentPage]" :key="action.label">
+                        <button @click.prevent="handleQuickAction(action.action)"
+                                :class="[
+                                    'px-3 py-1.5 rounded-lg text-xs font-medium transition-all-300 border',
+                                    action.primary ? 'bg-primary/15 hover:bg-primary/25 border-primary/20 text-primary' : 'bg-slate-900/50 hover:border-white border-slate-700 text-slate-400 hover:text-white'
+                                ]"
+                                x-text="action.label">
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Content Container -->
+            <transition :enter-active-class="transitionEnterClasses[currentPage]" enter-start:classes="transitionStartClasses[currentPage]" enter-end:classes="transitionEndClasses[currentPage]" leave-active-class="transition ease-in duration-150" leave-start:classes="opacity-100 translate-y-0" leave-end:classes="opacity-0 translate-y-4">
+                <div x-show="currentPage === 'dashboard'" :id="`content-dashboard`" class="space-y-6">
+                    <!-- Stats Grid -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <template x-for="(stat, index) in dashboardStats" :key="index">
+                            <div class="glass-panel rounded-xl p-5 hover-lift transition-all-300 border border-slate-700/50 shadow-lg shadow-black/10">
+                                <p class="text-xs font-medium text-slate-400 uppercase tracking-wider" x-text="stat.label"></p>
+                                <p class="text-2xl font-bold mt-2" :class="stat.color" x-text="formatNumber(stat.value)"></p>
+                                <p class="text-xs text-slate-500 mt-1" x-text="'Last updated: ' + formatTime(stat.lastUpdated)"></p>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Charts Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- CPU Usage Chart -->
+                        <glass-panel rounded-xl p-5 border border-slate-700/50 shadow-lg shadow-black/10 h-full min-h-[400px]">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="font-semibold text-white flex items-center gap-2">
+                                    <i data-lucide="cpu" class="w-5 h-5 text-primary"></i>
+                                    CPU Usage
+                                </h2>
+                                <span class="text-xs px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700" x-text="'Avg: ' + formatNumber(avgCpu) + '%'"></span>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="cpuChart"></canvas>
+                            </div>
+
+                            <!-- Chart Controls -->
+                            <div class="flex items-center gap-4 mt-4 pt-3 border-t border-slate-700/50">
+                                <button @click="toggleChartMode('cpu', 'line')"
+                                        :class="[
+                                            activeCpuMode === 'line' ? 'text-primary bg-primary/10' : 'text-slate-400 hover:text-white',
+                                            activeCpuMode === 'line' ? 'bg-primary/10' : ''
+                                        ]"
+                                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all-300">
+                                    <i data-lucide="line-chart" :class="activeCpuMode === 'line' ? 'text-primary' : ''"></i> Line
+                                </button>
+                                <button @click="toggleChartMode('cpu', 'area')"
+                                        :class="[
+                                            activeCpuMode === 'area' ? 'text-secondary bg-secondary/10' : 'text-slate-400 hover:text-white',
+                                            activeCpuMode === 'area' ? 'bg-secondary/10' : ''
+                                        ]"
+                                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all-300">
+                                    <i data-lucide="pie-chart" :class="activeCpuMode === 'area' ? 'text-secondary' : ''"></i> Area
+                                </button>
+                            </div>
+
+                            <!-- Legend -->
+                            <div class="flex items-center gap-4 mt-2 text-xs">
+                                <span class="flex items-center gap-1.5" x-data="{ hovered: false }">
+                                    <div class="w-3 h-3 rounded-full bg-primary/60" :class="hovered ? 'ring-2 ring-primary' : ''"></div>
+                                    <span class="text-slate-400" x-text="'CPU 1-Core (' + formatNumber(cpuChartData.labels[0]) + ')'"></span>
+                                </span>
+                            </div>
+                        </glass-panel>
+
+                        <!-- Memory Usage Chart -->
+                        <glass-panel rounded-xl p-5 border border-slate-700/50 shadow-lg shadow-black/10 h-full min-h-[400px]">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="font-semibold text-white flex items-center gap-2">
+                                    <i data-lucide="hard-drive" class="w-5 h-5 text-secondary"></i>
+                                    Memory Usage
+                                </h2>
+                                <span class="text-xs px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700" x-text="'Used: ' + formatNumber(memoryData.used) + ' / ' + formatNumber(memoryData.total)"></span>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="memoryChart"></canvas>
+                            </div>
+
+                            <!-- Memory Usage Bars -->
+                            <div class="space-y-3 mt-4 pt-3 border-t border-slate-700/50">
+                                <template x-for="(mem, index) in memoryData.bars" :key="index">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-xs text-slate-400 w-12 flex-shrink-0" x-text="'RAM ' + (index + 1)"></span>
+                                        <div class="flex-1 bg-slate-800/50 rounded-lg p-2">
+                                            <canvas :ref="'memChart-' + index" data-width="100%" data-height="30px"
+                                                    :data-label="index + 1" :data-used="mem.used" :data-total="mem.total"></canvas>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </glass-panel>
+                    </div>
+
+                    <!-- Additional Charts -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Disk I/O Chart -->
+                        <glass-panel rounded-xl p-5 border border-slate-700/50 shadow-lg shadow-black/10 h-full min-h-[280px]">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="font-semibold text-white flex items-center gap-2">
+                                    <i data-lucide="hard-drive" class="w-5 h-5 text-accent"></i>
+                                    Disk I/O
+                                </h2>
+                                <span class="text-xs px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700" x-text="'Total: ' + formatNumber(diskIoData.total)"></span>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="diskChart"></canvas>
+                            </div>
+
+                            <!-- Disk Usage List -->
+                            <div class="space-y-2 mt-4 pt-3 border-t border-slate-700/50">
+                                <h3 class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Disk Usage</h3>
+                                <template x-for="(disk, index) in diskData" :key="index">
+                                    <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 transition-all-300 cursor-pointer group">
+                                        <i data-lucide="hard-drive-2" class="w-4 h-4 text-slate-500 group-hover:text-accent"></i>
+                                        <span class="text-sm font-medium flex-1" x-text="'/data' + (index + 1)"></span>
+                                        <div class="flex items-center gap-2 w-32">
+                                            <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                                                <div class="h-full rounded-full"
+                                                     :class="disk.used > 90 ? 'bg-red-500' : disk.used > 75 ? 'bg-yellow-500' : 'bg-green-500'"
+                                                     :style="'width: ' + (disk.used * 100) + '%'"></div>
+                                            </div>
+                                        </div>
+                                        <span class="text-xs text-slate-400" x-text="formatNumber(disk.total) + ' used'"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </glass-panel>
+
+                        <!-- Network Traffic -->
+                        <glass-panel rounded-xl p-5 border border-slate-700/50 shadow-lg shadow-black/10 h-full min-h-[280px]">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="font-semibold text-white flex items-center gap-2">
+                                    <i data-lucide="network" class="w-5 h-5 text-blue-400"></i>
+                                    Network Traffic
+                                </h2>
+                                <span class="text-xs px-2.5 py-1 rounded-full bg-slate-800/50 border border-slate-700" x-text="'Upload: ' + formatNumber(networkData.upload) + ' / Down: ' + formatNumber(networkData.download)"></span>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="networkChart"></canvas>
+                            </div>
+
+                            <!-- Network Interfaces -->
+                            <div class="space-y-2 mt-4 pt-3 border-t border-slate-700/50">
+                                <h3 class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Interfaces</h3>
+                                <template x-for="(iface, index) in networkData.interfaces" :key="index">
+                                    <div class="flex items-center justify-between p-2 rounded-lg hover:bg-slate-800/50 transition-all-300 cursor-pointer group">
+                                        <span class="text-sm font-medium flex-1 truncate" x-text="'eth' + (index + 1)"></span>
+                                        <div class="flex items-center gap-2">
+                                            <button @click.prevent="toggleInterface(index)"
+                                                    :class="[
+                                                        'w-4 h-4 rounded-full border transition-all-300 flex items-center justify-center',
+                                                        interfaceStatus[index] === 'up' ? 'border-green-500 bg-green-500/20 text-white' : 'border-slate-600 bg-slate-900/50 text-transparent'
+                                                    ]">
+                                                <i data-lucide="chevron-up" x-show="interfaceStatus[index] === 'up'" class="w-3 h-3"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </glass-panel>
+
+                        <!-- Uptime & Alerts -->
+                        <glass-panel rounded-xl p-5 border border-slate-700/50 shadow-lg shadow-black/10 h-full min-h-[280px] flex flex-col">
+                            <h2 class="font-semibold text-white mb-4 flex items-center gap-2">
+                                <i data-lucide="clock" class="w-5 h-5 text-green-400"></i>
+                                Uptime & Alerts
+                            </h2>
+
+                            <!-- Uptime -->
+                            <div class="flex items-center justify-between mb-4 p-3 rounded-xl bg-slate-800/50 border border-slate-700">
+                                <div>
+                                    <p class="text-xs text-slate-400 uppercase tracking-wider">System Uptime</p>
+                                    <p class="text-lg font-bold" :class="'text-green-500'"><template x-text="formatUptime(uptime)"></template></p>
+                                </div>
+                                <i data-lucide="clock" class="w-8 h-8 text-green-500/20"></i>
+                            </div>
+
+                            <!-- Recent Alerts -->
+                            <h3 class="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">Recent Alerts</h3>
+
+                            <template x-for="(alert, index) in alerts" :key="index">
+                                <transition enter="transition ease-out duration-200" enter-start="opacity-0 translate-y-1" enter-end="opacity-100 translate-y-0">
+                                    <div class="flex items-start gap-3 p-2.5 rounded-lg hover:bg-slate-800/50 transition-all-300 cursor-pointer group border-l-4" :class="alert.severity === 'critical' ? 'border-red-500 bg-red-500/5' : alert.severity === 'warning' ? 'border-yellow-500 bg-yellow-500/5' : 'border-blue-500 bg-blue-500/5'">
+                                        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                                             :class="{
+                                                 'bg-red-500/10 text-red-500': alert.severity === 'critical',
+                                                 'bg-yellow-500/10 text-yellow-500': alert.severity === 'warning',
+                                                 'bg-blue-500/10 text-blue-500': alert.severity === 'info'
+                                             }">
+                                            <i data-lucide :name="alert.type" class="w-4 h-4"></i>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-slate-300 group-hover:text-white transition-colors truncate" x-text="alert.title"></p>
+                                            <p class="text-xs text-slate-400 mt-0.5 truncate" x-text="alert.message"></p>
+                                        </div>
+                                        <span class="text-[10px] px-2 py-1 rounded-full bg-slate-800/50 border border-slate-700 font-medium flex-shrink-0 ml-2"
+                                              :class="{
+                                                  'text-red-400': alert.severity === 'critical',
+                                                  'text-yellow-400': alert.severity === 'warning',
+                                                  'text-blue-400': alert.severity === 'info'
+                                              }">
+                                            <template x-text="alert.severity.toUpperCase()"></template>
+                                        </span>
+                                    </div>
+                                </transition>
+                            </template>
+
+                            <div x-show="alerts.length === 0" class="flex-1 flex items-center justify-center text-slate-500">
+                                <i data-lucide="shield-check" class="w-8 h-8 mb-2"></i>
+                                <p class="text-xs">No alerts. All systems operational.</p>
+                            </div>
+
+                            <!-- Add Alert Button -->
+                            <button @click.prevent="handleAddAlert()"
+                                    :class="[
+                                        'mt-auto w-full py-2 rounded-lg text-xs font-medium transition-all-300 border',
+                                        alerts.length > 0 ? 'bg-accent/15 hover:bg-accent/20 border-accent/20 text-accent' : 'bg-slate-900/50 hover:border-white border-slate-700 text-slate-400 hover:text-white'
+                                    ]">
+                                <i data-lucide="plus" class="w-3 h-3 inline-block mr-1"></i> Add Alert Rule
+                            </button>
+                        </glass-panel>
+                    </div>
+
+                </div>
+
+                <!-- Settings Page -->
+                <div x-show="currentPage === 'settings'" :id="`content-settings`" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Sidebar -->
+                        <glass-panel rounded-xl p-4 border border-slate-700/50 shadow-lg shadow-black/10 h-full max-h-[calc(100vh-2rem)] overflow-y-auto">
+                            <h3 class="font-semibold text-white mb-4 flex items-center gap-2">
+                                <i data-lucide="sliders" class="w-5 h-5"></i> Configuration
+                            </h3>
+
+                            <nav class="space-y-1">
+                                <template x-for="(item, index) in settingsMenuItems" :key="index">
+                                    <button @click.prevent="settingsTab = item.id"
+                                            :class="[
+                                                'w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all-300',
+                                                settingsTab === item.id ? 'bg-primary/15 text-white border border-primary/20 shadow-lg shadow-primary/10' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                                            ]"
+                                            x-text="item.label">
+                                        <i data-lucide :name="item.icon" :class="settingsTab === item.id ? 'text-primary' : ''"></i>
+                                    </button>
+                                </template>
+                            </nav>
+
+                            <!-- Settings Content -->
+                            <div class="mt-6 space-y-4">
+                                <h4 class="font-medium text-white flex items-center gap-2" x-text="'General ' + (settingsTab === 'general' ? '' : settingsMenuItems.find(i => i.id === settingsTab)?.subLabel)"></h4>
+
+                                <template x-for="(field, index) in settingsFields[settingsTab]" :key="index">
+                                    <div class="space-y-2">
+                                        <label :for="'setting-' + field.name" class="block text-sm font-medium text-slate-300">
+                                            <span x-text="field.label"></span>
+                                            <template x-if="field.required"><span class='text-red-500 ml-1'>(required)</span></template>
+                                        </label>
+
+                                        <!-- Input types -->
+                                        <input type="text"
+                                               id="'setting-' + field.name"
+                                               :value="field.value"
+                                               @input.prevent="field.value = $event.target.value"
+                                               x-show="field.type === 'text'"
+                                               class="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary transition-all-300">
+
+                                        <input type="number"
+                                               id="'setting-' + field.name"
+                                               :value="field.value"
+                                               @input.prevent="field.value = $event.target.value"
+                                               x-show="field.type === 'number'"
+                                               class="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary transition-all-300">
+
+                                        <select id="'setting-' + field.name"
+                                                :value="field.value"
+                                                @change.prevent="field.value = $event.target.value"
+                                                x-show="field.type === 'select'"
+                                                class="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-sm focus:outline-none focus:border-primary transition-all-300">
+                                            <template x-for="(option, optIndex) in field.options" :key="optIndex">
+                                                <option :value="option.value" x-text="option.label"></option>
+                                            </template>
+                                        </select>
+
+                                        <!-- Toggle -->
+                                        <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-700"
+                                             :class="field.value ? 'border-primary/20' : ''">
+                                            <span x-text="field.label" class="text-sm font-medium text-slate-300"></span>
+                                            <button @click.prevent="field.value = !field.value"
+                                                    type="checkbox"
+                                                    :checked="field.value"
+                                                    :class="[
+                                                        'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none',
+                                                        field.value ? 'bg-primary' : 'bg-slate-700'
+                                                    ]">
+                                                <span x-show="field.value" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out translate-x-5"></span>
+                                            </button>
+                                        </div>
+
+                                        <!-- Description -->
+                                        <p x-show="field.description" class="text-xs text-slate-500 leading-relaxed" x-text="field.description"></p>
+                                    </div>
+                                </template>
+                            </div>
+                        </glass-panel>
+
+                        <!-- Content Area -->
+                        <div class="md:col-span-2 space-y-6">
+
+                            <!-- General Tab -->
+                            <transition :enter-active-class="transitionEnterClasses.settings" enter-start:classes="transitionStartClasses.settings" enter-end:classes="transitionEndClasses.settings">
+                                <template x-show="settingsTab === 'general'">
+                                    <glass-panel rounded-xl p-5 border border-slate-700/50 shadow-lg shadow-black/10 h-full flex flex-col>
+                                        <h3 class="font-semibold text-white mb-4 flex items-center gap-2">
+                                            <i data-lucide="settings" class="w-5 h-5"></i> General Settings
+                                        </h3>
+
+                                        <!-- Server Information -->
+                                        <div class="space-y-4 mb-6">
+                                            <div class="flex items-start gap-4 p-4 rounded-xl bg-slate-900/50 border border-slate-700 hover:border-primary/20 transition-all-300 cursor-pointer group" x-data="{ expanded: true }">
+                                                <div class="p-2.5 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                                                    <i data-lucide="server" class="w-5 h-5"></i>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <h4 class="font-medium text-white mb-1">Server Information</h4>
+                                                    <p class="text-sm text-slate-400 line-clamp-2 group-hover:line-clamp-none transition-all-300" x-text="'PyMon ' + pyMonVersion + ' running on FastAPI'"></p>
+                                                </div>
+                                                <i data-lucide="chevron-right" :class="expanded ? '-rotate-90' : ''" class="w-4 h-4 text-slate-500 transition-transform"></i>
+                                            </div>
+
+                                            <!-- Performance Stats -->
+                                            <div class="flex items-start gap-4 p-4 rounded-xl bg-slate-900/50 border border-slate-700 hover:border-primary/20 transition-all-300 cursor-pointer group">
+                                                <div class="p-2.5 rounded-lg bg-secondary/10 text-secondary group-hover:bg-secondary/20 transition-colors">
+                                                    <i data-lucide="zap" class="w-5 h-5"></i>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <h4 class="font-medium text-white mb-1">Performance Stats</h4>
+                                                    <p class="text-sm text-slate-400" x-text="'Avg response time: ' + formatNumber(avgResponseTime) + 'ms | Total requests: ' + formatNumber(totalRequests)"></p>
+                                                </div>
+                                            </div>
+
+                                            <!-- System Info -->
+                                            <div class="flex items-start gap-4 p-4 rounded-xl bg-slate-900/50 border border-slate-700 hover:border-primary/20 transition-all-300 cursor-pointer group">
+                                                <div class="p-2.5 rounded-lg bg-accent/10 text-accent group-hover:bg-accent/20 transition-colors">
+                                                    <i data-lucide="terminal" class="w-5 h-5"></i>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <h4 class="font-medium text-white mb-1">System Information</h4>
+                                                    <p class="text-sm text-slate-400" x-text="'OS: Windows Server 2022 / Linux | Kernel: ' + kernelVersion"></p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Actions -->
+                                        <div class="mt-auto pt-6 border-t border-slate-700/50 flex items-center justify-between">
+                                            <button @click.prevent="handleResetDefaults()"
+                                                    :class="[
+                                                        'px-4 py-2 rounded-lg text-sm font-medium transition-all-300 border',
+                                                        settingsTab === 'danger' ? 'bg-red-500/10 hover:bg-red-500/20 border-red-500/20 text-red-400' : 'bg-slate-900/50 hover:border-white border-slate-700 text-slate-400 hover:text-white'
+                                                    ]"
+                                                    x-text="settingsTab === 'danger' ? 'Restore Defaults' : 'Danger Zone'>
+                                                <i data-lucide="trash-2" x-show="settingsTab !== 'danger'" class="w-3 h-3 inline-block ml-1"></i>
+                                            </button>
+
+                                            <div x-data="{ loading: false }">
+                                                <button @click.prevent="handleSaveSettings()" :disabled="loading"
+                                                        :class="[
+                                                            'px-4 py-2 rounded-lg text-sm font-medium transition-all-300 shadow-lg',
+                                                            activeButton === 'save' ? 'bg-primary hover:bg-primary/90 shadow-primary/25' : 'bg-slate-800 border border-slate-700 text-white hover:border-primary'
+                                                        ]"
+                                                        x-text="loading ? 'Saving...' : 'Save Changes'>
+                                                </button>
+
+                                                <button @click.prevent="handleCancel()"
+                                                        :class="[
+                                                            'px-4 py-2 rounded-lg text-sm font-medium transition-all-300 border ml-2',
+                                                            activeButton === 'cancel' ? 'bg-slate-800 border-slate-600 text-white hover:bg-slate-700' : 'border-transparent text-slate-500 hover:text-white'
+                                                        ]"
+                                                        x-text="activeButton === 'save' || activeButton === 'cancel' ? 'Cancel' : ''">
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                    </glass-panel>
+                                </template>
+                            </transition>
+
+                        </div>
+                    </div>
+
+                </div>
+
+            </transition>
+
+        </main>
+
+    </div>
+
+    <!-- Overlay for mobile -->
+    <div x-show="sidebarOpen || mobileMenuOpen" @click="sidebarOpen = false; mobileMenuOpen = false"
+         class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity duration-300 lg:hidden"></div>
+
+    <!-- Toast Notifications -->
+    <div x-data="{ toasts: [] }">
+        <template x-for="(toast, index) in toasts" :key="index">
+            <transition enter="transition ease-out duration-200" enter-start="opacity-0 translate-y-4" enter-end="opacity-100 translate-y-0"
+                        leave-active-class="transition fade-in duration-75" leave-start:classes="opacity-100 translate-y-0" leave-end:classes="opacity-0 translate-y-4">
+                <div class="fixed bottom-6 right-6 z-50 p-4 rounded-xl shadow-2xl glass-panel border border-slate-700/50 max-w-sm animate-slide-in-right flex items-center gap-3"
+                     :class="{
+                         'bg-red-950/95 border-red-500/50': toast.type === 'error',
+                         'bg-green-950/95 border-green-500/50': toast.type === 'success',
+                         'bg-blue-950/95 border-blue-500/50': toast.type === 'info'
+                     }">
+                    <div class="flex-shrink-0">
+                        <i data-lucide :name="toast.icon" class="w-5 h-5"></i>
+                    </div>
+                    <p class="text-sm font-medium text-white flex-1" x-text="toast.message"></p>
+                    <button @click.prevent="toasts.splice(index, 1)"
+                            type="button"
+                            class="flex-shrink-0 p-1 rounded-md hover:bg-slate-800/50 transition-all-300 text-white">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </transition>
+        </template>
+    </div>
+
+</body>
+
+<script>
+// Dashboard Application Logic
+function dashboardApp() {
+    return {
+        sidebarOpen: false,
+        mobileMenuOpen: false,
+
+        // Navigation items
+        navigationItems: [
+            { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard' },
+            { id: 'analytics', label: 'Analytics', icon: 'bar-chart-2' },
+            { id: 'servers', label: 'Servers', icon: 'server' },
+            { id: 'alerts', label: 'Alerts & Rules', icon: 'bell-alert' }
+        ],
+
+        // Page titles
+        pageTitles: {
+            dashboard: 'Overview Dashboard',
+            analytics: 'Analytics & Reports',
+            servers: 'Server Management',
+            alerts: 'Alert Rules & Notifications',
+            settings: 'System Settings'
+        },
+
+        // Quick actions per page
+        quickActions: {
+            dashboard: [
+                { label: '+ Add Server', action: 'addServer' },
+                { label: 'Refresh Data', action: 'refreshData' }
+            ],
+            analytics: [
+                { label: 'Export Report', action: 'exportReport' }
+            ],
+            servers: [
+                { label: '+ New Server', action: 'newServer' },
+                { label: 'Bulk Import', action: 'bulkImport' }
+            ],
+            alerts: [],
+            settings: []
+        },
+
+        // Time range options for charts
+        rangeOptions: [
+            { value: '1h', label: 'Last Hour' },
+            { value: '6h', label: 'Last 6 Hours' },
+            { value: '1d', label: 'Last 24 Hours' },
+            { value: '7d', label: 'Last 7 Days' }
+        ],
+
+        // Dashboard statistics (simulated data)
+        dashboardStats: [
+            { label: 'Active Servers', value: 12, lastUpdated: Date.now(), color: 'text-white font-bold' },
+            { label: 'CPU Load', value: 68.5, lastUpdated: Date.now(), color: 'text-red-400 font-bold' },
+            { label: 'Memory Used', value: 12.4 + 'GB', lastUpdated: Date.now(), color: 'text-yellow-400 font-bold' },
+            { label: 'Disk Free', value: 890.2 + 'GB', lastUpdated: Date.now(), color: 'text-green-400 font-bold' }
+        ],
+
+        // Chart data placeholders
+        cpuChartData: { labels: ['12:00 PM', '
