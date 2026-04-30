@@ -1529,10 +1529,18 @@ function copyToClipboard(elementId) {
 }
 // Update stats overview
 function updateStats() {
+    if (!servers || !servers.length) {
+        document.getElementById('stat-online').textContent = '0';
+        document.getElementById('stat-offline').textContent = '0';
+        document.getElementById('stat-cpu-avg').textContent = '0%';
+        document.getElementById('stat-mem-avg').textContent = '0%';
+        return;
+    }
+    
     const online = servers.filter(s => s.last_status === 'up').length;
     const offline = servers.length - online;
-    const cpuAvg = servers.length ? (servers.reduce((a, s) => a + (s.cpu_percent || 0), 0) / servers.length).toFixed(1) : 0;
-    const memAvg = servers.length ? (servers.reduce((a, s) => a + (s.memory_percent || 0), 0) / servers.length).toFixed(1) : 0;
+    const cpuAvg = (servers.reduce((a, s) => a + (s.cpu_percent || 0), 0) / servers.length).toFixed(1);
+    const memAvg = (servers.reduce((a, s) => a + (s.memory_percent || 0), 0) / servers.length).toFixed(1);
 
     document.getElementById('stat-online').textContent = online;
     document.getElementById('stat-offline').textContent = offline;
@@ -1542,6 +1550,8 @@ function updateStats() {
 
 // Load trend data (comparison with previous period)
 async function loadTrendData() {
+    if (!servers || !servers.length) return;
+    
     try {
         const cpuResp = await fetch(`/api/servers/compare?metric=cpu&range=${currentRange}`, {
             headers: {'Authorization': 'Bearer ' + token}
@@ -1609,7 +1619,18 @@ function updateGauges() {
     const gaugeDiskEl = document.getElementById('gaugeDisk');
     
     if (!gaugeCpuEl || !gaugeMemEl || !gaugeDiskEl) return;
-    if (!servers.length) return;
+    
+    // Якщо немає серверів - показуємо 0%
+    if (!servers || servers.length === 0) {
+        const gaugeCpuValueEl = document.getElementById('gaugeCpuValue');
+        const gaugeMemValueEl = document.getElementById('gaugeMemoryValue');
+        const gaugeDiskValueEl = document.getElementById('gaugeDiskValue');
+        
+        if (gaugeCpuValueEl) gaugeCpuValueEl.textContent = '0%';
+        if (gaugeMemValueEl) gaugeMemValueEl.textContent = '0%';
+        if (gaugeDiskValueEl) gaugeDiskValueEl.textContent = '0%';
+        return;
+    }
 
     const cpuAvg = servers.reduce((a, s) => a + (s.cpu_percent || 0), 0) / servers.length;
     const memAvg = servers.reduce((a, s) => a + (s.memory_percent || 0), 0) / servers.length;
