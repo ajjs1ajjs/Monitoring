@@ -1388,8 +1388,17 @@ document.getElementById('addServerForm').addEventListener('submit', async (e) =>
 function showSection(section) {
     document.querySelectorAll('.section-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    document.getElementById('section-' + section).classList.add('active');
-    document.querySelector(`.nav-item[data-section="${section}"]`)?.classList.add('active');
+    const sectionEl = document.getElementById('section-' + section);
+    const navItem = document.querySelector(`.nav-item[data-section="${section}"]`);
+    if (sectionEl) sectionEl.classList.add('active');
+    if (navItem) navItem.classList.add('active');
+}
+
+function showAlertModal(id = null) {
+    const modal = document.getElementById('alertModal');
+    if (modal) {
+        modal.classList.add('active');
+    }
 }
 
 // Main data loading function
@@ -1424,12 +1433,14 @@ async function loadData() {
         await loadUptimeTimeline();
         await loadTrendData();
 
-        // Also load alerts if in alerts section
-        if (document.getElementById('section-alerts').classList.contains('active')) {
+        // Also load alerts if in alerts section (check if element exists first)
+        const alertsSection = document.getElementById('section-alerts');
+        if (alertsSection && alertsSection.classList.contains('active')) {
             loadAlerts();
         }
-        // Load settings if in settings section
-        if (document.getElementById('section-settings').classList.contains('active')) {
+        // Load settings if in settings section (check if element exists first)
+        const settingsSection = document.getElementById('section-settings');
+        if (settingsSection && settingsSection.classList.contains('active')) {
             loadSettings();
         }
     } catch(e) {

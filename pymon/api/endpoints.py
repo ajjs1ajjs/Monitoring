@@ -541,6 +541,10 @@ async def get_all_servers_metrics_history(
         time_filter = time_ranges.get(range, "-1 hour")
 
         servers = conn.execute("SELECT id FROM servers").fetchall()
+        
+        if not servers:
+            return {"range": range, "servers": []}
+        
         results = []
         # Whitelist of allowed column names to prevent SQL injection
         allowed_columns = {
