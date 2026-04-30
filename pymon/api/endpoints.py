@@ -773,6 +773,25 @@ async def create_backup_endpoint():
     return {"status": "ok", "filename": zipname}
 
 
+@api.get("/servers", response_model=list)
+async def list_servers():
+    """List all monitored servers"""
+    import sqlite3
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        c = conn.cursor()
+        c.execute("SELECT * FROM servers ORDER BY name")
+        rows = c.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception:
+        conn.close()
+        return []
+
+
 @api.post("/servers", response_model=dict)
 async def create_server(data: ServerCreate, current_user: User = Depends(get_admin_user)):
     """Create a new monitored server"""
