@@ -60,7 +60,7 @@ python -m pymon server
 
 **Default credentials:** `admin` / `changeme`
 
-> ⚠️ Change password after first login!
+> &#9888;&#65039; Change password after first login!
 
 ---
 
@@ -95,7 +95,7 @@ storage:
 
 auth:
   admin_username: admin
-  admin_password: changeme  # ⚠️ CHANGE THIS!
+  admin_password: changeme  # &#9888;&#65039; CHANGE THIS!
   jwt_expire_hours: 24
 
 scrape_configs:
@@ -196,27 +196,27 @@ curl "http://localhost:8090/api/v1/servers/1/export?format=csv&range=24h"
 
 ```
 Monitoring/
-├── pymon/
-│   ├── __init__.py          # Package init
-│   ├── cli.py               # CLI entry point
-│   ├── config.py            # Configuration
-│   ├── auth.py              # JWT Authentication
-│   ├── scrape.py            # Metrics scraping
-│   ├── middleware.py        # Error handling
-│   ├── validation.py        # Input validation
-│   ├── web_dashboard.py     # Legacy dashboard
-│   ├── web_dashboard_enhanced.py  # Enhanced dashboard
-│   ├── api/
-│   │   └── endpoints.py     # API endpoints
-│   ├── metrics/             # Metrics modules
-│   ├── storage/             # Storage backends
-│   └── storage/db_utils.py   # DB utilities
-├── config.yml              # Configuration
-├── requirements.txt        # Dependencies
-├── run.sh                 # Linux start script
-├── run.bat                # Windows start script
-├── install.sh             # Linux installer
-└── install.ps1            # Windows installer
+&#9500;&#9472;&#9472; pymon/
+&#9474;   &#9500;&#9472;&#9472; __init__.py          # Package init
+&#9474;   &#9500;&#9472;&#9472; cli.py               # CLI entry point
+&#9474;   &#9500;&#9472;&#9472; config.py            # Configuration
+&#9474;   &#9500;&#9472;&#9472; auth.py              # JWT Authentication
+&#9474;   &#9500;&#9472;&#9472; scrape.py            # Metrics scraping
+&#9474;   &#9500;&#9472;&#9472; middleware.py        # Error handling
+&#9474;   &#9500;&#9472;&#9472; validation.py        # Input validation
+&#9474;   &#9500;&#9472;&#9472; web_dashboard.py     # Legacy dashboard
+&#9474;   &#9500;&#9472;&#9472; web_dashboard_enhanced.py  # Enhanced dashboard
+&#9474;   &#9500;&#9472;&#9472; api/
+&#9474;   &#9474;   &#9492;&#9472;&#9472; endpoints.py     # API endpoints
+&#9474;   &#9500;&#9472;&#9472; metrics/             # Metrics modules
+&#9474;   &#9500;&#9472;&#9472; storage/             # Storage backends
+&#9474;   &#9492;&#9472;&#9472; storage/db_utils.py   # DB utilities
+&#9500;&#9472;&#9472; config.yml              # Configuration
+&#9500;&#9472;&#9472; requirements.txt        # Dependencies
+&#9500;&#9472;&#9472; run.sh                 # Linux start script
+&#9500;&#9472;&#9472; run.bat                # Windows start script
+&#9500;&#9472;&#9472; install.sh             # Linux installer
+&#9492;&#9472;&#9472; install.ps1            # Windows installer
 ```
 
 ---
@@ -249,10 +249,10 @@ curl http://server:9100/metrics  # Linux
 
 ## Security
 
-- ⚠️ Change default password immediately
-- 🔒 Use TLS in production
-- 🔑 Use API keys for integrations
-- 📝 Review audit logs
+- &#9888;&#65039; Change default password immediately
+- &#128274; Use TLS in production
+- &#128273; Use API keys for integrations
+- &#128221; Review audit logs
 
 ---
 
@@ -272,4 +272,4 @@ MIT - See [LICENSE](LICENSE)
 
 ---
 
-**⭐ Star if useful!**
+**&#11088; Star if useful!**

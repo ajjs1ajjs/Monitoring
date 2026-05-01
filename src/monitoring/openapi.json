@@ -1,0 +1,451 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Monitoring Dashboard API",
+    "description": "Interactive monitoring dashboard with real-time charts, metrics, and system information.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Main dashboard page with interactive charts",
+        "description": "Returns the main HTML dashboard page with real-time interactive charts using Chart.js.",
+        "operationId": "index",
+        "responses": {
+          "200": {
+            "description": "Dashboard HTML page rendered successfully",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics": {
+      "get": {
+        "summary": "Get current metrics values",
+        "description": "Returns the latest values of all monitored metrics (CPU, memory, disk I/O, network traffic, request rate).",
+        "operationId": "get_metrics",
+        "tags": ["Metrics"],
+        "responses": {
+          "200": {
+            "description": "Current metrics snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics/history/{metric_name}": {
+      "get": {
+        "summary": "Get historical data for a specific metric",
+        "description": "Returns time-series data for a specific metric over the specified time range (1 hour to 720 hours).",
+        "operationId": "get_metric_history",
+        "tags": ["Metrics"],
+        "parameters": [
+          {
+            "name": "metric_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["cpu_usage", "memory_usage", "disk_io", "network_in", "network_out", "request_rate"],
+              "description": "The name of the metric to retrieve historical data for."
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 24,
+              "minimum": 1,
+              "maximum": 720
+            },
+            "description": "Number of hours to return historical data for (1-720)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historical metric data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoricalData"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid metric name or time range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/system": {
+      "get": {
+        "summary": "Get system information",
+        "description": "Returns detailed system information including hostname, uptime, hardware specs, and software versions.",
+        "operationId": "get_system_info",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "System information snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemInfo"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health check endpoint",
+        "description": "Returns the current health status of the monitoring service. Used for load balancer and CDN health checks.",
+        "operationId": "health_check",
+        "tags": ["System"],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard": {
+      "get": {
+        "summary": "Get complete dashboard data",
+        "description": "Returns all necessary data for rendering the main dashboard in a single API call. Includes charts, system info, and current metrics.",
+        "operationId": "get_dashboard_data",
+        "tags": ["Dashboard"],
+        "responses": {
+          "200": {
+            "description": "Complete dashboard data packet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardData"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "MetricsResponse": {
+        "type": "object",
+        "description": "Current snapshot of all monitored metrics values.",
+        "properties": {
+          "metrics": {
+            "type": "object",
+            "description": "Dictionary of metric names and their latest values.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MetricValue"
+            }
+          }
+        },
+        "required": ["metrics"]
+      },
+
+      "MetricValue": {
+        "type": "object",
+        "description": "A single metric's latest value with metadata.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "CPU Usage"
+          },
+          "value": {
+            "type": "number",
+            "format": "float",
+            "example": 45.23
+          },
+          "unit": {
+            "type": "string",
+            "example": "%"
+          }
+        },
+        "required": ["name", "value"]
+      },
+
+      "HistoricalData": {
+        "type": "object",
+        "description": "Time-series data for a single metric.",
+        "properties": {
+          "metric": {
+            "type": "string",
+            "example": "cpu_usage"
+          },
+          "hours": {
+            "type": "integer",
+            "example": 24
+          },
+          "data": {
+            "type": "array",
+            "description": "List of data points with timestamp and value.",
+            "items": {
+              "$ref": "#/components/schemas/DataPoint"
+            }
+          }
+        },
+        "required": ["metric", "hours", "data"]
+      },
+
+      "DataPoint": {
+        "type": "object",
+        "description": "A single data point in the time series.",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-01-15T10:30:00Z"
+          },
+          "value": {
+            "type": "number",
+            "format": "float",
+            "example": 42.5
+          }
+        },
+        "required": ["timestamp", "value"]
+      },
+
+      "SystemInfo": {
+        "type": "object",
+        "description": "Detailed system information.",
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "example": "a1b2c3d4e5f6"
+          },
+          "uptime_seconds": {
+            "type": "integer",
+            "example": 86400
+          },
+          "memory_total_mb": {
+            "type": "integer",
+            "example": 16384
+          },
+          "memory_free_mb": {
+            "type": "number",
+            "format": "float",
+            "example": 4096.5
+          },
+          "cpu_cores": {
+            "type": "integer",
+            "example": 8
+          },
+          "os_version": {
+            "type": "string",
+            "example": "Windows Server"
+          },
+          "python_version": {
+            "type": "string",
+            "example": "3.11.x"
+          }
+        },
+        "required": ["hostname", "uptime_seconds"]
+      },
+
+      "HealthResponse": {
+        "type": "object",
+        "description": "Health check response.",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["healthy"],
+            "example": "healthy"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-01-15T10:30:00Z"
+          },
+          "version": {
+            "type": "string",
+            "example": "1.0.0"
+          }
+        },
+        "required": ["status", "timestamp"]
+      },
+
+      "DashboardData": {
+        "type": "object",
+        "description": "Complete dashboard data packet.",
+        "properties": {
+          "charts": {
+            "$ref": "#/components/schemas/DashboardCharts"
+          },
+          "system": {
+            "$ref": "#/components/schemas/SystemInfo"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/MetricsResponse"
+          }
+        },
+        "required": ["charts", "system", "metrics"]
+      },
+
+      "DashboardCharts": {
+        "type": "object",
+        "description": "All chart data for the dashboard.",
+        "properties": {
+          "cpu_usage": {
+            "$ref": "#/components/schemas/ChartData"
+          },
+          "memory_usage": {
+            "$ref": "#/components/schemas/ChartData"
+          },
+          "disk_io": {
+            "$ref": "#/components/schemas/ChartData"
+          },
+          "network_in": {
+            "$ref": "#/components/schemas/ChartData"
+          },
+          "network_out": {
+            "$ref": "#/components/schemas/ChartData"
+          },
+          "request_rate": {
+            "$ref": "#/components/schemas/ChartData"
+          }
+        },
+        "additionalProperties": false,
+        "required": ["cpu_usage", "memory_usage", "disk_io", "network_in", "network_out", "request_rate"]
+      },
+
+      "ChartData": {
+        "type": "object",
+        "description": "Data for a single chart (Chart.js compatible).",
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "datasets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChartDataset"
+            }
+          }
+        },
+        "required": ["labels", "datasets"]
+      },
+
+      "ChartDataset": {
+        "type": "object",
+        "description": "A single dataset in a Chart.js chart.",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataPoint"
+            }
+          },
+          "borderColor": {
+            "type": "string",
+            "example": "#e17055"
+          },
+          "fill": {
+            "type": "boolean"
+          }
+        },
+        "required": ["label", "data"]
+      },
+
+      "Error": {
+        "type": "object",
+        "description": "Standard error response format.",
+        "properties": {
+          "detail": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["detail"]
+      }
+    }
+  }
+}

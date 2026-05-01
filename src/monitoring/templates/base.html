@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <</head>meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Monitoring{% endblock %}</title>
+
+    <!-- Theme Support -->
+    <meta name="theme-color" content="#2d3436" data-light="#ffffff" data-dark="#1e1e1e">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+
+    <!-- Stylesheets -->
+    {% block styles %}
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
+    {% endblock %}
+
+    <!-- Chart.js (CDN for development, can be bundled later) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+    <!-- Header / Navigation -->
+    {% block header %}
+    <header id="main-header" class="header">
+        <div class="container-fluid">
+            <a href="{{ url_for('index') }}" class="logo">
+                📊 Monitoring Dashboard
+            </a>
+
+            <!-- Theme Toggle Button -->
+            <button id="theme-toggle" aria-label="Toggle dark/light theme" title="Перемикач теми">
+                <svg class="icon sun-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.64" y1="18.36" x2="5.76" y2="19.78"></line><line x1="19.78" y1="4.22" x2="18.36" y2="5.64"></line></svg>
+                <svg class="icon moon-icon hidden" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+
+            <!-- Mobile Menu Toggle -->
+            <button id="mobile-menu-toggle" class="btn btn-icon d-lg-none">
+                <span class="icon-bars"></span>
+            </button>
+        </div>
+    </header>
+    {% endblock %}
+
+    <!-- Main Content Area -->
+    <main id="main-content" class="container-fluid py-4">
+
+        <!-- Alert Banner (optional) -->
+        {% block alerts %}{% endblock %}
+
+        <!-- Dashboard / Charts Grid -->
+        <div id="dashboard-grid" class="row g-4">
+            {% block dashboard %}
+
+            <!-- Default: Empty state or welcome message -->
+            <div class="col-12 text-center text-muted mt-5">
+                <h3>Д</h3>обірка завантажена! 🎉</h3>
+                <p>Ви</p>беріть вкладку вище або додайте графіки в шаблон.</p>
+            </div>
+
+            {% endblock %}
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    {% block footer %}
+    <footer id="main-footer" class="footer mt-5 py-3 text-center">
+        <div class="container">
+            <p>&copy; 2024 Monitoring Dashboard. Всі права захищено.</p>
+            <p class="small mb-0 text-muted">
+                Версія: <span id="app-version">{{ APP_VERSION|default('unknown') }}</span> |
+                <a href="{{ url_for('api_docs') }}" target="_blank" rel="noopener noreferrer">API Docs</a>
+            </p>
+        </div>
+    </footer>
+    {% endblock %}
+
+    <!-- Scripts -->
+    {% block scripts %}
+
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', path='js/main.js') }}"></script>
+
+    {% endblock %}
+
+</body>
+</html>
