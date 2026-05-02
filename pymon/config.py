@@ -1,41 +1,39 @@
-"""Configuration loader and manager"""
+"""Configuration loader and manager, using Pydantic for strict validation."""
 
 import os
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
+from pydantic import BaseModel, Field, ValidationError, validator
 
 
-@dataclass
-class StaticConfig:
-    targets: list[str]
-    labels: dict[str, str] = field(default_factory=dict)
+class StaticConfig(BaseModel):
+    targets: List[str]
+    labels: Dict[str, str] = Field(default_factory=dict)
 
 
-@dataclass
-class ScrapeConfig:
+class ScrapeConfig(BaseModel):
     job_name: str
-    scrape_interval: int = 15
-    scrape_timeout: int = 10
+    scrape_interval: int = 15  # seconds
+    scrape_timeout: int = 10  # seconds
     metrics_path: str = "/metrics"
     honor_labels: bool = False
-    static_configs: list[StaticConfig] = field(default_factory=list)
+    static_configs: List[StaticConfig] = Field(default_factory=list)
 
 
-@dataclass
-class AlertRule:
+class AlertRule(BaseModel):
     name: str
-    expr: str
-    threshold: float
-    duration: int = 0
+    expr: str = Field(..., description="PromQL query expression")
+    threshold: float = 0.0
+    duration: int = 0  # seconds
     severity: str = "warning"
     message: str = ""
 
 
-@dataclass
-class NotificationConfig:
+class NotificationConfig(BaseModel):
+    """Handles connection details for various alerting channels."""
+
     enabled: bool = False
 
     # Email
@@ -57,53 +55,79 @@ class NotificationConfig:
 
     # Generic webhook
     webhook_url: str = ""
-    webhook_headers: dict = field(default_factory=dict)
+    webhook_headers: Dict[str, str] = Field(default_factory=dict)
 
 
-@dataclass
-class ServerConfig:
+class ServerConfig(BaseModel):
+    """Configuration for the main monitoring server."""
+
     port: int = 8090
     host: str = "0.0.0.0"
     domain: str = "localhost"
 
 
-@dataclass
-class StorageConfig:
+class StorageConfig(BaseModel):
+    """Configuration for the data storage backend."""
+
     backend: str = "sqlite"
     path: str = "pymon.db"
-    retention_hours: int = 168
+    retention_hours: int = 168  # Hours of retention
 
 
-@dataclass
-class AuthConfig:
+class AuthConfig(BaseModel):
+    """Authentication credentials and policies."""
+
     admin_username: str = "admin"
     admin_password: str = "changeme"
-    jwt_expire_hours: int = 24
+    jwt_expire_hours: int = 24  # Hours token is valid
 
 
-@dataclass
-class BackupConfig:
+class BackupConfig(BaseModel):
+    """Configuration for scheduled database backups."""
+
     enabled: bool = True
     max_backups: int = 10
     backup_dir: str = "./backups"
-    schedule: str = "0 2 * * *"
+    schedule: str = "0 2 * * *"  # Cron format
 
 
-@dataclass
-class PyMonConfig:
-    server: ServerConfig = field(default_factory=ServerConfig)
-    storage: StorageConfig = field(default_factory=StorageConfig)
-    auth: AuthConfig = field(default_factory=AuthConfig)
-    backup: BackupConfig = field(default_factory=BackupConfig)
-    scrape_configs: list[ScrapeConfig] = field(default_factory=list)
-    alerting_rules: list[AlertRule] = field(default_factory=list)
-    notifications: NotificationConfig = field(default_factory=NotificationConfig)
+class PyMonConfig(BaseModel):
+    """The root configuration model for the entire monitoring system."""
+
+    server: ServerConfig = Field(default_factory=ServerConfig)
+    storage: StorageConfig = Field(default_factory=StorageConfig)
+    auth: AuthConfig = Field(default_factory=AuthConfig)
+    backup: BackupConfig = Field(default_factory=BackupConfig)
+    scrape_configs: List[ScrapeConfig] = Field(default_factory=list)
+    alerting_rules: List[AlertRule] = Field(default_factory=list)
+    notifications: NotificationConfig = Field(default_factory=NotificationConfig)
 
     @classmethod
     def from_yaml(cls, path: str) -> "PyMonConfig":
-        with open(path) as f:
-            data = yaml.safe_load(f) or {}
-        return cls.from_dict(data)
+        """Loads configuration from a YAML file and validates it using Pydantic."""
+        try:
+            with open(path) as f:
+                data = yaml.safe_load(f) or {}
+            # Use model_construct for clean loading before validation
+            return cls(**data)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Configuration file not found at {path}")
+        except ValidationError as e:
+            print(f"\n[ERROR] Configuration Validation Failed in {path}:")
+            for error in e.errors():
+                print(f"- Field '{error['loc'][0]}': {error['msg']}")
+            raise ValueError("Invalid configuration structure or data types.") from e
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "PyMonConfig":
+        """Validates and constructs the config model from a dictionary."""
+        try:
+            return cls(**data)
+        except ValidationError as e:
+            print("\n[ERROR] Configuration Validation Failed:")
+            for error in e.errors():
+                print(f"- Field '{error['loc'][0]}': {error['msg']}")
+            raise ValueError("Invalid configuration structure or data types.") from e
 
     @classmethod
     def from_dict(cls, data: dict) -> "PyMonConfig":
@@ -254,44 +278,75 @@ class PyMonConfig:
         }
 
 
-def _parse_duration(value: str | int) -> int:
+def _parse_duration(value: Any) -> int:
+    """Parses a duration string (e.g., '15s', 60, '2h') into total seconds."""
     if isinstance(value, int):
         return value
 
-    value = str(value).strip()
+    try:
+        value = str(value).strip()
+    except Exception:
+        raise TypeError("Duration must be a string or integer.")
+
+    # Handle common suffixes for robustness
     if value.endswith("s"):
-        return int(value[:-1])
+        seconds = int(value[:-1])
+        if seconds < 0:
+            raise ValueError("Duration cannot be negative.")
+        return seconds
     elif value.endswith("m"):
-        return int(value[:-1]) * 60
+        minutes = int(value[:-1])
+        return minutes * 60
     elif value.endswith("h"):
-        return int(value[:-1]) * 3600
+        hours = int(value[:-1])
+        return hours * 3600
+    # Assuming 'd' for days is rare, but included for completeness
     elif value.endswith("d"):
-        return int(value[:-1]) * 86400
+        days = int(value[:-1])
+        return days * 86400
     else:
-        return int(value)
+        try:
+            # Assume plain integer seconds if no suffix is provided
+            return int(value)
+        except ValueError:
+            raise ValueError(f"Invalid duration format: {value}. Must end with s, m, h, or be a number.")
 
 
 def load_config(path: str | None = None) -> PyMonConfig:
-    import json
-
+    """
+    Loads configuration from specified path or environment variable.
+    Automatically attempts common file extensions (.yml, .yaml, .json).
+    """
     if path and os.path.exists(path):
-        if path.endswith((".yml", ".yaml")):
+        # If the path is explicitly given and exists, we prioritize it
+        if path.lower().endswith((".yml", ".yaml")):
             return PyMonConfig.from_yaml(path)
-        if path.endswith(".json"):
-            with open(path) as f:
-                return PyMonConfig.from_dict(json.load(f))
+        elif path.lower().endswith(".json"):
+            with open(path, "r") as f:
+                data = json.load(f)
+            return PyMonConfig.from_dict(data)
 
+    # Fallback search logic (searching for the file by common extensions)
     config_path = path or os.getenv("CONFIG_PATH", "config.yml")
 
     for ext in [".yml", ".yaml", ".json"]:
         test_path = config_path
-        if not test_path.endswith(ext):
+        if not test_path.lower().endswith(ext):
+            # Construct a potential alternative path for testing
             test_path = str(Path(config_path).with_suffix(ext))
-        if os.path.exists(test_path):
-            if ext in [".yml", ".yaml"]:
-                return PyMonConfig.from_yaml(test_path)
-            if ext == ".json":
-                with open(test_path) as f:
-                    return PyMonConfig.from_dict(json.load(f))
 
-    return PyMonConfig()
+        if os.path.exists(test_path):
+            try:
+                print(f"Attempting to load configuration from: {test_path}")
+                if ext in [".yml", ".yaml"]:
+                    return PyMonConfig.from_yaml(test_path)
+                elif ext == ".json":
+                    with open(test_path, "r") as f:
+                        data = json.load(f)
+                    return PyMonConfig.from_dict(data)
+            except Exception as e:
+                print(f"[WARNING] Could not load configuration from {test_path}: {e}")
+                continue  # Try next extension
+
+    # If no config was loaded successfully
+    raise FileNotFoundError("Could not find or validate a valid configuration file (.yml, .yaml, or .json).")
