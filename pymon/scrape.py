@@ -45,6 +45,7 @@ class ScrapeManager:
         self.targets: list[ScrapeTarget] = []
         self._running = False
         self._tasks: list = []
+        self._cpu_history = {} # Store {target: (idle_last, total_last)}
 
         self.scrape_total = Counter("pymon_scrape_total", "Total scrape attempts")
         self.scrape_success = Counter("pymon_scrape_success_total", "Successful scrapes")
@@ -553,10 +554,21 @@ class ScrapeManager:
                         except:
                             continue
 
-                    # Store aggregated values
-                    if cpu_idle_total > 0:
-                        metrics["windows_cpu_time_total_idle"] = cpu_idle_total
-                        metrics["windows_cpu_time_total_all"] = cpu_all_total
+                    # Calculate CPU percentage from counters
+                    if cpu_all_total > 0:
+                        prev = self._cpu_history.get(target.target)
+                        if prev:
+                            idle_delta = cpu_idle_total - prev[0]
+                            all_delta = cpu_all_total - prev[1]
+                            if all_delta > 0:
+                                cpu_percent = 100 * (1 - (idle_delta / all_delta))
+                                metrics["cpu_usage_percent"] = max(0, min(100, cpu_percent))
+                        
+                        self._cpu_history[target.target] = (cpu_idle_total, cpu_all_total)
+
+                    # Store aggregated values for diagnostics
+                    metrics["windows_cpu_time_total_idle"] = cpu_idle_total
+                    metrics["windows_cpu_time_total_all"] = cpu_all_total
 
                     # Calculate disk percentages and get C: for main metric
                     disks_list = []

@@ -271,6 +271,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <i data-lucide="bell-ring"></i> Alerting
                 </button>
                 
+                <div class="nav-label">Support</div>
+                <button class="nav-item" data-section="help">
+                    <i data-lucide="help-circle"></i> Help & Agents
+                </button>
                 <div class="nav-label">Management</div>
                 <button class="nav-item" data-section="logs">
                     <i data-lucide="list"></i> Audit Logs
@@ -454,6 +458,74 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         <h2 style="font-size: 1.5rem; font-weight: 700;">Active Alert Rules</h2>
                         <button class="btn btn-primary" onclick="toggleModal('addAlertModal', true)">Create Logic Rule</button>
                     </div>
+
+                <!-- Section: Help & Agents -->
+                <div id="section-help" class="dashboard-section">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <!-- Linux Agent -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: var(--success);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(34, 197, 94, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="terminal" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Linux node_exporter</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Standard Prometheus agent for Linux/Unix systems.</p>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Install Command (Debian/Ubuntu)</label>
+                                    <textarea readonly class="form-input" style="height: 80px; font-family: monospace; font-size: 0.75rem; background: #020617;">sudo apt update && sudo apt install -y prometheus-node-exporter
+sudo systemctl enable prometheus-node-exporter
+sudo systemctl start prometheus-node-exporter</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Manual Download</label>
+                                    <p style="font-size: 0.75rem;">Download from <a href="https://github.com/prometheus/node_exporter/releases" target="_blank" style="color: var(--accent);">Official Releases</a></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Windows Agent -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: #3b82f6;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="monitor" style="color: #3b82f6; width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Windows Exporter</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Best-in-class agent for Windows Server monitoring.</p>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">PowerShell Install</label>
+                                    <textarea readonly class="form-input" style="height: 80px; font-family: monospace; font-size: 0.75rem; background: #020617;">msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.22.0/windows_exporter-0.22.0-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system"</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Agent Port</label>
+                                    <p style="font-size: 0.75rem;">Default Port: <strong style="color: white;">9182</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 2rem;">
+                        <div class="card-header">
+                            <h3>Quick Setup Guide</h3>
+                        </div>
+                        <div class="card-body" style="font-size: 0.9rem; line-height: 1.6;">
+                            <ol style="padding-left: 1.5rem;">
+                                <li>Install the appropriate agent on your target server.</li>
+                                <li>Ensure the firewall allows traffic on port <strong style="color: var(--accent);">9100</strong> (Linux) or <strong style="color: var(--accent);">9182</strong> (Windows).</li>
+                                <li>Go to <strong>Infrastructure</strong> tab and click <strong>+ Add Node</strong>.</li>
+                                <li>Enter the IP address and the correct port.</li>
+                                <li>Wait 30-60 seconds for the first metrics to appear.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
                     <div class="stats-grid" id="alertRulesGrid">
                         <!-- Dynamic Alerts -->
                     </div>
