@@ -27,7 +27,7 @@ def get_cpu_chart_html(servers_data: dict) -> str:
     total_cpu = sum(s.get("cpu_percent", 0) for s in servers if s.get("last_status") == "up")
     active_servers = len([s for s in servers if s.get("last_status") == "up"])
 
-    avg_cpu = (total_cpu / active_servers * 100).toFixed(1) if active_servers else 0
+    avg_cpu = round(total_cpu / active_servers, 1) if active_servers else 0
 
     # Generate color gradient based on CPU load
     cpu_color = _get_cpu_color(avg_cpu)
@@ -115,7 +115,7 @@ def get_cpu_summary(servers_data: dict) -> dict:
     servers = servers_data.get("servers", []) or []
     active_servers = [s for s in servers if s.get("last_status") == "up"]
     total_cpu = sum(s.get("cpu_percent", 0) for s in active_servers)
-    avg_cpu = (total_cpu / len(active_servers) * 100).toFixed(2) if active_servers else 0
+    avg_cpu = round(total_cpu / len(active_servers), 2) if active_servers else 0
 
     # Categorize server CPU states
     low_cpu = [s for s in active_servers if s.get("cpu_percent", 0) < 30]

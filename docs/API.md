@@ -35,7 +35,7 @@ Get JWT access token.
 ```json
 {
   "username": "admin",
-  "password": "admin"
+  "password": "changeme"
 }
 ```
 
@@ -83,7 +83,7 @@ Authorization: Bearer <token>
 **Request:**
 ```json
 {
-  "current_password": "admin",
+  "current_password": "changeme",
   "new_password": "NewSecure123"
 }
 ```
@@ -126,7 +126,7 @@ DELETE /api/v1/auth/api-keys/{key_id}
 
 ### List All Servers
 
-**Endpoint:** `GET /api/servers`
+**Endpoint:** `GET /api/v1/servers`
 
 **Response:**
 ```json
@@ -152,7 +152,7 @@ DELETE /api/v1/auth/api-keys/{key_id}
 
 ### Add Server
 
-**Endpoint:** `POST /api/servers`
+**Endpoint:** `POST /api/v1/servers`
 
 **Request:**
 ```json
@@ -174,9 +174,9 @@ DELETE /api/v1/auth/api-keys/{key_id}
 
 ---
 
-### Get Server Details
+### Get Server Summary
 
-**Endpoint:** `GET /api/servers/{server_id}`
+**Endpoint:** `GET /api/v1/servers/{server_id}/summary`
 
 **Response:**
 ```json
@@ -199,45 +199,7 @@ DELETE /api/v1/auth/api-keys/{key_id}
 
 ---
 
-### Update Server
-
-**Endpoint:** `PUT /api/servers/{server_id}`
-
-**Request:**
-```json
-{
-  "name": "Updated Server Name",
-  "enabled": true
-}
-```
-
----
-
-### Delete Server
-
-**Endpoint:** `DELETE /api/servers/{server_id}`
-
-**Response:**
-```json
-{
-  "message": "Server deleted"
-}
-```
-
----
-
-### Manual Scrape
-
-Trigger immediate metrics collection.
-
-**Endpoint:** `POST /api/servers/{server_id}/scrape`
-
-**Response:**
-```json
-{
-  "message": "Scrape triggered"
-}
-```
+Update, delete, and manual scrape endpoints existed in an old dashboard router, but they are not mounted by the current `pymon.cli:create_app()` entrypoint.
 
 ---
 
@@ -247,7 +209,7 @@ Trigger immediate metrics collection.
 
 Get time-series data for charts.
 
-**Endpoint:** `GET /api/servers/metrics-history`
+**Endpoint:** `GET /api/v1/servers/history`
 
 **Query Parameters:**
 | Parameter | Type | Default | Description |
@@ -258,7 +220,7 @@ Get time-series data for charts.
 
 **Example:**
 ```bash
-GET /api/servers/metrics-history?range=1h&metric=cpu
+GET /api/v1/servers/history?range=1h&metric=cpu
 ```
 
 **Response:**
@@ -284,11 +246,11 @@ GET /api/servers/metrics-history?range=1h&metric=cpu
 
 Get per-disk usage for a server (C:, D:, E: etc.).
 
-**Endpoint:** `GET /api/servers/{server_id}/disk-breakdown`
+**Endpoint:** `GET /api/v1/servers/{server_id}/disk-breakdown`
 
 **Example:**
 ```bash
-GET /api/servers/1/disk-breakdown
+GET /api/v1/servers/1/disk-breakdown
 ```
 
 **Response:**
@@ -323,7 +285,7 @@ GET /api/servers/1/disk-breakdown
 
 Get server uptime/downtime timeline.
 
-**Endpoint:** `GET /api/servers/{server_id}/uptime-timeline`
+**Endpoint:** `GET /api/v1/servers/{server_id}/uptime-timeline`
 
 **Query Parameters:**
 | Parameter | Type | Default | Description |
@@ -332,7 +294,7 @@ Get server uptime/downtime timeline.
 
 **Example:**
 ```bash
-GET /api/servers/1/uptime-timeline?days=7
+GET /api/v1/servers/1/uptime-timeline?days=7
 ```
 
 **Response:**
@@ -354,7 +316,7 @@ GET /api/servers/1/uptime-timeline?days=7
 
 Export metrics data as CSV or JSON.
 
-**Endpoint:** `GET /api/servers/{server_id}/export`
+**Endpoint:** `GET /api/v1/servers/{server_id}/export`
 
 **Query Parameters:**
 | Parameter | Type | Default | Description |
@@ -364,7 +326,7 @@ Export metrics data as CSV or JSON.
 
 **Example (JSON):**
 ```bash
-GET /api/servers/1/export?format=json&range=24h
+GET /api/v1/servers/1/export?format=json&range=24h
 ```
 
 **Response (JSON):**
@@ -398,7 +360,7 @@ Timestamp,CPU %,Memory %,Disk %,Network RX (MB),Network TX (MB)
 
 Compare current period vs previous period with trend analysis.
 
-**Endpoint:** `GET /api/servers/compare`
+**Endpoint:** `GET /api/v1/servers/compare`
 
 **Query Parameters:**
 | Parameter | Type | Default | Description |
@@ -409,7 +371,7 @@ Compare current period vs previous period with trend analysis.
 
 **Example:**
 ```bash
-GET /api/servers/compare?metric=cpu&range=1h
+GET /api/v1/servers/compare?metric=cpu&range=1h
 ```
 
 **Response:**
@@ -527,7 +489,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### List Alerts
 
-**Endpoint:** `GET /api/alerts`
+**Endpoint:** `GET /api/v1/alerts`
 
 **Response:**
 ```json
@@ -550,7 +512,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### Create Alert
 
-**Endpoint:** `POST /api/alerts`
+**Endpoint:** `POST /api/v1/alerts`
 
 **Request:**
 ```json
@@ -571,7 +533,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### Update Alert
 
-**Endpoint:** `PUT /api/alerts/{id}`
+This endpoint belongs to an old dashboard router and is not mounted by the current app.
 
 **Request:**
 ```json
@@ -585,7 +547,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### Delete Alert
 
-**Endpoint:** `DELETE /api/alerts/{id}`
+This endpoint belongs to an old dashboard router and is not mounted by the current app.
 
 ---
 
@@ -593,7 +555,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### Get Backup Config
 
-**Endpoint:** `GET /api/backup/config`
+This endpoint belongs to an old dashboard router and is not mounted by the current app.
 
 **Response:**
 ```json
@@ -609,7 +571,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### Update Backup Config
 
-**Endpoint:** `POST /api/backup/config`
+This endpoint belongs to an old dashboard router and is not mounted by the current app.
 
 **Request:**
 ```json
@@ -625,7 +587,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### Create Backup
 
-**Endpoint:** `POST /api/backup/create`
+**Endpoint:** `POST /api/v1/backup/create`
 
 **Request:**
 ```json
@@ -646,7 +608,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### Restore Backup
 
-**Endpoint:** `POST /api/backup/restore`
+This endpoint belongs to an old dashboard router and is not mounted by the current app.
 
 **Request:**
 ```json
@@ -662,7 +624,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### List Backups
 
-**Endpoint:** `GET /api/backup/list`
+**Endpoint:** `GET /api/v1/backup/list`
 
 **Response:**
 ```json
@@ -681,7 +643,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### Delete Backup
 
-**Endpoint:** `DELETE /api/backup/file`
+This endpoint belongs to an old dashboard router and is not mounted by the current app.
 
 **Request:**
 ```json
@@ -696,7 +658,7 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ### Health Check
 
-**Endpoint:** `GET /api/health`
+**Endpoint:** `GET /api/v1/health`
 
 **Response:**
 ```json
@@ -712,13 +674,13 @@ GET /api/v1/query?query=cpu&start=2026-03-19T09:00:00&end=2026-03-19T10:00:00&st
 
 ⚠️ **WARNING:** This will delete all data!
 
-**Endpoint:** `POST /api/system/reset`
+This endpoint belongs to an old dashboard router and is not mounted by the current app.
 
 ---
 
 ### Clear Metrics
 
-**Endpoint:** `POST /api/system/clear-metrics`
+This endpoint belongs to an old dashboard router and is not mounted by the current app.
 
 ---
 
@@ -781,18 +743,18 @@ import requests
 # Login
 resp = requests.post('http://localhost:8090/api/v1/auth/login', json={
     'username': 'admin',
-    'password': 'admin'
+    'password': 'changeme'
 })
 token = resp.json()['access_token']
 
 # Get servers
 headers = {'Authorization': f'Bearer {token}'}
-resp = requests.get('http://localhost:8090/api/servers', headers=headers)
+resp = requests.get('http://localhost:8090/api/v1/servers', headers=headers)
 servers = resp.json()['servers']
 
 # Get metrics history
 resp = requests.get(
-    'http://localhost:8090/api/servers/metrics-history?range=1h&metric=cpu',
+    'http://localhost:8090/api/v1/servers/history?range=1h&metric=cpu',
     headers=headers
 )
 metrics = resp.json()
@@ -804,14 +766,14 @@ metrics = resp.json()
 # Login
 TOKEN=$(curl -s -X POST http://localhost:8090/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}' | jq -r '.access_token')
+  -d '{"username":"admin","password":"changeme"}' | jq -r '.access_token')
 
 # Get servers
-curl -X GET http://localhost:8090/api/servers \
+curl -X GET http://localhost:8090/api/v1/servers \
   -H "Authorization: Bearer $TOKEN"
 
 # Get metrics history
-curl -X GET "http://localhost:8090/api/servers/metrics-history?range=1h" \
+curl -X GET "http://localhost:8090/api/v1/servers/history?range=1h" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -828,13 +790,13 @@ const { data } = await axios.post('http://localhost:8090/api/v1/auth/login', {
 const token = data.access_token;
 
 // Get servers
-const servers = await axios.get('http://localhost:8090/api/servers', {
+const servers = await axios.get('http://localhost:8090/api/v1/servers', {
   headers: { 'Authorization': `Bearer ${token}` }
 });
 
 // Get metrics history
 const metrics = await axios.get(
-  'http://localhost:8090/api/servers/metrics-history?range=1h',
+  'http://localhost:8090/api/v1/servers/history?range=1h',
   { headers: { 'Authorization': `Bearer ${token}` } }
 );
 ```

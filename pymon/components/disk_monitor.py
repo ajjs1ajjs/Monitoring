@@ -27,7 +27,7 @@ def get_disk_monitor_html(disk_data: dict) -> str:
     total_disk = sum(s.get("disk_percent", 0) for s in servers if s.get("last_status") == "up")
     active_servers = len([s for s in servers if s.get("last_status") == "up"])
 
-    avg_disk = (total_disk / active_servers * 100).toFixed(1) if active_servers else 0
+    avg_disk = round(total_disk / active_servers, 1) if active_servers else 0
 
     # Generate color gradient based on disk load
     disk_color = _get_disk_color(avg_disk)
@@ -115,7 +115,7 @@ def get_disk_summary(disk_data: dict) -> dict:
     servers = disk_data.get("servers", []) or []
     active_servers = [s for s in servers if s.get("last_status") == "up"]
     total_disk = sum(s.get("disk_percent", 0) for s in active_servers)
-    avg_disk = (total_disk / len(active_servers) * 100).toFixed(2) if active_servers else 0
+    avg_disk = round(total_disk / len(active_servers), 2) if active_servers else 0
 
     # Categorize server disk states
     low_disk = [s for s in active_servers if s.get("disk_percent", 0) < 30]
@@ -393,7 +393,7 @@ def _get_partition_badge_style(status: str) -> str:
         "critical": 'background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);',
     }
 
-    return f'style="{styles.get(status.lower(), "background: rgba(51,65,85,0.5);")}"'
+    return styles.get(status.lower(), "background: rgba(51,65,85,0.5);")
 
 
 def _generate_partition_bar(partition: dict, index: int) -> str:
@@ -429,13 +429,14 @@ def _generate_partition_info(partition: dict, index: int) -> str:
     """Generate partition info badge."""
 
     mount_point = (partition.get("mount_point", f"/dev/{index}").lstrip("/")).replace("/", " /")[:25]
-    use = partition.get("use_percent", 0).toFixed(1)
+    use = float(partition.get("use_percent", 0) or 0)
     size = partition.get("size_gb", "N/A") or "-"
+    badge_style = _get_partition_badge_style(_get_partition_badge_status(partition))
 
     return f"""<div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #334155;
                      border-radius: 8px; padding: 8px 16px; display: flex; align-items: center; gap: 8px;">
-        <span style="background: {_get_partition_badge_style(_get_partition_badge_status(partition));} color: white; font-size: 12px; font-weight: 500; padding: 2px 6px; border-radius: 9999px;">
-            {use}%
+        <span style="{badge_style} color: white; font-size: 12px; font-weight: 500; padding: 2px 6px; border-radius: 9999px;">
+            {use:.1f}%
         </span>
         <div style="flex: 1;">
             <div style="color: #e2e8f0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
@@ -480,7 +481,7 @@ def _generate_space_row(space: dict, index: int) -> str:
     mount = (space.get("mount_point", f"/dev/{index}").lstrip("/")).replace("/", " /")[:30] if space.get("mount_point") else "-"
     free = space.get("free_gb", 0) or 0
     total = space.get("total_gb", 1) or 1
-    used_percent = ((total - free) / total * 100).toFixed(2)
+    used_percent = round((total - free) / total * 100, 2)
 
     return f"""<div class="space-row">
         <div style="color: #f8fafc; font-size: 13px; margin-bottom: 4px;">{mount}</div>
@@ -490,7 +491,7 @@ def _generate_space_row(space: dict, index: int) -> str:
         </div>
         <div class="progress-bar" style="flex: 1; margin-left: auto;">
             <div class="progress-fill" style="{_get_fill_style(used_percent)}"
-                title={`${used_percent}% used, ${free:.1f} GB free`}>
+                title="{used_percent}% used, {free:.1f} GB free">
             </div>
         </div>
     </div>"""
@@ -533,8 +534,10 @@ def get_disk_health_summary(disk_data: dict) -> dict:
     warning_partitions = len([p for p in partitions if 70 <= p.get("use_percent", 0) < 85])
 
     overall_status = (
-        "critical" if critical_partitions > 0
-        else ("warning" if warning_partitions > 1 or any(p.get("use_percent", 0) >= 60 for p in partitions))
+        "critical"
+        if critical_partitions > 0
+        else "warning"
+        if warning_partitions > 1 or any(p.get("use_percent", 0) >= 60 for p in partitions)
         else "healthy"
     )
 

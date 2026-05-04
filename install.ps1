@@ -205,7 +205,7 @@ if __name__ == '__main__':
     
     # Register with nssm if available, otherwise sc
     $scPath = "sc.exe"
-    & $scPath create $serviceName binPath= "python `"$wrapperPath`" --config `"$configPath`"" start= auto
+    & $scPath create $serviceName binPath= "python `"$wrapperPath`" server --config `"$configPath`"" start= auto
     & $scPath start $serviceName
 }
 

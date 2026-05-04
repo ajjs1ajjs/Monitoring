@@ -1,7 +1,7 @@
 """Metrics collector and registry"""
 
 from collections import defaultdict
-from threading import Lock
+from threading import RLock
 from typing import Iterator
 
 from pymon.metrics.models import Label, Metric, MetricSeries, MetricType
@@ -11,7 +11,7 @@ class MetricsRegistry:
     def __init__(self):
         self._metrics: dict[str, dict[str, Metric]] = defaultdict(dict)
         self._series: dict[str, MetricSeries] = {}
-        self._lock = Lock()
+        self._lock = RLock()
 
     def register(
         self,
@@ -81,6 +81,14 @@ class MetricsRegistry:
 registry = MetricsRegistry()
 
 
+def _merge_labels(base_labels: list[Label], labels: list[Label] | None = None) -> list[Label]:
+    if not labels:
+        return base_labels
+    merged = {label.name: label for label in base_labels}
+    merged.update({label.name: label for label in labels})
+    return list(merged.values())
+
+
 class Counter:
     def __init__(self, name: str, help_text: str = "", labels: list[Label] | None = None):
         self.name = name
@@ -88,7 +96,7 @@ class Counter:
         self._base_labels = labels or []
 
     def inc(self, value: float = 1.0, labels: list[Label] | None = None) -> None:
-        registry.inc(self.name, value, labels or self._base_labels)
+        registry.inc(self.name, value, _merge_labels(self._base_labels, labels))
 
 
 class Gauge:
@@ -98,12 +106,13 @@ class Gauge:
         self._base_labels = labels or []
 
     def set(self, value: float, labels: list[Label] | None = None) -> None:
-        registry.set(self.name, value, labels or self._base_labels)
+        registry.set(self.name, value, _merge_labels(self._base_labels, labels))
 
     def inc(self, value: float = 1.0, labels: list[Label] | None = None) -> None:
-        metric = registry.get_metric(self.name, labels or self._base_labels)
+        merged_labels = _merge_labels(self._base_labels, labels)
+        metric = registry.get_metric(self.name, merged_labels)
         current = metric.value if metric else 0
-        registry.set(self.name, current + value, labels or self._base_labels)
+        registry.set(self.name, current + value, merged_labels)
 
     def dec(self, value: float = 1.0, labels: list[Label] | None = None) -> None:
         self.inc(-value, labels)
@@ -123,4 +132,4 @@ class Histogram:
         self._base_labels = labels or []
 
     def observe(self, value: float, labels: list[Label] | None = None) -> None:
-        registry.observe(self.name, value, labels or self._base_labels)
+        registry.observe(self.name, value, _merge_labels(self._base_labels, labels))

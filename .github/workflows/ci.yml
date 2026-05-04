@@ -1,43 +1,27 @@
-<<<<<<< HEAD
-name: CI/CD Pipeline
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: \'3.12\'
-      - name: Install dependencies
-        run: pip install pytest pytest-cov
-      - name: Run tests
-        run: pytest --cov=.
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: \'3.12\'
-      - name: Run ruff
-        run: ruff check src/monitoring
-=======
 name: CI
+
 on:
   push:
   pull_request:
+
 jobs:
-  build:
+  python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          node-version: '18'
-      - run: npm ci --silent
-      - run: npm test --silent
-      - run: npm run build --silent || echo "Build failed, but tests passed (CI can handle)." 
->>>>>>> origin/fix/dashboard-unified-html-mount
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Compile Python sources
+        run: python -m compileall -q pymon test_simple.py examples
+
+      - name: Run tests
+        run: python -m pytest -q

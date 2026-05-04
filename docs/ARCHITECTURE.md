@@ -3,7 +3,7 @@ Phase 3–4 Architecture Overview
 - Overview
   - PyMon backend is a FastAPI service exposing REST APIs for monitoring data and control operations.
   - Data is stored in SQLite (default) with a Memory backend available for tests and small deployments. A future plan is PostgreSQL for scale.
-  - The UI is a separate frontend integrated via Enhanced Dashboard (web_dashboard_enhanced.py). A legacy Dashboard Unified remains as a deprecated artifact.
+  - The UI is integrated via Enhanced Dashboard (web_dashboard_enhanced.py).
 
 - Key Components
   - API Layer (FastAPI)
@@ -14,7 +14,7 @@ Phase 3–4 Architecture Overview
     - MemoryStorage for tests or small-scale usage.
   - UI Layer
     - Enhanced Dashboard (web_dashboard_enhanced.py) – main UI.
-    - Dashboard Unified (deprecated) – kept for historical reference and migration path.
+    - Legacy dashboard routers are not mounted by the active app; remaining legacy modules are used only for database schema helpers until that initialization path is migrated.
 
 - Data Flow
   - Collectors fetch metrics from exporters (node_exporter/windows_exporter/Telegraf) and push to metrics_history table via API endpoints and storage backends.

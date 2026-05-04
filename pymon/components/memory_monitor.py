@@ -27,7 +27,7 @@ def get_memory_monitor_html(memory_data: dict) -> str:
     total_memory = sum(s.get("memory_percent", 0) for s in servers if s.get("last_status") == "up")
     active_servers = len([s for s in servers if s.get("last_status") == "up"])
 
-    avg_memory = (total_memory / active_servers * 100).toFixed(1) if active_servers else 0
+    avg_memory = round(total_memory / active_servers, 1) if active_servers else 0
 
     # Generate color gradient based on memory load
     memory_color = _get_memory_color(avg_memory)
@@ -115,7 +115,7 @@ def get_memory_summary(memory_data: dict) -> dict:
     servers = memory_data.get("servers", []) or []
     active_servers = [s for s in servers if s.get("last_status") == "up"]
     total_memory = sum(s.get("memory_percent", 0) for s in active_servers)
-    avg_memory = (total_memory / len(active_servers) * 100).toFixed(2) if active_servers else 0
+    avg_memory = round(total_memory / len(active_servers), 2) if active_servers else 0
 
     # Categorize server memory states
     low_memory = [s for s in active_servers if s.get("memory_percent", 0) < 30]

@@ -1,11 +1,12 @@
 """Configuration loader and manager, using Pydantic for strict validation."""
 
+import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError, validator
+from pydantic import BaseModel, Field, ValidationError
 
 
 class StaticConfig(BaseModel):
@@ -108,8 +109,7 @@ class PyMonConfig(BaseModel):
         try:
             with open(path) as f:
                 data = yaml.safe_load(f) or {}
-            # Use model_construct for clean loading before validation
-            return cls(**data)
+            return cls.from_dict(data)
         except FileNotFoundError:
             raise FileNotFoundError(f"Configuration file not found at {path}")
         except ValidationError as e:

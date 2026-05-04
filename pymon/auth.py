@@ -106,7 +106,7 @@ def init_auth_tables():
             "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) VALUES (?, ?, 1, 1, ?)",
             (auth_config.admin_username, password_hash, datetime.now(timezone.utc).isoformat()),
         )
-        print(f"Created default user: {auth_config.admin_username} / {auth_config.admin_password}")
+        print(f"Created default user: {auth_config.admin_username}")
 
     conn.commit()
     conn.close()

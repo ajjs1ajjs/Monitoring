@@ -28,8 +28,8 @@ def get_network_monitor_html(network_data: dict) -> str:
     total_tx = sum(s.get("network_tx", 0) for s in servers if s.get("last_status") == "up")
     active_servers = len([s for s in servers if s.get("last_status") == "up"])
 
-    avg_rx = (total_rx / active_servers).toFixed(2) if active_servers else 0
-    avg_tx = (total_tx / active_servers).toFixed(2) if active_servers else 0
+    avg_rx = round(total_rx / active_servers, 2) if active_servers else 0
+    avg_tx = round(total_tx / active_servers, 2) if active_servers else 0
 
     # Generate color gradient based on network load
     network_color = _get_network_color(avg_rx, avg_tx)
@@ -134,11 +134,7 @@ def get_network_summary(network_data: dict) -> dict:
     rx_health_score = min(1.0, max(0, 1 - (avg_rx / 512)))  # Cap at 512 MB/s
     tx_health_score = min(1.0, max(0, 1 - (avg_tx / 512)))
 
-    overall_status = (
-        "critical" if avg_rx > 900 or avg_tx > 900
-        else ("warning" if avg_rx > 600 or avg_tx > 600)
-        else "healthy"
-    )
+    overall_status = "critical" if avg_rx > 900 or avg_tx > 900 else "warning" if avg_rx > 600 or avg_tx > 600 else "healthy"
 
     return {
         "total_rx": total_rx,
@@ -411,7 +407,7 @@ def _generate_latency_point(latency: dict, index: int) -> str:
 def _generate_latency_info(latency: dict, index: int) -> str:
     """Generate latency info badge."""
 
-    ms = (latency.get("latency_ms", 0) or 0).toFixed(2)
+    ms = round(latency.get("latency_ms", 0) or 0, 2)
     timestamp = (latency.get("checked_at") or "").replace("T", " ").split(".")[0] if latency.get("checked_at") else "-"
 
     return f"""<div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #334155;
@@ -502,7 +498,7 @@ def _generate_jitter_point(jitter: dict, index: int) -> str:
 def _generate_jitter_info(jitter: dict, index: int) -> str:
     """Generate jitter info badge."""
 
-    ms = (jitter.get("jitter_ms", 0) or 0).toFixed(3)
+    ms = round(jitter.get("jitter_ms", 0) or 0, 3)
     timestamp = (jitter.get("checked_at") or "").replace("T", " ").split(".")[0] if jitter.get("checked_at") else "-"
 
     return f"""<div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #334155;
@@ -593,7 +589,7 @@ def _generate_loss_point(loss: dict, index: int) -> str:
 def _generate_loss_info(loss: dict, index: int) -> str:
     """Generate packet loss info badge."""
 
-    pct = (loss.get("loss_percent", 0) or 0).toFixed(3)
+    pct = round(loss.get("loss_percent", 0) or 0, 3)
     timestamp = (loss.get("checked_at") or "").replace("T", " ").split(".")[0] if loss.get("checked_at") else "-"
 
     return f"""<div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #334155;
@@ -689,7 +685,7 @@ def _generate_bandwidth_bar(bandwidth: dict, index: int) -> str:
 def _generate_bandwidth_info(bandwidth: dict, index: int) -> str:
     """Generate bandwidth info badge."""
 
-    mbps = (bandwidth.get("bandwidth_mbps", 0) or 0).toFixed(2)
+    mbps = round(bandwidth.get("bandwidth_mbps", 0) or 0, 2)
     timestamp = (bandwidth.get("checked_at") or "").replace("T", " ").split(".")[0] if bandwidth.get("checked_at") else "-"
 
     return f"""<div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #334155;
@@ -795,7 +791,7 @@ def _generate_ssl_badge(certificate: dict, index: int) -> str:
 def _generate_ssl_bar(certificate: dict, index: int) -> str:
     """Generate a single SSL certificate bar element."""
 
-    days = (certificate.get("days_until_expiry", 999) or 999).toFixed(0) if certificate.get("expires") != "expired" else "-"
+    days = int(certificate.get("days_until_expiry", 999) or 999) if certificate.get("expires") != "expired" else 0
 
     # Bar height scales with expiry days (max 180px for 365 days)
     bar_height = min(180, max(2, days * 0.47))
@@ -892,7 +888,7 @@ def _generate_connection_point(connection: dict, index: int) -> str:
 def _generate_connection_info(connection: dict, index: int) -> str:
     """Generate connection info badge."""
 
-    conns = (connection.get("active_connections", 0) or 0).toFixed(2)
+    conns = round(connection.get("active_connections", 0) or 0, 2)
     timestamp = (connection.get("checked_at") or "").replace("T", " ").split(".")[0] if connection.get("checked_at") else "-"
 
     return f"""<div style="background: rgba(15, 23, 42, 0.8); border: 1px solid #334155;
@@ -930,8 +926,10 @@ def get_network_health_summary(network_data: dict) -> dict:
     ]
 
     overall_status = (
-        "critical" if any(critical_factors) or rx_load > 0.8 or tx_load > 0.8
-        else ("warning" if rx_load > 0.5 or tx_load > 0.5 or len(active_servers) < 1)
+        "critical"
+        if any(critical_factors) or rx_load > 0.8 or tx_load > 0.8
+        else "warning"
+        if rx_load > 0.5 or tx_load > 0.5 or len(active_servers) < 1
         else "healthy"
     )
 

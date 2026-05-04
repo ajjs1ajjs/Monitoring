@@ -166,8 +166,8 @@ curl -X POST http://localhost:8090/api/v1/servers \
 ### Get Metrics
 
 ```bash
-# Historical metrics
-curl "http://localhost:8090/api/v1/servers/metrics-history?range=1h&metric=cpu"
+# Historical metrics across servers
+curl "http://localhost:8090/api/v1/servers/history?range=1h&metric=cpu"
 
 # Disk breakdown
 curl "http://localhost:8090/api/v1/servers/1/disk-breakdown"
@@ -204,8 +204,8 @@ Monitoring/
 &#9474;   &#9500;&#9472;&#9472; scrape.py            # Metrics scraping
 &#9474;   &#9500;&#9472;&#9472; middleware.py        # Error handling
 &#9474;   &#9500;&#9472;&#9472; validation.py        # Input validation
-&#9474;   &#9500;&#9472;&#9472; web_dashboard.py     # Legacy dashboard
-&#9474;   &#9500;&#9472;&#9472; web_dashboard_enhanced.py  # Enhanced dashboard
+&#9474;   &#9500;&#9472;&#9472; web_dashboard.py     # Legacy DB/table helpers
+&#9474;   &#9500;&#9472;&#9472; web_dashboard_enhanced.py  # Active dashboard UI
 &#9474;   &#9500;&#9472;&#9472; api/
 &#9474;   &#9474;   &#9492;&#9472;&#9472; endpoints.py     # API endpoints
 &#9474;   &#9500;&#9472;&#9472; metrics/             # Metrics modules

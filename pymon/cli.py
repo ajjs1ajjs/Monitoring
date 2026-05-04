@@ -17,7 +17,6 @@ scrape_manager = None
 
 
 def main():
-    print(">>> main() started")
     parser = argparse.ArgumentParser(description="PyMon - Python Monitoring System", prog="pymon")
     parser.add_argument("--version", action="version", version=f"PyMon {__version__}")
 
@@ -184,7 +183,6 @@ async def lifespan(app):
 
 
 def create_app():
-    print(">>> create_app() started")
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
@@ -192,8 +190,6 @@ def create_app():
 
     from pymon import web_dashboard_enhanced as web_dashboard
     from pymon.api.endpoints import api
-
-    print("Creating FastAPI app with ENHANCED dashboard...", file=sys.stderr)
 
     # Setup basic rotating logger for prod-like environments
     log_dir = os.path.join(".", "logs")

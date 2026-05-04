@@ -184,7 +184,7 @@ storage:
 
 auth:
   admin_username: admin
-  admin_password: admin
+  admin_password: changeme
   jwt_expire_hours: 24
 
 # Scrape configuration (Prometheus-style)
