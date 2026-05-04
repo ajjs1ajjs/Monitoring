@@ -1011,10 +1011,12 @@ async def create_server(request: Request, data: ServerCreate, current_user: User
         # Phase 2.11: Update ScrapeManager dynamically
         scrape_manager = getattr(request.app.state, "scrape_manager", None)
         if scrape_manager and data.enabled:
-            # Re-fetch row for target adding
             row = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
             if row:
-                scrape_manager.add_server_target(dict(row))
+                server_dict = dict(row)
+                scrape_manager.add_server_target(server_dict)
+                if not scrape_manager._running:
+                    scrape_manager.start()
         
         return {"status": "ok", "server_id": server_id}
     except Exception as e:
