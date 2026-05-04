@@ -700,7 +700,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
                             <div class="card-body" style="font-size: 0.85rem;">
                                 <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
                                     <span style="color: var(--text-muted);">Version</span>
-                                    <span style="color: white; font-weight: 600;">PyMon v0.1.0</span>
+                                    <span style="color: white; font-weight: 600;">PyMon v1.0.0</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
                                     <span style="color: var(--text-muted);">Database</span>
@@ -712,7 +712,11 @@ sudo systemctl start prometheus-node-exporter</textarea>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
                                     <span style="color: var(--text-muted);">Active Nodes</span>
-                                    <span style="color: var(--success); font-weight: 600;" id="settingsNodeCount">0</span>
+                                    <span style="color: var(--success); font-weight: 600;" id="settingsNodeCount">-</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Online Nodes</span>
+                                    <span style="color: var(--success); font-weight: 600;" id="settingsOnlineCount">-</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
                                     <span style="color: var(--text-muted);">Uptime</span>
@@ -1335,6 +1339,22 @@ sudo systemctl start prometheus-node-exporter</textarea>
             lucide.createIcons();
         }
 
+        async function loadAuditLogs() {
+            try {
+                const resp = await apiFetch('/api/v1/audit-log?limit=100');
+                if (!resp) return;
+                const data = await resp.json();
+                const logs = data.logs || [];
+                document.getElementById('auditLogStream').innerHTML = logs.length ? logs.slice(0, 50).map(l => `
+                    <div style="padding: 0.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.7rem;">
+                        <span style="color: var(--text-muted);">${l.timestamp ? l.timestamp.slice(0, 19).replace('T', ' ') : '-'}</span>
+                        <span style="color: ${l.action === 'Exporter Down' ? 'var(--danger)' : 'white'};">${l.action}</span>
+                        <span style="color: var(--text-muted);">${l.target || '-'}</span>
+                    </div>
+                `).join('') : '<div style="padding: 1rem; text-align: center; color: var(--text-muted);">No audit logs</div>';
+            } catch (e) { console.error(e); }
+        }
+
         async function deleteNode(id) {
             if (confirm('Permanently decommission this node?')) {
                 await apiFetch(`/api/v1/servers/${id}`, {method: 'DELETE'});
@@ -1363,6 +1383,17 @@ sudo systemctl start prometheus-node-exporter</textarea>
                 document.getElementById('tgChat').value = data.telegram_chat_id || '';
                 document.getElementById('dsWebhook').value = data.discord_webhook_url || '';
             }
+            // Update system info
+            const serverResp = await apiFetch('/api/v1/servers');
+            if (serverResp && serverResp.ok) {
+                const serverData = await serverResp.json();
+                const allServers = serverData.servers || [];
+                const online = allServers.filter(s => s.last_status === 'up').length;
+                document.getElementById('settingsNodeCount').textContent = allServers.length;
+                document.getElementById('settingsOnlineCount').textContent = online;
+            }
+            // Update uptime
+            document.getElementById('settingsUptime').textContent = new Date().toLocaleString();
         }
 
         async function saveSettings() {
