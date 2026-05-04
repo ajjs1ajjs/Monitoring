@@ -182,44 +182,82 @@ class ScrapeManager:
                 continue
 
             try:
+                name = None
+                value = None
                 if "{" in line:
                     name_part, value_part = line.split("{", 1)
-                    labels_part, value_str = value_part.rsplit("}", 1)
                     name = name_part.strip()
-                    value = float(value_str.strip())
-
-                    labels = list(target.labels.items()) if not target.honor_labels else []
-                    for label_str in labels_part.split(","):
-                        if "=" in label_str:
-                            lname, lvalue = label_str.split("=", 1)
-                            lvalue = lvalue.strip('"')
-                            labels.append((lname.strip(), lvalue))
+                    value = float(value_part.rsplit("}", 1)[1].strip())
                 else:
                     parts = line.split()
                     if len(parts) >= 2:
                         name = parts[0]
                         value = float(parts[1])
-                        labels = list(target.labels.items()) if not target.honor_labels else []
-                    else:
-                        continue
 
-                metrics[name] = value
+                if name and value is not None:
+                    metrics[name] = value
 
-                registry.register(name, MetricType.GAUGE, "", label_objs)
-                registry.set(name, value, label_objs)
+                    label_objs = list(target.labels.items()) if not target.honor_labels else []
+                    registry.register(name, MetricType.GAUGE, "", label_objs)
+                    registry.set(name, value, label_objs)
 
-                from pymon.metrics.models import Metric, MetricType
-
-                metric = Metric(
-                    name=name,
-                    value=value,
-                    metric_type=MetricType.GAUGE,
-                    labels=label_objs,
-                )
-                await storage.write(metric)
+                    from pymon.metrics.models import Metric, MetricType
+                    metric = Metric(
+                        name=name,
+                        value=value,
+                        metric_type=MetricType.GAUGE,
+                        labels=label_objs,
+                    )
+                    await storage.write(metric)
 
             except Exception:
                 continue
+
+        # Calculate node_exporter metrics with labels
+        try:
+            cpu_idle = 0
+            cpu_user = 0
+            cpu_system = 0
+            for k, v in metrics.items():
+                if 'cpu_seconds_total' in k and 'mode="idle"' in k:
+                    cpu_idle = max(cpu_idle, v)
+                elif 'cpu_seconds_total' in k and 'mode="user"' in k:
+                    cpu_user = max(cpu_user, v)
+                elif 'cpu_seconds_total' in k and 'mode="system"' in k:
+                    cpu_system = max(cpu_system, v)
+            
+            if cpu_idle > 0 and cpu_user > 0:
+                total_cpu = cpu_idle + cpu_user + cpu_system
+                if total_cpu > 0:
+                    metrics['node_cpu_calculated'] = 100 * (1 - cpu_idle / total_cpu)
+
+            for k, v in metrics.items():
+                if 'memory_MemTotal_bytes' in k:
+                    metrics['node_memory_total'] = v
+                elif 'memory_MemAvailable_bytes' in k:
+                    metrics['node_memory_available'] = v
+            
+            if 'node_memory_total' in metrics and 'node_memory_available' in metrics:
+                mt = metrics['node_memory_total']
+                ma = metrics['node_memory_available']
+                if mt > 0:
+                    metrics['node_memory_calculated'] = 100 * (1 - ma / mt)
+
+            for k, v in metrics.items():
+                if 'filesystem_size_bytes' in k:
+                    if 'node_disk_total' not in metrics or v > metrics['node_disk_total']:
+                        metrics['node_disk_total'] = v
+                elif 'filesystem_avail_bytes' in k:
+                    if 'node_disk_avail' not in metrics or v > metrics['node_disk_avail']:
+                        metrics['node_disk_avail'] = v
+            
+            if 'node_disk_total' in metrics and 'node_disk_avail' in metrics:
+                dt = metrics['node_disk_total']
+                da = metrics['node_disk_avail']
+                if dt > 0:
+                    metrics['node_disk_calculated'] = 100 * (1 - da / dt)
+        except Exception:
+            pass
 
         return metrics
 
@@ -250,7 +288,7 @@ class ScrapeManager:
 
                 if success:
                     # Parse CPU - support both node_exporter and windows_exporter
-                    cpu = metrics.get("node_cpu_percent") or metrics.get("cpu_usage_percent") or 0
+                    cpu = metrics.get("node_cpu_percent") or metrics.get("cpu_usage_percent") or metrics.get("node_cpu_calculated") or 0
                     if not cpu:
                         idle = metrics.get("windows_cpu_time_total_idle", 0)
                         total = metrics.get("windows_cpu_time_total_all", 0)
@@ -258,7 +296,7 @@ class ScrapeManager:
                             cpu = 100 * (1 - idle / total) if idle < total else 0
 
                     # Parse Memory - support both node_exporter and windows_exporter
-                    memory = metrics.get("node_memory_percent") or metrics.get("memory_usage_percent") or 0
+                    memory = metrics.get("node_memory_percent") or metrics.get("memory_usage_percent") or metrics.get("node_memory_calculated") or 0
                     if not memory:
                         mem_total = metrics.get("windows_cs_physical_memory_bytes", 0)
                         mem_free = metrics.get("windows_os_physical_memory_free_bytes", 0)
@@ -266,7 +304,7 @@ class ScrapeManager:
                             memory = 100 * (1 - mem_free / mem_total) if mem_free < mem_total else 0
 
                     # Parse Disk - support both node_exporter and windows_exporter
-                    disk = metrics.get("node_disk_percent") or metrics.get("disk_usage_percent") or 0
+                    disk = metrics.get("node_disk_percent") or metrics.get("disk_usage_percent") or metrics.get("node_disk_calculated") or 0
                     if not disk:
                         disk_total = metrics.get("windows_logical_disk_size_bytes", 0)
                         disk_free = metrics.get("windows_logical_disk_free_bytes", 0)
