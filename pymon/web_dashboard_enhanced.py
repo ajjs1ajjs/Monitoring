@@ -446,7 +446,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                     <th>Traffic (RX/TX)</th>
                                 </tr>
                             </thead>
-                            <tbody id="liveTableBody">
+                            <tbody id="nodesTableBody">
                                 <!-- Dynamic Content -->
                             </tbody>
                         </table>
@@ -884,11 +884,13 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         function filterNodes() {
-            const query = document.getElementById('nodeSearch').value.toLowerCase();
-            const statusFilter = document.getElementById('filterStatus').value;
+            const query = (document.getElementById('nodeSearch')?.value || '').toLowerCase();
+            const statusFilter = document.getElementById('filterStatus')?.value || 'all';
             
             let filtered = nodes.filter(n => {
-                const matchesSearch = n.name.toLowerCase().includes(query) || n.host.toLowerCase().includes(query);
+                const name = (n.name || '').toLowerCase();
+                const host = (n.host || '').toLowerCase();
+                const matchesSearch = name.includes(query) || host.includes(query);
                 const matchesStatus = statusFilter === 'all' || n.last_status === statusFilter;
                 return matchesSearch && matchesStatus;
             });
@@ -930,15 +932,17 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             const avgDisk = nodes.reduce((a, b) => a + (b.disk_percent || 0), 0) / count;
             const totalNet = nodes.reduce((a, b) => a + (b.network_rx || 0) + (b.network_tx || 0), 0) / (1024 * 1024);
             
-            document.getElementById('stat-cpu').innerHTML = `${avgCpu.toFixed(1)}<span>%</span>`;
-            document.getElementById('stat-mem').innerHTML = `${avgMem.toFixed(1)}<span>%</span>`;
-            document.getElementById('stat-disk').innerHTML = `${avgDisk.toFixed(1)}<span>%</span>`;
-            document.getElementById('stat-net').innerHTML = `${totalNet.toFixed(2)}<span>MB/s</span>`;
+            if (document.getElementById('stat-cpu')) document.getElementById('stat-cpu').innerHTML = `${avgCpu.toFixed(1)}<span>%</span>`;
+            if (document.getElementById('stat-mem')) document.getElementById('stat-mem').innerHTML = `${avgMem.toFixed(1)}<span>%</span>`;
+            if (document.getElementById('stat-disk')) document.getElementById('stat-disk').innerHTML = `${avgDisk.toFixed(1)}<span>%</span>`;
+            if (document.getElementById('stat-net')) document.getElementById('stat-net').innerHTML = `${totalNet.toFixed(2)}<span>MB/s</span>`;
         }
 
         function updateLiveTable(data) {
-            const body = document.getElementById('liveTableBody');
-            if (!body) return;
+            const overviewBody = document.getElementById('liveTableBody');
+            const nodesBody = document.getElementById('nodesTableBody');
+            if (!overviewBody && !nodesBody) return;
+            
             const targetData = data || nodes;
             const formatBytes = (b) => {
                 if (!b) return '0 B';
@@ -946,7 +950,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 return (b / Math.pow(1024, i)).toFixed(1) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][i];
             };
 
-            body.innerHTML = targetData.map(n => `
+            const html = targetData.map(n => `
                 <tr>
                     <td>
                         <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}" title="${n.error_message || ''}">
@@ -972,6 +976,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <td class="text-mono text-[10px] text-slate-500">${formatBytes(n.network_rx)} / ${formatBytes(n.network_tx)}</td>
                 </tr>
             `).join('');
+
+            if (overviewBody) overviewBody.innerHTML = html;
+            if (nodesBody) nodesBody.innerHTML = html;
         }
 
         function updateNodeGrid(data) {
