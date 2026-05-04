@@ -313,3 +313,48 @@ def delete_api_key(user_id: int, key_id: int) -> bool:
     conn.commit()
     conn.close()
     return deleted  # type: ignore
+
+
+def list_users() -> list[dict]:
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT id, username, is_admin, must_change_password, created_at, last_login FROM users ORDER BY id")
+    rows = c.fetchall()
+    conn.close()
+    return [
+        {
+            "id": r["id"],
+            "username": r["username"],
+            "is_admin": bool(r["is_admin"]),
+            "must_change_password": bool(r["must_change_password"]),
+            "created_at": r["created_at"],
+            "last_login": r["last_login"],
+        }
+        for r in rows
+    ]
+
+
+def update_user(user_id: int, is_admin: bool = None, must_change_password: bool = None) -> bool:
+    conn = get_db()
+    c = conn.cursor()
+    if is_admin is not None:
+        c.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(is_admin), user_id))
+    if must_change_password is not None:
+        c.execute("UPDATE users SET must_change_password = ? WHERE id = ?", (int(must_change_password), user_id))
+    updated = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+
+def delete_user(user_id: int) -> bool:
+    if user_id == 1:
+        raise HTTPException(status_code=400, detail="Cannot delete admin user")
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    deleted = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted

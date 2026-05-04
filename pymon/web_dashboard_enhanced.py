@@ -538,7 +538,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
                 <div id="section-users" class="dashboard-section">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
                         <h2 style="font-size: 1.5rem; font-weight: 700;">User Management</h2>
-                        <button class="btn btn-primary" onclick="alert('Module implementation in progress')">Create User</button>
+                        <button class="btn btn-primary" onclick="showAddUserModal()">Create User</button>
                     </div>
                     <div class="card">
                         <table class="inventory-table">
@@ -877,6 +877,38 @@ sudo systemctl start prometheus-node-exporter</textarea>
         </div>
     </div>
 
+    <div id="addUserModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create User</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addUserModal', false)"></i>
+            </div>
+            <form id="addUserForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="newUsername" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="newPassword" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <select id="newUserRole" class="form-input">
+                            <option value="false">User</option>
+                            <option value="true">Administrator</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addUserModal', false)">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         // Init Lucide
         lucide.createIcons();
@@ -907,6 +939,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
             if (section === 'logs') loadAuditLogs();
             if (section === 'alerts') loadAlertRules();
             if (section === 'settings') loadSettings();
+            if (section === 'users') loadUsers();
         }
 
         // Event Listeners
@@ -1388,17 +1421,77 @@ sudo systemctl start prometheus-node-exporter</textarea>
             }
         });
 
-        function showDeployModal(id) {
-            const s = nodes.find(n => n.id === id);
-            if (!s) return;
-            const os = s.os_type || 'linux';
-            const linuxCmd = `curl -sLO https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz && tar xvf node_exporter-1.7.0.linux-amd64.tar.gz && ./node_exporter-1.7.0.linux-amd64/node_exporter`;
-            const windowsCmd = `msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.30.9/windows_exporter-0.30.9-amd64.msi`;
-            
-            document.getElementById('deployCmd').value = (os === 'linux') ? linuxCmd : windowsCmd;
-            document.getElementById('deployTitle').textContent = `Deploy Agent to ${s.name} (${os})`;
+function showDeployModal(id) {
+            const node = nodes.find(n => n.id === id);
+            if (!node) return;
+            const isWin = node.os_type === 'windows';
+            let cmd = isWin 
+                ? `msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.30.9/windows_exporter-0.30.9-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system"`
+                : `curl -sLO https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz && tar xvf node_exporter-1.7.0.linux-amd64.tar.gz && ./node_exporter-1.7.0.linux-amd64/node_exporter`;
+            document.getElementById('deployCmd').value = cmd;
             toggleModal('deployModal', true);
         }
+
+        function showAddUserModal() {
+            toggleModal('addUserModal', true);
+        }
+
+        document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const resp = await apiFetch('/api/v1/auth/users', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username: document.getElementById('newUsername').value,
+                        password: document.getElementById('newPassword').value,
+                        is_admin: document.getElementById('newUserRole').value === 'true'
+                    })
+                });
+                if (resp && resp.ok) {
+                    toggleModal('addUserModal', false);
+                    e.target.reset();
+                    loadUsers();
+                } else if (resp) {
+                    const err = await resp.json();
+                    alert('Error: ' + (err.detail || 'Failed to create user'));
+                }
+            } catch (err) { alert('Connection Error'); }
+        });
+
+        async function loadUsers() {
+            try {
+                const resp = await apiFetch('/api/v1/auth/users');
+                if (resp && resp.ok) {
+                    const data = await resp.json();
+                    const tbody = document.querySelector('#section-users tbody');
+                    tbody.innerHTML = data.users.map(u => `
+                        <tr>
+                            <td class="font-bold text-white">${u.username}</td>
+                            <td><span class="status-badge ${u.is_admin ? 'up' : ''}">${u.is_admin ? 'Administrator' : 'User'}</span></td>
+                            <td>${u.must_change_password ? 'Password Change Required' : 'Active'}</td>
+                            <td class="text-slate-500">${u.last_login ? u.last_login.slice(0, 19).replace('T', ' ') : 'Never'}</td>
+                            <td>
+                                <button class="action-btn" style="color: #ef4444;" onclick="deleteUser(${u.id})"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+                            </td>
+                        </tr>
+                    `).join('');
+                    lucide.createIcons();
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function deleteUser(id) {
+            if (confirm('Delete this user?')) {
+                try {
+                    await apiFetch(`/api/v1/auth/users/${id}`, {method: 'DELETE'});
+                    loadUsers();
+                } catch (err) { alert('Delete failed'); }
+            }
+        }
+
+        // Initialize
+        if (section === 'users') loadUsers();
 
         function copyDeployCmd() {
             const el = document.getElementById('deployCmd');

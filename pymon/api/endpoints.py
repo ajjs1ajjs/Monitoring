@@ -129,6 +129,44 @@ async def list_keys(current_user: User = Depends(get_current_user)):
     return {"api_keys": list_api_keys(current_user.id)}
 
 
+@api.get("/auth/users")
+async def list_users(current_user: User = Depends(get_admin_user)):
+    from pymon.auth import list_users as _list_users
+    return {"users": _list_users()}
+
+
+@api.post("/auth/users")
+async def create_user(data: dict, current_user: User = Depends(get_admin_user)):
+    from pymon.auth import create_user as _create_user
+    try:
+        user = _create_user(
+            username=data.get("username"),
+            password=data.get("password", "changeme"),
+            is_admin=data.get("is_admin", False)
+        )
+        return {"status": "ok", "user_id": user.id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@api.put("/auth/users/{user_id}")
+async def update_user(user_id: int, data: dict, current_user: User = Depends(get_admin_user)):
+    from pymon.auth import update_user as _update_user
+    _update_user(user_id, is_admin=data.get("is_admin"), must_change_password=data.get("must_change_password"))
+    return {"status": "ok"}
+
+
+@api.delete("/auth/users/{user_id}")
+async def delete_user(user_id: int, current_user: User = Depends(get_admin_user)):
+    from pymon.auth import delete_user as _delete_user
+    from fastapi import HTTPException
+    try:
+        _delete_user(user_id)
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @api.delete("/auth/api-keys/{key_id}")
 async def delete_key(key_id: int, current_user: User = Depends(get_current_user)):
     if delete_api_key(current_user.id, key_id):
