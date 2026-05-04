@@ -963,6 +963,11 @@ async def create_server(request: Request, data: ServerCreate, current_user: User
         )
         conn.commit()
 
+        # Log action
+        c.execute("INSERT INTO audit_logs (username, action, target, timestamp) VALUES (?, ?, ?, ?)", 
+                  (current_user.username, "Add Server", f"{data.name} ({data.host})", datetime.now(timezone.utc).isoformat()))
+        conn.commit()
+
         server_id = c.lastrowid
         
         # Phase 2.11: Update ScrapeManager dynamically

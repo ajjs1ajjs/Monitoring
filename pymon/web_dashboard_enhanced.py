@@ -279,6 +279,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <button class="nav-item" data-section="logs">
                     <i data-lucide="list"></i> Audit Logs
                 </button>
+                <button class="nav-item" data-section="users">
+                    <i data-lucide="users"></i> Users
+                </button>
                 <button class="nav-item" data-section="settings">
                     <i data-lucide="settings"></i> Configuration
                 </button>
@@ -458,6 +461,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         <h2 style="font-size: 1.5rem; font-weight: 700;">Active Alert Rules</h2>
                         <button class="btn btn-primary" onclick="toggleModal('addAlertModal', true)">Create Logic Rule</button>
                     </div>
+                    <div class="stats-grid" id="alertRulesGrid">
+                        <!-- Dynamic Alerts -->
+                    </div>
+                </div>
 
                 <!-- Section: Help & Agents -->
                 <div id="section-help" class="dashboard-section">
@@ -526,8 +533,36 @@ sudo systemctl start prometheus-node-exporter</textarea>
                         </div>
                     </div>
                 </div>
-                    <div class="stats-grid" id="alertRulesGrid">
-                        <!-- Dynamic Alerts -->
+
+                <!-- Section: Users -->
+                <div id="section-users" class="dashboard-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                        <h2 style="font-size: 1.5rem; font-weight: 700;">User Management</h2>
+                        <button class="btn btn-primary" onclick="alert('Module implementation in progress')">Create User</button>
+                    </div>
+                    <div class="card">
+                        <table class="inventory-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Last Login</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="font-bold text-white">admin</td>
+                                    <td><span class="status-badge up">Administrator</span></td>
+                                    <td>Active</td>
+                                    <td class="text-slate-500">Just now</td>
+                                    <td>
+                                        <button class="action-btn" style="color: #3b82f6;"><i data-lucide="edit-2" style="width: 14px; height: 14px;"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -955,7 +990,13 @@ sudo systemctl start prometheus-node-exporter</textarea>
                             ${n.last_status || 'unknown'}
                         </div>
                     </td>
-                    <td class="font-bold text-white">${n.name}</td>
+                    <td>
+                        <div class="font-bold text-white">${n.name}</div>
+                        <div style="font-size: 0.65rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.25rem;">
+                            <i data-lucide="package" style="width: 10px; height: 10px;"></i>
+                            ${n.os_type || 'linux'} agent
+                        </div>
+                    </td>
                     <td class="text-mono text-xs text-slate-500">${n.host}</td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
@@ -969,7 +1010,24 @@ sudo systemctl start prometheus-node-exporter</textarea>
                             <div class="progress-bar"><div class="progress-fill" style="width: ${n.memory_percent || 0}%; background: #3b82f6;"></div></div>
                         </div>
                     </td>
-                    <td>${(n.disk_percent || 0).toFixed(0)}%</td>
+                    <td>
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            ${(() => {
+                                try {
+                                    const disks = JSON.parse(n.disk_info || '{}');
+                                    return Object.entries(disks).map(([vol, pct]) => `
+                                        <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.65rem;">
+                                            <span style="min-width: 1.2rem; color: white; font-weight: 600;">${vol}</span>
+                                            <div class="progress-bar" style="height: 4px; flex-grow: 1;">
+                                                <div class="progress-fill" style="width: ${pct}%; background: ${pct > 90 ? 'var(--danger)' : '#f59e0b'};"></div>
+                                            </div>
+                                            <span style="min-width: 1.5rem; text-align: right; opacity: 0.7;">${pct.toFixed(0)}%</span>
+                                        </div>
+                                    `).join('');
+                                } catch(e) { return n.disk_percent + '%'; }
+                            })()}
+                        </div>
+                    </td>
                     <td class="text-mono text-[10px] text-slate-500">${formatBytes(n.network_rx)} / ${formatBytes(n.network_tx)}</td>
                     <td style="text-align: right;">
                         <div style="display: flex; gap: 0.25rem; justify-content: flex-end;">
