@@ -13,22 +13,45 @@ LOGIN_HTML = r"""<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PyMon - Login</title>
+    <title>PyMon NOC - Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(20, 22, 26, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .gradient-bg { background: radial-gradient(circle at top left, #1e293b, #0f172a); }
-        .glow { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+        body { font-family: 'Space Grotesk', sans-serif; background: #05070d; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .noc-bg {
+            position: fixed; inset: 0; pointer-events: none;
+            background:
+                radial-gradient(circle at 18% 20%, rgba(255, 122, 0, .24), transparent 34%),
+                radial-gradient(circle at 85% 12%, rgba(0, 224, 255, .18), transparent 28%),
+                linear-gradient(135deg, rgba(255,255,255,.045) 1px, transparent 1px);
+            background-size: auto, auto, 34px 34px;
+            opacity: .95;
+        }
+        .glass {
+            background: linear-gradient(180deg, rgba(15, 23, 42, .86), rgba(2, 6, 23, .72));
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(148, 163, 184, .16);
+            box-shadow: 0 30px 120px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.06);
+        }
+        .glow { box-shadow: 0 0 70px rgba(255, 122, 0, .18), 0 0 90px rgba(0, 224, 255, .08); }
     </style>
 </head>
-<body class="gradient-bg min-h-screen flex items-center justify-center p-6 text-slate-200">
-    <div class="glass w-full max-w-md p-10 rounded-3xl glow">
-        <div class="text-center mb-10">
-            <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-lg shadow-blue-500/30">P</div>
-            <h1 class="text-3xl font-bold tracking-tight text-white">PyMon</h1>
-            <p class="text-slate-400 mt-2">Enterprise Server Monitoring</p>
+<body class="min-h-screen flex items-center justify-center p-6 text-slate-200 overflow-hidden">
+    <div class="noc-bg"></div>
+    <div class="relative z-10 glass w-full max-w-md p-10 rounded-[2rem] glow">
+        <div class="mb-10">
+            <div class="inline-flex items-center gap-3 px-3 py-2 rounded-2xl border border-orange-500/20 bg-orange-500/10 text-orange-300 mono text-[10px] font-bold uppercase tracking-[0.28em] mb-6">
+                secure operator access
+            </div>
+            <div class="flex items-center gap-4 mb-5">
+                <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-cyan-400 rounded-2xl flex items-center justify-center text-black text-3xl font-black shadow-lg shadow-orange-500/20">P</div>
+                <div>
+                    <h1 class="text-4xl font-black tracking-tight text-white">PyMon NOC</h1>
+                    <p class="text-slate-500 text-sm">Grafana-style monitoring command center</p>
+                </div>
+            </div>
+            <div class="h-px bg-gradient-to-r from-orange-500/60 via-cyan-400/40 to-transparent"></div>
         </div>
 
         <div id="errorBox" class="hidden mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
@@ -38,19 +61,19 @@ LOGIN_HTML = r"""<!DOCTYPE html>
         <form id="loginForm" class="space-y-6">
             <div>
                 <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Username</label>
-                <input type="text" id="username" required class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="admin">
+                <input type="text" id="username" required class="w-full bg-slate-950/70 border border-slate-700/70 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all" placeholder="admin">
             </div>
             <div>
                 <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Password</label>
-                <input type="password" id="password" required class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" placeholder="••••••••">
+                <input type="password" id="password" required class="w-full bg-slate-950/70 border border-slate-700/70 rounded-2xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all" placeholder="••••••••">
             </div>
-            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]">
-                Sign In
+            <button type="submit" class="w-full bg-orange-500 hover:bg-orange-400 text-black font-black py-3 rounded-2xl transition-all shadow-lg shadow-orange-500/20 active:scale-[0.98]">
+                Enter Command Center
             </button>
         </form>
 
-        <p class="mt-8 text-center text-slate-500 text-xs">
-            &copy; 2026 PyMon Monitoring System. All rights reserved.
+        <p class="mt-8 text-center text-slate-600 text-xs mono">
+            PyMon Monitoring System / 2026
         </p>
     </div>
 
@@ -99,11 +122,29 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(20, 22, 26, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .sidebar-item-active { background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-right: 2px solid #3b82f6; }
+        body { font-family: 'Space Grotesk', sans-serif; background: #05070d; }
+        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
+        .noc-bg {
+            position: fixed; inset: 0; pointer-events: none; z-index: 0;
+            background:
+                radial-gradient(circle at 15% 15%, rgba(255, 122, 0, .22), transparent 32%),
+                radial-gradient(circle at 86% 12%, rgba(0, 224, 255, .18), transparent 30%),
+                radial-gradient(circle at 55% 90%, rgba(34, 197, 94, .12), transparent 26%),
+                linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+            background-size: auto, auto, auto, 44px 44px, 44px 44px;
+            mask-image: linear-gradient(to bottom, black, rgba(0,0,0,.55));
+        }
+        .glass {
+            background: linear-gradient(180deg, rgba(13, 18, 30, .88), rgba(8, 11, 20, .76));
+            backdrop-filter: blur(18px);
+            border: 1px solid rgba(148, 163, 184, .14);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 24px 80px rgba(0,0,0,.34);
+        }
+        .sidebar-item-active { background: rgba(255, 122, 0, 0.13); color: #ffb86b; border-right: 2px solid #ff7a00; }
+        .critical-glow { box-shadow: 0 0 38px rgba(255, 122, 0, .18); }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
@@ -112,12 +153,16 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
     </style>
 </head>
-<body class="bg-[#0b0c0f] text-slate-300 min-h-screen flex overflow-hidden">
+<body class="text-slate-300 min-h-screen flex overflow-hidden">
+    <div class="noc-bg"></div>
     <!-- Sidebar -->
-    <aside class="w-64 border-r border-slate-800/50 flex flex-col glass z-20">
+    <aside class="w-72 border-r border-slate-800/50 flex flex-col glass z-20">
         <div class="p-6 flex items-center gap-3">
-            <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">P</div>
-            <span class="text-xl font-bold text-white tracking-tight">PyMon</span>
+            <div class="w-11 h-11 rounded-2xl flex items-center justify-center text-black font-black shadow-lg shadow-orange-500/25" style="background: linear-gradient(135deg, #ff7a00, #00e0ff);">P</div>
+            <div>
+                <span class="block text-xl font-bold text-white tracking-tight">PyMon NOC</span>
+                <span class="block text-[10px] uppercase tracking-[0.28em] text-slate-500">Grafana-grade ops</span>
+            </div>
         </div>
 
         <nav class="flex-1 px-4 py-6 space-y-1">
@@ -161,13 +206,13 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         <!-- Header -->
         <header class="h-20 border-bottom border-slate-800/30 flex items-center justify-between px-8 z-10">
             <div>
-                <h2 id="pageTitle" class="text-2xl font-bold text-white tracking-tight">Overview</h2>
-                <p class="text-xs text-slate-500 mt-0.5">Real-time infrastructure monitoring</p>
+                <h2 id="pageTitle" class="text-3xl font-black text-white tracking-tight">Command Center</h2>
+                <p class="text-xs text-slate-500 mt-1 mono">live telemetry / exporters / incident surface</p>
             </div>
 
             <div class="flex items-center gap-4">
                 <div class="flex bg-slate-900/50 rounded-xl p-1 border border-slate-800">
-                    <button data-range="1h" class="range-btn px-4 py-1.5 rounded-lg text-xs font-medium transition-all active bg-blue-600 text-white">1h</button>
+                    <button data-range="1h" class="range-btn px-4 py-1.5 rounded-lg text-xs font-medium transition-all active bg-orange-500 text-black">1h</button>
                     <button data-range="6h" class="range-btn px-4 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-400 hover:text-slate-200">6h</button>
                     <button data-range="24h" class="range-btn px-4 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-400 hover:text-slate-200">24h</button>
                     <button data-range="7d" class="range-btn px-4 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-400 hover:text-slate-200">7d</button>
@@ -185,7 +230,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             <div id="section-overview" class="section active space-y-8">
                 <!-- Summary Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div class="glass p-6 rounded-3xl relative overflow-hidden group">
+                    <div class="glass p-6 rounded-3xl relative overflow-hidden group critical-glow">
                         <div class="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full transition-all group-hover:bg-emerald-500/20"></div>
                         <div class="flex items-center justify-between mb-4">
                             <div class="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500">
@@ -404,27 +449,29 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         // Initialize Lucide Icons
         lucide.createIcons();
 
+        function showSection(section) {
+            document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+            document.getElementById('section-' + section).classList.remove('hidden');
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active', 'sidebar-item-active'));
+            const btn = document.querySelector(`nav button[data-section="${section}"]`);
+            if (btn) btn.classList.add('sidebar-item-active');
+            document.getElementById('pageTitle').textContent = section === 'overview' ? 'Command Center' : section.charAt(0).toUpperCase() + section.slice(1);
+        }
+
         // Navigation
         document.querySelectorAll('nav button').forEach(btn => {
             btn.addEventListener('click', () => {
-                const section = btn.dataset.section;
-                document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
-                document.getElementById('section-' + section).classList.remove('hidden');
-
-                document.querySelectorAll('nav button').forEach(b => b.classList.remove('active', 'sidebar-item-active'));
-                btn.classList.add('sidebar-item-active');
-
-                document.getElementById('pageTitle').textContent = section.charAt(0).toUpperCase() + section.slice(1);
+                showSection(btn.dataset.section);
             });
         });
 
         // Range Buttons
         document.querySelectorAll('.range-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active', 'bg-blue-600', 'text-white'));
+                document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active', 'bg-orange-500', 'text-black'));
                 document.querySelectorAll('.range-btn').forEach(b => b.classList.add('text-slate-400'));
                 btn.classList.remove('text-slate-400');
-                btn.classList.add('active', 'bg-blue-600', 'text-white');
+                btn.classList.add('active', 'bg-orange-500', 'text-black');
                 currentRange = btn.dataset.range;
                 loadData();
             });
@@ -450,7 +497,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         document.getElementById('addServerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            await fetch('/api/v1/servers', {
+            const resp = await fetch('/api/v1/servers', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
                 body: JSON.stringify({
@@ -460,6 +507,16 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     agent_port: parseInt(document.getElementById('nodePort').value)
                 })
             });
+            if (resp.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
+            if (!resp.ok) {
+                const err = await resp.text();
+                alert('Failed to add server: ' + err);
+                return;
+            }
+            e.target.reset();
             toggleModal('addServerModal', false);
             loadData();
         });
@@ -513,7 +570,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     headers: {'Authorization': 'Bearer ' + token}
                 });
                 if (sResp.status === 401) window.location.href = '/login';
-                servers = await sResp.json();
+                if (!sResp.ok) throw new Error(`servers request failed: ${sResp.status}`);
+                const sPayload = await sResp.json();
+                servers = Array.isArray(sPayload) ? sPayload : (sPayload.servers || []);
 
                 updateOverview();
                 updateServerUI();
@@ -529,6 +588,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     const sData = hData.servers[0];
                     updateChart(charts.cpu, sData.labels, sData.cpu);
                     updateChart(charts.memory, sData.labels, sData.memory);
+                } else {
+                    updateChart(charts.cpu, [], []);
+                    updateChart(charts.memory, [], []);
                 }
 
                 // 3. Load Trends
@@ -544,9 +606,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             }
         }
 
-        function updateChart(chart, labels, data) {
-            chart.data.labels = labels.map(l => l.split('T')[1].substring(0, 5));
-            chart.data.datasets[0].data = data;
+        function updateChart(chart, labels = [], data = []) {
+            chart.data.labels = labels.map(l => String(l).includes('T') ? String(l).split('T')[1].substring(0, 5) : String(l));
+            chart.data.datasets[0].data = data || [];
             chart.update();
         }
 
@@ -557,17 +619,38 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             document.getElementById('stat-online').textContent = online;
             document.getElementById('stat-offline').textContent = offline;
 
-            if (servers.length > 0) {
-                const cpu = servers.reduce((a, b) => a + (b.cpu_percent || 0), 0) / servers.length;
-                const mem = servers.reduce((a, b) => a + (b.memory_percent || 0), 0) / servers.length;
-                document.getElementById('stat-cpu-avg').textContent = cpu.toFixed(1) + '%';
-                document.getElementById('stat-mem-avg').textContent = mem.toFixed(1) + '%';
-            }
+            const cpu = servers.length ? servers.reduce((a, b) => a + (b.cpu_percent || 0), 0) / servers.length : 0;
+            const mem = servers.length ? servers.reduce((a, b) => a + (b.memory_percent || 0), 0) / servers.length : 0;
+            document.getElementById('stat-cpu-avg').textContent = cpu.toFixed(1) + '%';
+            document.getElementById('stat-mem-avg').textContent = mem.toFixed(1) + '%';
         }
 
         function updateServerUI() {
             // Quick List
             const quickList = document.getElementById('quickServerList');
+            if (!servers.length) {
+                quickList.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-8 py-16">
+                            <div class="text-center max-w-xl mx-auto">
+                                <div class="mx-auto mb-5 w-16 h-16 rounded-3xl flex items-center justify-center text-orange-300 bg-orange-500/10 border border-orange-500/20">
+                                    <i data-lucide="radar" class="w-8 h-8"></i>
+                                </div>
+                                <div class="text-white text-xl font-black mb-2">No nodes in the mesh yet</div>
+                                <div class="text-slate-500 text-sm mb-6">Add a Windows or Linux exporter target to start building a live Grafana-style operations surface.</div>
+                                <button onclick="document.getElementById('addServerBtn').click()" class="bg-orange-500 hover:bg-orange-400 text-black font-bold px-6 py-3 rounded-2xl transition-all">Add first node</button>
+                            </div>
+                        </td>
+                    </tr>`;
+                document.getElementById('serverCards').innerHTML = `
+                    <div class="glass p-10 rounded-[2rem] border-orange-500/20 md:col-span-2 xl:col-span-3">
+                        <div class="text-orange-300 mono text-xs uppercase tracking-[0.3em] mb-3">awaiting telemetry</div>
+                        <div class="text-3xl font-black text-white mb-3">Your NOC wall is ready.</div>
+                        <p class="text-slate-500 max-w-2xl">Register exporters, then PyMon will render node cards, CPU/RAM panels, trends, uptime, disk and network signals in this command center.</p>
+                    </div>`;
+                lucide.createIcons();
+                return;
+            }
             quickList.innerHTML = servers.slice(0, 5).map(s => `
                 <tr class="hover:bg-slate-800/20 transition-all">
                     <td class="px-8 py-5 font-medium text-white text-sm">${s.name}</td>
@@ -638,11 +721,14 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         async function loadTrends() {
-            const cpuTrend = await (await fetch(`/api/v1/servers/compare?metric=cpu&range=${currentRange}`, {headers: {'Authorization': 'Bearer ' + token}})).json();
-            const memTrend = await (await fetch(`/api/v1/servers/compare?metric=memory&range=${currentRange}`, {headers: {'Authorization': 'Bearer ' + token}})).json();
-
-            updateTrendUI('cpu-trend', cpuTrend);
-            updateTrendUI('mem-trend', memTrend);
+            try {
+                const cpuTrend = await (await fetch(`/api/v1/servers/compare?metric=cpu&range=${currentRange}`, {headers: {'Authorization': 'Bearer ' + token}})).json();
+                const memTrend = await (await fetch(`/api/v1/servers/compare?metric=memory&range=${currentRange}`, {headers: {'Authorization': 'Bearer ' + token}})).json();
+                updateTrendUI('cpu-trend', cpuTrend);
+                updateTrendUI('mem-trend', memTrend);
+            } catch (e) {
+                console.warn('Trend data unavailable', e);
+            }
         }
 
         function updateTrendUI(id, data) {

@@ -105,22 +105,36 @@ try {
 
 Write-Success "Downloaded"
 
-# Extract
+# Extract outside the install directory so updates do not merge with stale files
 Write-Info "Extracting..."
-Expand-Archive -Path $zipPath -DestinationPath $InstallDir -Force
+$extractRoot = Join-Path $env:TEMP ("pymon_extract_" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Force -Path $extractRoot | Out-Null
+Expand-Archive -Path $zipPath -DestinationPath $extractRoot -Force
 Remove-Item $zipPath -Force
 
 # Find extracted directory
-$extractedDir = Get-ChildItem $InstallDir -Directory | Where-Object { $_.Name -match "^Monitoring" } | Select-Object -First 1
+$extractedDir = Get-ChildItem $extractRoot -Directory | Where-Object { $_.Name -match "^Monitoring" } | Select-Object -First 1
 if (-not $extractedDir) {
     Write-Error "Failed to find extracted files"
     exit 1
 }
 
-# Move contents
+# Remove old code artifacts but preserve runtime data, config, logs, backups, and venv
 Write-Info "Installing..."
-Move-Item "$($extractedDir.FullName)\*" "$InstallDir\" -Force -ErrorAction SilentlyContinue
-Remove-Item $extractedDir.FullName -Force
+$staleItems = @(
+    "pymon", "docs", "examples", "agent", "scripts", ".github",
+    "dashboard_unified.py", "PROJECT_REPORT.md", "config.json",
+    "pyproject.toml", "requirements.txt", "README.md", "CHANGELOG.md",
+    "Dockerfile", "docker-compose.yml", "run.bat", "run.sh", "install_exporter.ps1"
+)
+foreach ($item in $staleItems) {
+    $target = Join-Path $InstallDir $item
+    if (Test-Path $target) {
+        Remove-Item -LiteralPath $target -Recurse -Force
+    }
+}
+Copy-Item -Path (Join-Path $extractedDir.FullName "*") -Destination $InstallDir -Recurse -Force
+Remove-Item -LiteralPath $extractRoot -Recurse -Force
 
 # Create virtual environment
 Write-Info "Creating virtual environment..."
@@ -130,9 +144,10 @@ Set-Location $InstallDir
 # Install dependencies
 Write-Info "Installing Python packages..."
 $pipExe = "$InstallDir\venv\Scripts\pip.exe"
+$venvPython = "$InstallDir\venv\Scripts\python.exe"
 
 # Upgrade pip first
-$pipUpgrade = Start-Process -FilePath $pipExe -ArgumentList "install","--upgrade","pip" -NoNewWindow -Wait -PassThru
+$pipUpgrade = Start-Process -FilePath $venvPython -ArgumentList "-m","pip","install","--upgrade","pip" -NoNewWindow -Wait -PassThru
 if ($pipUpgrade.ExitCode -ne 0) {
     Write-Warn "pip upgrade had issues, continuing..."
 }
@@ -205,7 +220,7 @@ if __name__ == '__main__':
     
     # Register with nssm if available, otherwise sc
     $scPath = "sc.exe"
-    & $scPath create $serviceName binPath= "python `"$wrapperPath`" server --config `"$configPath`"" start= auto
+    & $scPath create $serviceName binPath= "`"$venvPython`" `"$wrapperPath`" server --config `"$configPath`"" start= auto
     & $scPath start $serviceName
 }
 

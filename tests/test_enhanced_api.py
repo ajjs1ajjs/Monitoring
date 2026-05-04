@@ -56,6 +56,23 @@ class TestMetricsHistory:
         assert response.status_code == 422  # Validation error
 
 
+class TestServersApi:
+    """Tests for server collection endpoints used by the dashboard."""
+
+    def test_list_servers_endpoint_allows_get(self, client):
+        response = client.get("/api/v1/servers")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "servers" in data
+        assert isinstance(data["servers"], list)
+
+    def test_delete_server_requires_authentication(self, client):
+        response = client.delete("/api/v1/servers/1")
+
+        assert response.status_code == 401
+
+
 class TestDiskBreakdown:
     """Tests for /api/v1/servers/{id}/disk-breakdown endpoint"""
 

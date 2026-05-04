@@ -949,3 +949,21 @@ async def create_server(data: ServerCreate, current_user: User = Depends(get_adm
         return {"status": "ok", "server_id": server_id}
     finally:
         conn.close()
+
+
+@api.delete("/servers/{server_id}")
+async def delete_server(server_id: int, current_user: User = Depends(get_admin_user)):
+    """Delete a monitored server and its historical metrics."""
+    import sqlite3
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.execute("DELETE FROM servers WHERE id = ?", (server_id,))
+        conn.execute("DELETE FROM metrics_history WHERE server_id = ?", (server_id,))
+        conn.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Server not found")
+        return {"status": "ok"}
+    finally:
+        conn.close()
