@@ -817,23 +817,23 @@ async def compare_time_ranges(
         )
         previous = cursor.fetchone()
 
-        metric_map = {"cpu": 0, "memory": 1, "disk": 2, "network": 3}
-        idx = metric_map.get(metric, 0)
+        metric_cols = {"cpu": ["cpu"], "memory": ["mem"], "disk": ["disk"], "network": ["rx", "tx"]}
+        target_cols = metric_cols.get(metric, ["cpu"])
 
-        current_val = 0.0
-        previous_val = 0.0
+        def get_avg_val(row, cols):
+            if not row:
+                return 0.0
+            vals = []
+            for col in cols:
+                try:
+                    val = row[col]
+                    vals.append(float(val) if val is not None else 0.0)
+                except (IndexError, KeyError, TypeError, ValueError):
+                    vals.append(0.0)
+            return sum(vals) / len(vals) if vals else 0.0
 
-        if current:
-            if idx < 3:
-                current_val = float(current[idx] or 0)
-            else:
-                current_val = (float(current[3] or 0) + float(current[4] or 0)) / 2.0
-
-        if previous:
-            if idx < 3:
-                previous_val = float(previous[idx] or 0)
-            else:
-                previous_val = (float(previous[3] or 0) + float(previous[4] or 0)) / 2.0
+        current_val = get_avg_val(current, target_cols)
+        previous_val = get_avg_val(previous, target_cols)
 
         delta = current_val - previous_val
         delta_percent = round((delta / previous_val * 100) if previous_val > 0 else 0, 2)
@@ -845,6 +845,9 @@ async def compare_time_ranges(
             "delta_percent": delta_percent,
             "trend": "up" if delta > 0.5 else "down" if delta < -0.5 else "stable",
         }
+    except Exception as e:
+        print(f"Error in compare_time_ranges: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
 

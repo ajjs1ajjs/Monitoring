@@ -397,6 +397,59 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     </div>
                 </div>
             </div>
+
+            <!-- Section: Alerts -->
+            <div id="section-alerts" class="section hidden space-y-8">
+                <div class="glass rounded-[2rem] overflow-hidden">
+                    <div class="p-8 border-b border-slate-800/30 bg-slate-900/20 flex items-center justify-between">
+                        <h3 class="text-lg font-bold text-white">Alert Rules</h3>
+                        <button class="px-6 py-2 rounded-xl bg-orange-500 text-black text-xs font-bold shadow-lg shadow-orange-500/20 hover:scale-105 transition-all">Create Rule</button>
+                    </div>
+                    <div class="p-8">
+                        <div id="alertsList" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Alerts will be injected here -->
+                            <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 text-center text-slate-500">
+                                No active alert rules configured
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section: Settings -->
+            <div id="section-settings" class="section hidden space-y-8">
+                <div class="glass rounded-[2rem] overflow-hidden">
+                    <div class="p-8 border-b border-slate-800/30 bg-slate-900/20">
+                        <h3 class="text-lg font-bold text-white">System Settings</h3>
+                    </div>
+                    <div class="p-8 space-y-8 max-w-2xl">
+                        <div class="space-y-4">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest">General Configuration</h4>
+                            <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 flex items-center justify-between">
+                                <div>
+                                    <div class="text-white font-medium">Metrics Retention</div>
+                                    <div class="text-xs text-slate-500">How long to keep historical telemetry data</div>
+                                </div>
+                                <select class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none">
+                                    <option>7 days</option>
+                                    <option>30 days</option>
+                                    <option>90 days</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Security & Access</h4>
+                            <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 flex items-center justify-between">
+                                <div>
+                                    <div class="text-white font-medium">Administrator Password</div>
+                                    <div class="text-xs text-slate-500">Rotate your login credentials regularly</div>
+                                </div>
+                                <button class="px-6 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 transition-all text-xs font-bold text-white">Update</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -450,12 +503,27 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         lucide.createIcons();
 
         function showSection(section) {
-            document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
-            document.getElementById('section-' + section).classList.remove('hidden');
-            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active', 'sidebar-item-active'));
-            const btn = document.querySelector(`nav button[data-section="${section}"]`);
-            if (btn) btn.classList.add('sidebar-item-active');
-            document.getElementById('pageTitle').textContent = section === 'overview' ? 'Command Center' : section.charAt(0).toUpperCase() + section.slice(1);
+            const sections = document.querySelectorAll('.section');
+            const targetSection = document.getElementById('section-' + section);
+
+            if (targetSection) {
+                sections.forEach(s => s.classList.add('hidden'));
+                targetSection.classList.remove('hidden');
+
+                document.querySelectorAll('nav button').forEach(b => b.classList.remove('sidebar-item-active'));
+                const btn = document.querySelector(`nav button[data-section="${section}"]`);
+                if (btn) btn.classList.add('sidebar-item-active');
+
+                const pageTitle = document.getElementById('pageTitle');
+                if (pageTitle) {
+                    pageTitle.textContent = section === 'overview' ? 'Command Center' : section.charAt(0).toUpperCase() + section.slice(1);
+                }
+
+                if (section === 'logs') loadAuditLogs();
+                if (section === 'overview') loadTrends();
+            } else {
+                console.warn('Section not found:', section);
+            }
         }
 
         // Navigation
@@ -722,10 +790,17 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         async function loadTrends() {
             try {
-                const cpuTrend = await (await fetch(`/api/v1/servers/compare?metric=cpu&range=${currentRange}`, {headers: {'Authorization': 'Bearer ' + token}})).json();
-                const memTrend = await (await fetch(`/api/v1/servers/compare?metric=memory&range=${currentRange}`, {headers: {'Authorization': 'Bearer ' + token}})).json();
-                updateTrendUI('cpu-trend', cpuTrend);
-                updateTrendUI('mem-trend', memTrend);
+                const cpuResp = await fetch(`/api/v1/servers/compare?metric=cpu&range=${currentRange}`, {headers: {'Authorization': 'Bearer ' + token}});
+                const memResp = await fetch(`/api/v1/servers/compare?metric=memory&range=${currentRange}`, {headers: {'Authorization': 'Bearer ' + token}});
+
+                if (cpuResp.ok) {
+                    const cpuTrend = await cpuResp.json();
+                    updateTrendUI('cpu-trend', cpuTrend);
+                }
+                if (memResp.ok) {
+                    const memTrend = await memResp.json();
+                    updateTrendUI('mem-trend', memTrend);
+                }
             } catch (e) {
                 console.warn('Trend data unavailable', e);
             }
@@ -733,6 +808,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         function updateTrendUI(id, data) {
             const el = document.getElementById(id);
+            if (!el || !data || data.delta === undefined) return;
             const isDown = data.delta < 0;
             el.innerHTML = `<i data-lucide="trending-${isDown ? 'down' : 'up'}" class="w-3 h-3"></i> ${isDown ? '' : '+'}${data.delta_percent}%`;
             el.className = `flex items-center gap-1 ${isDown ? 'text-emerald-500' : 'text-red-500'} text-[10px] font-bold`;
