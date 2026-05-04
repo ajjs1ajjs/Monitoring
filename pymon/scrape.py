@@ -74,7 +74,27 @@ class ScrapeManager:
 
         print(f"ScrapeManager: {len(self.targets)} targets configured")
 
+    async def execute_scrape(self, target: ScrapeTarget) -> ScrapeResult:
+        """Perform a scrape and update server status in the database."""
+        result = await self.scrape_target(target)
+        
+        labels = [Label(name="job", value=target.job_name), Label(name="target", value=target.target)]
+        self.scrape_total.inc()
+        
+        if result.success:
+            self.scrape_success.inc()
+            self.up_gauge.set(1, labels)
+            self._update_server_status(target.target, result.metrics or {}, True, server_id=target.server_id)
+        else:
+            self.scrape_failures.inc()
+            self.up_gauge.set(0, labels)
+            self._update_server_status(target.target, {}, False, result.error, server_id=target.server_id)
+            
+        self.response_time.set(result.latency_ms / 1000, labels)
+        return result
+
     async def scrape_target(self, target: ScrapeTarget) -> ScrapeResult:
+
         result = ScrapeResult(target=target, success=False, timestamp=datetime.now(timezone.utc), metrics={})
 
         try:

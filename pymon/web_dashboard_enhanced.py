@@ -130,9 +130,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         
         /* Sidebar */
         aside { width: var(--sidebar-w); background: #020617; border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; }
-        .sidebar-header { padding: 2rem 1.5rem; display: flex; items-center: center; gap: 0.75rem; }
+        .sidebar-header { padding: 2rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
         .sidebar-header svg { color: var(--accent); width: 28px; height: 28px; }
         .sidebar-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.025em; }
+        .sidebar-header span { color: var(--accent); }
         
         .nav-section { padding: 0 1rem; flex: 1; }
         .nav-label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 1.5rem 0 0.75rem 0.75rem; }
@@ -151,9 +152,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         header { height: 64px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; background: rgba(2, 6, 23, 0.5); backdrop-filter: blur(10px); z-index: 40; }
         .header-left h2 { font-size: 1rem; font-weight: 600; color: var(--text); }
         
-        .header-actions { display: flex; items-center: center; gap: 1rem; }
-        .range-selector { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.25rem; }
-        .range-btn { padding: 0.25rem 0.75rem; border-radius: 0.375rem; border: none; background: transparent; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+        .header-actions { display: flex; align-items: center; gap: 1rem; }
+        .range-selector { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.25rem; overflow-x: auto; max-width: 400px; }
+        .range-btn { padding: 0.25rem 0.6rem; border-radius: 0.375rem; border: none; background: transparent; color: var(--text-muted); font-size: 0.65rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
         .range-btn.active { background: var(--surface-hover); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
         
         .refresh-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
@@ -164,11 +165,11 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .content-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
         /* Dashboard Grid */
-        .dashboard-section { display: none; animation: fadeIn 0.3s ease-out; }
+        .dashboard-section { display: none; animation: fadeIn 0.2s ease-out; }
         .dashboard-section.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 1.5rem; border-radius: 1.25rem; position: relative; overflow: hidden; transition: transform 0.3s; }
         .stat-card:hover { transform: translateY(-4px); }
         .stat-card::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px; background: transparent; }
@@ -222,12 +223,23 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .btn-secondary { background: var(--surface-hover); color: var(--text); border-color: var(--border); }
         .btn-secondary:hover { background: #334155; }
         
-        .node-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; transition: border-color 0.2s; }
+        .node-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; transition: border-color 0.2s; position: relative; }
         .node-card:hover { border-color: var(--text-muted); }
+
+        /* Explorer Tools */
+        .explorer-toolbar { display: flex; gap: 1rem; background: var(--surface); border: 1px solid var(--border); padding: 1rem; border-radius: 1rem; margin-bottom: 1.5rem; align-items: flex-end; }
+        .explorer-field { flex: 1; }
+        .explorer-field label { display: block; font-size: 0.65rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; }
 
         /* Utility */
         .hidden { display: none; }
         .text-mono { font-family: 'JetBrains Mono', monospace; }
+        .font-bold { font-weight: 700; }
+        .text-slate-500 { color: #64748b; }
+        .text-white { color: #ffffff; }
+        .text-xs { font-size: 0.75rem; }
+        .animate-spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -251,9 +263,15 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <i data-lucide="bell-ring"></i> Alerting
                 </button>
                 
-                <div class="nav-label">Management</div>
+                <div class="nav-label">Tools</div>
                 <button class="nav-item" data-section="explorer">
-                    <i data-lucide="database"></i> Explorer
+                    <i data-lucide="activity"></i> Metrics Explorer
+                </button>
+                <button class="nav-item" data-section="manual">
+                    <i data-lucide="wrench"></i> Manual Control
+                </button>
+                <button class="nav-item" data-section="logs">
+                    <i data-lucide="list"></i> Audit Logs
                 </button>
                 <button class="nav-item" data-section="settings">
                     <i data-lucide="settings"></i> Configuration
@@ -276,9 +294,15 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <div class="header-actions">
                     <span id="updateTimer" style="font-size: 0.7rem; color: var(--text-muted); font-family: monospace;">Syncing...</span>
                     <div class="range-selector">
+                        <button class="range-btn" data-range="5m">5M</button>
+                        <button class="range-btn" data-range="15m">15M</button>
+                        <button class="range-btn" data-range="30m">30M</button>
                         <button class="range-btn active" data-range="1h">1H</button>
+                        <button class="range-btn" data-range="3h">3H</button>
                         <button class="range-btn" data-range="6h">6H</button>
+                        <button class="range-btn" data-range="12h">12H</button>
                         <button class="range-btn" data-range="24h">24H</button>
+                        <button class="range-btn" data-range="7d">7D</button>
                     </div>
                     <button id="refreshBtn" class="refresh-btn">
                         <i data-lucide="rotate-cw"></i>
@@ -325,24 +349,6 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                             </div>
                             <div class="card-body">
                                 <canvas id="memChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Network Throughput</h3>
-                                <i data-lucide="activity" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="netChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Storage Distribution</h3>
-                                <i data-lucide="hard-drive" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="diskChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -399,9 +405,81 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
                 <!-- Section: Explorer -->
                 <div id="section-explorer" class="dashboard-section">
+                    <div class="explorer-toolbar">
+                        <div class="explorer-field">
+                            <label>Target Series</label>
+                            <select id="explorerSeries" class="form-input">
+                                <option value="">Select Metric...</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="runQueryBtn">
+                            <i data-lucide="play" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Execute Query
+                        </button>
+                    </div>
+                    <div class="card" style="height: 500px;">
+                        <div class="card-header">
+                            <h3 id="explorerTitle">Query Results</h3>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="explorerChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Manual Control -->
+                <div id="section-manual" class="dashboard-section">
+                    <div class="card" style="max-width: 800px; margin: 0 auto;">
+                        <div class="card-header">
+                            <h3>Manual Metric Injection</h3>
+                        </div>
+                        <div class="card-body">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                <div class="form-group">
+                                    <label>Metric Name</label>
+                                    <input type="text" id="manualMetricName" class="form-input" placeholder="custom_app_orders">
+                                </div>
+                                <div class="form-group">
+                                    <label>Metric Value</label>
+                                    <input type="number" id="manualMetricValue" class="form-input" placeholder="42.5">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Metric Type</label>
+                                <select id="manualMetricType" class="form-input">
+                                    <option value="gauge">Gauge</option>
+                                    <option value="counter">Counter</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" style="width: 100%;" onclick="injectManualMetric()">Submit Metric</button>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="max-width: 800px; margin: 2rem auto;">
+                        <div class="card-header">
+                            <h3>Force Scrape Node</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Select Target</label>
+                                <select id="forceScrapeTarget" class="form-input">
+                                    <!-- Dynamic -->
+                                </select>
+                            </div>
+                            <button class="btn btn-secondary" style="width: 100%; border-color: var(--accent); color: var(--accent);" onclick="forceScrape()">
+                                <i data-lucide="zap" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Immediate Scrape
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Logs -->
+                <div id="section-logs" class="dashboard-section">
                     <div class="card" style="height: 600px;">
                         <div class="card-header">
-                            <h3>Audit Log Explorer</h3>
+                            <h3>Audit Log Stream</h3>
+                            <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.7rem;" onclick="loadAuditLogs()">
+                                <i data-lucide="rotate-cw" style="width: 12px; height: 12px;"></i>
+                            </button>
                         </div>
                         <div class="card-body" id="auditLogStream" style="overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">
                             <!-- Log stream -->
@@ -417,8 +495,8 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         </div>
                         <div class="card-body">
                             <div class="form-group">
-                                <label style="display: flex; items-center: center; gap: 0.5rem; margin-bottom: 1rem;">
-                                    <input type="checkbox" id="notifEnabled" class="accent-orange-500">
+                                <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                                    <input type="checkbox" id="notifEnabled" style="width: 16px; height: 16px;">
                                     Broadcast Notifications Enabled
                                 </label>
                             </div>
@@ -434,7 +512,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 <label>Discord Webhook URL</label>
                                 <input type="text" id="dsWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/...">
                             </div>
-                            <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSettings()">Apply configuration</button>
+                            <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSettings()">Apply Configuration</button>
                         </div>
                     </div>
                 </div>
@@ -543,9 +621,11 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             
             document.getElementById('viewTitle').textContent = section.charAt(0).toUpperCase() + section.slice(1);
             
-            if (section === 'explorer') loadAuditLogs();
+            if (section === 'explorer') loadExplorerMetadata();
+            if (section === 'logs') loadAuditLogs();
             if (section === 'alerts') loadAlertRules();
             if (section === 'settings') loadSettings();
+            if (section === 'manual') updateManualTargets();
         }
 
         // Event Listeners
@@ -568,13 +648,26 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             window.location.href = '/login';
         });
 
+        // Auth Helper
+        async function apiFetch(url, options = {}) {
+            options.headers = options.headers || {};
+            options.headers['Authorization'] = 'Bearer ' + token;
+            const resp = await fetch(url, options);
+            if (resp.status === 401) {
+                localStorage.removeItem('token');
+                window.location.href = '/login';
+                return null;
+            }
+            return resp;
+        }
+
         // Form Handlers
         document.getElementById('addNodeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
-                const resp = await fetch('/api/v1/servers', {
+                const resp = await apiFetch('/api/v1/servers', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         name: document.getElementById('nodeName').value,
                         host: document.getElementById('nodeHost').value,
@@ -583,24 +676,22 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         enabled: true
                     })
                 });
-                if (resp.ok) {
+                if (resp && resp.ok) {
                     toggleModal('addNodeModal', false);
                     e.target.reset();
                     refreshData();
-                } else {
+                } else if (resp) {
                     const err = await resp.json();
                     alert('Deployment Failed: ' + (err.detail || 'Internal Error'));
                 }
-            } catch (err) {
-                alert('Connection Error');
-            }
+            } catch (err) { alert('Connection Error'); }
         });
 
         document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const resp = await fetch('/api/v1/alerts', {
+            const resp = await apiFetch('/api/v1/alerts', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     name: document.getElementById('alertName').value,
                     metric: document.getElementById('alertMetric').value,
@@ -610,7 +701,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     severity: 'warning'
                 })
             });
-            if (resp.ok) {
+            if (resp && resp.ok) {
                 toggleModal('addAlertModal', false);
                 e.target.reset();
                 loadAlertRules();
@@ -650,16 +741,15 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         function initCharts() {
             charts.cpu = createLineChart('cpuChart', 'CPU', '#f97316');
             charts.mem = createLineChart('memChart', 'RAM', '#3b82f6');
-            charts.net = createLineChart('netChart', 'Traffic', '#10b981');
-            charts.disk = createLineChart('diskChart', 'Disk', '#f59e0b');
+            charts.explorer = createLineChart('explorerChart', 'Metric Value', '#10b981');
         }
 
         // Data Fetching
         async function refreshData() {
             document.getElementById('updateTimer').textContent = 'Syncing...';
             try {
-                const resp = await fetch('/api/v1/servers', {headers: {'Authorization': 'Bearer ' + token}});
-                if (resp.status === 401) { window.location.href = '/login'; return; }
+                const resp = await apiFetch('/api/v1/servers');
+                if (!resp) return;
                 const data = await resp.json();
                 nodes = data.servers;
                 
@@ -745,7 +835,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                             <div style="font-weight: 700; color: #3b82f6;">${(n.memory_percent || 0).toFixed(1)}%</div>
                         </div>
                     </div>
-                    <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+                    <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <button onclick="forceScrapeSingle(${n.id})" title="Force Scrape" style="background: transparent; border: none; color: var(--accent); cursor: pointer; opacity: 0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+                            <i data-lucide="zap" style="width: 14px; height: 14px;"></i>
+                        </button>
                         <button onclick="deleteNode(${n.id})" style="background: transparent; border: none; color: #f87171; cursor: pointer; opacity: 0.5;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">
                             <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                         </button>
@@ -757,13 +850,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         async function updateTrends() {
             try {
-                const resp = await fetch('/api/v1/metrics/trend', {headers: {'Authorization': 'Bearer ' + token}});
+                const resp = await apiFetch(`/api/v1/metrics/trend?range=${currentRange}`);
+                if (!resp) return;
                 const data = await resp.json();
-                
-                const labels = data.history.map(h => {
-                    const d = new Date(h.timestamp);
-                    return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
-                });
+                const labels = data.history.map(h => h.timestamp.split('T')[1].substring(0, 5));
 
                 charts.cpu.data.labels = labels;
                 charts.cpu.data.datasets[0].data = data.history.map(h => h.cpu_avg);
@@ -772,25 +862,92 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 charts.mem.data.labels = labels;
                 charts.mem.data.datasets[0].data = data.history.map(h => h.mem_avg);
                 charts.mem.update('none');
-                
-                charts.net.data.labels = labels;
-                charts.net.data.datasets[0].data = data.history.map(h => (h.net_rx_avg + h.net_tx_avg) / (1024 * 1024));
-                charts.net.update('none');
-                
-                charts.disk.data.labels = labels;
-                // Since trend doesn't return disk avg in current API, we mock it or use 0
-                charts.disk.data.datasets[0].data = data.history.map(() => nodes.reduce((a, b) => a + (b.disk_percent || 0), 0) / (nodes.length || 1));
-                charts.disk.update('none');
             } catch (e) {}
         }
 
+        async function loadExplorerMetadata() {
+            const resp = await apiFetch('/api/v1/series');
+            if (!resp) return;
+            const data = await resp.json();
+            const select = document.getElementById('explorerSeries');
+            select.innerHTML = '<option value="">Select Metric...</option>' + 
+                data.series.sort().map(s => `<option value="${s}">${s}</option>`).join('');
+        }
+
+        document.getElementById('runQueryBtn').addEventListener('click', async () => {
+            const series = document.getElementById('explorerSeries').value;
+            if (!series) return;
+            
+            const btn = document.getElementById('runQueryBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader" class="animate-spin" style="width: 14px; height: 14px;"></i> Executing...';
+            lucide.createIcons();
+
+            try {
+                const resp = await apiFetch(`/api/v1/query?query=${series}`);
+                if (!resp) return;
+                const data = await resp.json();
+                
+                const labels = data.result.map(r => r.timestamp.split('T')[1].substring(0, 8));
+                charts.explorer.data.labels = labels;
+                charts.explorer.data.datasets[0].data = data.result.map(r => r.value);
+                charts.explorer.data.datasets[0].label = series;
+                charts.explorer.update();
+                
+                document.getElementById('explorerTitle').textContent = 'Results for: ' + series;
+            } catch (e) {
+                alert('Query failed');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="play" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Execute Query';
+                lucide.createIcons();
+            }
+        });
+
+        async function injectManualMetric() {
+            const name = document.getElementById('manualMetricName').value;
+            const value = parseFloat(document.getElementById('manualMetricValue').value);
+            const type = document.getElementById('manualMetricType').value;
+            
+            if (!name || isNaN(value)) return;
+            
+            const resp = await apiFetch('/api/v1/metrics', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, value, type})
+            });
+            
+            if (resp && resp.ok) alert('Metric Injected');
+        }
+
+        function updateManualTargets() {
+            const select = document.getElementById('forceScrapeTarget');
+            select.innerHTML = nodes.map(n => `<option value="${n.id}">${n.name} (${n.host})</option>`).join('');
+        }
+
+        async function forceScrape() {
+            const id = document.getElementById('forceScrapeTarget').value;
+            forceScrapeSingle(id);
+        }
+
+        async function forceScrapeSingle(id) {
+            const resp = await apiFetch(`/api/v1/servers/${id}/scrape`, {method: 'POST'});
+            if (resp && resp.ok) {
+                alert('Scrape Triggered');
+                refreshData();
+            } else {
+                alert('Scrape command failed (Endpoint not yet implemented in backend)');
+            }
+        }
+
         async function loadAuditLogs() {
-            const resp = await fetch('/api/v1/audit-log?limit=100', {headers: {'Authorization': 'Bearer ' + token}});
+            const resp = await apiFetch('/api/v1/audit-log?limit=100');
+            if (!resp) return;
             const data = await resp.json();
             const stream = document.getElementById('auditLogStream');
             stream.innerHTML = data.logs.map(l => `
                 <div style="display: flex; gap: 1rem; margin-bottom: 0.25rem;">
-                    <span style="color: #64748b;">[${l.timestamp.split('T')[1].substring(0, 8)}]</span>
+                    <span style="color: #64748b;">[${l.timestamp ? l.timestamp.split('T')[1].substring(0, 8) : 'N/A'}]</span>
                     <span style="color: #3b82f6; width: 100px;">${l.username}</span>
                     <span style="color: #f8fafc;">${l.action}</span>
                     <span style="color: #64748b;">${l.target || ''}</span>
@@ -800,7 +957,8 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         async function loadAlertRules() {
-            const resp = await fetch('/api/v1/alerts', {headers: {'Authorization': 'Bearer ' + token}});
+            const resp = await apiFetch('/api/v1/alerts');
+            if (!resp) return;
             const data = await resp.json();
             const grid = document.getElementById('alertRulesGrid');
             grid.innerHTML = data.alerts.map(a => `
@@ -810,7 +968,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         Trigger: <span style="color: white; font-family: monospace;">${a.metric} > ${a.threshold}%</span>
                     </div>
                     <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
-                        <button onclick="deleteAlert(${a.id})" style="background: transparent; border: none; color: #f87171; cursor: pointer; opacity: 0.5;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">
+                        <button onclick="deleteAlert(${a.id})" style="background: transparent; border: none; color: #f87171; cursor: pointer; opacity: 0.5;">
                             <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                         </button>
                     </div>
@@ -821,19 +979,19 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         async function deleteNode(id) {
             if (confirm('Permanently decommission this node?')) {
-                await fetch(`/api/v1/servers/${id}`, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
+                await apiFetch(`/api/v1/servers/${id}`, {method: 'DELETE'});
                 refreshData();
             }
         }
 
         async function deleteAlert(id) {
-            await fetch(`/api/v1/alerts/${id}`, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
+            await apiFetch(`/api/v1/alerts/${id}`, {method: 'DELETE'});
             loadAlertRules();
         }
 
         async function loadSettings() {
-            const resp = await fetch('/api/v1/settings/notifications', {headers: {'Authorization': 'Bearer ' + token}});
-            if (resp.ok) {
+            const resp = await apiFetch('/api/v1/settings/notifications');
+            if (resp && resp.ok) {
                 const data = await resp.json();
                 document.getElementById('notifEnabled').checked = data.enabled;
                 document.getElementById('tgToken').value = data.telegram_bot_token || '';
@@ -849,13 +1007,12 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 telegram_chat_id: document.getElementById('tgChat').value,
                 discord_webhook_url: document.getElementById('dsWebhook').value
             };
-            const resp = await fetch('/api/v1/settings/notifications', {
+            const resp = await apiFetch('/api/v1/settings/notifications', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
-            if (resp.ok) alert('Configuration Saved Successfully');
-            else alert('Access Denied or Validation Failed');
+            if (resp && resp.ok) alert('Configuration Saved Successfully');
         }
 
         // Initialization
@@ -865,4 +1022,3 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
     </script>
 </body>
 </html>"""
-

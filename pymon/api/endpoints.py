@@ -1146,3 +1146,39 @@ async def update_notif_settings(data: NotificationSettings, current_user: User =
         yaml.safe_dump(config_data, f)
         
     return {"status": "ok"}
+@api.post("/servers/{server_id}/scrape")
+async def force_scrape_server(
+    server_id: int, request: Request, current_user: User = Depends(get_admin_user)
+):
+    """Manually trigger a scrape for a specific server."""
+    import sqlite3
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        server = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
+        if not server:
+            raise HTTPException(status_code=404, detail="Server not found")
+            
+        scrape_manager = getattr(request.app.state, "scrape_manager", None)
+        if not scrape_manager:
+            raise HTTPException(status_code=503, detail="ScrapeManager not available")
+            
+        # Find the target in the manager
+        target_str = f"{server['host']}:{server['agent_port']}"
+        target = None
+        for t in scrape_manager.targets:
+            if t.server_id == server_id or t.target == target_str:
+                target = t
+                break
+                
+        if not target:
+            # Try to add it if missing
+            target = scrape_manager.add_server_target(dict(server))
+            
+        # Trigger immediate scrape
+        await scrape_manager.execute_scrape(target)
+        
+        return {"status": "ok", "message": "Scrape triggered successfully"}
+    finally:
+        conn.close()
