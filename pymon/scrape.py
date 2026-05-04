@@ -203,6 +203,7 @@ class ScrapeManager:
 
                 if name and value is not None:
                     metrics[name] = value
+                    print(f"DEBUG PARSE: name={name}, value={value}")
 
                     label_objs = list(target.labels.items()) if not target.honor_labels else []
                     label_objs.extend(labels)
@@ -232,8 +233,14 @@ class ScrapeManager:
             disk_avail = 0
             
             for k, v in metrics.items():
-                # CPU metrics - check various patterns
-                if 'cpu_seconds_total' in k:
+                # CPU metrics - exact match patterns
+                if k == 'node_cpu_seconds_total' and 'idle' in k:
+                    cpu_idle = max(cpu_idle, v)
+                elif k == 'node_cpu_seconds_total' and 'user' in k:
+                    cpu_user = max(cpu_user, v)
+                elif k == 'node_cpu_seconds_total' and 'system' in k:
+                    cpu_system = max(cpu_system, v)
+                elif 'cpu_seconds_total' in k:
                     if 'idle' in k:
                         cpu_idle = max(cpu_idle, v)
                     elif 'user' in k:
@@ -241,20 +248,21 @@ class ScrapeManager:
                     elif 'system' in k:
                         cpu_system = max(cpu_system, v)
                 
-                # Memory metrics
-                if 'MemTotal' in k:
+                # Memory metrics - exact match
+                if k == 'node_memory_MemTotal_bytes':
+                    mem_total = max(mem_total, v)
+                elif k == 'node_memory_MemAvailable_bytes':
+                    mem_avail = max(mem_avail, v)
+                # Also try partial match
+                elif 'MemTotal' in k:
                     mem_total = max(mem_total, v)
                 elif 'MemAvailable' in k:
                     mem_avail = max(mem_avail, v)
-                elif 'node_memory_MemTotal' in k:
-                    mem_total = max(mem_total, v)
-                elif 'node_memory_MemAvailable' in k:
-                    mem_avail = max(mem_avail, v)
                 
                 # Disk metrics
-                if 'filesystem_size' in k:
+                if 'filesystem_size_bytes' in k:
                     disk_total = max(disk_total, v)
-                elif 'filesystem_avail' in k:
+                elif 'filesystem_avail_bytes' in k:
                     disk_avail = max(disk_avail, v)
             
             # Calculate CPU
@@ -264,18 +272,15 @@ class ScrapeManager:
                     metrics['node_cpu_calculated'] = 100 * (1 - cpu_idle / total_cpu)
             
             # Calculate Memory
+            print(f"DEBUG: mem_total={mem_total}, mem_avail={mem_avail}")
             if mem_total > 0 and mem_avail > 0:
                 metrics['node_memory_calculated'] = 100 * (1 - mem_avail / mem_total)
+                print(f"DEBUG: memory % = {100 * (1 - mem_avail / mem_total):.1f}")
             
             # Calculate Disk
             if disk_total > 0 and disk_avail > 0:
                 metrics['node_disk_calculated'] = 100 * (1 - disk_avail / disk_total)
                 
-            # Debug output
-            if metrics:
-                print(f"DEBUG: cpu_idle={cpu_idle}, cpu_user={cpu_user}, cpu_system={cpu_system}")
-                print(f"DEBUG: mem_total={mem_total}, mem_avail={mem_avail}")
-                print(f"DEBUG: disk_total={disk_total}, disk_avail={disk_avail}")
         except Exception as e:
             print(f"Metric calc error: {e}")
 
