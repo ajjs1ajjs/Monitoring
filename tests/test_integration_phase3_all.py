@@ -1,4 +1,3 @@
-import pytest
 
 
 def test_history_per_server_all_ranges(client):

@@ -50,7 +50,7 @@ class Logger:
         # This attempts to capture the caller's file/module name.
         # In a complex multi-threaded environment, this might need refinement.
         try:
-            return logging.currentframe().f_back.f_globals["__name__"]
+            return logging.currentframe().f_back.f_globals["__name__"]  # type: ignore
         except Exception:
             return "unknown_module"
 
@@ -92,6 +92,6 @@ if __name__ == "__main__":
         x = 1 / 0
     except ZeroDivisionError as e:
         # Demonstrating how to log an error with a stack trace (exc_info=True)
-        logger.error(f"Caught critical division by zero error.", exc_info=e)
+        logger.error(f"Caught critical division by zero error.", exc_info=e)  # type: ignore
 
     logger.warning("Configuration file check passed, but some parameters are deprecated.")

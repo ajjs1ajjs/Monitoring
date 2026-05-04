@@ -1,4 +1,3 @@
-import pytest
 
 
 def test_history_endpoint_all_methods(client):

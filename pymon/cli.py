@@ -1,7 +1,6 @@
 """CLI entry point"""
 
 import argparse
-import asyncio
 import logging
 import os
 import sys
@@ -64,7 +63,7 @@ def main():
             os.environ.setdefault("DB_PATH", db_path)
             os.environ.setdefault("CONFIG_PATH", config_path)
 
-            print(f"Initializing storage (SQLite)...", file=sys.stderr)
+            print("Initializing storage (SQLite)...", file=sys.stderr)
             from pymon.auth import auth_config as auth_cfg
             from pymon.auth import init_auth_tables
             from pymon.storage import init_storage
@@ -85,7 +84,7 @@ def main():
                 os.makedirs(abs_db_dir, exist_ok=True)
             db_path = os.path.abspath(db_path)
 
-            print(f"Initializing auth tables...", file=sys.stderr)
+            print("Initializing auth tables...", file=sys.stderr)
             init_auth_tables()
 
             print("Initializing web tables...", file=sys.stderr)

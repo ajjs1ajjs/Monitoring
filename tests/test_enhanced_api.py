@@ -13,10 +13,7 @@ Run with:
     python -m pytest tests/test_enhanced_api.py -v
 """
 
-import json
-from typing import Any, Dict
 
-import pytest
 
 
 class TestMetricsHistory:

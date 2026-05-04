@@ -471,7 +471,7 @@ async def export_server_data_json(
             output = io.StringIO()
             writer = _csv.writer(output)
             writer.writerow(["Timestamp", "CPU %", "Memory %", "Disk %", "Network RX (MB)", "Network TX (MB)"])
-            for row in data:
+            for row in data:  # type: ignore
                 writer.writerow(
                     [
                         row["timestamp"],

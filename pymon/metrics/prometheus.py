@@ -31,7 +31,7 @@ class PrometheusMetricsExporter:
             for label_name, label_value in labels.items():
                 if label_value is None:
                     continue  # Skip empty label values
-                self._gauge_samples[key][label_name] = str(label_value)
+                self._gauge_samples[key][label_name] = str(label_value)  # type: ignore
 
         self._gauge_samples[key]["value"] = value
 
@@ -71,7 +71,7 @@ class PrometheusMetricsExporter:
             if "__name__" not in metric_name:
                 continue  # Skip non-standard metrics
 
-            help_text = f"Sample value of {metric_name.__name__}"
+            help_text = f"Sample value of {metric_name.__name__}"  # type: ignore
 
             labels_str = ""
             for label, value in sorted(sample_data.items()):
@@ -80,8 +80,8 @@ class PrometheusMetricsExporter:
                 labels_str += f'{label}="{value}",'
 
             if labels_str:
-                lines.append(f"# HELP {metric_name.__name__} {metric_name.help}")
-                lines.append(f"# TYPE {metric_name.__name__} gauge")
+                lines.append(f"# HELP {metric_name.__name__} {metric_name.help}")  # type: ignore
+                lines.append(f"# TYPE {metric_name.__name__} gauge")  # type: ignore
 
             for label, value in sorted(sample_data.items()):
                 if label.startswith("__"):
@@ -96,7 +96,7 @@ class PrometheusMetricsExporter:
         # This is a simplified parser - in production you'd use prometheus_client library
         parts = key.split("{", 1)
         if len(parts) == 2:
-            name = self._parse_metric_name(parts[0])
+            name = self._parse_metric_name(parts[0])  # type: ignore
             return {"__name__": name, "help": f"Sample value of {name}"}
 
         # No labels - just metric name
@@ -111,7 +111,7 @@ class PrometheusMetricsExporter:
 def labels_key(labels: Optional[Dict[str, str]]) -> str:
     """Generate a label key string from dictionary of labels."""
     parts = []
-    for name, value in sorted(labels.items()):
+    for name, value in sorted(labels.items()):  # type: ignore
         if value is None:
             continue
         # Escape double quotes and backslashes

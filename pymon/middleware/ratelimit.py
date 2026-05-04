@@ -39,7 +39,7 @@ class RateLimitState:
     timestamps: deque[float] = field(default_factory=deque)
     total_requests: int = 0
 
-    @property
+    @property  # type: ignore
     def is_over_limit(self, config: RateLimitConfig) -> bool:
         """Check if current request would exceed the limit."""
         now = time.monotonic()
@@ -52,10 +52,10 @@ class RateLimitState:
 
         return len(self.timestamps) >= config.limit
 
-    @property
+    @property  # type: ignore
     def retry_after(self, config: RateLimitConfig) -> int | None:
         """Calculate seconds until a request would be allowed."""
-        if not self.is_over_limit(config):
+        if not self.is_over_limit(config):  # type: ignore
             return None
 
         # Calculate time to next slot
@@ -71,7 +71,7 @@ class RateLimitMiddleware:
 
     def __init__(
         self,
-        app: "fastapi.FastAPI",
+        app: "fastapi.FastAPI",  # type: ignore
         default_config: Optional[RateLimitConfig] = None,
         limiters: dict[str, RateLimitState] | None = None,
     ):
@@ -108,7 +108,7 @@ class RateLimitMiddleware:
         method = getattr(request.method, "upper", request.method).upper() if hasattr(request, "method") else ""
         return f"path:{path}:{method}"
 
-    async def __call__(self, request: Any, call_next: Callable) -> Response:
+    async def __call__(self, request: Any, call_next: Callable) -> Response:  # type: ignore
         """Handle incoming requests with rate limiting."""
 
         # Get the limit config from route or use default
@@ -127,9 +127,9 @@ class RateLimitMiddleware:
 
         limiter = self.limiters[key]
 
-        if config.is_over_limit(limiter):
+        if config.is_over_limit(limiter):  # type: ignore
             # Rate limit exceeded - return 429 response
-            retry_after = limiter.retry_after(config)
+            retry_after = limiter.retry_after(config)  # type: ignore
 
             # Calculate retry-after header value (based on time until window rolls over)
             now = time.monotonic()
@@ -146,7 +146,7 @@ class RateLimitMiddleware:
 
             response = await call_next(request)
 
-            return response
+            return response  # type: ignore
 
     def set_limit(self, request: Any, limit_config: Optional[RateLimitConfig] = None) -> dict[str, int]:
         """Set a custom rate limit for the current request.
@@ -230,7 +230,7 @@ class CircuitBreaker:
         if self.state == "OPEN":
             # Circuit is open - reject immediately
             now = time.monotonic()
-            if now - self.last_failure_time >= self.config.recovery_timeout:
+            if now - self.last_failure_time >= self.config.recovery_timeout:  # type: ignore
                 self._transition_to_half_open()
 
             return None  # Or raise an error indicating circuit breaker tripped

@@ -3,7 +3,7 @@
 import pytest
 
 from pymon.metrics.collector import Counter, Gauge, Histogram, registry
-from pymon.metrics.models import Label, MetricType
+from pymon.metrics.models import Label
 
 
 @pytest.fixture(autouse=True)

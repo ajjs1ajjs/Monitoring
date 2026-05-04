@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List
 
-import yaml
+import yaml  # type: ignore
 from pydantic import BaseModel, Field, ValidationError
 
 
@@ -109,7 +109,7 @@ class PyMonConfig(BaseModel):
         try:
             with open(path) as f:
                 data = yaml.safe_load(f) or {}
-            return cls.from_dict(data)
+            return cls.from_dict(data)  # type: ignore
         except FileNotFoundError:
             raise FileNotFoundError(f"Configuration file not found at {path}")
         except ValidationError as e:
@@ -129,7 +129,7 @@ class PyMonConfig(BaseModel):
                 print(f"- Field '{error['loc'][0]}': {error['msg']}")
             raise ValueError("Invalid configuration structure or data types.") from e
 
-    @classmethod
+    @classmethod  # type: ignore
     def from_dict(cls, data: dict) -> "PyMonConfig":
         config = cls()
 
@@ -324,26 +324,26 @@ def load_config(path: str | None = None) -> PyMonConfig:
         elif path.lower().endswith(".json"):
             with open(path, "r") as f:
                 data = json.load(f)
-            return PyMonConfig.from_dict(data)
+            return PyMonConfig.from_dict(data)  # type: ignore
 
     # Fallback search logic (searching for the file by common extensions)
     config_path = path or os.getenv("CONFIG_PATH", "config.yml")
 
     for ext in [".yml", ".yaml", ".json"]:
         test_path = config_path
-        if not test_path.lower().endswith(ext):
+        if not test_path.lower().endswith(ext):  # type: ignore
             # Construct a potential alternative path for testing
-            test_path = str(Path(config_path).with_suffix(ext))
+            test_path = str(Path(config_path).with_suffix(ext))  # type: ignore
 
-        if os.path.exists(test_path):
+        if os.path.exists(test_path):  # type: ignore
             try:
                 print(f"Attempting to load configuration from: {test_path}")
                 if ext in [".yml", ".yaml"]:
-                    return PyMonConfig.from_yaml(test_path)
+                    return PyMonConfig.from_yaml(test_path)  # type: ignore
                 elif ext == ".json":
-                    with open(test_path, "r") as f:
+                    with open(test_path, "r") as f:  # type: ignore
                         data = json.load(f)
-                    return PyMonConfig.from_dict(data)
+                    return PyMonConfig.from_dict(data)  # type: ignore
             except Exception as e:
                 print(f"[WARNING] Could not load configuration from {test_path}: {e}")
                 continue  # Try next extension

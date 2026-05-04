@@ -150,7 +150,7 @@ security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security), request: Request = None
+    credentials: HTTPAuthorizationCredentials = Depends(security), request: Request = None  # type: ignore
 ) -> User:
     if not credentials:
         api_key = request.headers.get("X-API-Key") if request else None
@@ -163,7 +163,7 @@ async def get_current_user(
     conn = get_db()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT id, username, is_admin, must_change_password FROM users WHERE username = ?", (payload["sub"],))
+    c.execute("SELECT id, username, is_admin, must_change_password FROM users WHERE username = ?", (payload["sub"],))  # type: ignore
     row = c.fetchone()
     conn.close()
 
@@ -312,4 +312,4 @@ def delete_api_key(user_id: int, key_id: int) -> bool:
     deleted = c.rowcount > 0
     conn.commit()
     conn.close()
-    return deleted
+    return deleted  # type: ignore

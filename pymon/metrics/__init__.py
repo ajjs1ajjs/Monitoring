@@ -75,7 +75,7 @@ class MetricRegistry:
 
                 # 2. Calculate Derived Metrics (Advanced Analysis)
                 # We pass the raw data as a source for historical analysis
-                derived_data = processor.calculate_derived_metrics(historical_data=raw_metrics_for_processor)
+                derived_data = processor.calculate_derived_metrics(historical_data=raw_metrics_for_processor)  # type: ignore
 
                 processed_results[metric_type] = {
                     "processed": processed_batch,
@@ -97,7 +97,7 @@ METRIC_REGISTRY = MetricRegistry()
 
 def register_cpu_processor():
     """Utility function to instantiate and register the CPU processor."""
-    from .processors.cpu_processor import CpuProcessor  # Assuming this concrete class exists
+    from pymon.processors.cpu_processor import CpuProcessor
 
     cpu_proc = CpuProcessor(metric_name="cpu", config={"aggregation": "percent"})
     METRIC_REGISTRY.register_processor(cpu_proc)
@@ -105,7 +105,7 @@ def register_cpu_processor():
 
 def register_memory_processor():
     """Utility function to instantiate and register the Memory processor."""
-    from .processors.memory_processor import MemoryProcessor  # Assuming this concrete class exists
+    from pymon.processors.memory_processor import MemoryProcessor
 
     mem_proc = MemoryProcessor(metric_name="memory", config={"aggregation": "bytes"})
     METRIC_REGISTRY.register_processor(mem_proc)

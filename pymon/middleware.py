@@ -2,7 +2,8 @@
 
 import logging
 import traceback
-from fastapi import FastAPI, Request, Response
+
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 

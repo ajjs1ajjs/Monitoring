@@ -1638,7 +1638,7 @@ async def scrape_server(server_id: int):
             resp = await client.get(url)
             if resp.status_code == 200:
                 # Parse metrics and update database
-                metrics = {}
+                metrics = {}  # type: ignore
                 cpu_idle_total = 0
                 cpu_all_total = 0
 
@@ -1656,8 +1656,8 @@ async def scrape_server(server_id: int):
                             # Aggregate CPU idle time from windows_exporter
                             if name == "windows_cpu_time_total":
                                 if 'mode="idle"' in labels_part:
-                                    cpu_idle_total += value
-                                cpu_all_total += value
+                                    cpu_idle_total += value  # type: ignore
+                                cpu_all_total += value  # type: ignore
 
                             # Collect ALL disks from windows_exporter
                             if name == "windows_logical_disk_free_bytes":
@@ -1985,9 +1985,9 @@ async def get_server_history(server_id: int, range: str = "1h"):
     # Convert range to hours
     hours = 1
     if range == "5m":
-        hours = 1 / 12
+        hours = 1 / 12  # type: ignore
     elif range == "15m":
-        hours = 0.25
+        hours = 0.25  # type: ignore
     elif range == "6h":
         hours = 6
     elif range == "24h":

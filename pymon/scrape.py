@@ -6,13 +6,12 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
-from urllib.parse import urlparse
 
 import httpx
 
-from pymon.config import PyMonConfig, ScrapeConfig, StaticConfig
+from pymon.config import PyMonConfig
 from pymon.metrics.collector import Counter, Gauge, Histogram, registry
-from pymon.metrics.models import Label, MetricType
+from pymon.metrics.models import Label
 from pymon.storage import get_storage
 
 
@@ -45,7 +44,7 @@ class ScrapeManager:
         self.config = config
         self.targets: list[ScrapeTarget] = []
         self._running = False
-        self._tasks = []
+        self._tasks: list = []
 
         self.scrape_total = Counter("pymon_scrape_total", "Total scrape attempts")
         self.scrape_success = Counter("pymon_scrape_success_total", "Successful scrapes")
@@ -146,12 +145,13 @@ class ScrapeManager:
                                     "free": float(d.get("FreeSpace", 0)),
                                     "size": float(d.get("Size", 0)),
                                 }
-                    except Exception as e:
+                    except Exception:
                         pass
-            except Exception as e:
+            except Exception:
                 pass
 
-        metrics = {}
+        from typing import Any
+        metrics: dict[str, Any] = {}
         storage = get_storage()
 
         for line in content.split("\n"):
@@ -162,9 +162,9 @@ class ScrapeManager:
             try:
                 if "{" in line:
                     name_part, value_part = line.split("{", 1)
-                    labels_part, value = value_part.rsplit("}", 1)
+                    labels_part, value_str = value_part.rsplit("}", 1)
                     name = name_part.strip()
-                    value = float(value.strip())
+                    value = float(value_str.strip())
 
                     labels = list(target.labels.items()) if not target.honor_labels else []
                     for label_str in labels_part.split(","):
@@ -343,7 +343,6 @@ class ScrapeManager:
     def _scrape_thread(self, target: ScrapeTarget):
         """Run scrape loop in a separate thread using synchronous httpx"""
         import time
-        from datetime import datetime
 
         import httpx
 
@@ -407,9 +406,10 @@ class ScrapeManager:
                             pass
 
                     # Parse metrics - support both node_exporter and windows_exporter
-                    metrics = {}
-                    cpu_idle_total = 0
-                    cpu_all_total = 0
+                    from typing import Any
+                    metrics: dict[str, Any] = {}
+                    cpu_idle_total = 0.0
+                    cpu_all_total = 0.0
 
                     for line in response.text.split("\n"):
                         line = line.strip()

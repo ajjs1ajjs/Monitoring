@@ -1,7 +1,7 @@
 """Shared fixtures for all tests"""
 import os
-import tempfile
 import sqlite3
+import tempfile
 from datetime import datetime, timedelta, timezone
 
 import pytest

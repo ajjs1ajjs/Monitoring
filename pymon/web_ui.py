@@ -1,15 +1,15 @@
 """Web UI templates and routes"""
 
+import json
+import os
+import sqlite3
+import time
 from datetime import datetime, timezone
-from fastapi import APIRouter, Request, Form, HTTPException
+
+import httpx
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import Optional
-import json
-import sqlite3
-import os
-import httpx
-import time
 
 app = APIRouter()
 
@@ -25,7 +25,7 @@ def get_db():
 def init_web_tables():
     conn = get_db()
     c = conn.cursor()
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS sites (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -43,14 +43,14 @@ def init_web_tables():
         last_status TEXT,
         last_response_time REAL
     )''')
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS notifications (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         channel TEXT UNIQUE NOT NULL,
         enabled BOOLEAN DEFAULT 0,
         config TEXT
     )''')
-    
+
     c.execute('''CREATE TABLE IF NOT EXISTS check_history (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         site_id INTEGER,
@@ -59,10 +59,10 @@ def init_web_tables():
         checked_at TEXT,
         FOREIGN KEY (site_id) REFERENCES sites(id)
     )''')
-    
+
     for channel in ['telegram', 'discord', 'slack', 'email', 'sms']:
         c.execute("INSERT OR IGNORE INTO notifications (channel, enabled, config) VALUES (?, 0, '{}')", (channel,))
-    
+
     conn.commit()
     conn.close()
 
@@ -144,20 +144,18 @@ async def check_site_now(site_id: int):
     if not site:
         conn.close()
         raise HTTPException(404, "Site not found")
-    
-    import httpx
-    import time
-    
+
+
     try:
         start = time.time()
         async with httpx.AsyncClient(timeout=site['timeout']) as client:
             resp = await client.get(site['url'], follow_redirects=True)
         response_time = (time.time() - start) * 1000
         status = "up" if resp.status_code < 400 else "down"
-    except Exception as e:
+    except Exception:
         status = "down"
         response_time = 0
-    
+
     now = datetime.now(timezone.utc).isoformat()
     conn.execute("UPDATE sites SET last_check=?, last_status=?, last_response_time=? WHERE id=?",
                  (now, status, response_time, site_id))
@@ -165,7 +163,7 @@ async def check_site_now(site_id: int):
                  (site_id, status, response_time, now))
     conn.commit()
     conn.close()
-    
+
     return {"status": status, "response_time": response_time}
 
 
@@ -199,7 +197,7 @@ async def get_notifications():
 async def update_notification(channel: str, config: dict):
     conn = get_db()
     c = conn.cursor()
-    
+
     existing = c.execute("SELECT id FROM notifications WHERE channel=?", (channel,)).fetchone()
     if not existing:
         c.execute("INSERT INTO notifications (channel, enabled, config) VALUES (?, ?, ?)",
@@ -207,7 +205,7 @@ async def update_notification(channel: str, config: dict):
     else:
         c.execute("UPDATE notifications SET enabled=?, config=? WHERE channel=?",
                   (int(config.get('enabled', False)), json.dumps(config), channel))
-    
+
     conn.commit()
     conn.close()
     return {"status": "ok"}

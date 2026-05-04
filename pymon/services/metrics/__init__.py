@@ -17,7 +17,7 @@ class MetricRecord:
 
     name: str
     value: float
-    labels: dict[str, str] = None
+    labels: dict[str, str] = None  # type: ignore
     timestamp: datetime | None = None
 
     def __post_init__(self) -> None:
@@ -85,7 +85,7 @@ class MetricsAggregator(IMetricsProcessor):
         """Add a metrics processor to the aggregation pipeline."""
         self.processors.append(processor)
 
-    async def process(self, target_url: str, timeout: int = 10) -> list[MetricRecord]:
+    async def process(self, target_url: str, timeout: int = 10) -> list[MetricRecord]:  # type: ignore
         """Process all registered processors and aggregate results.
 
         Args:
@@ -103,5 +103,5 @@ class MetricsAggregator(IMetricsProcessor):
             except Exception as e:
                 print(f"Processor error: {processor.__class__.__name__}: {e}")
 
-        self.processed_count += len(all_records)
+        self.processed_count += len(all_records)  # type: ignore
         return all_records

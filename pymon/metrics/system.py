@@ -1,9 +1,7 @@
 """System metrics collector"""
 
 import asyncio
-import platform
 import time
-from datetime import datetime
 
 from pymon.metrics.collector import Counter, Gauge, registry
 from pymon.metrics.models import Label
