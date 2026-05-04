@@ -18,6 +18,7 @@ try:
 except Exception:
     _PROM_METRICS_ENABLED = False
 
+from fastapi import WebSocket, WebSocketDisconnect
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -39,6 +40,39 @@ from pymon.auth import (
 from pymon.metrics.collector import registry
 from pymon.metrics.models import Label, MetricType
 from pymon.storage import get_storage
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: dict):
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except:
+                pass
+
+
+manager = ConnectionManager()
+
+
+@api.websocket("/ws/metrics")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
 
 _limiter = Limiter(key_func=get_remote_address)
 
@@ -74,6 +108,7 @@ class ServerCreate(BaseModel):
     os_type: str
     agent_port: int = 9100
     enabled: bool = True
+    server_group: str | None = None
 
 
 class ServerUpdate(BaseModel):
@@ -82,7 +117,6 @@ class ServerUpdate(BaseModel):
     os_type: str | None = None
     agent_port: int | None = None
     enabled: bool | None = None
-
 
 
 class AlertCreate(BaseModel):
@@ -132,17 +166,19 @@ async def list_keys(current_user: User = Depends(get_current_user)):
 @api.get("/auth/users")
 async def list_users(current_user: User = Depends(get_admin_user)):
     from pymon.auth import list_users as _list_users
+
     return {"users": _list_users()}
 
 
 @api.post("/auth/users")
 async def create_user(data: dict, current_user: User = Depends(get_admin_user)):
     from pymon.auth import create_user as _create_user
+
     try:
         user = _create_user(
             username=data.get("username"),
             password=data.get("password", "changeme"),
-            is_admin=data.get("is_admin", False)
+            is_admin=data.get("is_admin", False),
         )
         return {"status": "ok", "user_id": user.id}
     except Exception as e:
@@ -152,14 +188,17 @@ async def create_user(data: dict, current_user: User = Depends(get_admin_user)):
 @api.put("/auth/users/{user_id}")
 async def update_user(user_id: int, data: dict, current_user: User = Depends(get_admin_user)):
     from pymon.auth import update_user as _update_user
+
     _update_user(user_id, is_admin=data.get("is_admin"), must_change_password=data.get("must_change_password"))
     return {"status": "ok"}
 
 
 @api.delete("/auth/users/{user_id}")
 async def delete_user(user_id: int, current_user: User = Depends(get_admin_user)):
-    from pymon.auth import delete_user as _delete_user
     from fastapi import HTTPException
+
+    from pymon.auth import delete_user as _delete_user
+
     try:
         _delete_user(user_id)
         return {"status": "ok"}
@@ -295,7 +334,6 @@ async def create_alert(data: AlertCreate, current_user: User = Depends(get_curre
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     finally:
         conn.close()
-
 
 
 @api.get("/audit-log")
@@ -983,7 +1021,7 @@ async def create_server(request: Request, data: ServerCreate, current_user: User
     c = conn.cursor()
     try:
         c.execute(
-            "INSERT INTO servers (name, host, os_type, agent_port, enabled, last_status, cpu_percent, memory_percent, disk_percent, disk_info, last_check, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO servers (name, host, os_type, agent_port, enabled, last_status, cpu_percent, memory_percent, disk_percent, disk_info, last_check, created_at, server_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 data.name,
                 data.host,
@@ -997,17 +1035,20 @@ async def create_server(request: Request, data: ServerCreate, current_user: User
                 "[]",
                 datetime.now(timezone.utc).isoformat(),
                 datetime.now(timezone.utc).isoformat(),
+                data.server_group or "default",
             ),
         )
         conn.commit()
 
         # Log action
-        c.execute("INSERT INTO audit_logs (username, action, target, timestamp) VALUES (?, ?, ?, ?)", 
-                  (current_user.username, "Add Server", f"{data.name} ({data.host})", datetime.now(timezone.utc).isoformat()))
+        c.execute(
+            "INSERT INTO audit_logs (username, action, target, timestamp) VALUES (?, ?, ?, ?)",
+            (current_user.username, "Add Server", f"{data.name} ({data.host})", datetime.now(timezone.utc).isoformat()),
+        )
         conn.commit()
 
         server_id = c.lastrowid
-        
+
         # Phase 2.11: Update ScrapeManager dynamically
         scrape_manager = getattr(request.app.state, "scrape_manager", None)
         if scrape_manager and data.enabled:
@@ -1017,7 +1058,7 @@ async def create_server(request: Request, data: ServerCreate, current_user: User
                 scrape_manager.add_server_target(server_dict)
                 if not scrape_manager._running:
                     scrape_manager.start()
-        
+
         return {"status": "ok", "server_id": server_id}
     except Exception as e:
         conn.rollback()
@@ -1107,38 +1148,40 @@ async def get_metrics_trend(current_user: User = Depends(get_current_user)):
     conn.row_factory = sqlite3.Row
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
-        
+
         # Aggragate metrics into 1-minute buckets
         # Note: strftime formatting depends on the SQLite version and how timestamps were stored
         query = """
-            SELECT 
+            SELECT
                 substr(timestamp, 1, 16) as ts,
                 AVG(CASE WHEN name LIKE '%cpu%' THEN value END) as cpu_avg,
                 AVG(CASE WHEN name LIKE '%memory%' THEN value END) as mem_avg,
                 SUM(CASE WHEN name LIKE '%net%rx%' THEN value END) as net_rx,
                 SUM(CASE WHEN name LIKE '%net%tx%' THEN value END) as net_tx
-            FROM metrics 
+            FROM metrics
             WHERE timestamp > ?
             GROUP BY ts
             ORDER BY ts ASC
             LIMIT 60
         """
         rows = conn.execute(query, (cutoff,)).fetchall()
-        
+
         history = []
         for r in rows:
-            history.append({
-                "timestamp": r["ts"] + ":00Z",
-                "cpu_avg": r["cpu_avg"] or 0,
-                "mem_avg": r["mem_avg"] or 0,
-                "net_rx_avg": r["net_rx"] or 0,
-                "net_tx_avg": r["net_tx"] or 0
-            })
-            
+            history.append(
+                {
+                    "timestamp": r["ts"] + ":00Z",
+                    "cpu_avg": r["cpu_avg"] or 0,
+                    "mem_avg": r["mem_avg"] or 0,
+                    "net_rx_avg": r["net_rx"] or 0,
+                    "net_tx_avg": r["net_tx"] or 0,
+                }
+            )
+
         if not history:
             now = datetime.now(timezone.utc).isoformat()
             history = [{"timestamp": now, "cpu_avg": 0, "mem_avg": 0, "net_rx_avg": 0, "net_tx_avg": 0}]
-            
+
         return {"history": history}
     except Exception as e:
         return {"history": [], "error": str(e)}
@@ -1226,6 +1269,7 @@ class NotificationSettings(BaseModel):
 async def get_notif_settings(current_user: User = Depends(get_admin_user)):
     """Get notification settings from config.yml"""
     from pymon.config import load_config
+
     config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
     return config.notifications
 
@@ -1234,29 +1278,31 @@ async def get_notif_settings(current_user: User = Depends(get_admin_user)):
 async def update_notif_settings(data: NotificationSettings, current_user: User = Depends(get_admin_user)):
     """Update notification settings in config.yml"""
     import yaml
+
     config_path = os.getenv("CONFIG_PATH", "config.yml")
-    
+
     with open(config_path, "r") as f:
         config_data = yaml.safe_load(f) or {}
-    
+
     if "notifications" not in config_data:
         config_data["notifications"] = {}
-        
+
     config_data["notifications"]["enabled"] = data.enabled
     config_data["notifications"]["telegram_bot_token"] = data.telegram_bot_token
     config_data["notifications"]["telegram_chat_id"] = data.telegram_chat_id
     config_data["notifications"]["discord_webhook_url"] = data.discord_webhook_url
-    
+
     with open(config_path, "w") as f:
         yaml.safe_dump(config_data, f)
-        
+
     return {"status": "ok"}
+
+
 @api.post("/servers/{server_id}/scrape")
-async def force_scrape_server(
-    server_id: int, request: Request, current_user: User = Depends(get_admin_user)
-):
+async def force_scrape_server(server_id: int, request: Request, current_user: User = Depends(get_admin_user)):
     """Manually trigger a scrape for a specific server."""
     import sqlite3
+
     db_path = os.getenv("DB_PATH", "pymon.db")
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -1264,11 +1310,11 @@ async def force_scrape_server(
         server = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
         if not server:
             raise HTTPException(status_code=404, detail="Server not found")
-            
+
         scrape_manager = getattr(request.app.state, "scrape_manager", None)
         if not scrape_manager:
             raise HTTPException(status_code=503, detail="ScrapeManager not available")
-            
+
         # Find the target in the manager
         target_str = f"{server['host']}:{server['agent_port']}"
         target = None
@@ -1276,14 +1322,14 @@ async def force_scrape_server(
             if t.server_id == server_id or t.target == target_str:
                 target = t
                 break
-                
+
         if not target:
             # Try to add it if missing
             target = scrape_manager.add_server_target(dict(server))
-            
+
         # Trigger immediate scrape
         await scrape_manager.execute_scrape(target)
-        
+
         return {"status": "ok", "message": "Scrape triggered successfully"}
     finally:
         conn.close()

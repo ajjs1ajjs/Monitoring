@@ -45,7 +45,7 @@ class ScrapeManager:
         self.targets: list[ScrapeTarget] = []
         self._running = False
         self._tasks: list = []
-        self._cpu_history = {} # Store {target: (idle_last, total_last)}
+        self._cpu_history = {}  # Store {target: (idle_last, total_last)}
         self._down_alerted = set()  # Server IDs already alerted as down
 
         self.scrape_total = Counter("pymon_scrape_total", "Total scrape attempts")
@@ -79,10 +79,10 @@ class ScrapeManager:
     async def execute_scrape(self, target: ScrapeTarget) -> ScrapeResult:
         """Perform a scrape and update server status in the database."""
         result = await self.scrape_target(target)
-        
+
         labels = [Label(name="job", value=target.job_name), Label(name="target", value=target.target)]
         self.scrape_total.inc()
-        
+
         if result.success:
             self.scrape_success.inc()
             self.up_gauge.set(1, labels)
@@ -91,7 +91,7 @@ class ScrapeManager:
             self.scrape_failures.inc()
             self.up_gauge.set(0, labels)
             self._update_server_status(target.target, {}, False, result.error, server_id=target.server_id)
-            
+
         self.response_time.set(result.latency_ms / 1000, labels)
         return result
 
@@ -173,6 +173,7 @@ class ScrapeManager:
                 pass
 
         from typing import Any
+
         metrics: dict[str, Any] = {}
         storage = get_storage()
 
@@ -211,6 +212,7 @@ class ScrapeManager:
                     registry.set(name, value, label_objs)
 
                     from pymon.metrics.models import Metric, MetricType
+
                     metric = Metric(
                         name=name,
                         value=value,
@@ -231,56 +233,56 @@ class ScrapeManager:
             mem_avail = 0
             disk_total = 0
             disk_avail = 0
-            
+
             for k, v in metrics.items():
                 # CPU metrics - exact match patterns
-                if k == 'node_cpu_seconds_total' and 'idle' in k:
+                if k == "node_cpu_seconds_total" and "idle" in k:
                     cpu_idle = max(cpu_idle, v)
-                elif k == 'node_cpu_seconds_total' and 'user' in k:
+                elif k == "node_cpu_seconds_total" and "user" in k:
                     cpu_user = max(cpu_user, v)
-                elif k == 'node_cpu_seconds_total' and 'system' in k:
+                elif k == "node_cpu_seconds_total" and "system" in k:
                     cpu_system = max(cpu_system, v)
-                elif 'cpu_seconds_total' in k:
-                    if 'idle' in k:
+                elif "cpu_seconds_total" in k:
+                    if "idle" in k:
                         cpu_idle = max(cpu_idle, v)
-                    elif 'user' in k:
+                    elif "user" in k:
                         cpu_user = max(cpu_user, v)
-                    elif 'system' in k:
+                    elif "system" in k:
                         cpu_system = max(cpu_system, v)
-                
+
                 # Memory metrics - exact match
-                if k == 'node_memory_MemTotal_bytes':
+                if k == "node_memory_MemTotal_bytes":
                     mem_total = max(mem_total, v)
-                elif k == 'node_memory_MemAvailable_bytes':
+                elif k == "node_memory_MemAvailable_bytes":
                     mem_avail = max(mem_avail, v)
                 # Also try partial match
-                elif 'MemTotal' in k:
+                elif "MemTotal" in k:
                     mem_total = max(mem_total, v)
-                elif 'MemAvailable' in k:
+                elif "MemAvailable" in k:
                     mem_avail = max(mem_avail, v)
-                
+
                 # Disk metrics
-                if 'filesystem_size_bytes' in k:
+                if "filesystem_size_bytes" in k:
                     disk_total = max(disk_total, v)
-                elif 'filesystem_avail_bytes' in k:
+                elif "filesystem_avail_bytes" in k:
                     disk_avail = max(disk_avail, v)
-            
+
             # Calculate CPU
             if cpu_idle > 0:
                 total_cpu = cpu_idle + cpu_user + cpu_system
                 if total_cpu > 0:
-                    metrics['node_cpu_calculated'] = 100 * (1 - cpu_idle / total_cpu)
-            
+                    metrics["node_cpu_calculated"] = 100 * (1 - cpu_idle / total_cpu)
+
             # Calculate Memory
             print(f"DEBUG: mem_total={mem_total}, mem_avail={mem_avail}")
             if mem_total > 0 and mem_avail > 0:
-                metrics['node_memory_calculated'] = 100 * (1 - mem_avail / mem_total)
+                metrics["node_memory_calculated"] = 100 * (1 - mem_avail / mem_total)
                 print(f"DEBUG: memory % = {100 * (1 - mem_avail / mem_total):.1f}")
-            
+
             # Calculate Disk
             if disk_total > 0 and disk_avail > 0:
-                metrics['node_disk_calculated'] = 100 * (1 - disk_avail / disk_total)
-                
+                metrics["node_disk_calculated"] = 100 * (1 - disk_avail / disk_total)
+
         except Exception as e:
             print(f"Metric calc error: {e}")
 
@@ -313,7 +315,12 @@ class ScrapeManager:
 
                 if success:
                     # Parse CPU - support both node_exporter and windows_exporter
-                    cpu = metrics.get("node_cpu_percent") or metrics.get("cpu_usage_percent") or metrics.get("node_cpu_calculated") or 0
+                    cpu = (
+                        metrics.get("node_cpu_percent")
+                        or metrics.get("cpu_usage_percent")
+                        or metrics.get("node_cpu_calculated")
+                        or 0
+                    )
                     if not cpu:
                         idle = metrics.get("windows_cpu_time_total_idle", 0)
                         total = metrics.get("windows_cpu_time_total_all", 0)
@@ -321,7 +328,12 @@ class ScrapeManager:
                             cpu = 100 * (1 - idle / total) if idle < total else 0
 
                     # Parse Memory - support both node_exporter and windows_exporter
-                    memory = metrics.get("node_memory_percent") or metrics.get("memory_usage_percent") or metrics.get("node_memory_calculated") or 0
+                    memory = (
+                        metrics.get("node_memory_percent")
+                        or metrics.get("memory_usage_percent")
+                        or metrics.get("node_memory_calculated")
+                        or 0
+                    )
                     if not memory:
                         mem_total = metrics.get("windows_cs_physical_memory_bytes", 0)
                         mem_free = metrics.get("windows_os_physical_memory_free_bytes", 0)
@@ -329,7 +341,12 @@ class ScrapeManager:
                             memory = 100 * (1 - mem_free / mem_total) if mem_free < mem_total else 0
 
                     # Parse Disk - support both node_exporter and windows_exporter
-                    disk = metrics.get("node_disk_percent") or metrics.get("disk_usage_percent") or metrics.get("node_disk_calculated") or 0
+                    disk = (
+                        metrics.get("node_disk_percent")
+                        or metrics.get("disk_usage_percent")
+                        or metrics.get("node_disk_calculated")
+                        or 0
+                    )
                     if not disk:
                         disk_total = metrics.get("windows_logical_disk_size_bytes", 0)
                         disk_free = metrics.get("windows_logical_disk_free_bytes", 0)
@@ -361,8 +378,40 @@ class ScrapeManager:
                         network_rx = ?, network_tx = ?, uptime = ?, disk_info = ?,
                         exporter_version = ?
                         WHERE id = ?""",
-                        (now, cpu, memory, disk, network_rx, network_tx, str(uptime), disk_info_json, exporter_version, sid),
+                        (
+                            now,
+                            cpu,
+                            memory,
+                            disk,
+                            network_rx,
+                            network_tx,
+                            str(uptime),
+                            disk_info_json,
+                            exporter_version,
+                            sid,
+                        ),
                     )
+
+                    # Broadcast update via WebSocket
+                    try:
+                        import asyncio
+
+                        from pymon.api.endpoints import manager
+
+                        asyncio.create_task(
+                            manager.broadcast(
+                                {
+                                    "type": "server_update",
+                                    "server_id": sid,
+                                    "cpu": cpu,
+                                    "memory": memory,
+                                    "disk": disk,
+                                    "status": "up",
+                                }
+                            )
+                        )
+                    except Exception as e:
+                        print(f"WS Broadcast error: {e}")
                 else:
                     c.execute(
                         """UPDATE servers SET
@@ -377,6 +426,7 @@ class ScrapeManager:
                 if success:
                     try:
                         import asyncio
+
                         asyncio.run(self._check_alerts(sid, cpu, memory, disk, now))
                         # Clear down state if it was previously down
                         self._down_alerted.discard(sid)
@@ -388,6 +438,7 @@ class ScrapeManager:
                         if sid not in self._down_alerted:
                             self._down_alerted.add(sid)
                             import asyncio
+
                             asyncio.run(self._fire_exporter_down_alert(sid, target, error, now))
                     except Exception as ae:
                         print(f"Exporter Down alert failed: {ae}")
@@ -400,6 +451,7 @@ class ScrapeManager:
         """Check active alert rules for the server and dispatch notifications."""
         import os
         import sqlite3
+
         from pymon.notifications import dispatcher
 
         try:
@@ -410,24 +462,25 @@ class ScrapeManager:
 
             # Get active alerts
             alerts = c.execute("SELECT * FROM alerts WHERE enabled = 1").fetchall()
-            
+
             # Get notification config from app state if available
             # For now, we'll try to find it in the DB or global config
             from pymon.config import load_config
+
             config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
             notif_cfg = config.notifications
 
             for alert in alerts:
                 triggered = False
                 metric_val = 0
-                
+
                 if alert["metric"] == "cpu":
                     metric_val = cpu
                 elif alert["metric"] == "memory":
                     metric_val = memory
                 elif alert["metric"] == "disk":
                     metric_val = disk
-                
+
                 if alert["condition"] == ">":
                     triggered = metric_val > alert["threshold"]
                 elif alert["condition"] == "<":
@@ -438,26 +491,24 @@ class ScrapeManager:
                     # We can use a simple memory cache in ScrapeManager or a table
                     # For now, let's just send if triggered and log it
                     msg = f"🚨 <b>{alert['name']}</b> triggered on Server ID {server_id}!\nValue: {metric_val:.1f}%\nThreshold: {alert['threshold']}%"
-                    
+
                     channels = {}
                     if notif_cfg.enabled:
                         if notif_cfg.telegram_bot_token and notif_cfg.telegram_chat_id:
                             channels["telegram"] = {
                                 "bot_token": notif_cfg.telegram_bot_token,
-                                "chat_id": notif_cfg.telegram_chat_id
+                                "chat_id": notif_cfg.telegram_chat_id,
                             }
                         if notif_cfg.discord_webhook_url:
-                            channels["discord"] = {
-                                "webhook_url": notif_cfg.discord_webhook_url
-                            }
-                    
+                            channels["discord"] = {"webhook_url": notif_cfg.discord_webhook_url}
+
                     if channels:
                         dispatcher.dispatch(alert["name"], msg, channels)
-                        
+
                     # Log to audit logs
                     c.execute(
                         "INSERT INTO audit_logs (username, action, target, timestamp) VALUES (?, ?, ?, ?)",
-                        ("system", f"Alert Triggered: {alert['name']}", f"Server {server_id}", timestamp)
+                        ("system", f"Alert Triggered: {alert['name']}", f"Server {server_id}", timestamp),
                     )
                     conn.commit()
 
@@ -469,6 +520,7 @@ class ScrapeManager:
         """Fire an alert when an exporter becomes unreachable."""
         import os
         import sqlite3
+
         from pymon.notifications import dispatcher
 
         try:
@@ -484,6 +536,7 @@ class ScrapeManager:
 
             # Get notification config
             from pymon.config import load_config
+
             config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
             notif_cfg = config.notifications
 
@@ -500,12 +553,10 @@ class ScrapeManager:
                 if notif_cfg.telegram_bot_token and notif_cfg.telegram_chat_id:
                     channels["telegram"] = {
                         "bot_token": notif_cfg.telegram_bot_token,
-                        "chat_id": notif_cfg.telegram_chat_id
+                        "chat_id": notif_cfg.telegram_chat_id,
                     }
                 if notif_cfg.discord_webhook_url:
-                    channels["discord"] = {
-                        "webhook_url": notif_cfg.discord_webhook_url
-                    }
+                    channels["discord"] = {"webhook_url": notif_cfg.discord_webhook_url}
 
             if channels:
                 dispatcher.dispatch("Exporter Down", msg, channels)
@@ -513,7 +564,7 @@ class ScrapeManager:
             # Log to audit
             c.execute(
                 "INSERT INTO audit_logs (username, action, target, timestamp) VALUES (?, ?, ?, ?)",
-                ("system", "Exporter Down", f"{server_name} ({server_host})", timestamp)
+                ("system", "Exporter Down", f"{server_name} ({server_host})", timestamp),
             )
             conn.commit()
             conn.close()
@@ -633,56 +684,14 @@ class ScrapeManager:
                         except:
                             pass
 
-                    # Parse metrics - support both node_exporter and windows_exporter
-                    from typing import Any
-                    metrics: dict[str, Any] = {}
-                    cpu_idle_total = 0.0
-                    cpu_all_total = 0.0
+                    # Parse metrics using the new parser
+                    from pymon.services.metrics.parser import PrometheusParser
 
-                    for line in response.text.split("\n"):
-                        line = line.strip()
-                        if not line or line.startswith("#"):
-                            continue
-                        try:
-                            if "{" in line:
-                                name_part, rest = line.split("{", 1)
-                                labels_part, value_str = rest.rsplit("}", 1)
-                                name = name_part.strip()
-                                value = float(value_str.strip())
+                    parser = PrometheusParser()
+                    metrics = parser.parse(response.text)
 
-                                # Aggregate CPU idle time from windows_exporter
-                                if name == "windows_cpu_time_total":
-                                    if 'mode="idle"' in labels_part:
-                                        cpu_idle_total += value
-                                    cpu_all_total += value
-
-                                # Collect ALL disks from windows_exporter
-                                import re
-
-                                if name == "windows_logical_disk_free_bytes":
-                                    vol_match = re.search(r'volume="([^"]+)"', labels_part)
-                                    if vol_match:
-                                        vol = vol_match.group(1)
-                                        if vol not in disk_info:
-                                            disk_info[vol] = {"volume": vol, "free": 0, "size": 0}
-                                        disk_info[vol]["free"] = value
-                                if name == "windows_logical_disk_size_bytes":
-                                    vol_match = re.search(r'volume="([^"]+)"', labels_part)
-                                    if vol_match:
-                                        vol = vol_match.group(1)
-                                        if vol not in disk_info:
-                                            disk_info[vol] = {"volume": vol, "free": 0, "size": 0}
-                                        disk_info[vol]["size"] = value
-
-                                metrics[name] = value
-                            else:
-                                parts = line.split()
-                                if len(parts) >= 2:
-                                    name = parts[0]
-                                    value = float(parts[1])
-                                    metrics[name] = value
-                        except:
-                            continue
+                    # Logic to identify if it's Telegraf/Prometheus
+                    metrics["_exporter_detected"] = True
 
                     # Calculate CPU percentage from counters
                     if cpu_all_total > 0:
@@ -693,7 +702,7 @@ class ScrapeManager:
                             if all_delta > 0:
                                 cpu_percent = 100 * (1 - (idle_delta / all_delta))
                                 metrics["cpu_usage_percent"] = max(0, min(100, cpu_percent))
-                        
+
                         self._cpu_history[target.target] = (cpu_idle_total, cpu_all_total)
 
                     # Store aggregated values for diagnostics
