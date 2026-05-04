@@ -323,10 +323,11 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                             <thead class="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-900/10">
                                 <tr>
                                     <th class="px-8 py-5">Node Name</th>
-                                    <th class="px-8 py-5">Status</th>
+                                    <th class="px-8 py-5">Host</th>
+                                    <th class="px-8 py-5">OS</th>
                                     <th class="px-8 py-5">CPU</th>
                                     <th class="px-8 py-5">RAM</th>
-                                    <th class="px-8 py-5 text-right">Last Check</th>
+                                    <th class="px-8 py-5 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="quickServerList" class="divide-y divide-slate-800/20">
@@ -403,7 +404,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <div class="glass rounded-[2rem] overflow-hidden">
                     <div class="p-8 border-b border-slate-800/30 bg-slate-900/20 flex items-center justify-between">
                         <h3 class="text-lg font-bold text-white">Alert Rules</h3>
-                        <button class="px-6 py-2 rounded-xl bg-orange-500 text-black text-xs font-bold shadow-lg shadow-orange-500/20 hover:scale-105 transition-all">Create Rule</button>
+                        <button onclick="toggleModal('addAlertModal', true)" class="px-6 py-2 rounded-xl bg-orange-500 text-black text-xs font-bold shadow-lg shadow-orange-500/20 hover:scale-105 transition-all">Create Rule</button>
                     </div>
                     <div class="p-8">
                         <div id="alertsList" class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -438,13 +439,28 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                             </div>
                         </div>
                         <div class="space-y-4">
-                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest">Security & Access</h4>
-                            <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 flex items-center justify-between">
-                                <div>
-                                    <div class="text-white font-medium">Administrator Password</div>
-                                    <div class="text-xs text-slate-500">Rotate your login credentials regularly</div>
+                            <label class="block text-sm font-semibold text-slate-400">Admin Password</label>
+                            <button onclick="changePassword()" class="px-6 py-3 rounded-xl bg-slate-800 text-white font-semibold hover:bg-slate-700 transition-all">Change Password</button>
+                        </div>
+
+                        <!-- Notification Channels -->
+                        <div class="pt-8 border-t border-slate-800/30">
+                            <h4 class="text-white font-bold mb-6 flex items-center gap-2"><i data-lucide="bell" class="w-5 h-5 text-orange-500"></i> Notification Channels</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-slate-800">
+                                    <div class="flex items-center gap-4">
+                                        <div class="p-2 bg-[#229ED9]/10 text-[#229ED9] rounded-xl"><i data-lucide="send" class="w-4 h-4"></i></div>
+                                        <div class="text-white font-bold text-sm">Telegram</div>
+                                    </div>
+                                    <button class="px-4 py-2 rounded-lg bg-slate-800 text-[10px] font-bold text-slate-400 hover:text-white transition-all">Setup</button>
                                 </div>
-                                <button class="px-6 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 transition-all text-xs font-bold text-white">Update</button>
+                                <div class="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-slate-800">
+                                    <div class="flex items-center gap-4">
+                                        <div class="p-2 bg-[#5865F2]/10 text-[#5865F2] rounded-xl"><i data-lucide="message-square" class="w-4 h-4"></i></div>
+                                        <div class="text-white font-bold text-sm">Discord</div>
+                                    </div>
+                                    <button class="px-4 py-2 rounded-lg bg-slate-800 text-[10px] font-bold text-slate-400 hover:text-white transition-all">Setup</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -454,46 +470,68 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
     </main>
 
     <!-- Modals -->
-    <div id="addServerModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-6">
+    <div id="addAlertModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-6">
         <div class="glass w-full max-w-lg p-10 rounded-[2.5rem] glow relative">
-            <button onclick="toggleModal('addServerModal', false)" class="absolute top-8 right-8 text-slate-500 hover:text-white">
+            <button onclick="toggleModal('addAlertModal', false)" class="absolute top-8 right-8 text-slate-500 hover:text-white">
                 <i data-lucide="x" class="w-6 h-6"></i>
             </button>
-            <h3 class="text-2xl font-bold text-white mb-2">Add New Node</h3>
-            <p class="text-sm text-slate-500 mb-8">Connect a new server to the monitoring mesh</p>
+            <h3 class="text-2xl font-bold text-white mb-2">Create Alert Rule</h3>
+            <p class="text-sm text-slate-500 mb-8">Define thresholds for automated notifications</p>
 
-            <form id="addServerForm" class="space-y-6">
+            <form id="addAlertForm" class="space-y-6">
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Server Name</label>
-                    <input type="text" id="nodeName" required class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all" placeholder="Web-Srv-01">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Host / IP</label>
-                    <input type="text" id="nodeHost" required class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all" placeholder="10.0.0.5">
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Rule Name</label>
+                    <input type="text" id="alertName" required class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all" placeholder="High CPU Usage">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">OS Type</label>
-                        <select id="nodeOS" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all">
-                            <option value="linux">Linux</option>
-                            <option value="windows">Windows</option>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Metric</label>
+                        <select id="alertMetric" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white">
+                            <option value="cpu">CPU Usage (%)</option>
+                            <option value="memory">Memory Usage (%)</option>
+                            <option value="disk">Disk Usage (%)</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Agent Port</label>
-                        <input type="number" id="nodePort" value="9100" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Threshold (%)</label>
+                        <input type="number" id="alertThreshold" value="80" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white">
                     </div>
                 </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-4 rounded-2xl transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98] mt-4">
-                    Register Node
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Condition</label>
+                        <select id="alertCondition" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white">
+                            <option value=">">Greater than</option>
+                            <option value="<">Less than</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Duration (s)</label>
+                        <input type="number" id="alertDuration" value="60" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold py-4 rounded-2xl transition-all shadow-lg shadow-orange-600/20 active:scale-[0.98] mt-4">
+                    Enable Alert Rule
                 </button>
             </form>
         </div>
     </div>
 
+
     <script>
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/login';
+
+        function toggleModal(id, show) {
+            const el = document.getElementById(id);
+            if (show) {
+                el.classList.remove('hidden');
+                el.classList.add('flex');
+            } else {
+                el.classList.add('hidden');
+                el.classList.remove('flex');
+            }
+        }
 
         let charts = {};
         let currentRange = '1h';
@@ -520,6 +558,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 }
 
                 if (section === 'logs') loadAuditLogs();
+                if (section === 'alerts') loadAlerts();
                 if (section === 'overview') loadTrends();
             } else {
                 console.warn('Section not found:', section);
@@ -553,13 +592,6 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         // Refresh
         document.getElementById('refreshBtn').addEventListener('click', () => loadData());
-
-        // Modals
-        function toggleModal(id, show) {
-            const modal = document.getElementById(id);
-            modal.classList.toggle('hidden', !show);
-            modal.classList.toggle('flex', show);
-        }
 
         document.getElementById('addServerBtn').addEventListener('click', () => toggleModal('addServerModal', true));
 
@@ -664,10 +696,16 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 // 3. Load Trends
                 loadTrends();
 
-                // 4. Load Audit Logs
+                // 4. Load Alerts
+                if (!document.getElementById('section-alerts').classList.contains('hidden')) {
+                    loadAlerts();
+                }
+
+                // 5. Load Audit Logs
                 if (!document.getElementById('section-logs').classList.contains('hidden')) {
                     loadAuditLogs();
                 }
+
 
             } catch (e) {
                 console.error('Failed to load data', e);
@@ -720,31 +758,34 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 return;
             }
             quickList.innerHTML = servers.slice(0, 5).map(s => `
-                <tr class="hover:bg-slate-800/20 transition-all">
-                    <td class="px-8 py-5 font-medium text-white text-sm">${s.name}</td>
-                    <td class="px-8 py-5">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${s.last_status === 'up' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}">
-                            <span class="w-1.5 h-1.5 rounded-full ${s.last_status === 'up' ? 'bg-emerald-500' : 'bg-red-500'} pulsing-dot"></span>
-                            ${s.last_status === 'up' ? 'Online' : 'Offline'}
-                        </span>
-                    </td>
-                    <td class="px-8 py-5">
+                <tr class="border-b border-slate-800/30 hover:bg-slate-800/20 transition-all group">
+                    <td class="py-4 pl-8">
                         <div class="flex items-center gap-3">
-                            <div class="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-emerald-500 rounded-full" style="width: ${s.cpu_percent || 0}%"></div>
-                            </div>
-                            <span class="text-xs font-bold text-slate-400">${(s.cpu_percent || 0).toFixed(0)}%</span>
+                            <span class="w-2 h-2 rounded-full ${s.last_status === 'up' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'}"></span>
+                            <span class="font-semibold text-slate-200">${s.name}</span>
                         </div>
                     </td>
-                    <td class="px-8 py-5">
-                        <div class="flex items-center gap-3">
-                            <div class="w-24 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div class="h-full bg-blue-500 rounded-full" style="width: ${s.memory_percent || 0}%"></div>
-                            </div>
-                            <span class="text-xs font-bold text-slate-400">${(s.memory_percent || 0).toFixed(0)}%</span>
-                        </div>
+                    <td class="py-4 text-slate-400 text-sm font-mono">${s.host}</td>
+                    <td class="py-4">
+                        <span class="px-2 py-1 rounded-lg bg-slate-800 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">${s.os_type}</span>
                     </td>
-                    <td class="px-8 py-5 text-right text-xs text-slate-500">${s.last_check ? s.last_check.split('T')[1].substring(0, 5) : '-'}</td>
+                    <td class="py-4">
+                        <div class="w-24 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-blue-500 h-full transition-all" style="width: ${s.cpu_percent || 0}%"></div>
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-1 block">${(s.cpu_percent || 0).toFixed(1)}%</span>
+                    </td>
+                    <td class="py-4">
+                        <div class="w-24 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-emerald-500 h-full transition-all" style="width: ${s.memory_percent || 0}%"></div>
+                        </div>
+                        <span class="text-[10px] text-slate-500 mt-1 block">${(s.memory_percent || 0).toFixed(1)}%</span>
+                    </td>
+                    <td class="py-4 text-right pr-8">
+                        <button onclick="deleteServer(${s.id})" class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
                 </tr>
             `).join('');
 
@@ -834,11 +875,91 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             lucide.createIcons();
         }
 
-        async function deleteServer(id) {
-            if (confirm('Decommission this node?')) {
-                await fetch(`/api/v1/servers/${id}`, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
-                loadData();
+        async function loadAlerts() {
+            try {
+                const resp = await fetch('/api/v1/alerts', {
+                    headers: {'Authorization': 'Bearer ' + token}
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                const list = document.getElementById('alertsList');
+                if (data.alerts && data.alerts.length > 0) {
+                    list.innerHTML = data.alerts.map(a => `
+                        <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 flex items-center justify-between">
+                            <div>
+                                <h4 class="font-bold text-white">${a.name}</h4>
+                                <p class="text-xs text-slate-500">${a.metric} ${a.condition} ${a.threshold}% for ${a.duration}s</p>
+                            </div>
+                            <div class="flex gap-3">
+                                <button onclick="deleteAlert(${a.id})" class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+                    `).join('');
+                    lucide.createIcons();
+                } else {
+                    list.innerHTML = `<div class="col-span-full p-6 rounded-2xl bg-slate-900/50 border border-slate-800 text-center text-slate-500">No active alert rules configured</div>`;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resp = await fetch('/api/v1/alerts', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                body: JSON.stringify({
+                    name: document.getElementById('alertName').value,
+                    metric: document.getElementById('alertMetric').value,
+                    condition: document.getElementById('alertCondition').value,
+                    threshold: parseInt(document.getElementById('alertThreshold').value),
+                    duration: parseInt(document.getElementById('alertDuration').value),
+                    severity: 'warning'
+                })
+            });
+            if (resp.ok) {
+                toggleModal('addAlertModal', false);
+                document.getElementById('addAlertForm').reset();
+                loadAlerts();
+            } else {
+                const err = await resp.json();
+                alert('Failed to add alert rule: ' + (err.detail || resp.statusText));
             }
+        });
+
+        async function deleteServer(id) {
+            if (!confirm('Are you sure you want to remove this node? History will be purged.')) return;
+            try {
+                const resp = await fetch(`/api/v1/servers/${id}`, {
+                    method: 'DELETE',
+                    headers: {'Authorization': 'Bearer ' + token}
+                });
+                if (resp.ok) loadData();
+            } catch (e) { console.error(e); }
+        }
+
+        async function deleteAlert(id) {
+            if (!confirm('Delete this alert rule?')) return;
+            try {
+                const resp = await fetch(`/api/v1/alerts/${id}`, {
+                    method: 'DELETE',
+                    headers: {'Authorization': 'Bearer ' + token}
+                });
+                if (resp.ok) loadAlerts();
+            } catch (e) { console.error(e); }
+        }
+
+        async function changePassword() {
+            const newPass = prompt('Enter new admin password:');
+            if (!newPass) return;
+            try {
+                const resp = await fetch('/api/v1/auth/reset-password', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                    body: JSON.stringify({new_password: newPass})
+                });
+                if (resp.ok) alert('Password updated successfully');
+                else alert('Failed to update password');
+            } catch (e) { console.error(e); }
         }
 
         function copyCmd(id) {
@@ -849,7 +970,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         // Auto Refresh
         loadData();
-        setInterval(loadData, 30000);
+        setInterval(loadData, 10000);
     </script>
 </body>
-</html>"""
+</html>

@@ -216,32 +216,39 @@ async def list_alerts(current_user: User = Depends(get_current_user)):
 @api.post("/alerts")
 async def create_alert(data: AlertCreate, current_user: User = Depends(get_current_user)):
     import sqlite3
+    from datetime import datetime, timezone
 
     conn = get_db()
     c = conn.cursor()
-    c.execute(
-        "INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, notify_telegram, notify_discord, notify_slack, notify_email, notify_teams, description, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
-        (
-            data.name,
-            data.metric,
-            data.condition,
-            data.threshold,
-            data.duration,
-            data.severity,
-            data.server_id,
-            int(data.notify_telegram),
-            int(data.notify_discord),
-            int(data.notify_slack),
-            int(data.notify_email),
-            int(data.notify_teams),
-            data.description,
-            datetime.now(timezone.utc).isoformat(),
-        ),
-    )
-    conn.commit()
-    alert_id = c.lastrowid
-    conn.close()
-    return {"status": "ok", "id": alert_id}
+    try:
+        c.execute(
+            "INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, notify_telegram, notify_discord, notify_slack, notify_email, notify_teams, description, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+            (
+                data.name,
+                data.metric,
+                data.condition,
+                data.threshold,
+                data.duration,
+                data.severity,
+                data.server_id,
+                int(data.notify_telegram),
+                int(data.notify_discord),
+                int(data.notify_slack),
+                int(data.notify_email),
+                int(data.notify_teams),
+                data.description,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+        alert_id = c.lastrowid
+        return {"status": "ok", "id": alert_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    finally:
+        conn.close()
+
 
 
 @api.get("/audit-log")
@@ -921,15 +928,13 @@ async def list_servers_api():
 
 
 @api.post("/servers")
-async def create_server(data: ServerCreate, current_user: User = Depends(get_admin_user)):
-    """Create a new monitored server"""
+async def create_server(request: Request, data: ServerCreate, current_user: User = Depends(get_admin_user)):
     import sqlite3
+    from datetime import datetime, timezone
 
-    db_path = os.getenv("DB_PATH", "pymon.db")
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    conn = get_db()
+    c = conn.cursor()
     try:
-        c = conn.cursor()
         c.execute(
             "INSERT INTO servers (name, host, os_type, agent_port, enabled, last_status, cpu_percent, memory_percent, disk_percent, disk_info, last_check, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
@@ -948,8 +953,21 @@ async def create_server(data: ServerCreate, current_user: User = Depends(get_adm
             ),
         )
         conn.commit()
+
         server_id = c.lastrowid
+        
+        # Phase 2.11: Update ScrapeManager dynamically
+        scrape_manager = getattr(request.app.state, "scrape_manager", None)
+        if scrape_manager and data.enabled:
+            # Re-fetch row for target adding
+            row = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
+            if row:
+                scrape_manager.add_server_target(row)
+        
         return {"status": "ok", "server_id": server_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     finally:
         conn.close()
 

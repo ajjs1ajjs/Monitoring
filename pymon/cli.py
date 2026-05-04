@@ -15,6 +15,116 @@ from pymon import __version__
 scrape_manager = None
 
 
+@asynccontextmanager
+async def lifespan(app):
+    global scrape_manager
+    from pymon import web_dashboard
+
+    try:
+        from pymon.config import load_config
+        from pymon.scrape import ScrapeManager
+
+        config_path = os.getenv("CONFIG_PATH", "config.yml")
+        config = load_config(config_path)
+
+        conn = web_dashboard.get_db()
+        servers = conn.execute("SELECT * FROM servers WHERE enabled=1").fetchall()
+        conn.close()
+
+        if servers:
+            scrape_manager = ScrapeManager(config)
+            for server in servers:
+                scrape_manager.add_server_target(server)
+
+            if scrape_manager.targets:
+                scrape_manager.start()
+                print(
+                    f"Background scraping started (interval: {config.scrape_configs[0].scrape_interval if config.scrape_configs else 60}s, targets: {len(scrape_manager.targets)})",
+                    file=sys.stderr,
+                )
+        else:
+            print("No servers to scrape", file=sys.stderr)
+        
+        app.state.scrape_manager = scrape_manager
+    except Exception as e:
+        print(f"Warning: Could not start background scraping: {e}", file=sys.stderr)
+        app.state.scrape_manager = None
+
+    yield
+
+    if scrape_manager:
+        scrape_manager.stop()
+        print("Background scraping stopped", file=sys.stderr)
+
+
+def create_app():
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+    from fastapi.staticfiles import StaticFiles
+
+    from pymon import web_dashboard_enhanced as web_dashboard
+    from pymon.api.endpoints import api
+
+    # Setup basic rotating logger for prod-like environments
+    log_dir = os.path.join(".", "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    logfile = os.path.join(log_dir, "pymon.log")
+    try:
+        handler = RotatingFileHandler(logfile, maxBytes=10 * 1024 * 1024, backupCount=5)
+        logging.basicConfig(handlers=[handler], level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    except Exception:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+    app = FastAPI(title="PyMon", version=__version__, lifespan=lifespan)
+
+    # Configure CORS origins from environment so prod can lock down access
+    raw_origins = os.getenv("PYMON_ALLOWED_ORIGINS")
+    if raw_origins:
+        origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+    else:
+        origins = ["http://localhost:8090"]
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(api, prefix="/api/v1")
+
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+    @app.get("/favicon.ico")
+    async def favicon():
+        ico_path = os.path.join(static_dir, "favicon.ico")
+        svg_path = os.path.join(static_dir, "favicon.svg")
+        if os.path.exists(ico_path):
+            return FileResponse(ico_path)
+        elif os.path.exists(svg_path):
+            return FileResponse(svg_path)
+        return None
+
+    @app.get("/dashboard", response_class=HTMLResponse)
+    @app.get("/dashboard/", response_class=HTMLResponse)
+    async def dashboard():
+        return HTMLResponse(content=web_dashboard.ENHANCED_DASHBOARD_HTML)
+
+    @app.get("/", response_class=HTMLResponse)
+    async def root():
+        return RedirectResponse(url="/dashboard/")
+
+    @app.get("/login", response_class=HTMLResponse)
+    async def login_page():
+        return HTMLResponse(content=web_dashboard.LOGIN_HTML)
+
+    return app
+
+
 def main():
     parser = argparse.ArgumentParser(description="PyMon - Python Monitoring System", prog="pymon")
     parser.add_argument("--version", action="version", version=f"PyMon {__version__}")
@@ -140,113 +250,6 @@ def main():
             sys.exit(1)
     else:
         parser.print_help()
-
-
-@asynccontextmanager
-async def lifespan(app):
-    global scrape_manager
-    from pymon import web_dashboard
-
-    try:
-        from pymon.config import load_config
-        from pymon.scrape import ScrapeManager
-
-        config_path = os.getenv("CONFIG_PATH", "config.yml")
-        config = load_config(config_path)
-
-        conn = web_dashboard.get_db()
-        servers = conn.execute("SELECT * FROM servers WHERE enabled=1").fetchall()
-        conn.close()
-
-        if servers:
-            scrape_manager = ScrapeManager(config)
-            for server in servers:
-                scrape_manager.add_server_target(server)
-
-            if scrape_manager.targets:
-                scrape_manager.start()
-                print(
-                    f"Background scraping started (interval: {config.scrape_configs[0].scrape_interval if config.scrape_configs else 60}s, targets: {len(scrape_manager.targets)})",
-                    file=sys.stderr,
-                )
-        else:
-            print("No servers to scrape", file=sys.stderr)
-    except Exception as e:
-        print(f"Warning: Could not start background scraping: {e}", file=sys.stderr)
-
-    yield
-
-    if scrape_manager:
-        scrape_manager.stop()
-        print("Background scraping stopped", file=sys.stderr)
-
-
-def create_app():
-    from fastapi import FastAPI
-    from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-    from fastapi.staticfiles import StaticFiles
-
-    from pymon import web_dashboard_enhanced as web_dashboard
-    from pymon.api.endpoints import api
-
-    # Setup basic rotating logger for prod-like environments
-    log_dir = os.path.join(".", "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    logfile = os.path.join(log_dir, "pymon.log")
-    try:
-        handler = RotatingFileHandler(logfile, maxBytes=10 * 1024 * 1024, backupCount=5)
-        logging.basicConfig(handlers=[handler], level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    except Exception:
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-    app = FastAPI(title="PyMon", version=__version__, lifespan=lifespan)
-
-    # Configure CORS origins from environment so prod can lock down access
-    raw_origins = os.getenv("PYMON_ALLOWED_ORIGINS")
-    if raw_origins:
-        origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
-    else:
-        origins = ["http://localhost:8090"]
-
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    app.include_router(api, prefix="/api/v1")
-
-    static_dir = os.path.join(os.path.dirname(__file__), "static")
-    if os.path.exists(static_dir):
-        app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
-    @app.get("/favicon.ico")
-    async def favicon():
-        ico_path = os.path.join(static_dir, "favicon.ico")
-        svg_path = os.path.join(static_dir, "favicon.svg")
-        if os.path.exists(ico_path):
-            return FileResponse(ico_path)
-        elif os.path.exists(svg_path):
-            return FileResponse(svg_path)
-        return None
-
-    @app.get("/dashboard", response_class=HTMLResponse)
-    @app.get("/dashboard/", response_class=HTMLResponse)
-    async def dashboard():
-        return HTMLResponse(content=web_dashboard.ENHANCED_DASHBOARD_HTML)
-
-    @app.get("/", response_class=HTMLResponse)
-    async def root():
-        return RedirectResponse(url="/dashboard/")
-
-    @app.get("/login", response_class=HTMLResponse)
-    async def login_page():
-        return HTMLResponse(content=web_dashboard.LOGIN_HTML)
-
-    return app
 
 
 if __name__ == "__main__":
