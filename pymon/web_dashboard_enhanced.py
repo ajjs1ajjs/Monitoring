@@ -1522,7 +1522,9 @@ function showDeployModal(id) {
         }
 
         // Initialize
-        if (section === 'users') loadUsers();
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlSection = urlParams.get('section') || 'overview';
+        showSection(urlSection);
 
         function copyDeployCmd() {
             const el = document.getElementById('deployCmd');
