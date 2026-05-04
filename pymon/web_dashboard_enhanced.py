@@ -269,17 +269,38 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Security</h4>
                                 <button onclick="changePassword()" class="w-full py-2 bg-[#1f242c] text-white text-xs font-bold rounded hover:bg-[#30363d] transition-all">Update Admin Password</button>
                             </div>
-                            <div class="p-4 bg-[#0d1117] rounded border border-[#30363d]">
-                                <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Integrations</h4>
-                                <div class="grid grid-cols-2 gap-4">
-                                    <button class="py-4 bg-[#1f242c] rounded border border-[#30363d] text-center hover:bg-[#30363d]">
-                                        <div class="text-xs font-bold text-white">Telegram Bot</div>
-                                        <div class="text-[9px] text-slate-500">Configure notifications</div>
-                                    </button>
-                                    <button class="py-4 bg-[#1f242c] rounded border border-[#30363d] text-center hover:bg-[#30363d]">
-                                        <div class="text-xs font-bold text-white">Discord Webhook</div>
-                                        <div class="text-[9px] text-slate-500">Configure notifications</div>
-                                    </button>
+                            <!-- Notification Channels -->
+                            <div class="pt-8 border-t border-[#30363d]">
+                                <h4 class="text-white font-bold mb-6 flex items-center gap-2"><i data-lucide="bell" class="w-4 h-4 text-orange-500"></i> Notification Channels</h4>
+                                <div class="space-y-4">
+                                    <div class="flex items-center justify-between p-4 bg-[#0d1117] rounded border border-[#30363d]">
+                                        <div class="flex items-center gap-4">
+                                            <div class="p-2 bg-emerald-500/10 text-emerald-500 rounded"><i data-lucide="power" class="w-4 h-4"></i></div>
+                                            <div class="text-white font-bold text-sm">Enable Notifications</div>
+                                        </div>
+                                        <input type="checkbox" id="notifEnabled" class="w-4 h-4 accent-orange-500">
+                                    </div>
+
+                                    <div class="p-4 bg-[#0d1117] rounded border border-[#30363d] space-y-4">
+                                        <div class="flex items-center gap-4 mb-2">
+                                            <div class="p-2 bg-[#229ED9]/10 text-[#229ED9] rounded"><i data-lucide="send" class="w-4 h-4"></i></div>
+                                            <div class="text-white font-bold text-sm">Telegram Configuration</div>
+                                        </div>
+                                        <div class="grid grid-cols-1 gap-4">
+                                            <input type="text" id="tgToken" placeholder="Bot Token (e.g. 123456:ABC...)" class="bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
+                                            <input type="text" id="tgChat" placeholder="Chat ID (e.g. -100123456)" class="bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
+                                        </div>
+                                    </div>
+
+                                    <div class="p-4 bg-[#0d1117] rounded border border-[#30363d] space-y-4">
+                                        <div class="flex items-center gap-4 mb-2">
+                                            <div class="p-2 bg-[#5865F2]/10 text-[#5865F2] rounded"><i data-lucide="message-square" class="w-4 h-4"></i></div>
+                                            <div class="text-white font-bold text-sm">Discord Configuration</div>
+                                        </div>
+                                        <input type="text" id="dsWebhook" placeholder="Webhook URL" class="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
+                                    </div>
+
+                                    <button onclick="saveNotifSettings()" class="w-full py-3 bg-orange-600 text-black font-bold rounded uppercase tracking-widest text-[10px]">Save Notification Config</button>
                                 </div>
                             </div>
                         </div>
@@ -621,6 +642,44 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         async function changePassword() {
             const p = prompt('NEW PASSWORD:');
             if (p) await fetch('/api/v1/auth/reset-password', {method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify({new_password: p})});
+        }
+
+        async function loadNotifSettings() {
+            const resp = await fetch('/api/v1/settings/notifications', {headers: {'Authorization': 'Bearer ' + token}});
+            if (resp.ok) {
+                const data = await resp.json();
+                document.getElementById('notifEnabled').checked = data.enabled;
+                document.getElementById('tgToken').value = data.telegram_bot_token || '';
+                document.getElementById('tgChat').value = data.telegram_chat_id || '';
+                document.getElementById('dsWebhook').value = data.discord_webhook_url || '';
+            }
+        }
+
+        async function saveNotifSettings() {
+            const data = {
+                enabled: document.getElementById('notifEnabled').checked,
+                telegram_bot_token: document.getElementById('tgToken').value,
+                telegram_chat_id: document.getElementById('tgChat').value,
+                discord_webhook_url: document.getElementById('dsWebhook').value
+            };
+            const resp = await fetch('/api/v1/settings/notifications', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                body: JSON.stringify(data)
+            });
+            if (resp.ok) alert('Notification settings updated');
+            else alert('Failed to update settings');
+        }
+
+        function initSettings() {
+            loadNotifSettings();
+        }
+
+        // Add to showSection
+        const oldShowSection = showSection;
+        showSection = function(section) {
+            oldShowSection(section);
+            if (section === 'settings') initSettings();
         }
 
         loadData();

@@ -1108,3 +1108,41 @@ async def list_audit_logs(limit: int = 50, current_user: User = Depends(get_curr
         return {"logs": []}
     finally:
         conn.close()
+
+
+class NotificationSettings(BaseModel):
+    enabled: bool
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    discord_webhook_url: str = ""
+
+
+@api.get("/settings/notifications")
+async def get_notif_settings(current_user: User = Depends(get_admin_user)):
+    """Get notification settings from config.yml"""
+    from pymon.config import load_config
+    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+    return config.notifications
+
+
+@api.post("/settings/notifications")
+async def update_notif_settings(data: NotificationSettings, current_user: User = Depends(get_admin_user)):
+    """Update notification settings in config.yml"""
+    import yaml
+    config_path = os.getenv("CONFIG_PATH", "config.yml")
+    
+    with open(config_path, "r") as f:
+        config_data = yaml.safe_load(f) or {}
+    
+    if "notifications" not in config_data:
+        config_data["notifications"] = {}
+        
+    config_data["notifications"]["enabled"] = data.enabled
+    config_data["notifications"]["telegram_bot_token"] = data.telegram_bot_token
+    config_data["notifications"]["telegram_chat_id"] = data.telegram_chat_id
+    config_data["notifications"]["discord_webhook_url"] = data.discord_webhook_url
+    
+    with open(config_path, "w") as f:
+        yaml.safe_dump(config_data, f)
+        
+    return {"status": "ok"}

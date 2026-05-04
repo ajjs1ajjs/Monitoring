@@ -289,9 +289,82 @@ class ScrapeManager:
 
                 conn.commit()
 
+                # Phase 2.15: Check alerts for this server
+                if success:
+                    await self._check_alerts(sid, cpu, memory, disk, now)
+
             conn.close()
         except Exception as e:
             print(f"Error updating server status: {e}")
+
+    async def _check_alerts(self, server_id: int, cpu: float, memory: float, disk: float, timestamp: str):
+        """Check active alert rules for the server and dispatch notifications."""
+        import os
+        import sqlite3
+        from pymon.notifications import dispatcher
+
+        try:
+            db_path = os.getenv("DB_PATH", "pymon.db")
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+
+            # Get active alerts
+            alerts = c.execute("SELECT * FROM alerts WHERE enabled = 1").fetchall()
+            
+            # Get notification config from app state if available
+            # For now, we'll try to find it in the DB or global config
+            from pymon.config import load_config
+            config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+            notif_cfg = config.notifications
+
+            for alert in alerts:
+                triggered = False
+                metric_val = 0
+                
+                if alert["metric"] == "cpu":
+                    metric_val = cpu
+                elif alert["metric"] == "memory":
+                    metric_val = memory
+                elif alert["metric"] == "disk":
+                    metric_val = disk
+                
+                if alert["condition"] == ">":
+                    triggered = metric_val > alert["threshold"]
+                elif alert["condition"] == "<":
+                    triggered = metric_val < alert["threshold"]
+
+                if triggered:
+                    # Check if already firing (to avoid spam)
+                    # We can use a simple memory cache in ScrapeManager or a table
+                    # For now, let's just send if triggered and log it
+                    msg = f"🚨 <b>{alert['name']}</b> triggered on Server ID {server_id}!\nValue: {metric_val:.1f}%\nThreshold: {alert['threshold']}%"
+                    
+                    channels = {}
+                    if notif_cfg.enabled:
+                        if notif_cfg.telegram_bot_token and notif_cfg.telegram_chat_id:
+                            channels["telegram"] = {
+                                "bot_token": notif_cfg.telegram_bot_token,
+                                "chat_id": notif_cfg.telegram_chat_id
+                            }
+                        if notif_cfg.discord_webhook_url:
+                            channels["discord"] = {
+                                "webhook_url": notif_cfg.discord_webhook_url
+                            }
+                    
+                    if channels:
+                        dispatcher.dispatch(alert["name"], msg, channels)
+                        
+                    # Log to audit logs
+                    c.execute(
+                        "INSERT INTO audit_logs (username, action, target, timestamp) VALUES (?, ?, ?, ?)",
+                        ("system", f"Alert Triggered: {alert['name']}", f"Server {server_id}", timestamp)
+                    )
+                    conn.commit()
+
+            conn.close()
+        except Exception as e:
+            print(f"Error in alert check: {e}")
 
     async def _scrape_loop(self, target: ScrapeTarget):
         while self._running:
