@@ -981,10 +981,130 @@ async def delete_server(server_id: int, current_user: User = Depends(get_admin_u
     conn = sqlite3.connect(db_path)
     try:
         cursor = conn.execute("DELETE FROM servers WHERE id = ?", (server_id,))
-        conn.execute("DELETE FROM metrics_history WHERE server_id = ?", (server_id,))
+        # Also cleanup metrics
+        conn.execute("DELETE FROM metrics WHERE labels LIKE ?", (f"%server_id={server_id}%",))
         conn.commit()
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Server not found")
         return {"status": "ok"}
+    finally:
+        conn.close()
+
+
+@api.get("/metrics/trend")
+async def get_metrics_trend(current_user: User = Depends(get_current_user)):
+    """Get aggregated metrics trend for the overview dashboard."""
+    import sqlite3
+    from datetime import datetime, timedelta, timezone
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        
+        # Aggragate metrics into 1-minute buckets
+        # Note: strftime formatting depends on the SQLite version and how timestamps were stored
+        query = """
+            SELECT 
+                substr(timestamp, 1, 16) as ts,
+                AVG(CASE WHEN name LIKE '%cpu%' THEN value END) as cpu_avg,
+                AVG(CASE WHEN name LIKE '%memory%' THEN value END) as mem_avg,
+                SUM(CASE WHEN name LIKE '%net%rx%' THEN value END) as net_rx,
+                SUM(CASE WHEN name LIKE '%net%tx%' THEN value END) as net_tx
+            FROM metrics 
+            WHERE timestamp > ?
+            GROUP BY ts
+            ORDER BY ts ASC
+            LIMIT 60
+        """
+        rows = conn.execute(query, (cutoff,)).fetchall()
+        
+        history = []
+        for r in rows:
+            history.append({
+                "timestamp": r["ts"] + ":00Z",
+                "cpu_avg": r["cpu_avg"] or 0,
+                "mem_avg": r["mem_avg"] or 0,
+                "net_rx_avg": r["net_rx"] or 0,
+                "net_tx_avg": r["net_tx"] or 0
+            })
+            
+        if not history:
+            now = datetime.now(timezone.utc).isoformat()
+            history = [{"timestamp": now, "cpu_avg": 0, "mem_avg": 0, "net_rx_avg": 0, "net_tx_avg": 0}]
+            
+        return {"history": history}
+    except Exception as e:
+        return {"history": [], "error": str(e)}
+    finally:
+        conn.close()
+
+
+@api.get("/alerts")
+async def list_alerts_api(current_user: User = Depends(get_current_user)):
+    """List all alert rules."""
+    import sqlite3
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute("SELECT * FROM alerts").fetchall()
+        return {"alerts": [dict(r) for r in rows]}
+    except Exception:
+        return {"alerts": []}
+    finally:
+        conn.close()
+
+
+@api.post("/alerts")
+async def create_alert_api(data: AlertCreate, current_user: User = Depends(get_admin_user)):
+    """Create a new alert rule."""
+    import sqlite3
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "INSERT INTO alerts (name, metric, condition, threshold, duration, severity, enabled) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (data.name, data.metric, data.condition, data.threshold, data.duration, data.severity, 1),
+        )
+        conn.commit()
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        conn.close()
+
+
+@api.delete("/alerts/{alert_id}")
+async def delete_alert_api(alert_id: int, current_user: User = Depends(get_admin_user)):
+    """Delete an alert rule."""
+    import sqlite3
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("DELETE FROM alerts WHERE id = ?", (alert_id,))
+        conn.commit()
+        return {"status": "ok"}
+    finally:
+        conn.close()
+
+
+@api.get("/audit-log")
+async def list_audit_logs(limit: int = 50, current_user: User = Depends(get_current_user)):
+    """List recent audit logs."""
+    import sqlite3
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT ?", (limit,)).fetchall()
+        return {"logs": [dict(r) for r in rows]}
+    except Exception:
+        return {"logs": []}
     finally:
         conn.close()

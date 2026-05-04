@@ -560,6 +560,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         async function loadTrends() {
             try {
                 const resp = await fetch('/api/v1/metrics/trend', {headers: {'Authorization': 'Bearer ' + token}});
+                if (resp.status === 401) { window.location.href = '/login'; return; }
                 if (!resp.ok) return;
                 const data = await resp.json();
                 if (!charts.cpu) charts.cpu = createChart('cpuChart', 'CPU', '#f0883e');
@@ -578,6 +579,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         async function loadAlerts() {
             const resp = await fetch('/api/v1/alerts', {headers: {'Authorization': 'Bearer ' + token}});
+            if (resp.status === 401) { window.location.href = '/login'; return; }
             if (!resp.ok) return;
             const data = await resp.json();
             document.getElementById('alertsList').innerHTML = data.alerts.map(a => `
@@ -591,6 +593,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         async function loadAuditLogs() {
             const resp = await fetch('/api/v1/audit-log?limit=50', {headers: {'Authorization': 'Bearer ' + token}});
+            if (resp.status === 401) { window.location.href = '/login'; return; }
             if (!resp.ok) return;
             const data = await resp.json();
             document.getElementById('auditLogs').innerHTML = data.logs.map(l => `
