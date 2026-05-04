@@ -293,7 +293,7 @@ class ScrapeManager:
 
                     c.execute(
                         """UPDATE servers SET
-                        last_check = ?, last_status = 'up',
+                        last_check = ?, last_status = 'up', error_message = NULL,
                         cpu_percent = ?, memory_percent = ?, disk_percent = ?,
                         network_rx = ?, network_tx = ?, uptime = ?, disk_info = ?
                         WHERE id = ?""",
@@ -302,9 +302,9 @@ class ScrapeManager:
                 else:
                     c.execute(
                         """UPDATE servers SET
-                        last_check = ?, last_status = 'down'
+                        last_check = ?, last_status = 'down', error_message = ?
                         WHERE id = ?""",
-                        (now, sid),
+                        (now, error, sid),
                     )
 
                 conn.commit()

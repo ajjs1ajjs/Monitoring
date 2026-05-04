@@ -123,7 +123,8 @@ def init_web_tables():
             'network_tx': 'REAL',
             'uptime': 'TEXT',
             'raid_status': 'TEXT',
-            'disk_info': 'TEXT'
+            'disk_info': 'TEXT',
+            'error_message': 'TEXT'
         }
         for col, col_type in needed.items():
             if col not in columns:

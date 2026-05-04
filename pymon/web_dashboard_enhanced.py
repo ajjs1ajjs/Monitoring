@@ -948,7 +948,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             body.innerHTML = targetData.map(n => `
                 <tr>
                     <td>
-                        <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">
+                        <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}" title="${n.error_message || ''}">
                             <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
                             ${n.last_status || 'unknown'}
                         </div>
@@ -996,6 +996,11 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                             <div style="font-weight: 700; color: #3b82f6;">${(n.memory_percent || 0).toFixed(1)}%</div>
                         </div>
                     </div>
+                    ${n.error_message ? `
+                    <div style="margin-top: 0.75rem; padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border-radius: 0.5rem; border-left: 2px solid var(--danger); font-size: 0.65rem; color: #fca5a5;">
+                        <i data-lucide="alert-circle" style="width: 10px; height: 10px; display: inline; margin-right: 0.25rem;"></i>
+                        ${n.error_message}
+                    </div>` : ''}
                     <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
                         <div style="display: flex; gap: 0.5rem;">
                             <button onclick="forceScrapeSingle(${n.id})" title="Force Scrape" style="background: transparent; border: none; color: var(--accent); cursor: pointer; opacity: 0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
