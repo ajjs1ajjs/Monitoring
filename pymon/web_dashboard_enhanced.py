@@ -994,7 +994,8 @@ sudo systemctl start prometheus-node-exporter</textarea>
                         <div class="font-bold text-white">${n.name}</div>
                         <div style="font-size: 0.65rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.25rem;">
                             <i data-lucide="package" style="width: 10px; height: 10px;"></i>
-                            ${n.os_type || 'linux'} agent
+                            ${n.os_type === 'windows' ? 'windows_exporter' : 'node_exporter'}
+                            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background: ${n.exporter_version === 'active' ? 'var(--success)' : (n.last_status === 'up' ? '#f59e0b' : 'var(--danger)')}; margin-left: 0.25rem;"></span>
                         </div>
                     </td>
                     <td class="text-mono text-xs text-slate-500">${n.host}</td>
@@ -1014,17 +1015,31 @@ sudo systemctl start prometheus-node-exporter</textarea>
                         <div style="display: flex; flex-direction: column; gap: 0.25rem;">
                             ${(() => {
                                 try {
-                                    const disks = JSON.parse(n.disk_info || '{}');
-                                    return Object.entries(disks).map(([vol, pct]) => `
-                                        <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.65rem;">
-                                            <span style="min-width: 1.2rem; color: white; font-weight: 600;">${vol}</span>
-                                            <div class="progress-bar" style="height: 4px; flex-grow: 1;">
-                                                <div class="progress-fill" style="width: ${pct}%; background: ${pct > 90 ? 'var(--danger)' : '#f59e0b'};"></div>
-                                            </div>
-                                            <span style="min-width: 1.5rem; text-align: right; opacity: 0.7;">${pct.toFixed(0)}%</span>
-                                        </div>
-                                    `).join('');
-                                } catch(e) { return n.disk_percent + '%'; }
+                                    const raw = n.disk_info;
+                                    if (!raw || raw === 'null') throw 0;
+                                    const disks = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                                    if (Array.isArray(disks)) {
+                                        return disks.map(d => {
+                                            const pct = d.percent || 0;
+                                            return '<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.65rem;">' +
+                                                '<span style="min-width:1.8rem;color:white;font-weight:600;">' + (d.volume || '?') + '</span>' +
+                                                '<div class="progress-bar" style="height:4px;flex-grow:1;"><div class="progress-fill" style="width:' + pct + '%;background:' + (pct > 90 ? 'var(--danger)' : '#f59e0b') + ';"></div></div>' +
+                                                '<span style="min-width:2rem;text-align:right;opacity:0.7;">' + pct.toFixed(0) + '%</span></div>';
+                                        }).join('');
+                                    }
+                                    return Object.entries(disks).map(([vol, pct]) =>
+                                        '<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.65rem;">' +
+                                        '<span style="min-width:1.8rem;color:white;font-weight:600;">' + vol + '</span>' +
+                                        '<div class="progress-bar" style="height:4px;flex-grow:1;"><div class="progress-fill" style="width:' + pct + '%;background:' + (pct > 90 ? 'var(--danger)' : '#f59e0b') + ';"></div></div>' +
+                                        '<span style="min-width:2rem;text-align:right;opacity:0.7;">' + Math.round(pct) + '%</span></div>'
+                                    ).join('');
+                                } catch(e) {
+                                    const p = n.disk_percent || 0;
+                                    return '<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.65rem;">' +
+                                        '<span style="min-width:1.8rem;color:white;font-weight:600;">All</span>' +
+                                        '<div class="progress-bar" style="height:4px;flex-grow:1;"><div class="progress-fill" style="width:' + p + '%;background:' + (p > 90 ? 'var(--danger)' : '#f59e0b') + ';"></div></div>' +
+                                        '<span style="min-width:2rem;text-align:right;opacity:0.7;">' + Math.round(p) + '%</span></div>';
+                                }
                             })()}
                         </div>
                     </td>

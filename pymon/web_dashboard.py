@@ -124,7 +124,9 @@ def init_web_tables():
             'uptime': 'TEXT',
             'raid_status': 'TEXT',
             'disk_info': 'TEXT',
-            'error_message': 'TEXT'
+            'error_message': 'TEXT',
+            'exporter_version': 'TEXT',
+            'raid_info': 'TEXT'
         }
         for col, col_type in needed.items():
             if col not in columns:

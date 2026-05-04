@@ -288,14 +288,16 @@ class ScrapeManager:
                         or metrics.get("windows_system_system_up_time", "")
                     )
                     disk_info_json = metrics.get("_disk_info_json")
+                    exporter_version = "active" if metrics.get("_exporter_detected") else "unknown"
 
                     c.execute(
                         """UPDATE servers SET
                         last_check = ?, last_status = 'up', error_message = NULL,
                         cpu_percent = ?, memory_percent = ?, disk_percent = ?,
-                        network_rx = ?, network_tx = ?, uptime = ?, disk_info = ?
+                        network_rx = ?, network_tx = ?, uptime = ?, disk_info = ?,
+                        exporter_version = ?
                         WHERE id = ?""",
-                        (now, cpu, memory, disk, network_rx, network_tx, str(uptime), disk_info_json, sid),
+                        (now, cpu, memory, disk, network_rx, network_tx, str(uptime), disk_info_json, exporter_version, sid),
                     )
                 else:
                     c.execute(
@@ -568,18 +570,18 @@ class ScrapeManager:
                     metrics["windows_cpu_time_total_all"] = cpu_all_total
 
                     # Calculate disk percentages and get C: for main metric
-                    disks_list = []
+                    disks_dict = {}  # {"C:": 94.2, "D:": 45.1}
                     for vol, info in disk_info.items():
                         if info["size"] > 0:
-                            info["percent"] = 100 * (1 - info["free"] / info["size"])
-                            disks_list.append(info)
+                            pct = 100 * (1 - info["free"] / info["size"])
+                            info["percent"] = pct
+                            disks_dict[vol] = round(pct, 1)
                             if "C:" in vol:
                                 metrics["windows_logical_disk_free_bytes"] = info["free"]
                                 metrics["windows_logical_disk_size_bytes"] = info["size"]
 
                     # Publish per-disk usage as Prometheus metrics with volume label
                     try:
-                        # Ensure the metric exists; we reuse the same metric name with per-disk labels
                         registry.register("disk_usage_percent", MetricType.GAUGE, "Disk usage percent per volume", None)
                         for vol, info in disk_info.items():
                             vol_label = Label("volume", vol)
@@ -588,7 +590,13 @@ class ScrapeManager:
                     except Exception as e:
                         print(f"[DEBUG] failed to publish per-disk metric: {e}")
 
-                    metrics["_disk_info_json"] = json.dumps(disks_list) if disks_list else None
+                    metrics["_disk_info_json"] = json.dumps(disks_dict) if disks_dict else None
+
+                    # Detect exporter version from build_info metrics
+                    for key in metrics:
+                        if "build_info" in key or "exporter_build_info" in key:
+                            metrics["_exporter_detected"] = True
+                            break
 
                     self._update_server_status(target.target, metrics, True, server_id=target.server_id)
                 else:
