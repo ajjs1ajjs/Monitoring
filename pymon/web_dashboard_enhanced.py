@@ -271,13 +271,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <i data-lucide="bell-ring"></i> Alerting
                 </button>
                 
-                <div class="nav-label">Tools</div>
-                <button class="nav-item" data-section="explorer">
-                    <i data-lucide="activity"></i> Metrics Explorer
-                </button>
-                <button class="nav-item" data-section="manual">
-                    <i data-lucide="wrench"></i> Manual Control
-                </button>
+                <div class="nav-label">Management</div>
                 <button class="nav-item" data-section="logs">
                     <i data-lucide="list"></i> Audit Logs
                 </button>
@@ -465,74 +459,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     </div>
                 </div>
 
-                <!-- Section: Explorer -->
-                <div id="section-explorer" class="dashboard-section">
-                    <div class="explorer-toolbar">
-                        <div class="explorer-field">
-                            <label>Target Series</label>
-                            <select id="explorerSeries" class="form-input">
-                                <option value="">Select Metric...</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-primary" id="runQueryBtn">
-                            <i data-lucide="play" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Execute Query
-                        </button>
-                    </div>
-                    <div class="card" style="height: 500px;">
-                        <div class="card-header">
-                            <h3 id="explorerTitle">Query Results</h3>
-                        </div>
-                        <div class="card-body">
-                            <canvas id="explorerChart"></canvas>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Section: Manual Control -->
-                <div id="section-manual" class="dashboard-section">
-                    <div class="card" style="max-width: 800px; margin: 0 auto;">
-                        <div class="card-header">
-                            <h3>Manual Metric Injection</h3>
-                        </div>
-                        <div class="card-body">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                                <div class="form-group">
-                                    <label>Metric Name</label>
-                                    <input type="text" id="manualMetricName" class="form-input" placeholder="custom_app_orders">
-                                </div>
-                                <div class="form-group">
-                                    <label>Metric Value</label>
-                                    <input type="number" id="manualMetricValue" class="form-input" placeholder="42.5">
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Metric Type</label>
-                                <select id="manualMetricType" class="form-input">
-                                    <option value="gauge">Gauge</option>
-                                    <option value="counter">Counter</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary" style="width: 100%;" onclick="injectManualMetric()">Submit Metric</button>
-                        </div>
-                    </div>
-                    
-                    <div class="card" style="max-width: 800px; margin: 2rem auto;">
-                        <div class="card-header">
-                            <h3>Force Scrape Node</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="form-group">
-                                <label>Select Target</label>
-                                <select id="forceScrapeTarget" class="form-input">
-                                    <!-- Dynamic -->
-                                </select>
-                            </div>
-                            <button class="btn btn-secondary" style="width: 100%; border-color: var(--accent); color: var(--accent);" onclick="forceScrape()">
-                                <i data-lucide="zap" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Immediate Scrape
-                            </button>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Section: Logs -->
                 <div id="section-logs" class="dashboard-section">
