@@ -172,24 +172,6 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <p class="text-xs text-slate-500 mt-1 mono">live telemetry / exporters / incident surface</p>
                 </div>
 
-                <div class="flex items-center gap-4">
-                    <div class="flex bg-slate-900/50 rounded-xl p-1 border border-slate-800">
-                        <button data-range="1h" class="range-btn px-4 py-1.5 rounded-lg text-xs font-medium transition-all active bg-orange-500 text-black">1h</button>
-                        <button data-range="6h" class="range-btn px-4 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-400 hover:text-slate-200">6h</button>
-                        <button data-range="24h" class="range-btn px-4 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-400 hover:text-slate-200">24h</button>
-                        <button data-range="7d" class="range-btn px-4 py-1.5 rounded-lg text-xs font-medium transition-all text-slate-400 hover:text-slate-200">7d</button>
-                    </div>
-
-                    <button id="refreshBtn" class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-600 transition-all">
-                        <i data-lucide="rotate-cw" class="w-4 h-4 text-slate-400"></i>
-                    </button>
-                </div>
-            </header>
-
-            <!-- Content Area -->
-            <div id="content" class="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-8">
-                <!-- Section: Overview -->
-                <div id="section-overview" class="section space-y-8">
                     <!-- Summary Cards -->
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div class="glass p-6 rounded-3xl relative overflow-hidden group critical-glow">
@@ -225,9 +207,6 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 <span class="text-blue-500 text-xs font-bold tracking-wider uppercase">Avg CPU</span>
                             </div>
                             <div class="text-4xl font-bold text-white mb-1" id="stat-cpu-avg">0%</div>
-                            <div class="flex items-center gap-1 text-emerald-500 text-[10px] font-bold" id="cpu-trend">
-                                <i data-lucide="trending-down" class="w-3 h-3"></i> 0%
-                            </div>
                         </div>
 
                         <div class="glass p-6 rounded-3xl relative overflow-hidden group">
@@ -239,40 +218,51 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 <span class="text-purple-500 text-xs font-bold tracking-wider uppercase">Avg RAM</span>
                             </div>
                             <div class="text-4xl font-bold text-white mb-1" id="stat-mem-avg">0%</div>
-                            <div class="flex items-center gap-1 text-red-500 text-[10px] font-bold" id="mem-trend">
-                                <i data-lucide="trending-up" class="w-3 h-3"></i> 0%
-                            </div>
                         </div>
                     </div>
 
                     <!-- Charts Row -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         <div class="glass p-8 rounded-[2rem] space-y-6">
                             <div class="flex items-center justify-between">
                                 <h3 class="text-lg font-bold text-white">CPU Performance</h3>
                                 <div class="flex items-center gap-2">
                                     <span class="w-2 h-2 rounded-full bg-emerald-500 pulsing-dot"></span>
-                                    <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Real-time</span>
+                                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Live</span>
                                 </div>
                             </div>
-                            <div class="h-[280px] w-full">
+                            <div class="h-[200px] w-full">
                                 <canvas id="cpuChart"></canvas>
                             </div>
                         </div>
 
                         <div class="glass p-8 rounded-[2rem] space-y-6">
                             <div class="flex items-center justify-between">
-                                <h3 class="text-lg font-bold text-white">Memory Utilization</h3>
+                                <h3 class="text-lg font-bold text-white">Memory Load</h3>
                                 <div class="flex items-center gap-2">
                                     <span class="w-2 h-2 rounded-full bg-blue-500 pulsing-dot"></span>
-                                    <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Real-time</span>
+                                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Live</span>
                                 </div>
                             </div>
-                            <div class="h-[280px] w-full">
+                            <div class="h-[200px] w-full">
                                 <canvas id="memoryChart"></canvas>
                             </div>
                         </div>
+
+                        <div class="glass p-8 rounded-[2rem] space-y-6">
+                            <div class="flex items-center justify-between">
+                                <h3 class="text-lg font-bold text-white">Network (MB)</h3>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-orange-500 pulsing-dot"></span>
+                                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Live</span>
+                                </div>
+                            </div>
+                            <div class="h-[200px] w-full">
+                                <canvas id="networkChart"></canvas>
+                            </div>
+                        </div>
                     </div>
+
 
                     <!-- Server List Quick View -->
                     <div class="glass rounded-[2rem] overflow-hidden">
@@ -289,6 +279,8 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                         <th class="px-8 py-5">OS</th>
                                         <th class="px-8 py-5">CPU</th>
                                         <th class="px-8 py-5">RAM</th>
+                                        <th class="px-8 py-5">Disk</th>
+                                        <th class="px-8 py-5">Network (RX/TX)</th>
                                         <th class="px-8 py-5 text-right">Actions</th>
                                     </tr>
                                 </thead>
@@ -671,6 +663,12 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         function updateServerUI() {
+            const formatBytes = (b) => {
+                if (!b) return '0 B';
+                const i = Math.floor(Math.log(b) / Math.log(1024));
+                return (b / Math.pow(1024, i)).toFixed(2) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][i];
+            };
+
             const quickList = document.getElementById('quickServerList');
             quickList.innerHTML = servers.slice(0, 5).map(s => `
                 <tr class="border-b border-slate-800/30 hover:bg-slate-800/20 transition-all group">
@@ -683,14 +681,31 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <td class="py-4 text-slate-400 text-sm font-mono">${s.host}</td>
                     <td class="py-4"><span class="px-2 py-1 rounded-lg bg-slate-800 text-[10px] font-bold text-slate-400 uppercase">${s.os_type}</span></td>
                     <td class="py-4">
-                        <div class="w-24 bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div class="bg-blue-500 h-full transition-all" style="width: ${s.cpu_percent || 0}%"></div>
+                        <div class="flex flex-col gap-1">
+                            <div class="text-[10px] font-bold text-slate-600">${(s.cpu_percent || 0).toFixed(1)}%</div>
+                            <div class="w-20 bg-slate-800 h-1 rounded-full overflow-hidden">
+                                <div class="bg-blue-500 h-full" style="width: ${s.cpu_percent || 0}%"></div>
+                            </div>
                         </div>
                     </td>
                     <td class="py-4">
-                        <div class="w-24 bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div class="bg-emerald-500 h-full transition-all" style="width: ${s.memory_percent || 0}%"></div>
+                        <div class="flex flex-col gap-1">
+                            <div class="text-[10px] font-bold text-slate-600">${(s.memory_percent || 0).toFixed(1)}%</div>
+                            <div class="w-20 bg-slate-800 h-1 rounded-full overflow-hidden">
+                                <div class="bg-emerald-500 h-full" style="width: ${s.memory_percent || 0}%"></div>
+                            </div>
                         </div>
+                    </td>
+                    <td class="py-4">
+                        <div class="flex flex-col gap-1">
+                            <div class="text-[10px] font-bold text-slate-600">${(s.disk_percent || 0).toFixed(1)}%</div>
+                            <div class="w-20 bg-slate-800 h-1 rounded-full overflow-hidden">
+                                <div class="bg-purple-500 h-full" style="width: ${s.disk_percent || 0}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-4 text-xs font-mono text-slate-500">
+                        ${formatBytes(s.network_rx)} / ${formatBytes(s.network_tx)}
                     </td>
                     <td class="py-4 text-right pr-8">
                         <button onclick="deleteServer(${s.id})" class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100">
@@ -720,11 +735,19 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="bg-slate-900/40 p-4 rounded-2xl border border-slate-800/30">
                             <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">CPU</div>
-                            <div class="text-2xl font-bold text-emerald-500">${(s.cpu_percent || 0).toFixed(1)}%</div>
+                            <div class="text-xl font-bold text-emerald-500">${(s.cpu_percent || 0).toFixed(1)}%</div>
                         </div>
                         <div class="bg-slate-900/40 p-4 rounded-2xl border border-slate-800/30">
-                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Memory</div>
-                            <div class="text-2xl font-bold text-blue-500">${(s.memory_percent || 0).toFixed(1)}%</div>
+                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">RAM</div>
+                            <div class="text-xl font-bold text-blue-500">${(s.memory_percent || 0).toFixed(1)}%</div>
+                        </div>
+                        <div class="bg-slate-900/40 p-4 rounded-2xl border border-slate-800/30">
+                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Disk</div>
+                            <div class="text-xl font-bold text-purple-500">${(s.disk_percent || 0).toFixed(1)}%</div>
+                        </div>
+                        <div class="bg-slate-900/40 p-4 rounded-2xl border border-slate-800/30">
+                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Net Total</div>
+                            <div class="text-[10px] font-bold text-orange-400">${formatBytes(s.network_rx + s.network_tx)}</div>
                         </div>
                     </div>
                     <div class="pt-2 flex items-center justify-between text-[10px] font-bold text-slate-600 uppercase">
@@ -735,6 +758,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             `).join('');
             lucide.createIcons();
         }
+
 
         async function loadAlerts() {
             try {
@@ -778,8 +802,79 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             if (resp.ok) loadAlerts();
         }
 
+        // Chart Helper
+        function createChart(canvasId, label, color) {
+            const el = document.getElementById(canvasId);
+            if (!el) return null;
+            const ctx = el.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+            gradient.addColorStop(0, color + '33');
+            gradient.addColorStop(1, color + '00');
+
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: label,
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
         async function loadTrends() {
-            // Trend logic here if needed
+            try {
+                const resp = await fetch('/api/v1/metrics/trend', {
+                    headers: {'Authorization': 'Bearer ' + token}
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                
+                if (!charts.cpu) charts.cpu = createChart('cpuChart', 'CPU', '#10b981');
+                if (!charts.mem) charts.mem = createChart('memoryChart', 'Memory', '#3b82f6');
+                if (!charts.net) charts.net = createChart('networkChart', 'Network', '#f59e0b');
+
+                const labels = data.history.map(h => new Date(h.timestamp).toLocaleTimeString());
+                const cpuData = data.history.map(h => h.cpu_avg);
+                const memData = data.history.map(h => h.mem_avg);
+                const netData = data.history.map(h => (h.net_rx_avg + h.net_tx_avg) / (1024 * 1024)); // MB
+
+                if (charts.cpu) {
+                    charts.cpu.data.labels = labels;
+                    charts.cpu.data.datasets[0].data = cpuData;
+                    charts.cpu.update('none');
+                }
+                if (charts.mem) {
+                    charts.mem.data.labels = labels;
+                    charts.mem.data.datasets[0].data = memData;
+                    charts.mem.update('none');
+                }
+                if (charts.net) {
+                    charts.net.data.labels = labels;
+                    charts.net.data.datasets[0].data = netData;
+                    charts.net.update('none');
+                }
+            } catch (e) { console.error(e); }
         }
 
         async function loadAuditLogs() {
