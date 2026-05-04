@@ -46,6 +46,7 @@ class ScrapeManager:
         self._running = False
         self._tasks: list = []
         self._cpu_history = {} # Store {target: (idle_last, total_last)}
+        self._down_alerted = set()  # Server IDs already alerted as down
 
         self.scrape_total = Counter("pymon_scrape_total", "Total scrape attempts")
         self.scrape_success = Counter("pymon_scrape_success_total", "Successful scrapes")
@@ -314,8 +315,19 @@ class ScrapeManager:
                     try:
                         import asyncio
                         asyncio.run(self._check_alerts(sid, cpu, memory, disk, now))
+                        # Clear down state if it was previously down
+                        self._down_alerted.discard(sid)
                     except Exception as ae:
                         print(f"Alert check failed: {ae}")
+                else:
+                    # Exporter Down alert
+                    try:
+                        if sid not in self._down_alerted:
+                            self._down_alerted.add(sid)
+                            import asyncio
+                            asyncio.run(self._fire_exporter_down_alert(sid, target, error, now))
+                    except Exception as ae:
+                        print(f"Exporter Down alert failed: {ae}")
 
             conn.close()
         except Exception as e:
@@ -389,6 +401,62 @@ class ScrapeManager:
             conn.close()
         except Exception as e:
             print(f"Error in alert check: {e}")
+
+    async def _fire_exporter_down_alert(self, server_id: int, target: str, error: str, timestamp: str):
+        """Fire an alert when an exporter becomes unreachable."""
+        import os
+        import sqlite3
+        from pymon.notifications import dispatcher
+
+        try:
+            db_path = os.getenv("DB_PATH", "pymon.db")
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+
+            # Get server name
+            server = c.execute("SELECT name, host FROM servers WHERE id = ?", (server_id,)).fetchone()
+            server_name = server["name"] if server else f"ID {server_id}"
+            server_host = server["host"] if server else target
+
+            # Get notification config
+            from pymon.config import load_config
+            config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+            notif_cfg = config.notifications
+
+            msg = (
+                f"🔴 <b>EXPORTER DOWN</b>\n\n"
+                f"Server: <b>{server_name}</b>\n"
+                f"Endpoint: {server_host}\n"
+                f"Error: {error or 'unreachable'}\n"
+                f"Time: {timestamp}"
+            )
+
+            channels = {}
+            if notif_cfg.enabled:
+                if notif_cfg.telegram_bot_token and notif_cfg.telegram_chat_id:
+                    channels["telegram"] = {
+                        "bot_token": notif_cfg.telegram_bot_token,
+                        "chat_id": notif_cfg.telegram_chat_id
+                    }
+                if notif_cfg.discord_webhook_url:
+                    channels["discord"] = {
+                        "webhook_url": notif_cfg.discord_webhook_url
+                    }
+
+            if channels:
+                dispatcher.dispatch("Exporter Down", msg, channels)
+
+            # Log to audit
+            c.execute(
+                "INSERT INTO audit_logs (username, action, target, timestamp) VALUES (?, ?, ?, ?)",
+                ("system", "Exporter Down", f"{server_name} ({server_host})", timestamp)
+            )
+            conn.commit()
+            conn.close()
+            print(f"[ALERT] Exporter Down: {server_name} ({server_host}) - {error}")
+        except Exception as e:
+            print(f"Error firing exporter down alert: {e}")
 
     async def _scrape_loop(self, target: ScrapeTarget):
         while self._running:

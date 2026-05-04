@@ -48,6 +48,8 @@ class AlertModel(BaseModel):
     notify_slack: bool = False
     notify_email: bool = False
     notify_teams: bool = False
+    notify_webhook: bool = False
+    is_exporter_down: bool = False
     description: Optional[str] = None
     enabled: bool = True
 
@@ -192,14 +194,19 @@ def init_web_tables():
             notify_slack BOOLEAN DEFAULT 0,
             notify_email BOOLEAN DEFAULT 0,
             notify_teams BOOLEAN DEFAULT 0,
+            notify_webhook BOOLEAN DEFAULT 0,
             description TEXT,
             enabled BOOLEAN DEFAULT 1,
             created_at TEXT
         )""")
 
-        # Add notify_teams column if not exists
         try:
-            c.execute("ALTER TABLE alerts ADD COLUMN notify_teams BOOLEAN DEFAULT 0")
+            c.execute("ALTER TABLE alerts ADD COLUMN notify_webhook BOOLEAN DEFAULT 0")
+        except:
+            pass
+
+        try:
+            c.execute("ALTER TABLE alerts ADD COLUMN is_exporter_down BOOLEAN DEFAULT 0")
         except:
             pass
 
@@ -555,6 +562,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <button class="nav-item active" data-view="dashboard"><i class="fas fa-th-large"></i> Dashboard</button>
                 <button class="nav-item" data-view="servers"><i class="fas fa-server"></i> Servers</button>
                 <button class="nav-item" data-view="alerts"><i class="fas fa-bell"></i> Alerts</button>
+                <button class="nav-item" data-view="logs"><i class="fas fa-list"></i> Logs</button>
                 <button class="nav-item" data-view="settings"><i class="fas fa-cog"></i> Settings</button>
             </nav>
             <div class="sidebar-footer">
@@ -724,15 +732,137 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                 </div>
             </div>
 
+            <div id="view-logs" class="view hidden">
+                <div class="header">
+                    <h2>System Logs</h2>
+                    <div class="header-actions">
+                        <select id="log-filter" class="form-control" style="width: 120px;" onchange="Logs.load()">
+                            <option value="">All Types</option>
+                            <option value="Exporter Down">Exporter Down</option>
+                            <option value="server added">Server Added</option>
+                            <option value="server deleted">Server Deleted</option>
+                            <option value="login">Login</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="Logs.load()"><i class="fas fa-sync"></i></button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <table class="table">
+                            <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th></th></tr></thead>
+                            <tbody id="logs-list"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div id="view-settings" class="view hidden">
-                <div class="header"><h2>Settings</h2></div>
+<div class="header"><h2>Settings</h2></div>
                 <div class="card">
                     <div class="card-body">
                         <div class="tabs">
-                            <div class="tab active" data-tab="notifications">Notifications</div>
+                            <div class="tab active" data-tab="general">General</div>
+                            <div class="tab" data-tab="notifications">Notifications</div>
                             <div class="tab" data-tab="backups">Backups</div>
                             <div class="tab" data-tab="api">API Keys</div>
+                            <div class="tab" data-tab="system">System</div>
                         </div>
+
+                        <div id="tab-general" class="tab-content active">
+                            <h4 style="margin-bottom: 16px;">Server Configuration</h4>
+                            <div class="grid-2">
+                                <div class="form-group"><label>Server Port</label><input type="number" id="server-port" class="form-control" value="8090"></div>
+                                <div class="form-group"><label>Server Host</label><input type="text" id="server-host" class="form-control" value="0.0.0.0"></div>
+                            </div>
+                            <div class="grid-2">
+                                <div class="form-group"><label>Database Path</label><input type="text" id="db-path" class="form-control" value="pymon.db"></div>
+                                <div class="form-group"><label>Retention (hours)</label><input type="number" id="retention-hours" class="form-control" value="168"></div>
+                            </div>
+                            <h4 style="margin: 24px 0 16px;">Scrape Settings</h4>
+                            <div class="grid-2">
+                                <div class="form-group"><label>Default Interval (sec)</label><input type="number" id="scrape-interval" class="form-control" value="15"></div>
+                                <div class="form-group"><label>Timeout (sec)</label><input type="number" id="scrape-timeout" class="form-control" value="10"></div>
+                            </div>
+                            <button class="btn btn-primary" onclick="Settings.saveGeneral()"><i class="fas fa-save"></i> Save</button>
+                        </div>
+
+                        <div id="tab-notifications" class="tab-content">
+                            <div class="grid-2">
+                                <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius);">
+                                    <h4 style="margin-bottom: 12px; color: #229ED9;"><i class="fab fa-telegram"></i> Telegram</h4>
+                                    <div class="form-group"><label><input type="checkbox" id="telegram-enabled"> Enabled</label></div>
+                                    <div class="form-group"><label>Bot Token</label><input type="text" id="telegram-token" class="form-control"></div>
+                                    <div class="form-group"><label>Chat ID</label><input type="text" id="telegram-chat" class="form-control"></div>
+                                </div>
+                                <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius);">
+                                    <h4 style="margin-bottom: 12px; color: #5865F2;"><i class="fab fa-discord"></i> Discord</h4>
+                                    <div class="form-group"><label><input type="checkbox" id="discord-enabled"> Enabled</label></div>
+                                    <div class="form-group"><label>Webhook URL</label><input type="text" id="discord-webhook" class="form-control"></div>
+                                </div>
+                            </div>
+                            <div class="grid-2" style="margin-top: 16px;">
+                                <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius);">
+                                    <h4 style="margin-bottom: 12px; color: #E01E5A;"><i class="fab fa-slack"></i> Slack</h4>
+                                    <div class="form-group"><label><input type="checkbox" id="slack-enabled"> Enabled</label></div>
+                                    <div class="form-group"><label>Webhook URL</label><input type="text" id="slack-webhook" class="form-control"></div>
+                                </div>
+                                <div style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius);">
+                                    <h4 style="margin-bottom: 12px; #4A154B;"><i class="fas fa-envelope"></i> Email</h4>
+                                    <div class="form-group"><label><input type="checkbox" id="email-enabled"> Enabled</label></div>
+                                    <div class="form-group"><label>SMTP Server</label><input type="text" id="email-smtp" class="form-control"></div>
+                                    <div class="form-group"><label>To</label><input type="text" id="email-to" class="form-control"></div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 16px; padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius);">
+                                <h4 style="margin-bottom: 12px;"><i class="fas fa-link"></i> Webhook</h4>
+                                <div class="form-group"><label><input type="checkbox" id="webhook-enabled"> Enabled</label></div>
+                                <div class="form-group"><label>Webhook URL</label><input type="text" id="webhook-url" class="form-control"></div>
+                            </div>
+                            <button class="btn btn-primary mt-4" onclick="Settings.saveNotifications()"><i class="fas fa-save"></i> Save</button>
+                        </div>
+
+                        <div id="tab-backups" class="tab-content">
+                            <div class="grid-2">
+                                <div class="form-group"><label><input type="checkbox" id="auto-backup-enabled"> Auto Backup</label></div>
+                                <div class="form-group"><label>Schedule (cron)</label><input type="text" id="backup-schedule" class="form-control" value="0 2 * * *"></div>
+                            </div>
+                            <div class="grid-2">
+                                <div class="form-group"><label>Backup Directory</label><input type="text" id="backup-dir" class="form-control"></div>
+                                <div class="form-group"><label>Max Backups</label><input type="number" id="max-backups" class="form-control" value="10"></div>
+                            </div>
+                            <button class="btn btn-primary mb-4" onclick="Settings.saveBackupConfig()"><i class="fas fa-save"></i> Save Config</button>
+                            <hr>
+                            <button class="btn btn-primary mb-4" onclick="Settings.createBackup()"><i class="fas fa-download"></i> Create Backup Now</button>
+                            <table id="backups-table"><thead><tr><th>Filename</th><th>Size</th><th>Created</th><th></th></tr><tbody></tbody></table>
+                        </div>
+
+                        <div id="tab-api" class="tab-content">
+                            <button class="btn btn-primary mb-4" onclick="Settings.createApiKey()"><i class="fas fa-key"></i> Generate New Key</button>
+                            <table id="apikeys-table"><thead><tr><th>Name</th><th>Created</th><th>Last Used</th><th></th></tr><tbody></tbody></table>
+                        </div>
+
+                        <div id="tab-system" class="tab-content">
+                            <h4 style="margin-bottom: 16px;">System Information</h4>
+                            <div id="system-info" style="padding: 16px; background: var(--bg-tertiary); border-radius: var(--radius);">
+                                <p><strong>Version:</strong> <span id="sys-version">-</span></p>
+                                <p><strong>Uptime:</strong> <span id="sys-uptime">-</span></p>
+                                <p><strong>Total Servers:</strong> <span id="sys-servers">-</span></p>
+                                <p><strong>Online:</strong> <span id="sys-online">-</span></p>
+                                <p><strong>Database Size:</strong> <span id="sys-db-size">-</span></p>
+                            </div>
+                            <h4 style="margin: 24px 0 16px;">Maintenance</h4>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button class="btn btn-warning" onclick="Settings.clearOldData()">Clear Old Data</button>
+                                <button class="btn btn-warning" onclick="Settings.optimizeDb()">Optimize Database</button>
+                                <button class="btn btn-danger" onclick="Settings.exportConfig()">Export Config</button>
+                                <button class="btn btn-danger" onclick="Settings.importConfig()">Import Config</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
 
                         <div id="tab-notifications" class="tab-content active">
                             <div class="grid-2">
@@ -814,11 +944,34 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
             </div>
             <form id="form-alert" onsubmit="Alerts.create(event)">
                 <div class="modal-body">
+                    <input type="hidden" id="alert-id">
                     <div class="form-group"><label>Name</label><input type="text" id="alert-name" class="form-control" required></div>
-                    <div class="form-group"><label>Metric</label><select id="alert-metric" class="form-control"><option value="cpu">CPU</option><option value="memory">Memory</option><option value="disk">Disk</option></select></div>
-                    <div class="form-group"><label>Condition</label><select id="alert-condition" class="form-control"><option value=">">Greater than</option><option value="<">Less than</option></select></div>
-                    <div class="form-group"><label>Threshold (%)</label><input type="number" id="alert-threshold" class="form-control" value="80"></div>
+                    <div class="form-group"><label>Type</label>
+                        <select id="alert-type" class="form-control" onchange="AlertForm.toggleType()">
+                            <option value="metric">Metric Threshold</option>
+                            <option value="exporter">Exporter Down</option>
+                        </select>
+                    </div>
+                    <div id="alert-metric-options">
+                        <div class="form-group"><label>Metric</label><select id="alert-metric" class="form-control"><option value="cpu">CPU</option><option value="memory">Memory</option><option value="disk">Disk</option></select></div>
+                        <div class="form-group"><label>Condition</label><select id="alert-condition" class="form-control"><option value=">">Greater than</option><option value="<">Less than</option></select></div>
+                        <div class="form-group"><label>Threshold (%)</label><input type="number" id="alert-threshold" class="form-control" value="80"></div>
+                    </div>
+                    <div id="alert-exporter-options" style="display:none;">
+                        <div class="form-group"><label>Check Interval (seconds)</label><input type="number" id="alert-check-interval" class="form-control" value="60"></div>
+                    </div>
                     <div class="form-group"><label>Severity</label><select id="alert-severity" class="form-control"><option value="warning">Warning</option><option value="critical">Critical</option></select></div>
+                    <div class="form-group"><label>Notifications</label>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            <label><input type="checkbox" id="alert-notify-telegram"> Telegram</label>
+                            <label><input type="checkbox" id="alert-notify-discord"> Discord</label>
+                            <label><input type="checkbox" id="alert-notify-slack"> Slack</label>
+                            <label><input type="checkbox" id="alert-notify-email"> Email</label>
+                            <label><input type="checkbox" id="alert-notify-webhook"> Webhook</label>
+                        </div>
+                    </div>
+                    <div class="form-group"><label>Description</label><textarea id="alert-description" class="form-control" rows="2"></textarea></div>
+                    <div class="form-group"><label><input type="checkbox" id="alert-enabled" checked> Enabled</label></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="Modal.hide('alert')">Cancel</button>
@@ -858,6 +1011,7 @@ const App = {
         if (view === 'dashboard') Dashboard.loadData();
         if (view === 'servers') Servers.load();
         if (view === 'alerts') Alerts.load();
+        if (view === 'logs') Logs.load();
         if (view === 'settings') Settings.load();
     },
 
@@ -1407,6 +1561,33 @@ const Servers = {
     }
 };
 
+const Logs = {
+    async load() {
+        try {
+            const filter = document.getElementById('log-filter').value;
+            let url = '/api/audit-logs?limit=100';
+            if (filter) url += '&filter=' + encodeURIComponent(filter);
+            const data = await API.get(url);
+            const logs = data.logs || [];
+            document.getElementById('logs-list').innerHTML = logs.length ? logs.map(l => `
+                <tr>
+                    <td style="font-size: 12px;">${l.timestamp ? l.timestamp.slice(0, 19).replace('T', ' ') : '-'}</td>
+                    <td>${l.username || '-'}</td>
+                    <td><span class="badge ${l.action === 'Exporter Down' ? 'badge-danger' : 'badge-info'}">${l.action}</span></td>
+                    <td style="font-size: 12px;">${l.target || '-'}</td>
+                    <td><button class="btn btn-danger btn-sm" onclick="Logs.delete(${l.id})"><i class="fas fa-trash"></i></button></td>
+                </tr>`).join('') : '<tr><td colspan="5" class="text-muted">No logs found</td></tr>';
+        } catch (e) { console.error(e); }
+    },
+
+    async delete(id) {
+        if (confirm('Delete this log entry?')) {
+            await API.delete(`/api/audit-logs/${id}`);
+            Logs.load();
+        }
+    }
+};
+
 const Alerts = {
     async load() {
         try {
@@ -1414,9 +1595,17 @@ const Alerts = {
             const alerts = data.alerts || [];
             document.getElementById('alerts-list').innerHTML = alerts.length ? alerts.map(a => `
                 <div style="padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                    <div><div style="font-weight: 600;">${a.name}</div><div class="text-muted" style="font-size: 12px;">${a.metric} ${a.condition} ${a.threshold}%</div></div>
+                    <div><div style="font-weight: 600;">${a.name}</div>
+                        <div class="text-muted" style="font-size: 12px;">
+                            ${a.is_exporter_down ? 'Exporter Down Monitoring' : a.metric + ' ' + a.condition + ' ' + a.threshold + '%'}
+                        </div>
+                        <div style="font-size: 11px; margin-top: 4px;">
+                            ${a.notify_telegram ? 'Telegram ' : ''}${a.notify_discord ? 'Discord ' : ''}${a.notify_slack ? 'Slack ' : ''}${a.notify_email ? 'Email ' : ''}${a.notify_webhook ? 'Webhook' : ''}
+                        </div>
+                    </div>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <span class="badge ${a.severity === 'critical' ? 'badge-danger' : 'badge-warning'}">${a.severity}</span>
+                        <button class="btn btn-secondary btn-sm" onclick="Alerts.edit(${a.id})"><i class="fas fa-edit"></i></button>
                         <button class="btn btn-danger btn-sm" onclick="Alerts.delete(${a.id})"><i class="fas fa-trash"></i></button>
                     </div>
                 </div>`).join('') : '<div class="empty-state"><i class="fas fa-bell"></i><p>No alerts configured</p></div>';
@@ -1425,11 +1614,60 @@ const Alerts = {
 
     async create(e) {
         e.preventDefault();
-        const data = { name: document.getElementById('alert-name').value, metric: document.getElementById('alert-metric').value, condition: document.getElementById('alert-condition').value, threshold: parseInt(document.getElementById('alert-threshold').value), severity: document.getElementById('alert-severity').value, enabled: true };
-        await API.post('/api/alerts', data);
+        const alertId = document.getElementById('alert-id').value;
+        const isExporterDown = document.getElementById('alert-type').value === 'exporter';
+        const data = {
+            name: document.getElementById('alert-name').value,
+            metric: document.getElementById('alert-metric').value || 'cpu',
+            condition: document.getElementById('alert-condition').value || '>',
+            threshold: parseInt(document.getElementById('alert-threshold').value) || 80,
+            duration: parseInt(document.getElementById('alert-check-interval').value) || 60,
+            severity: document.getElementById('alert-severity').value,
+            is_exporter_down: isExporterDown,
+            notify_telegram: document.getElementById('alert-notify-telegram').checked,
+            notify_discord: document.getElementById('alert-notify-discord').checked,
+            notify_slack: document.getElementById('alert-notify-slack').checked,
+            notify_email: document.getElementById('alert-notify-email').checked,
+            notify_webhook: document.getElementById('alert-notify-webhook').checked,
+            description: document.getElementById('alert-description').value,
+            enabled: document.getElementById('alert-enabled').checked
+        };
+        if (alertId) {
+            await API.put(`/api/alerts/${alertId}`, data);
+        } else {
+            await API.post('/api/alerts', data);
+        }
         Modal.hide('alert');
         document.getElementById('form-alert').reset();
+        document.getElementById('alert-id').value = '';
+        document.querySelector('#modal-alert .modal-header h3').textContent = 'New Alert';
         Alerts.load();
+    },
+
+    async edit(id) {
+        try {
+            const data = await API.get('/api/alerts');
+            const alert = data.alerts.find(a => a.id === id);
+            if (!alert) return;
+            document.getElementById('alert-id').value = alert.id;
+            document.getElementById('alert-name').value = alert.name;
+            document.getElementById('alert-type').value = alert.is_exporter_down ? 'exporter' : 'metric';
+            document.getElementById('alert-metric').value = alert.metric || 'cpu';
+            document.getElementById('alert-condition').value = alert.condition || '>';
+            document.getElementById('alert-threshold').value = alert.threshold || 80;
+            document.getElementById('alert-check-interval').value = alert.duration || 60;
+            document.getElementById('alert-severity').value = alert.severity || 'warning';
+            document.getElementById('alert-notify-telegram').checked = alert.notify_telegram;
+            document.getElementById('alert-notify-discord').checked = alert.notify_discord;
+            document.getElementById('alert-notify-slack').checked = alert.notify_slack;
+            document.getElementById('alert-notify-email').checked = alert.notify_email;
+            document.getElementById('alert-notify-webhook').checked = alert.notify_webhook;
+            document.getElementById('alert-description').value = alert.description || '';
+            document.getElementById('alert-enabled').checked = alert.enabled;
+            AlertForm.toggleType();
+            document.querySelector('#modal-alert .modal-header h3').textContent = 'Edit Alert';
+            Modal.show('alert');
+        } catch (e) { console.error(e); }
     },
 
     async delete(id) {
@@ -1440,34 +1678,124 @@ const Alerts = {
     }
 };
 
+const AlertForm = {
+    toggleType() {
+        const type = document.getElementById('alert-type').value;
+        document.getElementById('alert-metric-options').style.display = type === 'metric' ? 'block' : 'none';
+        document.getElementById('alert-exporter-options').style.display = type === 'exporter' ? 'block' : 'none';
+    }
+};
+
 const Settings = {
     async load() {
+        try {
+            await Promise.all([
+                Settings.loadGeneral(),
+                Settings.loadNotifications(),
+                Settings.loadBackupConfig(),
+                Settings.loadApiKeys(),
+                Settings.loadSystemInfo()
+            ]);
+        } catch (e) { console.error(e); }
+    },
+
+    async loadGeneral() {
+        try {
+            const data = await API.get('/api/settings');
+            if (data.server) {
+                document.getElementById('server-port').value = data.server.port || 8090;
+                document.getElementById('server-host').value = data.server.host || '0.0.0.0';
+            }
+            if (data.storage) {
+                document.getElementById('db-path').value = data.storage.path || 'pymon.db';
+                document.getElementById('retention-hours').value = data.storage.retention_hours || 168;
+            }
+        } catch (e) { console.error(e); }
+    },
+
+    async saveGeneral() {
+        const data = {
+            server: { port: parseInt(document.getElementById('server-port').value), host: document.getElementById('server-host').value },
+            storage: { path: document.getElementById('db-path').value, retention_hours: parseInt(document.getElementById('retention-hours').value) }
+        };
+        try {
+            await API.put('/api/settings/general', data);
+            alert('Settings saved!');
+        } catch (e) { alert('Error: ' + e.message); }
+    },
+
+    async loadNotifications() {
         try {
             const data = await API.get('/api/notifications');
             (data.notifications || []).forEach(n => {
                 if (n.channel === 'telegram') { document.getElementById('telegram-enabled').checked = n.enabled; document.getElementById('telegram-token').value = n.telegram_bot_token || ''; document.getElementById('telegram-chat').value = n.telegram_chat_id || ''; }
                 if (n.channel === 'discord') { document.getElementById('discord-enabled').checked = n.enabled; document.getElementById('discord-webhook').value = n.discord_webhook || ''; }
+                if (n.channel === 'slack') { document.getElementById('slack-enabled').checked = n.enabled; document.getElementById('slack-webhook').value = n.slack_webhook || ''; }
+                if (n.channel === 'email') { document.getElementById('email-enabled').checked = n.enabled; document.getElementById('email-smtp').value = n.smtp_server || ''; document.getElementById('email-to').value = n.email_to || ''; }
+                if (n.channel === 'webhook') { document.getElementById('webhook-enabled').checked = n.enabled; document.getElementById('webhook-url').value = n.webhook_url || ''; }
             });
-            const backupData = await API.get('/api/backup/list');
-            document.querySelector('#backups-table tbody').innerHTML = (backupData.files || []).map(f => `<tr><td>${f.filename}</td><td>${(f.size/1024).toFixed(1)} KB</td><td>${f.created?.slice(0,19) || '-'}</td></tr>`).join('') || '<tr><td colspan="3" class="text-muted">No backups</td></tr>';
-            const apiData = await API.get('/api/api-keys');
-            document.querySelector('#apikeys-table tbody').innerHTML = (apiData.keys || []).map(k => `<tr><td>${k.name}</td><td>${k.created_at?.slice(0,19) || '-'}</td><td>${k.last_used || 'Never'}</td><td><button class="btn btn-danger btn-sm" onclick="Settings.deleteApiKey(${k.id})"><i class="fas fa-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="4" class="text-muted">No keys</td></tr>';
         } catch (e) { console.error(e); }
     },
 
     async saveNotifications() {
         const channels = [
             { id: 'telegram', config: { enabled: document.getElementById('telegram-enabled').checked, telegram_bot_token: document.getElementById('telegram-token').value, telegram_chat_id: document.getElementById('telegram-chat').value }},
-            { id: 'discord', config: { enabled: document.getElementById('discord-enabled').checked, discord_webhook: document.getElementById('discord-webhook').value }}
+            { id: 'discord', config: { enabled: document.getElementById('discord-enabled').checked, discord_webhook: document.getElementById('discord-webhook').value }},
+            { id: 'slack', config: { enabled: document.getElementById('slack-enabled').checked, slack_webhook: document.getElementById('slack-webhook').value }},
+            { id: 'email', config: { enabled: document.getElementById('email-enabled').checked, smtp_server: document.getElementById('email-smtp').value, email_to: document.getElementById('email-to').value }},
+            { id: 'webhook', config: { enabled: document.getElementById('webhook-enabled').checked, webhook_url: document.getElementById('webhook-url').value }}
         ];
-        for (const ch of channels) await API.put(`/api/notifications/${ch.id}`, ch.config);
-        alert('Saved!');
+        for (const ch of channels) {
+            try {
+                await API.put(`/api/notifications/${ch.id}`, ch.config);
+            } catch (e) { console.error(e); }
+        }
+        alert('Notifications saved!');
+    },
+
+    async loadBackupConfig() {
+        try {
+            const data = await API.get('/api/backup/config');
+            document.getElementById('auto-backup-enabled').checked = data.auto_backup;
+            document.getElementById('backup-schedule').value = data.backup_time || '02:00';
+            document.getElementById('backup-dir').value = data.backup_path || '';
+            document.getElementById('max-backups').value = data.keep_days || 10;
+            const listData = await API.get('/api/backup/list');
+            document.querySelector('#backups-table tbody').innerHTML = (listData.files || []).map(f => `<tr><td>${f.filename}</td><td>${(f.size/1024).toFixed(1)} KB</td><td>${f.created?.slice(0,19) || '-'}</td><td><button class="btn btn-danger btn-sm" onclick="Settings.deleteBackup('${f.filename}')"><i class="fas fa-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="4" class="text-muted">No backups</td></tr>';
+        } catch (e) { console.error(e); }
+    },
+
+    async saveBackupConfig() {
+        const data = {
+            auto_backup: document.getElementById('auto-backup-enabled').checked,
+            backup_time: document.getElementById('backup-schedule').value,
+            backup_path: document.getElementById('backup-dir').value,
+            keep_days: parseInt(document.getElementById('max-backups').value)
+        };
+        await API.post('/api/backup/config', data);
+        alert('Backup config saved!');
     },
 
     async createBackup() {
-        const res = await API.post('/api/backup/create', {});
-        alert(res.status === 'ok' ? 'Backup created!' : 'Error');
-        Settings.load();
+        try {
+            const res = await API.post('/api/backup/create', {});
+            alert(res.status === 'ok' ? 'Backup created!' : 'Error');
+            Settings.loadBackupConfig();
+        } catch (e) { alert('Error: ' + e.message); }
+    },
+
+    async deleteBackup(filename) {
+        if (confirm('Delete this backup?')) {
+            await API.delete(`/api/backup/${filename}`);
+            Settings.loadBackupConfig();
+        }
+    },
+
+    async loadApiKeys() {
+        try {
+            const data = await API.get('/api/api-keys');
+            document.querySelector('#apikeys-table tbody').innerHTML = (data.keys || []).map(k => `<tr><td>${k.name}</td><td>${k.created_at?.slice(0,19) || '-'}</td><td>${k.last_used || 'Never'}</td><td><button class="btn btn-danger btn-sm" onclick="Settings.deleteApiKey(${k.id})"><i class="fas fa-trash"></i></button></td></tr>`).join('') || '<tr><td colspan="4" class="text-muted">No keys</td></tr>';
+        } catch (e) { console.error(e); }
     },
 
     async createApiKey() {
@@ -1475,11 +1803,68 @@ const Settings = {
         if (!name) return;
         const res = await API.post('/api/api-keys', { name });
         if (res.key) alert('API Key:\n' + res.key);
-        Settings.load();
+        Settings.loadApiKeys();
     },
 
     async deleteApiKey(id) {
-        if (confirm('Delete this key?')) { await API.delete(`/api/api-keys/${id}`); Settings.load(); }
+        if (confirm('Delete this key?')) { await API.delete(`/api/api-keys/${id}`); Settings.loadApiKeys(); }
+    },
+
+    async loadSystemInfo() {
+        try {
+            const serverData = await API.get('/api/servers');
+            const servers = serverData.servers || [];
+            const online = servers.filter(s => s.last_status === 'up').length;
+            document.getElementById('sys-version').textContent = '1.0.0';
+            document.getElementById('sys-uptime').textContent = '-';
+            document.getElementById('sys-servers').textContent = servers.length;
+            document.getElementById('sys-online').textContent = online;
+            document.getElementById('sys-db-size').textContent = '-';
+        } catch (e) { console.error(e); }
+    },
+
+    async clearOldData() {
+        if (confirm('Clear data older than 30 days?')) {
+            alert('Feature coming soon');
+        }
+    },
+
+    async optimizeDb() {
+        alert('Optimizing...');
+        try {
+            await API.post('/api/backup/optimize', {});
+            alert('Database optimized!');
+        } catch (e) { alert('Error: ' + e.message); }
+    },
+
+    async exportConfig() {
+        const data = await API.get('/api/export');
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'pymon-config.json';
+        a.click();
+    },
+
+    async importConfig() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    await API.post('/api/import', data);
+                    alert('Config imported!');
+                    Settings.load();
+                } catch (err) { alert('Error: ' + err.message); }
+            };
+            reader.readAsText(file);
+        };
+        input.click();
     }
 };
 
@@ -2043,8 +2428,8 @@ async def create_alert(alert: AlertModel):
     conn = get_db()
     try:
         conn.execute(
-            """INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, notify_telegram, notify_discord, notify_slack, notify_email, description, enabled, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, notify_telegram, notify_discord, notify_slack, notify_email, notify_webhook, is_exporter_down, description, enabled, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 alert.name,
                 alert.metric,
@@ -2057,6 +2442,8 @@ async def create_alert(alert: AlertModel):
                 int(alert.notify_discord),
                 int(alert.notify_slack),
                 int(alert.notify_email),
+                int(alert.notify_webhook),
+                int(alert.is_exporter_down),
                 alert.description,
                 int(alert.enabled),
                 datetime.now(timezone.utc).isoformat(),
@@ -2073,7 +2460,7 @@ async def create_alert(alert: AlertModel):
 async def update_alert(alert_id: int, alert: AlertModel):
     conn = get_db()
     conn.execute(
-        """UPDATE alerts SET name=?, metric=?, condition=?, threshold=?, duration=?, severity=?, server_id=?, notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?, description=?, enabled=? WHERE id=?""",
+        """UPDATE alerts SET name=?, metric=?, condition=?, threshold=?, duration=?, severity=?, server_id=?, notify_telegram=?, notify_discord=?, notify_slack=?, notify_email=?, notify_webhook=?, is_exporter_down=?, description=?, enabled=? WHERE id=?""",
         (
             alert.name,
             alert.metric,
@@ -2086,6 +2473,8 @@ async def update_alert(alert_id: int, alert: AlertModel):
             int(alert.notify_discord),
             int(alert.notify_slack),
             int(alert.notify_email),
+            int(alert.notify_webhook),
+            int(alert.is_exporter_down),
             alert.description,
             int(alert.enabled),
             alert_id,
@@ -2436,6 +2825,26 @@ async def list_audit_log(limit: int = 100):
     logs = conn.execute("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT ?", (limit,)).fetchall()
     conn.close()
     return {"logs": [dict(l) for l in logs]}
+
+
+@router.get("/api/audit-logs")
+async def list_audit_logs(limit: int = 100, filter: str = ""):
+    conn = get_db()
+    if filter:
+        logs = conn.execute("SELECT * FROM audit_logs WHERE action LIKE ? ORDER BY timestamp DESC LIMIT ?", (f"%{filter}%", limit)).fetchall()
+    else:
+        logs = conn.execute("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT ?", (limit,)).fetchall()
+    conn.close()
+    return {"logs": [dict(l) for l in logs]}
+
+
+@router.delete("/api/audit-logs/{log_id}")
+async def delete_audit_log(log_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM audit_logs WHERE id = ?", (log_id,))
+    conn.commit()
+    conn.close()
+    return {"status": "ok"}
 
 
 def log_audit(user_id: int, action: str, details: str = "", ip: str = ""):
