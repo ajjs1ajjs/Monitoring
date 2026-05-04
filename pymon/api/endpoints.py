@@ -76,6 +76,15 @@ class ServerCreate(BaseModel):
     enabled: bool = True
 
 
+class ServerUpdate(BaseModel):
+    name: str | None = None
+    host: str | None = None
+    os_type: str | None = None
+    agent_port: int | None = None
+    enabled: bool | None = None
+
+
+
 class AlertCreate(BaseModel):
     name: str
     metric: str
@@ -968,6 +977,57 @@ async def create_server(request: Request, data: ServerCreate, current_user: User
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    finally:
+        conn.close()
+
+
+@api.put("/servers/{server_id}")
+async def update_server(
+    server_id: int, request: Request, data: ServerUpdate, current_user: User = Depends(get_admin_user)
+):
+    conn = get_db()
+    c = conn.cursor()
+    try:
+        # Check if exists
+        server = c.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
+        if not server:
+            raise HTTPException(status_code=404, detail="Server not found")
+
+        updates = []
+        params = []
+        if data.name is not None:
+            updates.append("name = ?")
+            params.append(data.name)
+        if data.host is not None:
+            updates.append("host = ?")
+            params.append(data.host)
+        if data.os_type is not None:
+            updates.append("os_type = ?")
+            params.append(data.os_type)
+        if data.agent_port is not None:
+            updates.append("agent_port = ?")
+            params.append(data.agent_port)
+        if data.enabled is not None:
+            updates.append("enabled = ?")
+            params.append(1 if data.enabled else 0)
+
+        if not updates:
+            return {"status": "no_changes"}
+
+        params.append(server_id)
+        c.execute(f"UPDATE servers SET {', '.join(updates)} WHERE id = ?", tuple(params))
+        conn.commit()
+
+        # Update ScrapeManager dynamically
+        scrape_manager = getattr(request.app.state, "scrape_manager", None)
+        if scrape_manager:
+            # Refresh targets from DB
+            updated_server = c.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
+            scrape_manager.remove_target("agents", f"{server['host']}:{server['agent_port']}")
+            if updated_server["enabled"]:
+                scrape_manager.add_server_target(dict(updated_server))
+
+        return {"status": "ok"}
     finally:
         conn.close()
 

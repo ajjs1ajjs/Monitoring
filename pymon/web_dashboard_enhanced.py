@@ -594,6 +594,62 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         </div>
     </div>
 
+    <div id="editNodeModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Update Node Configuration</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('editNodeModal', false)"></i>
+            </div>
+            <form id="editNodeForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Display Name</label>
+                        <input type="text" id="editNodeName" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Host Address</label>
+                        <input type="text" id="editNodeHost" required class="form-input">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>System OS</label>
+                            <select id="editNodeOS" class="form-input">
+                                <option value="linux">Linux / POSIX</option>
+                                <option value="windows">Windows / NT</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Agent Port</label>
+                            <input type="number" id="editNodePort" class="form-input">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('editNodeModal', false)">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="deployModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="deployTitle">Deploy Agent</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('deployModal', false)"></i>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Execute this command on the target server to install the exporter:</p>
+                <div class="form-group">
+                    <textarea id="deployCmd" readonly class="form-input" style="height: 120px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; resize: none;"></textarea>
+                </div>
+                <button class="btn btn-secondary" style="width: 100%;" onclick="copyDeployCmd()">
+                    <i data-lucide="copy" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Copy to Clipboard
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Init Lucide
         lucide.createIcons();
@@ -836,9 +892,17 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         </div>
                     </div>
                     <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                        <button onclick="forceScrapeSingle(${n.id})" title="Force Scrape" style="background: transparent; border: none; color: var(--accent); cursor: pointer; opacity: 0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
-                            <i data-lucide="zap" style="width: 14px; height: 14px;"></i>
-                        </button>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button onclick="forceScrapeSingle(${n.id})" title="Force Scrape" style="background: transparent; border: none; color: var(--accent); cursor: pointer; opacity: 0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+                                <i data-lucide="zap" style="width: 14px; height: 14px;"></i>
+                            </button>
+                            <button onclick="showEditModal(${n.id})" title="Edit Node" style="background: transparent; border: none; color: #3b82f6; cursor: pointer; opacity: 0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+                                <i data-lucide="settings" style="width: 14px; height: 14px;"></i>
+                            </button>
+                            <button onclick="showDeployModal(${n.id})" title="Deploy Agent" style="background: transparent; border: none; color: var(--success); cursor: pointer; opacity: 0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+                                <i data-lucide="download-cloud" style="width: 14px; height: 14px;"></i>
+                            </button>
+                        </div>
                         <button onclick="deleteNode(${n.id})" style="background: transparent; border: none; color: #f87171; cursor: pointer; opacity: 0.5;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">
                             <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                         </button>
@@ -1015,6 +1079,58 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             if (resp && resp.ok) alert('Configuration Saved Successfully');
         }
 
+        // --- NEW FEATURES ---
+
+        let editingServerId = null;
+
+        function showEditModal(id) {
+            const s = nodes.find(n => n.id === id);
+            if (!s) return;
+            editingServerId = id;
+            document.getElementById('editNodeName').value = s.name;
+            document.getElementById('editNodeHost').value = s.host;
+            document.getElementById('editNodeOS').value = s.os_type || 'linux';
+            document.getElementById('editNodePort').value = s.agent_port || 9100;
+            toggleModal('editNodeModal', true);
+        }
+
+        document.getElementById('editNodeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resp = await apiFetch(`/api/v1/servers/${editingServerId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: document.getElementById('editNodeName').value,
+                    host: document.getElementById('editNodeHost').value,
+                    os_type: document.getElementById('editNodeOS').value,
+                    agent_port: parseInt(document.getElementById('editNodePort').value)
+                })
+            });
+            if (resp && resp.ok) {
+                toggleModal('editNodeModal', false);
+                refreshData();
+            }
+        });
+
+        function showDeployModal(id) {
+            const s = nodes.find(n => n.id === id);
+            if (!s) return;
+            const os = s.os_type || 'linux';
+            const linuxCmd = `curl -sLO https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz && tar xvf node_exporter-1.7.0.linux-amd64.tar.gz && ./node_exporter-1.7.0.linux-amd64/node_exporter`;
+            const windowsCmd = `msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.24.4/windows_exporter-0.24.4-amd64.msi`;
+            
+            document.getElementById('deployCmd').value = (os === 'linux') ? linuxCmd : windowsCmd;
+            document.getElementById('deployTitle').textContent = `Deploy Agent to ${s.name} (${os})`;
+            toggleModal('deployModal', true);
+        }
+
+        function copyDeployCmd() {
+            const el = document.getElementById('deployCmd');
+            el.select();
+            document.execCommand('copy');
+            alert('Command copied to clipboard');
+        }
+
         // Initialization
         initCharts();
         refreshData();
@@ -1022,3 +1138,4 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
     </script>
 </body>
 </html>"""
+
