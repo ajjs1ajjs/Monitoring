@@ -973,4 +973,4 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         setInterval(loadData, 10000);
     </script>
 </body>
-</html>
+</html>"""
