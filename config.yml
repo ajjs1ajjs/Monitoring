@@ -1,0 +1,33 @@
+server:
+  port: 8090
+  host: 0.0.0.0
+  domain: localhost
+storage:
+  backend: sqlite
+  path: pymon.db
+  retention_hours: 168
+auth:
+  admin_username: admin
+  admin_password: changeme
+  jwt_expire_hours: 24
+backup:
+  enabled: true
+  max_backups: 10
+  backup_dir: ./backups
+  schedule: 0 2 * * *
+scrape_configs:
+  - job_name: agents
+    scrape_interval: 15
+    scrape_timeout: 10
+    metrics_path: /metrics
+    honor_labels: false
+    static_configs: []
+alerting:
+  enabled: true
+  rules:
+    - name: Exporter Down
+      expr: up
+      threshold: 0
+      duration: 0
+      severity: critical
+      message: Exporter is down
