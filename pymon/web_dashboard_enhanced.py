@@ -1117,7 +1117,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             if (!s) return;
             const os = s.os_type || 'linux';
             const linuxCmd = `curl -sLO https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz && tar xvf node_exporter-1.7.0.linux-amd64.tar.gz && ./node_exporter-1.7.0.linux-amd64/node_exporter`;
-            const windowsCmd = `msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.24.4/windows_exporter-0.24.4-amd64.msi`;
+            const windowsCmd = `msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.30.9/windows_exporter-0.30.9-amd64.msi`;
             
             document.getElementById('deployCmd').value = (os === 'linux') ? linuxCmd : windowsCmd;
             document.getElementById('deployTitle').textContent = `Deploy Agent to ${s.name} (${os})`;
