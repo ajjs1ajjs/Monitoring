@@ -111,30 +111,24 @@ scrape_configs:
 
 ---
 
-## Data Sources
+## Data Sources (Telegraf)
+
+Ми використовуємо Telegraf як єдиний агент збору метрик.
 
 ### Windows Server
-
+Виконайте PowerShell як Адміністратор:
 ```powershell
-# Install windows_exporter (PowerShell as Admin)
-msiexec /i windows_exporter.msi ENABLED_COLLECTORS="cpu,cs,memory,net,logical_disk"
-
-# Or via script
-iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install_exporter.ps1' | iex
+iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/scripts/deploy_telegraf_windows.ps1' | iex
 ```
-
-**Port:** 9182
 
 ### Linux Server
-
+Виконайте команду в терміналі:
 ```bash
-# Install node_exporter
-wget https://github.com/prometheus/node_exporter/releases/download/v1.8.0/node_exporter-1.8.0.linux-amd64.tar.gz
-tar xzf node_exporter-*.tar.gz
-./node_exporter
+curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/scripts/deploy_telegraf_linux.sh | sudo bash
 ```
 
-**Port:** 9100
+**Порт:** 9273
+
 
 ---
 
