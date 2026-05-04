@@ -104,10 +104,26 @@ def init_web_tables():
         # Schema Migration: Add missing columns if they don't exist
         columns = [info[1] for info in c.execute("PRAGMA table_info(servers)").fetchall()]
         needed = {
-            'disk_info': 'TEXT',
             'os_type': "TEXT DEFAULT 'linux'",
+            'agent_port': "INTEGER DEFAULT 9100",
+            'check_interval': "INTEGER DEFAULT 15",
             'enabled': 'BOOLEAN DEFAULT 1',
-            'raid_status': 'TEXT'
+            'server_group': "TEXT DEFAULT 'default'",
+            'notify_telegram': 'BOOLEAN DEFAULT 0',
+            'notify_discord': 'BOOLEAN DEFAULT 0',
+            'notify_slack': 'BOOLEAN DEFAULT 0',
+            'notify_email': 'BOOLEAN DEFAULT 0',
+            'created_at': 'TEXT',
+            'last_check': 'TEXT',
+            'last_status': 'TEXT',
+            'cpu_percent': 'REAL',
+            'memory_percent': 'REAL',
+            'disk_percent': 'REAL',
+            'network_rx': 'REAL',
+            'network_tx': 'REAL',
+            'uptime': 'TEXT',
+            'raid_status': 'TEXT',
+            'disk_info': 'TEXT'
         }
         for col, col_type in needed.items():
             if col not in columns:
