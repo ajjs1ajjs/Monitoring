@@ -379,7 +379,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         </div>
                         <div class="card">
                             <div class="card-header">
-                                <h3>Storage Distribution</h3>
+                                <h3>Disk Distribution</h3>
                                 <i data-lucide="hard-drive" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
                             </div>
                             <div class="card-body">
@@ -402,7 +402,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                         <th>Endpoint</th>
                                         <th>CPU</th>
                                         <th>RAM</th>
-                                        <th>Storage</th>
+                                        <th>Disk</th>
                                         <th>Traffic (RX/TX)</th>
                                     </tr>
                                 </thead>
@@ -443,7 +443,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                     <th>Endpoint</th>
                                     <th style="cursor: pointer;" onclick="sortNodes('cpu_percent')">CPU <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
                                     <th style="cursor: pointer;" onclick="sortNodes('memory_percent')">RAM <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
-                                    <th style="cursor: pointer;" onclick="sortNodes('disk_percent')">Storage <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
+                                    <th style="cursor: pointer;" onclick="sortNodes('disk_percent')">Disk <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
                                     <th>Traffic (RX/TX)</th>
                                     <th style="text-align: right;">Actions</th>
                                 </tr>
@@ -808,7 +808,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
                             <select id="alertMetric" class="form-input">
                                 <option value="cpu">CPU Load</option>
                                 <option value="memory">Memory Usage</option>
-                                <option value="disk">Storage Level</option>
+                                <option value="disk">Disk Usage</option>
                             </select>
                         </div>
                         <div class="form-group">
