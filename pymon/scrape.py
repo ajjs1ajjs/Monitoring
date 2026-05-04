@@ -204,9 +204,6 @@ class ScrapeManager:
 
                 metrics[name] = value
 
-                label_objs = [Label(name=k, value=v) for k, v in labels]
-                from pymon.metrics.models import MetricType
-
                 registry.register(name, MetricType.GAUGE, "", label_objs)
                 registry.set(name, value, label_objs)
 
@@ -582,8 +579,6 @@ class ScrapeManager:
 
                     # Publish per-disk usage as Prometheus metrics with volume label
                     try:
-                        from pymon.metrics.models import Label, MetricType
-
                         # Ensure the metric exists; we reuse the same metric name with per-disk labels
                         registry.register("disk_usage_percent", MetricType.GAUGE, "Disk usage percent per volume", None)
                         for vol, info in disk_info.items():

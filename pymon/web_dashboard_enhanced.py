@@ -738,11 +738,9 @@ sudo systemctl start prometheus-node-exporter</textarea>
             
             document.getElementById('viewTitle').textContent = section.charAt(0).toUpperCase() + section.slice(1);
             
-            if (section === 'explorer') loadExplorerMetadata();
             if (section === 'logs') loadAuditLogs();
             if (section === 'alerts') loadAlertRules();
             if (section === 'settings') loadSettings();
-            if (section === 'manual') updateManualTargets();
         }
 
         // Event Listeners
@@ -860,7 +858,6 @@ sudo systemctl start prometheus-node-exporter</textarea>
             charts.mem = createLineChart('memChart', 'RAM', '#3b82f6');
             charts.net = createLineChart('netChart', 'Net MB/s', '#10b981');
             charts.disk = createLineChart('diskChart', 'Disk %', '#f59e0b');
-            charts.explorer = createLineChart('explorerChart', 'Metric Value', '#10b981');
         }
 
         // Data Fetching
@@ -1078,106 +1075,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
             } catch (e) {}
         }
 
-        async function loadExplorerMetadata() {
-            const resp = await apiFetch('/api/v1/series');
-            if (!resp) return;
-            const data = await resp.json();
-            const select = document.getElementById('explorerSeries');
-            select.innerHTML = '<option value="">Select Metric...</option>' + 
-                data.series.sort().map(s => `<option value="${s}">${s}</option>`).join('');
-        }
 
-        document.getElementById('runQueryBtn').addEventListener('click', async () => {
-            const series = document.getElementById('explorerSeries').value;
-            if (!series) return;
-            
-            const btn = document.getElementById('runQueryBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<i data-lucide="loader" class="animate-spin" style="width: 14px; height: 14px;"></i> Executing...';
-            lucide.createIcons();
-
-            try {
-                const resp = await apiFetch(`/api/v1/query?query=${series}`);
-                if (!resp) return;
-                const data = await resp.json();
-                
-                const labels = data.result.map(r => r.timestamp.split('T')[1].substring(0, 8));
-                charts.explorer.data.labels = labels;
-                charts.explorer.data.datasets[0].data = data.result.map(r => r.value);
-                charts.explorer.data.datasets[0].label = series;
-                charts.explorer.update();
-                
-                document.getElementById('explorerTitle').textContent = 'Results for: ' + series;
-            } catch (e) {
-                alert('Query failed');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i data-lucide="play" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Execute Query';
-                lucide.createIcons();
-            }
-        });
-
-        async function injectManualMetric() {
-            const name = document.getElementById('manualMetricName').value;
-            const value = parseFloat(document.getElementById('manualMetricValue').value);
-            const type = document.getElementById('manualMetricType').value;
-            
-            if (!name || isNaN(value)) return;
-            
-            const resp = await apiFetch('/api/v1/metrics', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({name, value, type})
-            });
-            
-            if (resp && resp.ok) alert('Metric Injected');
-        }
-
-        function updateManualTargets() {
-            const select = document.getElementById('forceScrapeTarget');
-            select.innerHTML = nodes.map(n => `<option value="${n.id}">${n.name} (${n.host})</option>`).join('');
-        }
-
-        async function forceScrape() {
-            const id = document.getElementById('forceScrapeTarget').value;
-            forceScrapeSingle(id);
-        }
-
-        async function forceScrapeSingle(id) {
-            const btn = event ? event.currentTarget : null;
-            if (btn) btn.classList.add('animate-spin');
-            
-            try {
-                const resp = await apiFetch(`/api/v1/servers/${id}/scrape`, {method: 'POST'});
-                if (resp && resp.ok) {
-                    alert('Scrape Triggered Successfully');
-                    refreshData();
-                } else if (resp) {
-                    const err = await resp.json().catch(() => ({}));
-                    alert(`Scrape Failed: ${resp.status} - ${err.detail || 'Access Denied'}`);
-                }
-            } catch (err) {
-                alert('Network Error');
-            } finally {
-                if (btn) btn.classList.remove('animate-spin');
-            }
-        }
-
-        async function loadAuditLogs() {
-            const resp = await apiFetch('/api/v1/audit-log?limit=100');
-            if (!resp) return;
-            const data = await resp.json();
-            const stream = document.getElementById('auditLogStream');
-            stream.innerHTML = data.logs.map(l => `
-                <div style="display: flex; gap: 1rem; margin-bottom: 0.25rem;">
-                    <span style="color: #64748b;">[${l.timestamp ? l.timestamp.split('T')[1].substring(0, 8) : 'N/A'}]</span>
-                    <span style="color: #3b82f6; width: 100px;">${l.username}</span>
-                    <span style="color: #f8fafc;">${l.action}</span>
-                    <span style="color: #64748b;">${l.target || ''}</span>
-                </div>
-            `).join('');
-            stream.scrollTop = stream.scrollHeight;
-        }
 
         async function loadAlertRules() {
             const resp = await apiFetch('/api/v1/alerts');
