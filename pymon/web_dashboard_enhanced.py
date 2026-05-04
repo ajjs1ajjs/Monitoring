@@ -1,4 +1,4 @@
-"""Enhanced Web Dashboard Template with Dark Mode NOC Aesthetics"""
+"""Enhanced Web Dashboard Template - 'Grafana Edition'"""
 
 LOGIN_HTML = r"""<!DOCTYPE html>
 <html lang="en">
@@ -14,23 +14,23 @@ LOGIN_HTML = r"""<!DOCTYPE html>
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen">
-    <div class="glass p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl">
-        <h1 class="text-3xl font-bold mb-2 text-center">PyMon</h1>
-        <p class="text-slate-500 text-center mb-8 text-sm">Enter your credentials to access the NOC</p>
+    <div class="glass p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl border border-orange-500/20">
+        <h1 class="text-3xl font-bold mb-2 text-center text-white">PyMon <span class="text-orange-500">NOC</span></h1>
+        <p class="text-slate-500 text-center mb-8 text-sm uppercase tracking-widest font-bold">Secure Access Gateway</p>
         
         <form id="loginForm" class="space-y-6">
             <div>
-                <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Username</label>
-                <input type="text" id="username" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:border-orange-500 transition-all">
+                <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Operator ID</label>
+                <input type="text" id="username" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-4 text-white focus:outline-none focus:border-orange-500 transition-all font-mono">
             </div>
             <div>
-                <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Password</label>
-                <input type="password" id="password" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:border-orange-500 transition-all">
+                <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Access Key</label>
+                <input type="password" id="password" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-4 text-white focus:outline-none focus:border-orange-500 transition-all font-mono">
             </div>
-            <button type="submit" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-orange-600/20 transition-all">
-                Authorize Access
+            <button type="submit" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-5 rounded-xl shadow-2xl shadow-orange-600/40 transition-all uppercase tracking-widest text-sm">
+                Authenticate
             </button>
-            <div id="error" class="text-red-500 text-center text-xs hidden">Invalid credentials</div>
+            <div id="error" class="text-red-500 text-center text-xs hidden font-bold">ACCESS DENIED</div>
         </form>
     </div>
 
@@ -58,7 +58,7 @@ LOGIN_HTML = r"""<!DOCTYPE html>
                     errorBox.classList.remove('hidden');
                 }
             } catch (e) {
-                errorBox.textContent = 'Connection error. Please try again.';
+                errorBox.textContent = 'NETWORK TIMEOUT';
                 errorBox.classList.remove('hidden');
             }
         });
@@ -66,352 +66,220 @@ LOGIN_HTML = r"""<!DOCTYPE html>
 </body>
 </html>"""
 
-# ============================================================================
-# Main Enhanced Dashboard HTML
-# ============================================================================
-
 ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PyMon Dashboard</title>
+    <title>PyMon | NOC Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Space Grotesk', sans-serif; background: #05070d; }
+        body { font-family: 'Space Grotesk', sans-serif; background: #0b0e14; color: #d8d9da; }
         code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
-        .noc-bg {
-            position: fixed; inset: 0; pointer-events: none; z-index: 0;
-            background:
-                radial-gradient(circle at 15% 15%, rgba(255, 122, 0, .22), transparent 32%),
-                radial-gradient(circle at 86% 12%, rgba(0, 224, 255, .18), transparent 30%),
-                radial-gradient(circle at 55% 90%, rgba(34, 197, 94, .12), transparent 26%),
-                linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
-            background-size: auto, auto, auto, 44px 44px, 44px 44px;
-            mask-image: linear-gradient(to bottom, black, rgba(0,0,0,.55));
-        }
-        .glass {
-            background: linear-gradient(180deg, rgba(13, 18, 30, .88), rgba(8, 11, 20, .76));
-            backdrop-filter: blur(18px);
-            border: 1px solid rgba(148, 163, 184, .14);
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 24px 80px rgba(0,0,0,.34);
-        }
-        .sidebar-item-active { background: rgba(255, 122, 0, 0.13); color: #ffb86b; border-right: 2px solid #ff7a00; }
-        .critical-glow { box-shadow: 0 0 38px rgba(255, 122, 0, .18); }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        .glass { background: #161b22; border: 1px solid #30363d; }
+        .glass:hover { border-color: #8b949e; }
+        .sidebar-item-active { background: #1f242c; color: #f0883e; border-left: 4px solid #f0883e; border-right: none; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0b0e14; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
         .pulsing-dot { animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(1.5); } 100% { opacity: 1; transform: scale(1); } }
+        .stat-card { border-left: 4px solid transparent; }
+        .stat-card.online { border-left-color: #3fb950; }
+        .stat-card.offline { border-left-color: #f85149; }
+        .stat-card.warning { border-left-color: #d29922; }
     </style>
 </head>
-<body class="text-slate-300 selection:bg-orange-500/30 overflow-hidden">
-    <div class="noc-bg"></div>
-
-    <div class="flex h-screen relative z-10">
+<body class="overflow-hidden">
+    <div class="flex h-screen relative">
         <!-- Sidebar -->
-        <aside class="w-72 glass border-r border-slate-800/50 flex flex-col">
-            <div class="p-8">
-                <div class="flex items-center gap-3 mb-10">
-                    <div class="w-10 h-10 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-                        <i data-lucide="activity" class="text-black w-6 h-6"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-xl font-black text-white tracking-tighter">PYMON</h1>
-                        <p class="text-[10px] font-bold text-slate-500 tracking-[0.2em] uppercase">Control Node</p>
-                    </div>
+        <aside class="w-64 bg-[#0d1117] border-r border-[#30363d] flex flex-col z-20">
+            <div class="p-6">
+                <div class="flex items-center gap-3 mb-8">
+                    <img src="https://grafana.com/static/img/menu/grafana_icon.svg" class="w-8 h-8 opacity-80" alt="PyMon">
+                    <h1 class="text-xl font-bold text-white tracking-tight">PyMon <span class="text-xs font-normal text-slate-500">v0.1</span></h1>
                 </div>
 
-                <nav class="space-y-2">
-                    <button data-section="overview" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800/50 group sidebar-item-active">
-                        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                        <span class="font-medium text-sm">Overview</span>
+                <nav class="space-y-1">
+                    <button data-section="overview" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm sidebar-item-active">
+                        <i data-lucide="layout-grid" class="w-4 h-4"></i> Overview
                     </button>
-                    <button data-section="servers" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800/50 group">
-                        <i data-lucide="server" class="w-5 h-5"></i>
-                        <span class="font-medium text-sm">Servers</span>
+                    <button data-section="servers" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm">
+                        <i data-lucide="server" class="w-4 h-4"></i> Nodes
                     </button>
-                    <button data-section="alerts" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800/50 group">
-                        <i data-lucide="bell" class="w-5 h-5"></i>
-                        <span class="font-medium text-sm">Alert Rules</span>
+                    <button data-section="alerts" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm">
+                        <i data-lucide="bell" class="w-4 h-4"></i> Alerting
                     </button>
-                    <button data-section="logs" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800/50 group">
-                        <i data-lucide="clipboard-list" class="w-5 h-5"></i>
-                        <span class="font-medium text-sm">Audit Logs</span>
+                    <button data-section="logs" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm">
+                        <i data-lucide="list" class="w-4 h-4"></i> Explorer
                     </button>
-                    <button data-section="deploy" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800/50 group">
-                        <i data-lucide="rocket" class="w-5 h-5"></i>
-                        <span class="font-medium text-sm">Deploy Agent</span>
+                    <div class="pt-6 pb-2 text-[10px] font-bold text-slate-600 uppercase tracking-widest px-3">Administration</div>
+                    <button data-section="deploy" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm text-slate-400">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Data Source
                     </button>
-                    <div class="pt-10 pb-4 text-[10px] font-bold text-slate-600 uppercase tracking-widest px-4">System</div>
-                    <button data-section="settings" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-slate-800/50 group">
-                        <i data-lucide="settings" class="w-5 h-5"></i>
-                        <span class="font-medium text-sm">Settings</span>
+                    <button data-section="settings" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm text-slate-400">
+                        <i data-lucide="settings" class="w-4 h-4"></i> Configuration
                     </button>
                 </nav>
             </div>
 
-            <div class="mt-auto p-4 border-t border-slate-800/50">
-                <button id="logoutBtn" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-red-500/10 hover:text-red-400 group">
-                    <i data-lucide="log-out" class="w-5 h-5"></i>
-                    <span class="font-medium text-sm">Logout</span>
+            <div class="mt-auto p-4 border-t border-[#30363d]">
+                <button id="logoutBtn" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-red-500/10 text-sm text-slate-400 hover:text-red-400">
+                    <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
                 </button>
             </div>
         </aside>
 
-        <!-- Main Content -->
-        <main class="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        <!-- Main -->
+        <main class="flex-1 flex flex-col min-w-0 bg-[#0b0e14]">
             <!-- Header -->
-            <header class="h-20 border-b border-slate-800/30 flex items-center justify-between px-8 z-10">
-                <div>
-                    <h2 id="pageTitle" class="text-3xl font-black text-white tracking-tight">Command Center</h2>
-                    <p class="text-xs text-slate-500 mt-1 mono">live telemetry / exporters / incident surface</p>
+            <header class="h-12 border-b border-[#30363d] flex items-center justify-between px-6 bg-[#0d1117] shrink-0">
+                <div class="flex items-center gap-4">
+                    <h2 id="pageTitle" class="text-sm font-bold text-white">General / Overview</h2>
+                    <div class="h-4 w-px bg-[#30363d]"></div>
+                    <span class="text-[10px] text-slate-500 font-mono" id="lastUpdated">Last updated: 13:28:44</span>
                 </div>
 
-                    <!-- Summary Cards -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div class="glass p-6 rounded-3xl relative overflow-hidden group critical-glow">
-                            <div class="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/10 blur-3xl rounded-full transition-all group-hover:bg-emerald-500/20"></div>
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="p-3 bg-emerald-500/10 rounded-2xl text-emerald-500">
-                                    <i data-lucide="check-circle" class="w-6 h-6"></i>
-                                </div>
-                                <span class="text-emerald-500 text-xs font-bold tracking-wider uppercase">Online</span>
-                            </div>
-                            <div class="text-4xl font-bold text-white mb-1" id="stat-online">0</div>
-                            <div class="text-slate-500 text-xs">Operational nodes</div>
-                        </div>
+                <div class="flex items-center gap-2">
+                    <div class="flex bg-[#161b22] border border-[#30363d] rounded p-0.5">
+                        <button data-range="1h" class="range-btn px-3 py-0.5 rounded text-[10px] font-bold transition-all active bg-[#f0883e] text-black">1h</button>
+                        <button data-range="6h" class="range-btn px-3 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white">6h</button>
+                        <button data-range="24h" class="range-btn px-3 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white">24h</button>
+                    </div>
+                    <button id="refreshBtn" class="p-1.5 bg-[#161b22] border border-[#30363d] rounded hover:border-[#8b949e]">
+                        <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-slate-400"></i>
+                    </button>
+                </div>
+            </header>
 
-                        <div class="glass p-6 rounded-3xl relative overflow-hidden group">
-                            <div class="absolute -right-4 -top-4 w-24 h-24 bg-red-500/10 blur-3xl rounded-full transition-all group-hover:bg-red-500/20"></div>
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="p-3 bg-red-500/10 rounded-2xl text-red-500">
-                                    <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-                                </div>
-                                <span class="text-red-500 text-xs font-bold tracking-wider uppercase">Offline</span>
-                            </div>
-                            <div class="text-4xl font-bold text-white mb-1" id="stat-offline">0</div>
-                            <div class="text-slate-500 text-xs">Requires attention</div>
+            <!-- Scrollable Content -->
+            <div id="content" class="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
+                <!-- Section: Overview -->
+                <div id="section-overview" class="section space-y-4">
+                    <!-- Stat Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="glass p-4 rounded stat-card online">
+                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Nodes Online</div>
+                            <div class="text-3xl font-bold text-[#3fb950]" id="stat-online">0</div>
                         </div>
-
-                        <div class="glass p-6 rounded-3xl relative overflow-hidden group">
-                            <div class="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/10 blur-3xl rounded-full transition-all group-hover:bg-blue-500/20"></div>
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="p-3 bg-blue-500/10 rounded-2xl text-blue-500">
-                                    <i data-lucide="cpu" class="w-6 h-6"></i>
-                                </div>
-                                <span class="text-blue-500 text-xs font-bold tracking-wider uppercase">Avg CPU</span>
-                            </div>
-                            <div class="text-4xl font-bold text-white mb-1" id="stat-cpu-avg">0%</div>
+                        <div class="glass p-4 rounded stat-card offline">
+                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Nodes Offline</div>
+                            <div class="text-3xl font-bold text-[#f85149]" id="stat-offline">0</div>
                         </div>
-
-                        <div class="glass p-6 rounded-3xl relative overflow-hidden group">
-                            <div class="absolute -right-4 -top-4 w-24 h-24 bg-purple-500/10 blur-3xl rounded-full transition-all group-hover:bg-purple-500/20"></div>
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="p-3 bg-purple-500/10 rounded-2xl text-purple-500">
-                                    <i data-lucide="layers" class="w-6 h-6"></i>
-                                </div>
-                                <span class="text-purple-500 text-xs font-bold tracking-wider uppercase">Avg RAM</span>
-                            </div>
-                            <div class="text-4xl font-bold text-white mb-1" id="stat-mem-avg">0%</div>
+                        <div class="glass p-4 rounded stat-card warning">
+                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Avg CPU Load</div>
+                            <div class="text-3xl font-bold text-[#f0883e]" id="stat-cpu-avg">0%</div>
+                        </div>
+                        <div class="glass p-4 rounded stat-card warning">
+                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Avg Memory</div>
+                            <div class="text-3xl font-bold text-[#388bfd]" id="stat-mem-avg">0%</div>
                         </div>
                     </div>
 
-                    <!-- Charts Row -->
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div class="glass p-8 rounded-[2rem] space-y-6">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-lg font-bold text-white">CPU Performance</h3>
-                                <div class="flex items-center gap-2">
-                                    <span class="w-2 h-2 rounded-full bg-emerald-500 pulsing-dot"></span>
-                                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Live</span>
-                                </div>
+                    <!-- Main Charts -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div class="glass p-4 rounded h-[300px] flex flex-col">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold text-white uppercase tracking-wider">CPU Usage History</h3>
                             </div>
-                            <div class="h-[200px] w-full">
+                            <div class="flex-1 min-h-0">
                                 <canvas id="cpuChart"></canvas>
                             </div>
                         </div>
-
-                        <div class="glass p-8 rounded-[2rem] space-y-6">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-lg font-bold text-white">Memory Load</h3>
-                                <div class="flex items-center gap-2">
-                                    <span class="w-2 h-2 rounded-full bg-blue-500 pulsing-dot"></span>
-                                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Live</span>
-                                </div>
+                        <div class="glass p-4 rounded h-[300px] flex flex-col">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-xs font-bold text-white uppercase tracking-wider">Memory Usage History</h3>
                             </div>
-                            <div class="h-[200px] w-full">
+                            <div class="flex-1 min-h-0">
                                 <canvas id="memoryChart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="glass p-8 rounded-[2rem] space-y-6">
-                            <div class="flex items-center justify-between">
-                                <h3 class="text-lg font-bold text-white">Network (MB)</h3>
-                                <div class="flex items-center gap-2">
-                                    <span class="w-2 h-2 rounded-full bg-orange-500 pulsing-dot"></span>
-                                    <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Live</span>
-                                </div>
-                            </div>
-                            <div class="h-[200px] w-full">
-                                <canvas id="networkChart"></canvas>
                             </div>
                         </div>
                     </div>
 
-
-                    <!-- Server List Quick View -->
-                    <div class="glass rounded-[2rem] overflow-hidden">
-                        <div class="p-8 border-b border-slate-800/30 flex items-center justify-between bg-slate-900/20">
-                            <h3 class="text-lg font-bold text-white">Infrastructure Status</h3>
-                            <button onclick="showSection('servers')" class="text-blue-500 text-xs font-bold hover:underline">View all nodes</button>
+                    <!-- Node Status Table -->
+                    <div class="glass rounded overflow-hidden">
+                        <div class="p-4 border-b border-[#30363d] bg-[#161b22]/50 flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Infrastructure Status</h3>
+                            <button onclick="showSection('servers')" class="text-[10px] text-blue-400 font-bold hover:underline">Manage Nodes</button>
                         </div>
                         <div class="overflow-x-auto">
-                            <table class="w-full text-left">
-                                <thead class="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-900/10">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-[#0d1117] text-slate-500 border-b border-[#30363d]">
                                     <tr>
-                                        <th class="px-8 py-5">Node Name</th>
-                                        <th class="px-8 py-5">Host</th>
-                                        <th class="px-8 py-5">OS</th>
-                                        <th class="px-8 py-5">CPU</th>
-                                        <th class="px-8 py-5">RAM</th>
-                                        <th class="px-8 py-5">Disk</th>
-                                        <th class="px-8 py-5">Network (RX/TX)</th>
-                                        <th class="px-8 py-5 text-right">Actions</th>
+                                        <th class="px-4 py-3 font-bold">Node</th>
+                                        <th class="px-4 py-3 font-bold">Status</th>
+                                        <th class="px-4 py-3 font-bold">CPU</th>
+                                        <th class="px-4 py-3 font-bold">Memory</th>
+                                        <th class="px-4 py-3 font-bold">Disk</th>
+                                        <th class="px-4 py-3 font-bold">Net RX/TX</th>
+                                        <th class="px-4 py-3 font-bold text-right">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="quickServerList" class="divide-y divide-slate-800/20">
-                                    <!-- Row template -->
+                                <tbody id="quickServerList" class="divide-y divide-[#30363d]">
+                                    <!-- Dynamic -->
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
 
-                <!-- Section: Servers (Full List) -->
-                <div id="section-servers" class="section hidden space-y-8">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-xl font-bold text-white">Monitored Nodes</h3>
-                        <button id="addServerBtn" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-blue-600/20">
-                            <i data-lucide="plus" class="w-4 h-4"></i> Add Server
+                <!-- Section: Nodes -->
+                <div id="section-servers" class="section hidden space-y-4">
+                    <div class="flex justify-between items-center bg-[#161b22] p-4 rounded border border-[#30363d]">
+                        <h3 class="text-sm font-bold text-white uppercase">Monitored Inventory</h3>
+                        <button id="addServerBtn" class="bg-[#f0883e] hover:bg-[#ff9b5e] text-black text-[10px] font-bold px-4 py-1.5 rounded transition-all flex items-center gap-2">
+                            <i data-lucide="plus" class="w-3 h-3"></i> Add Node
                         </button>
                     </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" id="serverCards">
-                        <!-- Cards will be injected here -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4" id="serverCards">
+                        <!-- Cards -->
                     </div>
                 </div>
 
                 <!-- Section: Alerts -->
-                <div id="section-alerts" class="section hidden space-y-8">
-                    <div class="glass rounded-[2rem] overflow-hidden">
-                        <div class="p-8 border-b border-slate-800/30 bg-slate-900/20 flex items-center justify-between">
-                            <h3 class="text-lg font-bold text-white">Alert Rules</h3>
-                            <button id="addAlertBtn" class="px-6 py-2 rounded-xl bg-orange-500 text-black text-xs font-bold shadow-lg shadow-orange-500/20 hover:scale-105 transition-all">Create Rule</button>
+                <div id="section-alerts" class="section hidden space-y-4">
+                    <div class="glass p-6 rounded">
+                         <div class="flex justify-between items-center mb-6 pb-4 border-b border-[#30363d]">
+                            <h3 class="text-sm font-bold text-white uppercase">Alerting Rules</h3>
+                            <button id="addAlertBtn" class="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-4 py-1.5 rounded transition-all">Create Rule</button>
                         </div>
-                        <div class="p-8">
-                            <div id="alertsList" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <!-- Alerts will be injected here -->
-                            </div>
-                        </div>
+                        <div id="alertsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
                     </div>
                 </div>
-
-                <!-- Section: Deploy -->
-                <div id="section-deploy" class="section hidden space-y-8">
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div class="glass p-8 rounded-[2rem] space-y-6">
-                            <div class="flex items-center gap-4 mb-2">
-                                <div class="p-3 bg-blue-500/10 rounded-2xl text-blue-500"><i data-lucide="monitor" class="w-6 h-6"></i></div>
-                                <h3 class="text-xl font-bold text-white">Windows Agent</h3>
-                            </div>
-                            <p class="text-sm text-slate-400">Install <strong>windows_exporter</strong> to monitor CPU, Memory, Disks, and Network on Windows Server.</p>
-                            <div class="bg-slate-900 rounded-2xl p-6 font-mono text-xs text-blue-400 border border-slate-800 relative group">
-                                <pre class="whitespace-pre-wrap break-all" id="winCmd">Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install_exporter.ps1'))</pre>
-                                <button onclick="copyCmd('winCmd')" class="absolute top-4 right-4 p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 opacity-0 group-hover:opacity-100 transition-all">
-                                    <i data-lucide="copy" class="w-4 h-4"></i>
-                                </button>
-                            </div>
+                
+                <!-- Section: Explorer (Logs) -->
+                <div id="section-logs" class="section hidden space-y-4">
+                    <div class="glass p-4 rounded flex flex-col h-[700px]">
+                        <div class="flex items-center gap-4 mb-4 pb-4 border-b border-[#30363d]">
+                            <h3 class="text-xs font-bold text-white uppercase">Audit Explorer</h3>
                         </div>
-
-                        <div class="glass p-8 rounded-[2rem] space-y-6">
-                            <div class="flex items-center gap-4 mb-2">
-                                <div class="p-3 bg-orange-500/10 rounded-2xl text-orange-500"><i data-lucide="terminal" class="w-6 h-6"></i></div>
-                                <h3 class="text-xl font-bold text-white">Linux Agent</h3>
-                            </div>
-                            <p class="text-sm text-slate-400">Install <strong>node_exporter</strong> via our automated script to monitor Linux infrastructure.</p>
-                            <div class="bg-slate-900 rounded-2xl p-6 font-mono text-xs text-orange-400 border border-slate-800 relative group">
-                                <pre class="whitespace-pre-wrap break-all" id="linuxCmd">curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash</pre>
-                                <button onclick="copyCmd('linuxCmd')" class="absolute top-4 right-4 p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 opacity-0 group-hover:opacity-100 transition-all">
-                                    <i data-lucide="copy" class="w-4 h-4"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Section: Logs -->
-                <div id="section-logs" class="section hidden space-y-8">
-                    <div class="glass rounded-[2rem] overflow-hidden">
-                        <div class="p-8 border-b border-slate-800/30 bg-slate-900/20">
-                            <h3 class="text-lg font-bold text-white">Audit Logs</h3>
-                        </div>
-                        <div class="p-6">
-                            <div id="auditLogs" class="space-y-4">
-                                <!-- Logs will be injected here -->
-                            </div>
-                        </div>
+                        <div id="auditLogs" class="flex-1 overflow-y-auto font-mono text-[11px] space-y-1 custom-scrollbar"></div>
                     </div>
                 </div>
 
                 <!-- Section: Settings -->
-                <div id="section-settings" class="section hidden space-y-8">
-                    <div class="glass rounded-[2rem] overflow-hidden">
-                        <div class="p-8 border-b border-slate-800/30 bg-slate-900/20">
-                            <h3 class="text-lg font-bold text-white">System Settings</h3>
-                        </div>
-                        <div class="p-8 space-y-8 max-w-2xl">
-                            <div class="space-y-4">
-                                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest">General Configuration</h4>
-                                <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 flex items-center justify-between">
-                                    <div>
-                                        <div class="text-white font-medium">Metrics Retention</div>
-                                        <div class="text-xs text-slate-500">How long to keep historical telemetry data</div>
-                                    </div>
-                                    <select class="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none">
-                                        <option>7 days</option>
-                                        <option>30 days</option>
-                                        <option>90 days</option>
-                                    </select>
-                                </div>
+                <div id="section-settings" class="section hidden space-y-4">
+                    <div class="glass p-8 rounded max-w-2xl mx-auto">
+                        <h3 class="text-xl font-bold text-white mb-6">System Preferences</h3>
+                        <div class="space-y-6">
+                            <div class="p-4 bg-[#0d1117] rounded border border-[#30363d]">
+                                <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Security</h4>
+                                <button onclick="changePassword()" class="w-full py-2 bg-[#1f242c] text-white text-xs font-bold rounded hover:bg-[#30363d] transition-all">Update Admin Password</button>
                             </div>
-                            <div class="space-y-4">
-                                <label class="block text-sm font-semibold text-slate-400">Admin Password</label>
-                                <button onclick="changePassword()" class="px-6 py-3 rounded-xl bg-slate-800 text-white font-semibold hover:bg-slate-700 transition-all">Change Password</button>
-                            </div>
-
-                            <!-- Notification Channels -->
-                            <div class="pt-8 border-t border-slate-800/30">
-                                <h4 class="text-white font-bold mb-6 flex items-center gap-2"><i data-lucide="bell" class="w-5 h-5 text-orange-500"></i> Notification Channels</h4>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div class="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-slate-800">
-                                        <div class="flex items-center gap-4">
-                                            <div class="p-2 bg-[#229ED9]/10 text-[#229ED9] rounded-xl"><i data-lucide="send" class="w-4 h-4"></i></div>
-                                            <div class="text-white font-bold text-sm">Telegram</div>
-                                        </div>
-                                        <button class="px-4 py-2 rounded-lg bg-slate-800 text-[10px] font-bold text-slate-400 hover:text-white transition-all">Setup</button>
-                                    </div>
-                                    <div class="flex items-center justify-between p-4 bg-slate-900/50 rounded-2xl border border-slate-800">
-                                        <div class="flex items-center gap-4">
-                                            <div class="p-2 bg-[#5865F2]/10 text-[#5865F2] rounded-xl"><i data-lucide="message-square" class="w-4 h-4"></i></div>
-                                            <div class="text-white font-bold text-sm">Discord</div>
-                                        </div>
-                                        <button class="px-4 py-2 rounded-lg bg-slate-800 text-[10px] font-bold text-slate-400 hover:text-white transition-all">Setup</button>
-                                    </div>
+                            <div class="p-4 bg-[#0d1117] rounded border border-[#30363d]">
+                                <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Integrations</h4>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <button class="py-4 bg-[#1f242c] rounded border border-[#30363d] text-center hover:bg-[#30363d]">
+                                        <div class="text-xs font-bold text-white">Telegram Bot</div>
+                                        <div class="text-[9px] text-slate-500">Configure notifications</div>
+                                    </button>
+                                    <button class="py-4 bg-[#1f242c] rounded border border-[#30363d] text-center hover:bg-[#30363d]">
+                                        <div class="text-xs font-bold text-white">Discord Webhook</div>
+                                        <div class="text-[9px] text-slate-500">Configure notifications</div>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -422,86 +290,61 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
     </div>
 
     <!-- Modals -->
-    <div id="addServerModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-6">
-        <div class="glass w-full max-w-lg p-10 rounded-[2.5rem] glow relative">
-            <button onclick="toggleModal('addServerModal', false)" class="absolute top-8 right-8 text-slate-500 hover:text-white">
-                <i data-lucide="x" class="w-6 h-6"></i>
-            </button>
-            <h3 class="text-2xl font-bold text-white mb-2">Add New Node</h3>
-            <p class="text-sm text-slate-500 mb-8">Connect a new server to the monitoring mesh</p>
-
-            <form id="addServerForm" class="space-y-6">
+    <div id="addServerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="glass w-full max-w-md p-6 rounded relative border-[#f0883e]/30">
+            <button onclick="toggleModal('addServerModal', false)" class="absolute top-4 right-4 text-slate-500 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+            <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider">Register New Data Source</h3>
+            <form id="addServerForm" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Server Name</label>
-                    <input type="text" id="nodeName" required class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all" placeholder="Web-Srv-01">
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Display Name</label>
+                    <input type="text" id="nodeName" required class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f0883e]">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Host / IP</label>
-                    <input type="text" id="nodeHost" required class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all" placeholder="10.0.0.5">
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Host / Endpoint</label>
+                    <input type="text" id="nodeHost" required class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f0883e]">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">OS Type</label>
-                        <select id="nodeOS" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all">
-                            <option value="linux">Linux</option>
-                            <option value="windows">Windows</option>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Architecture</label>
+                        <select id="nodeOS" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white">
+                            <option value="linux">Linux / x64</option>
+                            <option value="windows">Windows / x64</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Agent Port</label>
-                        <input type="number" id="nodePort" value="9100" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all">
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Scrape Port</label>
+                        <input type="number" id="nodePort" value="9100" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white">
                     </div>
                 </div>
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-4 rounded-2xl transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98] mt-4">
-                    Register Node
-                </button>
+                <button type="submit" class="w-full bg-[#f0883e] text-black font-bold py-3 rounded text-sm uppercase tracking-widest mt-4">Connect</button>
             </form>
         </div>
     </div>
 
-    <div id="addAlertModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center p-6">
-        <div class="glass w-full max-w-lg p-10 rounded-[2.5rem] glow relative">
-            <button onclick="toggleModal('addAlertModal', false)" class="absolute top-8 right-8 text-slate-500 hover:text-white">
-                <i data-lucide="x" class="w-6 h-6"></i>
-            </button>
-            <h3 class="text-2xl font-bold text-white mb-2">Create Alert Rule</h3>
-            <p class="text-sm text-slate-500 mb-8">Define thresholds for automated notifications</p>
-
-            <form id="addAlertForm" class="space-y-6">
+    <div id="addAlertModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="glass w-full max-w-md p-6 rounded relative border-blue-500/30">
+            <button onclick="toggleModal('addAlertModal', false)" class="absolute top-4 right-4 text-slate-500 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+            <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider">Configure Alert Rule</h3>
+            <form id="addAlertForm" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Rule Name</label>
-                    <input type="text" id="alertName" required class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all" placeholder="High CPU Usage">
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Rule Name</label>
+                    <input type="text" id="alertName" required class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Metric</label>
-                        <select id="alertMetric" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white">
-                            <option value="cpu">CPU Usage (%)</option>
-                            <option value="memory">Memory Usage (%)</option>
-                            <option value="disk">Disk Usage (%)</option>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Metric</label>
+                        <select id="alertMetric" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white">
+                            <option value="cpu">CPU Usage</option>
+                            <option value="memory">RAM Usage</option>
+                            <option value="disk">Disk Space</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Threshold (%)</label>
-                        <input type="number" id="alertThreshold" value="80" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white">
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Threshold (%)</label>
+                        <input type="number" id="alertThreshold" value="80" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white">
                     </div>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Condition</label>
-                        <select id="alertCondition" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white">
-                            <option value=">">Greater than</option>
-                            <option value="<">Less than</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Duration (s)</label>
-                        <input type="number" id="alertDuration" value="60" class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-white">
-                    </div>
-                </div>
-                <button type="submit" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold py-4 rounded-2xl transition-all shadow-lg shadow-orange-600/20 active:scale-[0.98] mt-4">
-                    Enable Alert Rule
-                </button>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded text-sm uppercase tracking-widest mt-4">Deploy Rule</button>
             </form>
         </div>
     </div>
@@ -513,80 +356,55 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         function toggleModal(id, show) {
             const el = document.getElementById(id);
             if (!el) return;
-            if (show) {
-                el.classList.remove('hidden');
-                el.classList.add('flex');
-            } else {
-                el.classList.add('hidden');
-                el.classList.remove('flex');
-            }
+            el.classList.toggle('hidden', !show);
+            el.classList.toggle('flex', show);
         }
 
         let charts = {};
         let currentRange = '1h';
         let servers = [];
 
-        // Initialize Lucide Icons
         lucide.createIcons();
 
         function showSection(section) {
-            const sections = document.querySelectorAll('.section');
-            const targetSection = document.getElementById('section-' + section);
-
-            if (targetSection) {
-                sections.forEach(s => s.classList.add('hidden'));
-                targetSection.classList.remove('hidden');
-
-                document.querySelectorAll('nav button').forEach(b => b.classList.remove('sidebar-item-active'));
-                const btn = document.querySelector(`nav button[data-section="${section}"]`);
-                if (btn) btn.classList.add('sidebar-item-active');
-
-                const pageTitle = document.getElementById('pageTitle');
-                if (pageTitle) {
-                    pageTitle.textContent = section === 'overview' ? 'Command Center' : section.charAt(0).toUpperCase() + section.slice(1);
-                }
-
+            document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+            const target = document.getElementById('section-' + section);
+            if (target) {
+                target.classList.remove('hidden');
+                document.querySelectorAll('nav button').forEach(b => {
+                    b.classList.toggle('sidebar-item-active', b.dataset.section === section);
+                });
+                document.getElementById('pageTitle').textContent = `General / ${section.charAt(0).toUpperCase() + section.slice(1)}`;
                 if (section === 'logs') loadAuditLogs();
                 if (section === 'alerts') loadAlerts();
-                if (section === 'overview') loadTrends();
             }
         }
 
-        // Navigation
         document.querySelectorAll('nav button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                showSection(btn.dataset.section);
-            });
+            btn.addEventListener('click', () => showSection(btn.dataset.section));
         });
 
-        // Range Buttons
         document.querySelectorAll('.range-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active', 'bg-orange-500', 'text-black'));
+                document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('bg-[#f0883e]', 'text-black'));
                 document.querySelectorAll('.range-btn').forEach(b => b.classList.add('text-slate-400'));
                 btn.classList.remove('text-slate-400');
-                btn.classList.add('active', 'bg-orange-500', 'text-black');
+                btn.classList.add('bg-[#f0883e]', 'text-black');
                 currentRange = btn.dataset.range;
                 loadData();
             });
         });
 
-        // Logout
         document.getElementById('logoutBtn').addEventListener('click', () => {
             localStorage.removeItem('token');
             window.location.href = '/login';
         });
 
-        // Refresh
         document.getElementById('refreshBtn').addEventListener('click', () => loadData());
+        document.getElementById('addServerBtn').addEventListener('click', () => toggleModal('addServerModal', true));
+        document.getElementById('addAlertBtn').addEventListener('click', () => toggleModal('addAlertModal', true));
 
-        // Modals triggers
-        const addSrvBtn = document.getElementById('addServerBtn');
-        if (addSrvBtn) addSrvBtn.addEventListener('click', () => toggleModal('addServerModal', true));
-        
-        const addAltBtn = document.getElementById('addAlertBtn');
-        if (addAltBtn) addAltBtn.addEventListener('click', () => toggleModal('addAlertModal', true));
-
+        // Forms
         document.getElementById('addServerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const resp = await fetch('/api/v1/servers', {
@@ -600,14 +418,8 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 })
             });
             if (resp.status === 401) { window.location.href = '/login'; return; }
-            if (resp.ok) {
-                toggleModal('addServerModal', false);
-                e.target.reset();
-                loadData();
-            } else {
-                const err = await resp.json();
-                alert('Failed to add server: ' + (err.detail || 'Unknown error'));
-            }
+            if (resp.ok) { toggleModal('addServerModal', false); e.target.reset(); loadData(); }
+            else { alert('Deployment failed'); }
         });
 
         document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
@@ -618,199 +430,20 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 body: JSON.stringify({
                     name: document.getElementById('alertName').value,
                     metric: document.getElementById('alertMetric').value,
-                    condition: document.getElementById('alertCondition').value,
+                    condition: '>',
                     threshold: parseInt(document.getElementById('alertThreshold').value),
-                    duration: parseInt(document.getElementById('alertDuration').value),
+                    duration: 60,
                     severity: 'warning'
                 })
             });
-            if (resp.status === 401) { window.location.href = '/login'; return; }
-            if (resp.ok) {
-                toggleModal('addAlertModal', false);
-                e.target.reset();
-                loadAlerts();
-            } else {
-                const err = await resp.json();
-                alert('Failed to add alert rule: ' + (err.detail || 'Unknown error'));
-            }
+            if (resp.ok) { toggleModal('addAlertModal', false); e.target.reset(); loadAlerts(); }
         });
 
-        // Data Loading
-        async function loadData() {
-            try {
-                const resp = await fetch('/api/v1/servers', {
-                    headers: {'Authorization': 'Bearer ' + token}
-                });
-                if (resp.status === 401) { window.location.href = '/login'; return; }
-                if (!resp.ok) return;
-                const data = await resp.json();
-                servers = data.servers;
-                updateOverview();
-                updateServerUI();
-                loadTrends();
-            } catch (e) { console.error('Failed to load data', e); }
-        }
-
-        function updateOverview() {
-            const online = servers.filter(s => s.last_status === 'up').length;
-            const offline = servers.length - online;
-            document.getElementById('stat-online').textContent = online;
-            document.getElementById('stat-offline').textContent = offline;
-            const cpu = servers.length ? servers.reduce((a, b) => a + (b.cpu_percent || 0), 0) / servers.length : 0;
-            const mem = servers.length ? servers.reduce((a, b) => a + (b.memory_percent || 0), 0) / servers.length : 0;
-            document.getElementById('stat-cpu-avg').textContent = cpu.toFixed(1) + '%';
-            document.getElementById('stat-mem-avg').textContent = mem.toFixed(1) + '%';
-        }
-
-        function updateServerUI() {
-            const formatBytes = (b) => {
-                if (!b) return '0 B';
-                const i = Math.floor(Math.log(b) / Math.log(1024));
-                return (b / Math.pow(1024, i)).toFixed(2) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][i];
-            };
-
-            const quickList = document.getElementById('quickServerList');
-            quickList.innerHTML = servers.slice(0, 5).map(s => `
-                <tr class="border-b border-slate-800/30 hover:bg-slate-800/20 transition-all group">
-                    <td class="py-4 pl-8">
-                        <div class="flex items-center gap-3">
-                            <span class="w-2 h-2 rounded-full ${s.last_status === 'up' ? 'bg-emerald-500 pulsing-dot' : 'bg-red-500 pulsing-dot'}"></span>
-                            <span class="font-semibold text-slate-200">${s.name}</span>
-                        </div>
-                    </td>
-                    <td class="py-4 text-slate-400 text-sm font-mono">${s.host}</td>
-                    <td class="py-4"><span class="px-2 py-1 rounded-lg bg-slate-800 text-[10px] font-bold text-slate-400 uppercase">${s.os_type}</span></td>
-                    <td class="py-4">
-                        <div class="flex flex-col gap-1">
-                            <div class="text-[10px] font-bold text-slate-600">${(s.cpu_percent || 0).toFixed(1)}%</div>
-                            <div class="w-20 bg-slate-800 h-1 rounded-full overflow-hidden">
-                                <div class="bg-blue-500 h-full" style="width: ${s.cpu_percent || 0}%"></div>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="py-4">
-                        <div class="flex flex-col gap-1">
-                            <div class="text-[10px] font-bold text-slate-600">${(s.memory_percent || 0).toFixed(1)}%</div>
-                            <div class="w-20 bg-slate-800 h-1 rounded-full overflow-hidden">
-                                <div class="bg-emerald-500 h-full" style="width: ${s.memory_percent || 0}%"></div>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="py-4">
-                        <div class="flex flex-col gap-1">
-                            <div class="text-[10px] font-bold text-slate-600">${(s.disk_percent || 0).toFixed(1)}%</div>
-                            <div class="w-20 bg-slate-800 h-1 rounded-full overflow-hidden">
-                                <div class="bg-purple-500 h-full" style="width: ${s.disk_percent || 0}%"></div>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="py-4 text-xs font-mono text-slate-500">
-                        ${formatBytes(s.network_rx)} / ${formatBytes(s.network_tx)}
-                    </td>
-                    <td class="py-4 text-right pr-8">
-                        <button onclick="deleteServer(${s.id})" class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-
-            const grid = document.getElementById('serverCards');
-            grid.innerHTML = servers.map(s => `
-                <div class="glass p-6 rounded-[2rem] space-y-6 relative overflow-hidden group">
-                    <div class="absolute right-6 top-6">
-                        <span class="p-2 bg-slate-800/50 rounded-lg text-slate-500 hover:text-white cursor-pointer transition-all" onclick="deleteServer(${s.id})">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </span>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <div class="p-4 ${s.os_type === 'windows' ? 'bg-blue-500/10 text-blue-500' : 'bg-orange-500/10 text-orange-500'} rounded-2xl">
-                            <i data-lucide="${s.os_type === 'windows' ? 'monitor' : 'terminal'}" class="w-6 h-6"></i>
-                        </div>
-                        <div>
-                            <h4 class="font-bold text-white text-lg">${s.name}</h4>
-                            <p class="text-xs text-slate-500">${s.host}:${s.agent_port}</p>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-slate-900/40 p-4 rounded-2xl border border-slate-800/30">
-                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">CPU</div>
-                            <div class="text-xl font-bold text-emerald-500">${(s.cpu_percent || 0).toFixed(1)}%</div>
-                        </div>
-                        <div class="bg-slate-900/40 p-4 rounded-2xl border border-slate-800/30">
-                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">RAM</div>
-                            <div class="text-xl font-bold text-blue-500">${(s.memory_percent || 0).toFixed(1)}%</div>
-                        </div>
-                        <div class="bg-slate-900/40 p-4 rounded-2xl border border-slate-800/30">
-                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Disk</div>
-                            <div class="text-xl font-bold text-purple-500">${(s.disk_percent || 0).toFixed(1)}%</div>
-                        </div>
-                        <div class="bg-slate-900/40 p-4 rounded-2xl border border-slate-800/30">
-                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-2">Net Total</div>
-                            <div class="text-[10px] font-bold text-orange-400">${formatBytes(s.network_rx + s.network_tx)}</div>
-                        </div>
-                    </div>
-                    <div class="pt-2 flex items-center justify-between text-[10px] font-bold text-slate-600 uppercase">
-                        <span>Status: <span class="${s.last_status === 'up' ? 'text-emerald-500' : 'text-red-500'}">${s.last_status}</span></span>
-                        <span>Uptime: ${s.uptime || '-'}</span>
-                    </div>
-                </div>
-            `).join('');
-            lucide.createIcons();
-        }
-
-
-        async function loadAlerts() {
-            try {
-                const resp = await fetch('/api/v1/alerts', {
-                    headers: {'Authorization': 'Bearer ' + token}
-                });
-                if (resp.status === 401) { window.location.href = '/login'; return; }
-                if (!resp.ok) return;
-                const data = await resp.json();
-                const list = document.getElementById('alertsList');
-                list.innerHTML = data.alerts.map(a => `
-                    <div class="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 flex items-center justify-between">
-                        <div>
-                            <h4 class="font-bold text-white">${a.name}</h4>
-                            <p class="text-xs text-slate-500">${a.metric} ${a.condition} ${a.threshold}% for ${a.duration}s</p>
-                        </div>
-                        <button onclick="deleteAlert(${a.id})" class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                `).join('');
-                lucide.createIcons();
-            } catch (e) { console.error(e); }
-        }
-
-        async function deleteServer(id) {
-            if (!confirm('Remove this node?')) return;
-            const resp = await fetch(`/api/v1/servers/${id}`, {
-                method: 'DELETE',
-                headers: {'Authorization': 'Bearer ' + token}
-            });
-            if (resp.ok) loadData();
-        }
-
-        async function deleteAlert(id) {
-            if (!confirm('Delete alert rule?')) return;
-            const resp = await fetch(`/api/v1/alerts/${id}`, {
-                method: 'DELETE',
-                headers: {'Authorization': 'Bearer ' + token}
-            });
-            if (resp.ok) loadAlerts();
-        }
-
-        // Chart Helper
+        // Charts
         function createChart(canvasId, label, color) {
             const el = document.getElementById(canvasId);
             if (!el) return null;
             const ctx = el.getContext('2d');
-            const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-            gradient.addColorStop(0, color + '33');
-            gradient.addColorStop(1, color + '00');
-
             return new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -819,11 +452,11 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         label: label,
                         data: [],
                         borderColor: color,
-                        backgroundColor: gradient,
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        backgroundColor: color + '11',
                         fill: true,
-                        tension: 0.4,
-                        borderWidth: 2,
-                        pointRadius: 0
+                        tension: 0
                     }]
                 },
                 options: {
@@ -831,92 +464,164 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { display: false },
-                        y: { 
-                            beginAtZero: true,
-                            grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10 } }
-                        }
+                        x: { display: true, ticks: { color: '#444', font: { size: 9 } }, grid: { display: false } },
+                        y: { beginAtZero: true, grid: { color: '#222' }, ticks: { color: '#444', font: { size: 9 } } }
                     }
                 }
             });
         }
 
-        async function loadTrends() {
+        async function loadData() {
             try {
-                const resp = await fetch('/api/v1/metrics/trend', {
-                    headers: {'Authorization': 'Bearer ' + token}
-                });
-                if (!resp.ok) return;
+                const resp = await fetch('/api/v1/servers', {headers: {'Authorization': 'Bearer ' + token}});
+                if (resp.status === 401) { window.location.href = '/login'; return; }
                 const data = await resp.json();
-                
-                if (!charts.cpu) charts.cpu = createChart('cpuChart', 'CPU', '#10b981');
-                if (!charts.mem) charts.mem = createChart('memoryChart', 'Memory', '#3b82f6');
-                if (!charts.net) charts.net = createChart('networkChart', 'Network', '#f59e0b');
-
-                const labels = data.history.map(h => new Date(h.timestamp).toLocaleTimeString());
-                const cpuData = data.history.map(h => h.cpu_avg);
-                const memData = data.history.map(h => h.mem_avg);
-                const netData = data.history.map(h => (h.net_rx_avg + h.net_tx_avg) / (1024 * 1024)); // MB
-
-                if (charts.cpu) {
-                    charts.cpu.data.labels = labels;
-                    charts.cpu.data.datasets[0].data = cpuData;
-                    charts.cpu.update('none');
-                }
-                if (charts.mem) {
-                    charts.mem.data.labels = labels;
-                    charts.mem.data.datasets[0].data = memData;
-                    charts.mem.update('none');
-                }
-                if (charts.net) {
-                    charts.net.data.labels = labels;
-                    charts.net.data.datasets[0].data = netData;
-                    charts.net.update('none');
-                }
-            } catch (e) { console.error(e); }
+                servers = data.servers;
+                document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                updateUI();
+                loadTrends();
+            } catch (e) {}
         }
 
-        async function loadAuditLogs() {
-            const resp = await fetch('/api/v1/audit-log?limit=20', {headers: {'Authorization': 'Bearer ' + token}});
-            if (resp.status === 401) { window.location.href = '/login'; return; }
-            if (!resp.ok) return;
-            const data = await resp.json();
-            const logs = document.getElementById('auditLogs');
-            logs.innerHTML = data.logs.map(l => `
-                <div class="flex items-start gap-4 p-4 rounded-2xl hover:bg-slate-800/30 transition-all">
-                    <div class="p-2 bg-blue-500/10 rounded-xl text-blue-500 mt-1"><i data-lucide="user" class="w-4 h-4"></i></div>
-                    <div class="flex-1">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-bold text-white">${l.username} ${l.action}</span>
-                            <span class="text-[10px] text-slate-600 uppercase font-bold">${l.timestamp.split('T')[1].substring(0, 5)}</span>
+        function updateUI() {
+            const online = servers.filter(s => s.last_status === 'up').length;
+            const offline = servers.length - online;
+            document.getElementById('stat-online').textContent = online;
+            document.getElementById('stat-offline').textContent = offline;
+            
+            const cpu = servers.length ? servers.reduce((a, b) => a + (b.cpu_percent || 0), 0) / servers.length : 0;
+            const mem = servers.length ? servers.reduce((a, b) => a + (b.memory_percent || 0), 0) / servers.length : 0;
+            document.getElementById('stat-cpu-avg').textContent = cpu.toFixed(1) + '%';
+            document.getElementById('stat-mem-avg').textContent = mem.toFixed(1) + '%';
+
+            const formatBytes = (b) => {
+                if (!b) return '0 B';
+                const i = Math.floor(Math.log(b) / Math.log(1024));
+                return (b / Math.pow(1024, i)).toFixed(1) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][i];
+            };
+
+            const list = document.getElementById('quickServerList');
+            list.innerHTML = servers.map(s => `
+                <tr class="hover:bg-[#161b22] transition-all group">
+                    <td class="px-4 py-3 font-bold text-white">${s.name}</td>
+                    <td class="px-4 py-3">
+                        <span class="flex items-center gap-1.5 ${s.last_status === 'up' ? 'text-[#3fb950]' : 'text-[#f85149]'}">
+                            <span class="w-1.5 h-1.5 rounded-full bg-current pulsing-dot"></span>
+                            ${s.last_status.toUpperCase()}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                            <span class="w-8">${(s.cpu_percent || 0).toFixed(0)}%</span>
+                            <div class="w-16 bg-[#30363d] h-1.5 rounded-full overflow-hidden"><div class="bg-[#f0883e] h-full" style="width: ${s.cpu_percent || 0}%"></div></div>
                         </div>
-                        <p class="text-xs text-slate-500">Target: ${l.target || 'System'}</p>
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-2">
+                            <span class="w-8">${(s.memory_percent || 0).toFixed(0)}%</span>
+                            <div class="w-16 bg-[#30363d] h-1.5 rounded-full overflow-hidden"><div class="bg-[#388bfd] h-full" style="width: ${s.memory_percent || 0}%"></div></div>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3">${(s.disk_percent || 0).toFixed(0)}%</td>
+                    <td class="px-4 py-3 font-mono text-[10px] text-slate-500">${formatBytes(s.network_rx)} / ${formatBytes(s.network_tx)}</td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="deleteServer(${s.id})" class="text-slate-600 hover:text-red-400"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+
+            const grid = document.getElementById('serverCards');
+            grid.innerHTML = servers.map(s => `
+                <div class="glass p-4 rounded flex flex-col gap-3 group relative">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="${s.os_type === 'windows' ? 'monitor' : 'terminal'}" class="w-4 h-4 ${s.last_status === 'up' ? 'text-blue-400' : 'text-slate-600'}"></i>
+                            <span class="font-bold text-white text-xs">${s.name}</span>
+                        </div>
+                        <div class="w-2 h-2 rounded-full ${s.last_status === 'up' ? 'bg-[#3fb950]' : 'bg-[#f85149]'} pulsing-dot"></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[10px] font-bold text-slate-500"><span>CPU</span><span>${(s.cpu_percent || 0).toFixed(1)}%</span></div>
+                        <div class="bg-[#30363d] h-1 rounded-full overflow-hidden"><div class="bg-[#f0883e] h-full" style="width: ${s.cpu_percent || 0}%"></div></div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[10px] font-bold text-slate-500"><span>RAM</span><span>${(s.memory_percent || 0).toFixed(1)}%</span></div>
+                        <div class="bg-[#30363d] h-1 rounded-full overflow-hidden"><div class="bg-[#388bfd] h-full" style="width: ${s.memory_percent || 0}%"></div></div>
+                    </div>
+                    <div class="pt-2 flex items-center justify-between text-[9px] text-slate-600 font-bold uppercase">
+                        <span>${s.host}</span>
+                        <button onclick="deleteServer(${s.id})" class="opacity-0 group-hover:opacity-100 transition-all text-red-500 hover:scale-110"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
                     </div>
                 </div>
             `).join('');
             lucide.createIcons();
         }
 
-        function copyCmd(id) {
-            const text = document.getElementById(id).textContent;
-            navigator.clipboard.writeText(text);
-            alert('Copied!');
+        async function loadTrends() {
+            try {
+                const resp = await fetch('/api/v1/metrics/trend', {headers: {'Authorization': 'Bearer ' + token}});
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (!charts.cpu) charts.cpu = createChart('cpuChart', 'CPU', '#f0883e');
+                if (!charts.mem) charts.mem = createChart('memoryChart', 'Memory', '#388bfd');
+                
+                const labels = data.history.map(h => new Date(h.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+                charts.cpu.data.labels = labels;
+                charts.cpu.data.datasets[0].data = data.history.map(h => h.cpu_avg);
+                charts.cpu.update('none');
+
+                charts.mem.data.labels = labels;
+                charts.mem.data.datasets[0].data = data.history.map(h => h.mem_avg);
+                charts.mem.update('none');
+            } catch(e){}
+        }
+
+        async function loadAlerts() {
+            const resp = await fetch('/api/v1/alerts', {headers: {'Authorization': 'Bearer ' + token}});
+            if (!resp.ok) return;
+            const data = await resp.json();
+            document.getElementById('alertsList').innerHTML = data.alerts.map(a => `
+                <div class="p-4 bg-[#0d1117] rounded border border-[#30363d] flex items-center justify-between">
+                    <div><div class="text-xs font-bold text-white">${a.name}</div><div class="text-[10px] text-slate-500">${a.metric} > ${a.threshold}%</div></div>
+                    <button onclick="deleteAlert(${a.id})" class="text-red-500/50 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        async function loadAuditLogs() {
+            const resp = await fetch('/api/v1/audit-log?limit=50', {headers: {'Authorization': 'Bearer ' + token}});
+            if (!resp.ok) return;
+            const data = await resp.json();
+            document.getElementById('auditLogs').innerHTML = data.logs.map(l => `
+                <div class="flex gap-4">
+                    <span class="text-slate-600">[${l.timestamp.split('T')[1].substring(0, 8)}]</span>
+                    <span class="text-blue-400 font-bold">${l.username}</span>
+                    <span class="text-white">${l.action}</span>
+                    <span class="text-slate-500">${l.target || '-'}</span>
+                </div>
+            `).join('');
+        }
+
+        async function deleteServer(id) {
+            if (confirm('REMOVE NODE?')) {
+                await fetch(`/api/v1/servers/${id}`, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
+                loadData();
+            }
+        }
+
+        async function deleteAlert(id) {
+            await fetch(`/api/v1/alerts/${id}`, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
+            loadAlerts();
         }
 
         async function changePassword() {
-            const p = prompt('New password:');
-            if (!p) return;
-            const resp = await fetch('/api/v1/auth/reset-password', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-                body: JSON.stringify({new_password: p})
-            });
-            if (resp.ok) alert('Updated');
+            const p = prompt('NEW PASSWORD:');
+            if (p) await fetch('/api/v1/auth/reset-password', {method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify({new_password: p})});
         }
 
         loadData();
-        setInterval(loadData, 15000);
+        setInterval(loadData, 10000);
     </script>
 </body>
 </html>"""
