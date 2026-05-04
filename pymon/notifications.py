@@ -2,7 +2,7 @@
 
 import json
 import logging
-import requests
+import httpx
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -23,8 +23,9 @@ class NotificationDispatcher:
             "parse_mode": "HTML"
         }
         try:
-            resp = requests.post(url, json=payload, timeout=10)
-            resp.raise_for_status()
+            with httpx.Client() as client:
+                resp = client.post(url, json=payload, timeout=10)
+                resp.raise_for_status()
             return True
         except Exception as e:
             logger.error(f"Telegram notification failed: {e}")
@@ -46,8 +47,9 @@ class NotificationDispatcher:
             ]
         }
         try:
-            resp = requests.post(webhook_url, json=payload, timeout=10)
-            resp.raise_for_status()
+            with httpx.Client() as client:
+                resp = client.post(webhook_url, json=payload, timeout=10)
+                resp.raise_for_status()
             return True
         except Exception as e:
             logger.error(f"Discord notification failed: {e}")

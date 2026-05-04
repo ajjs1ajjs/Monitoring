@@ -11,7 +11,7 @@ import httpx
 
 from pymon.config import PyMonConfig
 from pymon.metrics.collector import Counter, Gauge, Histogram, registry
-from pymon.metrics.models import Label
+from pymon.metrics.models import Label, MetricType
 from pymon.storage import get_storage
 
 
