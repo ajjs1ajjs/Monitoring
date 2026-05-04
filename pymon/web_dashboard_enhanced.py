@@ -240,6 +240,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .text-xs { font-size: 0.75rem; }
         .animate-spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .action-btn { background: transparent; border: none; cursor: pointer; opacity: 0.6; transition: all 0.2s; padding: 4px; display: flex; align-items: center; justify-content: center; }
+        .action-btn:hover { opacity: 1; transform: scale(1.1); }
+        .action-btn:active { transform: scale(0.9); }
     </style>
 </head>
 <body>
@@ -323,12 +327,20 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                             <div class="stat-value" id="stat-offline">0</div>
                         </div>
                         <div class="stat-card alert">
-                            <div class="stat-label">Avg CPU Load</div>
+                            <div class="stat-label">Avg CPU</div>
                             <div class="stat-value" id="stat-cpu">0<span>%</span></div>
                         </div>
                         <div class="stat-card up">
-                            <div class="stat-label">Avg Memory</div>
+                            <div class="stat-label">Avg RAM</div>
                             <div class="stat-value" id="stat-mem">0<span>%</span></div>
+                        </div>
+                        <div class="stat-card alert">
+                            <div class="stat-label">Avg Disk</div>
+                            <div class="stat-value" id="stat-disk">0<span>%</span></div>
+                        </div>
+                        <div class="stat-card up">
+                            <div class="stat-label">Net Throughput</div>
+                            <div class="stat-value" id="stat-net">0<span>MB/s</span></div>
                         </div>
                     </div>
 
@@ -349,6 +361,24 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                             </div>
                             <div class="card-body">
                                 <canvas id="memChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Network Throughput</h3>
+                                <i data-lucide="activity" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="netChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Storage Distribution</h3>
+                                <i data-lucide="hard-drive" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="diskChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -797,6 +827,8 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         function initCharts() {
             charts.cpu = createLineChart('cpuChart', 'CPU', '#f97316');
             charts.mem = createLineChart('memChart', 'RAM', '#3b82f6');
+            charts.net = createLineChart('netChart', 'Net MB/s', '#10b981');
+            charts.disk = createLineChart('diskChart', 'Disk %', '#f59e0b');
             charts.explorer = createLineChart('explorerChart', 'Metric Value', '#10b981');
         }
 
@@ -826,11 +858,16 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             document.getElementById('stat-online').textContent = online;
             document.getElementById('stat-offline').textContent = offline;
             
-            const avgCpu = nodes.length ? nodes.reduce((a, b) => a + (b.cpu_percent || 0), 0) / nodes.length : 0;
-            const avgMem = nodes.length ? nodes.reduce((a, b) => a + (b.memory_percent || 0), 0) / nodes.length : 0;
+            const count = nodes.length || 1;
+            const avgCpu = nodes.reduce((a, b) => a + (b.cpu_percent || 0), 0) / count;
+            const avgMem = nodes.reduce((a, b) => a + (b.memory_percent || 0), 0) / count;
+            const avgDisk = nodes.reduce((a, b) => a + (b.disk_percent || 0), 0) / count;
+            const totalNet = nodes.reduce((a, b) => a + (b.network_rx || 0) + (b.network_tx || 0), 0) / (1024 * 1024);
             
             document.getElementById('stat-cpu').innerHTML = `${avgCpu.toFixed(1)}<span>%</span>`;
             document.getElementById('stat-mem').innerHTML = `${avgMem.toFixed(1)}<span>%</span>`;
+            document.getElementById('stat-disk').innerHTML = `${avgDisk.toFixed(1)}<span>%</span>`;
+            document.getElementById('stat-net').innerHTML = `${totalNet.toFixed(2)}<span>MB/s</span>`;
         }
 
         function updateLiveTable() {
@@ -926,6 +963,14 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 charts.mem.data.labels = labels;
                 charts.mem.data.datasets[0].data = data.history.map(h => h.mem_avg);
                 charts.mem.update('none');
+
+                charts.net.data.labels = labels;
+                charts.net.data.datasets[0].data = data.history.map(h => (h.net_rx_avg + h.net_tx_avg) / (1024 * 1024));
+                charts.net.update('none');
+
+                charts.disk.data.labels = labels;
+                charts.disk.data.datasets[0].data = data.history.map(h => nodes.reduce((a, b) => a + (b.disk_percent || 0), 0) / (nodes.length || 1));
+                charts.disk.update('none');
             } catch (e) {}
         }
 
@@ -995,12 +1040,22 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         async function forceScrapeSingle(id) {
-            const resp = await apiFetch(`/api/v1/servers/${id}/scrape`, {method: 'POST'});
-            if (resp && resp.ok) {
-                alert('Scrape Triggered');
-                refreshData();
-            } else {
-                alert('Scrape command failed (Endpoint not yet implemented in backend)');
+            const btn = event ? event.currentTarget : null;
+            if (btn) btn.classList.add('animate-spin');
+            
+            try {
+                const resp = await apiFetch(`/api/v1/servers/${id}/scrape`, {method: 'POST'});
+                if (resp && resp.ok) {
+                    alert('Scrape Triggered Successfully');
+                    refreshData();
+                } else if (resp) {
+                    const err = await resp.json().catch(() => ({}));
+                    alert(`Scrape Failed: ${resp.status} - ${err.detail || 'Access Denied'}`);
+                }
+            } catch (err) {
+                alert('Network Error');
+            } finally {
+                if (btn) btn.classList.remove('animate-spin');
             }
         }
 
@@ -1080,6 +1135,14 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         // --- NEW FEATURES ---
+        
+        // Auto-port selection
+        document.getElementById('nodeOS').addEventListener('change', (e) => {
+            document.getElementById('nodePort').value = (e.target.value === 'windows') ? 9182 : 9100;
+        });
+        document.getElementById('editNodeOS').addEventListener('change', (e) => {
+            document.getElementById('editNodePort').value = (e.target.value === 'windows') ? 9182 : 9100;
+        });
 
         let editingServerId = null;
 
