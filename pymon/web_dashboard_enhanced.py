@@ -444,6 +444,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                     <th style="cursor: pointer;" onclick="sortNodes('memory_percent')">RAM <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
                                     <th style="cursor: pointer;" onclick="sortNodes('disk_percent')">Storage <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
                                     <th>Traffic (RX/TX)</th>
+                                    <th style="text-align: right;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="nodesTableBody">
@@ -974,11 +975,33 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     </td>
                     <td>${(n.disk_percent || 0).toFixed(0)}%</td>
                     <td class="text-mono text-[10px] text-slate-500">${formatBytes(n.network_rx)} / ${formatBytes(n.network_tx)}</td>
+                    <td style="text-align: right;">
+                        <div style="display: flex; gap: 0.25rem; justify-content: flex-end;">
+                            <button onclick="forceScrapeSingle(${n.id})" title="Force Scrape" class="action-btn" style="color: var(--accent);">
+                                <i data-lucide="zap" style="width: 14px; height: 14px;"></i>
+                            </button>
+                            <button onclick="showEditModal(${n.id})" title="Edit Node" class="action-btn" style="color: #3b82f6;">
+                                <i data-lucide="settings" style="width: 14px; height: 14px;"></i>
+                            </button>
+                            <button onclick="showDeployModal(${n.id})" title="Deploy Agent" class="action-btn" style="color: var(--success);">
+                                <i data-lucide="download-cloud" style="width: 14px; height: 14px;"></i>
+                            </button>
+                            <button onclick="deleteNode(${n.id})" title="Delete Node" class="action-btn" style="color: #f87171;">
+                                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                            </button>
+                        </div>
+                    </td>
                 </tr>
             `).join('');
 
-            if (overviewBody) overviewBody.innerHTML = html;
-            if (nodesBody) nodesBody.innerHTML = html;
+            if (overviewBody) {
+                overviewBody.innerHTML = html;
+                lucide.createIcons();
+            }
+            if (nodesBody) {
+                nodesBody.innerHTML = html;
+                lucide.createIcons();
+            }
         }
 
         function updateNodeGrid(data) {

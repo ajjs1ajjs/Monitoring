@@ -311,7 +311,11 @@ class ScrapeManager:
 
                 # Phase 2.15: Check alerts for this server
                 if success:
-                    await self._check_alerts(sid, cpu, memory, disk, now)
+                    try:
+                        import asyncio
+                        asyncio.run(self._check_alerts(sid, cpu, memory, disk, now))
+                    except Exception as ae:
+                        print(f"Alert check failed: {ae}")
 
             conn.close()
         except Exception as e:
