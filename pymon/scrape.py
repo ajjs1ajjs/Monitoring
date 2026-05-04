@@ -226,64 +226,58 @@ class ScrapeManager:
             cpu_idle = 0
             cpu_user = 0
             cpu_system = 0
-            for k, v in metrics.items():
-                if 'cpu_seconds_total' in k and 'mode="idle"' in k:
-                    cpu_idle = max(cpu_idle, v)
-                elif 'cpu_seconds_total' in k and 'mode="user"' in k:
-                    cpu_user = max(cpu_user, v)
-                elif 'cpu_seconds_total' in k and 'mode="system"' in k:
-                    cpu_system = max(cpu_system, v)
-                # Also check with underscores instead of quotes
-                if '_total{mode="idle"' in k or '_total{mode="idle"}' in k:
-                    cpu_idle = max(cpu_idle, v)
-                elif '_total{mode="user"' in k or '_total{mode="user"}' in k:
-                    cpu_user = max(cpu_user, v)
-                elif '_total{mode="system"' in k or '_total{mode="system"}' in k:
-                    cpu_system = max(cpu_system, v)
+            mem_total = 0
+            mem_avail = 0
+            disk_total = 0
+            disk_avail = 0
             
+            for k, v in metrics.items():
+                # CPU metrics - check various patterns
+                if 'cpu_seconds_total' in k:
+                    if 'idle' in k:
+                        cpu_idle = max(cpu_idle, v)
+                    elif 'user' in k:
+                        cpu_user = max(cpu_user, v)
+                    elif 'system' in k:
+                        cpu_system = max(cpu_system, v)
+                
+                # Memory metrics
+                if 'MemTotal' in k:
+                    mem_total = max(mem_total, v)
+                elif 'MemAvailable' in k:
+                    mem_avail = max(mem_avail, v)
+                elif 'node_memory_MemTotal' in k:
+                    mem_total = max(mem_total, v)
+                elif 'node_memory_MemAvailable' in k:
+                    mem_avail = max(mem_avail, v)
+                
+                # Disk metrics
+                if 'filesystem_size' in k:
+                    disk_total = max(disk_total, v)
+                elif 'filesystem_avail' in k:
+                    disk_avail = max(disk_avail, v)
+            
+            # Calculate CPU
             if cpu_idle > 0:
                 total_cpu = cpu_idle + cpu_user + cpu_system
                 if total_cpu > 0:
                     metrics['node_cpu_calculated'] = 100 * (1 - cpu_idle / total_cpu)
-
-            for k, v in metrics.items():
-                if 'MemTotal_bytes' in k:
-                    metrics['node_memory_total'] = v
-                elif 'MemAvailable_bytes' in k:
-                    metrics['node_memory_available'] = v
-                # Also check node_ version
-                if 'node_memory_MemTotal' in k:
-                    metrics['node_memory_total'] = v
-                elif 'node_memory_MemAvailable' in k:
-                    metrics['node_memory_available'] = v
             
-            if 'node_memory_total' in metrics and 'node_memory_available' in metrics:
-                mt = metrics['node_memory_total']
-                ma = metrics['node_memory_available']
-                if mt > 0 and ma > 0:
-                    metrics['node_memory_calculated'] = 100 * (1 - ma / mt)
-
-            for k, v in metrics.items():
-                if 'size_bytes' in k and 'filesystem' in k:
-                    if 'node_disk_total' not in metrics or v > metrics.get('node_disk_total', 0):
-                        metrics['node_disk_total'] = v
-                elif 'avail_bytes' in k and 'filesystem' in k:
-                    if 'node_disk_avail' not in metrics or v > metrics.get('node_disk_avail', 0):
-                        metrics['node_disk_avail'] = v
-                # Also check node_ version
-                if 'node_filesystem_size' in k:
-                    metrics['node_disk_total'] = v
-                elif 'node_filesystem_avail' in k:
-                    metrics['node_disk_avail'] = v
+            # Calculate Memory
+            if mem_total > 0 and mem_avail > 0:
+                metrics['node_memory_calculated'] = 100 * (1 - mem_avail / mem_total)
             
-            if 'node_disk_total' in metrics and 'node_disk_avail' in metrics:
-                dt = metrics['node_disk_total']
-                da = metrics['node_disk_avail']
-                if dt > 0 and da > 0:
-                    metrics['node_disk_calculated'] = 100 * (1 - da / dt)
+            # Calculate Disk
+            if disk_total > 0 and disk_avail > 0:
+                metrics['node_disk_calculated'] = 100 * (1 - disk_avail / disk_total)
+                
+            # Debug output
+            if metrics:
+                print(f"DEBUG: cpu_idle={cpu_idle}, cpu_user={cpu_user}, cpu_system={cpu_system}")
+                print(f"DEBUG: mem_total={mem_total}, mem_avail={mem_avail}")
+                print(f"DEBUG: disk_total={disk_total}, disk_avail={disk_avail}")
         except Exception as e:
             print(f"Metric calc error: {e}")
-            pass
 
         return metrics
 
