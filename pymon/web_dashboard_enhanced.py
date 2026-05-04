@@ -1309,6 +1309,13 @@ sudo systemctl start prometheus-node-exporter</textarea>
             }
         }
 
+        async function forceScrapeSingle(id) {
+            try {
+                await apiFetch(`/api/v1/servers/${id}/scrape`, {method: 'POST'});
+                refreshData();
+            } catch (err) { alert('Scrape failed'); }
+        }
+
         async function deleteAlert(id) {
             await apiFetch(`/api/v1/alerts/${id}`, {method: 'DELETE'});
             loadAlertRules();
