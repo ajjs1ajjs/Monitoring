@@ -962,7 +962,7 @@ async def create_server(request: Request, data: ServerCreate, current_user: User
             # Re-fetch row for target adding
             row = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
             if row:
-                scrape_manager.add_server_target(row)
+                scrape_manager.add_server_target(dict(row))
         
         return {"status": "ok", "server_id": server_id}
     except Exception as e:

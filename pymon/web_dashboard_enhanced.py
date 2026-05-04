@@ -1,36 +1,67 @@
-"""Enhanced Web Dashboard Template - 'Grafana Edition'"""
+"""Premium Enterprise Web Dashboard - 'Zenith NOC' Edition"""
 
 LOGIN_HTML = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PyMon Login</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>PyMon | Secure Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Space Grotesk', sans-serif; background: #05070d; color: white; }
-        .glass { background: rgba(13, 18, 30, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        :root {
+            --bg: #030508;
+            --surface: #0a0e14;
+            --accent: #f97316;
+            --text: #f8fafc;
+            --text-muted: #64748b;
+            --border: rgba(255, 255, 255, 0.08);
+            --glass: rgba(15, 23, 42, 0.6);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+
+        .blob { position: absolute; width: 500px; height: 500px; background: radial-gradient(circle, rgba(249, 115, 22, 0.15) 0%, rgba(249, 115, 22, 0) 70%); border-radius: 50%; z-index: -1; filter: blur(60px); animation: drift 20s infinite alternate; }
+        @keyframes drift { from { transform: translate(-10%, -10%); } to { transform: translate(10%, 10%); } }
+
+        .login-card { background: var(--glass); backdrop-filter: blur(20px); border: 1px solid var(--border); padding: 3rem; border-radius: 2rem; width: 100%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); position: relative; }
+        .login-card::before { content: ''; position: absolute; top: -1px; left: 50%; transform: translateX(-50%); width: 40%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); }
+
+        .logo { text-align: center; margin-bottom: 2.5rem; }
+        .logo h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.05em; margin-bottom: 0.5rem; }
+        .logo span { color: var(--accent); }
+        .logo p { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.2em; font-weight: 600; }
+
+        .form-group { margin-bottom: 1.5rem; }
+        label { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 0.5rem; padding-left: 0.25rem; }
+        input { width: 100%; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border); padding: 1rem 1.25rem; border-radius: 1rem; color: white; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        input:focus { outline: none; border-color: var(--accent); background: rgba(0, 0, 0, 0.5); box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.1); }
+
+        button { width: 100%; background: var(--accent); color: white; border: none; padding: 1.1rem; border-radius: 1rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: all 0.3s; margin-top: 1rem; text-transform: uppercase; letter-spacing: 0.1em; }
+        button:hover { background: #ea580c; transform: translateY(-2px); box-shadow: 0 10px 20px -5px rgba(249, 115, 22, 0.4); }
+        button:active { transform: translateY(0); }
+
+        #error { color: #f87171; text-align: center; font-size: 0.75rem; font-weight: 600; margin-top: 1.5rem; display: none; padding: 0.75rem; background: rgba(248, 113, 113, 0.1); border-radius: 0.75rem; }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen">
-    <div class="glass p-10 rounded-[2.5rem] w-full max-w-md shadow-2xl border border-orange-500/20">
-        <h1 class="text-3xl font-bold mb-2 text-center text-white">PyMon <span class="text-orange-500">NOC</span></h1>
-        <p class="text-slate-500 text-center mb-8 text-sm uppercase tracking-widest font-bold">Secure Access Gateway</p>
-        
-        <form id="loginForm" class="space-y-6">
-            <div>
-                <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Operator ID</label>
-                <input type="text" id="username" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-4 text-white focus:outline-none focus:border-orange-500 transition-all font-mono">
+<body>
+    <div class="blob"></div>
+    <div class="login-card">
+        <div class="logo">
+            <h1>PyMon<span>NOC</span></h1>
+            <p>Zenith Infrastructure Suite</p>
+        </div>
+        <form id="loginForm">
+            <div class="form-group">
+                <label>Terminal Username</label>
+                <input type="text" id="username" required placeholder="admin" autocomplete="off">
             </div>
-            <div>
-                <label class="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Access Key</label>
-                <input type="password" id="password" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-4 text-white focus:outline-none focus:border-orange-500 transition-all font-mono">
+            <div class="form-group">
+                <label>Secure Access Key</label>
+                <input type="password" id="password" required placeholder="••••••••">
             </div>
-            <button type="submit" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-black py-5 rounded-xl shadow-2xl shadow-orange-600/40 transition-all uppercase tracking-widest text-sm">
-                Authenticate
-            </button>
-            <div id="error" class="text-red-500 text-center text-xs hidden font-bold">ACCESS DENIED</div>
+            <button type="submit">Initialize Session</button>
+            <div id="error">INVALID CREDENTIALS - ACCESS DENIED</div>
         </form>
     </div>
 
@@ -38,7 +69,7 @@ LOGIN_HTML = r"""<!DOCTYPE html>
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const errorBox = document.getElementById('error');
-            errorBox.classList.add('hidden');
+            errorBox.style.display = 'none';
             
             try {
                 const resp = await fetch('/api/v1/auth/login', {
@@ -55,11 +86,11 @@ LOGIN_HTML = r"""<!DOCTYPE html>
                     localStorage.setItem('token', data.access_token);
                     window.location.href = '/dashboard/';
                 } else {
-                    errorBox.classList.remove('hidden');
+                    errorBox.style.display = 'block';
                 }
             } catch (e) {
-                errorBox.textContent = 'NETWORK TIMEOUT';
-                errorBox.classList.remove('hidden');
+                errorBox.textContent = 'SYSTEM TIMEOUT - CHECK CONNECTION';
+                errorBox.style.display = 'block';
             }
         });
     </script>
@@ -67,158 +98,274 @@ LOGIN_HTML = r"""<!DOCTYPE html>
 </html>"""
 
 ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PyMon | NOC Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>PyMon | Zenith NOC</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Space Grotesk', sans-serif; background: #0b0e14; color: #d8d9da; }
-        code, pre, .mono { font-family: 'JetBrains Mono', monospace; }
-        .glass { background: #161b22; border: 1px solid #30363d; }
-        .glass:hover { border-color: #8b949e; }
-        .sidebar-item-active { background: #1f242c; color: #f0883e; border-left: 4px solid #f0883e; border-right: none; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #0b0e14; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
-        .pulsing-dot { animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(1.5); } 100% { opacity: 1; transform: scale(1); } }
-        .stat-card { border-left: 4px solid transparent; }
-        .stat-card.online { border-left-color: #3fb950; }
-        .stat-card.offline { border-left-color: #f85149; }
-        .stat-card.warning { border-left-color: #d29922; }
+        :root {
+            --bg: #020617;
+            --surface: #0f172a;
+            --surface-hover: #1e293b;
+            --accent: #f97316;
+            --accent-glow: rgba(249, 115, 22, 0.4);
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.06);
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --sidebar-w: 260px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+
+        /* Layout */
+        .app-container { display: flex; height: 100vh; width: 100vw; }
+        
+        /* Sidebar */
+        aside { width: var(--sidebar-w); background: #020617; border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; }
+        .sidebar-header { padding: 2rem 1.5rem; display: flex; items-center: center; gap: 0.75rem; }
+        .sidebar-header svg { color: var(--accent); width: 28px; height: 28px; }
+        .sidebar-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.025em; }
+        
+        .nav-section { padding: 0 1rem; flex: 1; }
+        .nav-label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 1.5rem 0 0.75rem 0.75rem; }
+        
+        .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.75rem; color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; background: transparent; width: 100%; text-align: left; margin-bottom: 0.25rem; }
+        .nav-item:hover { background: var(--surface-hover); color: var(--text); }
+        .nav-item.active { background: rgba(249, 115, 22, 0.1); color: var(--accent); }
+        .nav-item.active svg { color: var(--accent); }
+        
+        .sidebar-footer { padding: 1rem; border-top: 1px solid var(--border); }
+        .logout-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; color: #f87171; width: 100%; border: none; background: transparent; font-size: 0.9rem; cursor: pointer; border-radius: 0.75rem; transition: all 0.2s; }
+        .logout-btn:hover { background: rgba(239, 68, 68, 0.1); }
+
+        /* Main Content */
+        main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #030712; }
+        header { height: 64px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; background: rgba(2, 6, 23, 0.5); backdrop-filter: blur(10px); z-index: 40; }
+        .header-left h2 { font-size: 1rem; font-weight: 600; color: var(--text); }
+        
+        .header-actions { display: flex; items-center: center; gap: 1rem; }
+        .range-selector { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.25rem; }
+        .range-btn { padding: 0.25rem 0.75rem; border-radius: 0.375rem; border: none; background: transparent; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+        .range-btn.active { background: var(--surface-hover); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        
+        .refresh-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+        .refresh-btn:hover { border-color: var(--text-muted); color: var(--text); }
+
+        .content-scroll { flex: 1; overflow-y: auto; padding: 2rem; scroll-behavior: smooth; }
+        .content-scroll::-webkit-scrollbar { width: 6px; }
+        .content-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+        /* Dashboard Grid */
+        .dashboard-section { display: none; animation: fadeIn 0.3s ease-out; }
+        .dashboard-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 1.5rem; border-radius: 1.25rem; position: relative; overflow: hidden; transition: transform 0.3s; }
+        .stat-card:hover { transform: translateY(-4px); }
+        .stat-card::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px; background: transparent; }
+        .stat-card.up::after { background: var(--success); }
+        .stat-card.down::after { background: var(--danger); }
+        .stat-card.alert::after { background: var(--warning); }
+        
+        .stat-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .stat-value { font-size: 2rem; font-weight: 700; color: var(--text); display: flex; align-items: baseline; gap: 0.25rem; }
+        .stat-value span { font-size: 0.875rem; color: var(--text-muted); }
+
+        .chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.25rem; display: flex; flex-direction: column; }
+        .card-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .card-header h3 { font-size: 0.875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+        .card-body { padding: 1.5rem; flex: 1; position: relative; min-height: 250px; }
+
+        /* Infrastructure Table */
+        .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.25rem; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { padding: 1rem 1.5rem; background: rgba(0,0,0,0.2); color: var(--text-muted); font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+        td { padding: 1rem 1.5rem; border-top: 1px solid var(--border); font-size: 0.875rem; vertical-align: middle; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .status-badge { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+        .status-badge.up { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+        .status-badge.down { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .status-dot.pulse { animation: statusPulse 2s infinite; }
+        @keyframes statusPulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        .progress-bar { width: 100px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+        /* Modals */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 1rem; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 1.5rem; width: 100%; max-width: 480px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .modal-body { padding: 1.5rem; }
+        .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; }
+        
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .form-input { width: 100%; background: #020617; border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 0.75rem; color: white; font-size: 0.9rem; }
+        .form-input:focus { outline: none; border-color: var(--accent); }
+
+        .btn { padding: 0.625rem 1.25rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; font-size: 0.875rem; }
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-primary:hover { background: #ea580c; transform: translateY(-1px); }
+        .btn-secondary { background: var(--surface-hover); color: var(--text); border-color: var(--border); }
+        .btn-secondary:hover { background: #334155; }
+        
+        .node-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; transition: border-color 0.2s; }
+        .node-card:hover { border-color: var(--text-muted); }
+
+        /* Utility */
+        .hidden { display: none; }
+        .text-mono { font-family: 'JetBrains Mono', monospace; }
     </style>
 </head>
-<body class="overflow-hidden">
-    <div class="flex h-screen relative">
+<body>
+    <div class="app-container">
         <!-- Sidebar -->
-        <aside class="w-64 bg-[#0d1117] border-r border-[#30363d] flex flex-col z-20">
-            <div class="p-6">
-                <div class="flex items-center gap-3 mb-8">
-                    <img src="https://grafana.com/static/img/menu/grafana_icon.svg" class="w-8 h-8 opacity-80" alt="PyMon">
-                    <h1 class="text-xl font-bold text-white tracking-tight">PyMon <span class="text-xs font-normal text-slate-500">v0.1</span></h1>
-                </div>
-
-                <nav class="space-y-1">
-                    <button data-section="overview" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm sidebar-item-active">
-                        <i data-lucide="layout-grid" class="w-4 h-4"></i> Overview
-                    </button>
-                    <button data-section="servers" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm">
-                        <i data-lucide="server" class="w-4 h-4"></i> Nodes
-                    </button>
-                    <button data-section="alerts" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm">
-                        <i data-lucide="bell" class="w-4 h-4"></i> Alerting
-                    </button>
-                    <button data-section="logs" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm">
-                        <i data-lucide="list" class="w-4 h-4"></i> Explorer
-                    </button>
-                    <div class="pt-6 pb-2 text-[10px] font-bold text-slate-600 uppercase tracking-widest px-3">Administration</div>
-                    <button data-section="deploy" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm text-slate-400">
-                        <i data-lucide="plus-circle" class="w-4 h-4"></i> Add Data Source
-                    </button>
-                    <button data-section="settings" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-[#1f242c] text-sm text-slate-400">
-                        <i data-lucide="settings" class="w-4 h-4"></i> Configuration
-                    </button>
-                </nav>
+        <aside>
+            <div class="sidebar-header">
+                <i data-lucide="shield-check"></i>
+                <h1>PyMon<span>NOC</span></h1>
             </div>
 
-            <div class="mt-auto p-4 border-t border-[#30363d]">
-                <button id="logoutBtn" class="w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all hover:bg-red-500/10 text-sm text-slate-400 hover:text-red-400">
-                    <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
+            <nav class="nav-section">
+                <div class="nav-label">Monitoring</div>
+                <button class="nav-item active" data-section="overview">
+                    <i data-lucide="layout-dashboard"></i> Dashboard
+                </button>
+                <button class="nav-item" data-section="nodes">
+                    <i data-lucide="server"></i> Infrastructure
+                </button>
+                <button class="nav-item" data-section="alerts">
+                    <i data-lucide="bell-ring"></i> Alerting
+                </button>
+                
+                <div class="nav-label">Management</div>
+                <button class="nav-item" data-section="explorer">
+                    <i data-lucide="database"></i> Explorer
+                </button>
+                <button class="nav-item" data-section="settings">
+                    <i data-lucide="settings"></i> Configuration
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">
+                    <i data-lucide="log-out"></i> End Session
                 </button>
             </div>
         </aside>
 
-        <!-- Main -->
-        <main class="flex-1 flex flex-col min-w-0 bg-[#0b0e14]">
-            <!-- Header -->
-            <header class="h-12 border-b border-[#30363d] flex items-center justify-between px-6 bg-[#0d1117] shrink-0">
-                <div class="flex items-center gap-4">
-                    <h2 id="pageTitle" class="text-sm font-bold text-white">General / Overview</h2>
-                    <div class="h-4 w-px bg-[#30363d]"></div>
-                    <span class="text-[10px] text-slate-500 font-mono" id="lastUpdated">Last updated: 13:28:44</span>
+        <!-- Main Content -->
+        <main>
+            <header>
+                <div class="header-left">
+                    <h2 id="viewTitle">Overview</h2>
                 </div>
-
-                <div class="flex items-center gap-2">
-                    <div class="flex bg-[#161b22] border border-[#30363d] rounded p-0.5">
-                        <button data-range="1h" class="range-btn px-3 py-0.5 rounded text-[10px] font-bold transition-all active bg-[#f0883e] text-black">1h</button>
-                        <button data-range="6h" class="range-btn px-3 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white">6h</button>
-                        <button data-range="24h" class="range-btn px-3 py-0.5 rounded text-[10px] font-bold text-slate-400 hover:text-white">24h</button>
+                <div class="header-actions">
+                    <span id="updateTimer" style="font-size: 0.7rem; color: var(--text-muted); font-family: monospace;">Syncing...</span>
+                    <div class="range-selector">
+                        <button class="range-btn active" data-range="1h">1H</button>
+                        <button class="range-btn" data-range="6h">6H</button>
+                        <button class="range-btn" data-range="24h">24H</button>
                     </div>
-                    <button id="refreshBtn" class="p-1.5 bg-[#161b22] border border-[#30363d] rounded hover:border-[#8b949e]">
-                        <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-slate-400"></i>
+                    <button id="refreshBtn" class="refresh-btn">
+                        <i data-lucide="rotate-cw"></i>
                     </button>
                 </div>
             </header>
 
-            <!-- Scrollable Content -->
-            <div id="content" class="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
+            <div class="content-scroll">
                 <!-- Section: Overview -->
-                <div id="section-overview" class="section space-y-4">
-                    <!-- Stat Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div class="glass p-4 rounded stat-card online">
-                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Nodes Online</div>
-                            <div class="text-3xl font-bold text-[#3fb950]" id="stat-online">0</div>
+                <div id="section-overview" class="dashboard-section active">
+                    <div class="stats-grid">
+                        <div class="stat-card up">
+                            <div class="stat-label">Active Nodes</div>
+                            <div class="stat-value" id="stat-online">0</div>
                         </div>
-                        <div class="glass p-4 rounded stat-card offline">
-                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Nodes Offline</div>
-                            <div class="text-3xl font-bold text-[#f85149]" id="stat-offline">0</div>
+                        <div class="stat-card down">
+                            <div class="stat-label">Offline Nodes</div>
+                            <div class="stat-value" id="stat-offline">0</div>
                         </div>
-                        <div class="glass p-4 rounded stat-card warning">
-                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Avg CPU Load</div>
-                            <div class="text-3xl font-bold text-[#f0883e]" id="stat-cpu-avg">0%</div>
+                        <div class="stat-card alert">
+                            <div class="stat-label">Avg CPU Load</div>
+                            <div class="stat-value" id="stat-cpu">0<span>%</span></div>
                         </div>
-                        <div class="glass p-4 rounded stat-card warning">
-                            <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Avg Memory</div>
-                            <div class="text-3xl font-bold text-[#388bfd]" id="stat-mem-avg">0%</div>
+                        <div class="stat-card up">
+                            <div class="stat-label">Avg Memory</div>
+                            <div class="stat-value" id="stat-mem">0<span>%</span></div>
                         </div>
                     </div>
 
-                    <!-- Main Charts -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <div class="glass p-4 rounded h-[300px] flex flex-col">
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-xs font-bold text-white uppercase tracking-wider">CPU Usage History</h3>
+                    <div class="chart-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>CPU Usage Trends</h3>
+                                <i data-lucide="cpu" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
                             </div>
-                            <div class="flex-1 min-h-0">
+                            <div class="card-body">
                                 <canvas id="cpuChart"></canvas>
                             </div>
                         </div>
-                        <div class="glass p-4 rounded h-[300px] flex flex-col">
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-xs font-bold text-white uppercase tracking-wider">Memory Usage History</h3>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Memory Utilization</h3>
+                                <i data-lucide="database" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
                             </div>
-                            <div class="flex-1 min-h-0">
-                                <canvas id="memoryChart"></canvas>
+                            <div class="card-body">
+                                <canvas id="memChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Network Throughput</h3>
+                                <i data-lucide="activity" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="netChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Storage Distribution</h3>
+                                <i data-lucide="hard-drive" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="diskChart"></canvas>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Node Status Table -->
-                    <div class="glass rounded overflow-hidden">
-                        <div class="p-4 border-b border-[#30363d] bg-[#161b22]/50 flex items-center justify-between">
-                            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Infrastructure Status</h3>
-                            <button onclick="showSection('servers')" class="text-[10px] text-blue-400 font-bold hover:underline">Manage Nodes</button>
+                    <div class="table-card">
+                        <div class="card-header">
+                            <h3>Live Infrastructure Status</h3>
+                            <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.7rem;" onclick="showSection('nodes')">Detailed Inventory</button>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left text-xs">
-                                <thead class="bg-[#0d1117] text-slate-500 border-b border-[#30363d]">
+                        <div style="overflow-x: auto;">
+                            <table>
+                                <thead>
                                     <tr>
-                                        <th class="px-4 py-3 font-bold">Node</th>
-                                        <th class="px-4 py-3 font-bold">Status</th>
-                                        <th class="px-4 py-3 font-bold">CPU</th>
-                                        <th class="px-4 py-3 font-bold">Memory</th>
-                                        <th class="px-4 py-3 font-bold">Disk</th>
-                                        <th class="px-4 py-3 font-bold">Net RX/TX</th>
-                                        <th class="px-4 py-3 font-bold text-right">Actions</th>
+                                        <th>Status</th>
+                                        <th>Node Identity</th>
+                                        <th>Endpoint</th>
+                                        <th>CPU</th>
+                                        <th>RAM</th>
+                                        <th>Storage</th>
+                                        <th>Traffic (RX/TX)</th>
                                     </tr>
                                 </thead>
-                                <tbody id="quickServerList" class="divide-y divide-[#30363d]">
+                                <tbody id="liveTableBody">
                                     <!-- Dynamic -->
                                 </tbody>
                             </table>
@@ -227,82 +374,67 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 </div>
 
                 <!-- Section: Nodes -->
-                <div id="section-servers" class="section hidden space-y-4">
-                    <div class="flex justify-between items-center bg-[#161b22] p-4 rounded border border-[#30363d]">
-                        <h3 class="text-sm font-bold text-white uppercase">Monitored Inventory</h3>
-                        <button id="addServerBtn" class="bg-[#f0883e] hover:bg-[#ff9b5e] text-black text-[10px] font-bold px-4 py-1.5 rounded transition-all flex items-center gap-2">
-                            <i data-lucide="plus" class="w-3 h-3"></i> Add Node
+                <div id="section-nodes" class="dashboard-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                        <h2 style="font-size: 1.5rem; font-weight: 700;">Managed Inventory</h2>
+                        <button class="btn btn-primary" onclick="toggleModal('addNodeModal', true)">
+                            <i data-lucide="plus" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 0.5rem;"></i> Register Node
                         </button>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4" id="serverCards">
-                        <!-- Cards -->
+                    <div class="stats-grid" id="nodeListGrid">
+                        <!-- Dynamic Nodes -->
                     </div>
                 </div>
 
                 <!-- Section: Alerts -->
-                <div id="section-alerts" class="section hidden space-y-4">
-                    <div class="glass p-6 rounded">
-                         <div class="flex justify-between items-center mb-6 pb-4 border-b border-[#30363d]">
-                            <h3 class="text-sm font-bold text-white uppercase">Alerting Rules</h3>
-                            <button id="addAlertBtn" class="bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-4 py-1.5 rounded transition-all">Create Rule</button>
-                        </div>
-                        <div id="alertsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                <div id="section-alerts" class="dashboard-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                        <h2 style="font-size: 1.5rem; font-weight: 700;">Active Alert Rules</h2>
+                        <button class="btn btn-primary" onclick="toggleModal('addAlertModal', true)">Create Logic Rule</button>
+                    </div>
+                    <div class="stats-grid" id="alertRulesGrid">
+                        <!-- Dynamic Alerts -->
                     </div>
                 </div>
-                
-                <!-- Section: Explorer (Logs) -->
-                <div id="section-logs" class="section hidden space-y-4">
-                    <div class="glass p-4 rounded flex flex-col h-[700px]">
-                        <div class="flex items-center gap-4 mb-4 pb-4 border-b border-[#30363d]">
-                            <h3 class="text-xs font-bold text-white uppercase">Audit Explorer</h3>
+
+                <!-- Section: Explorer -->
+                <div id="section-explorer" class="dashboard-section">
+                    <div class="card" style="height: 600px;">
+                        <div class="card-header">
+                            <h3>Audit Log Explorer</h3>
                         </div>
-                        <div id="auditLogs" class="flex-1 overflow-y-auto font-mono text-[11px] space-y-1 custom-scrollbar"></div>
+                        <div class="card-body" id="auditLogStream" style="overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">
+                            <!-- Log stream -->
+                        </div>
                     </div>
                 </div>
 
                 <!-- Section: Settings -->
-                <div id="section-settings" class="section hidden space-y-4">
-                    <div class="glass p-8 rounded max-w-2xl mx-auto">
-                        <h3 class="text-xl font-bold text-white mb-6">System Preferences</h3>
-                        <div class="space-y-6">
-                            <div class="p-4 bg-[#0d1117] rounded border border-[#30363d]">
-                                <h4 class="text-xs font-bold text-slate-400 uppercase mb-4">Security</h4>
-                                <button onclick="changePassword()" class="w-full py-2 bg-[#1f242c] text-white text-xs font-bold rounded hover:bg-[#30363d] transition-all">Update Admin Password</button>
+                <div id="section-settings" class="dashboard-section">
+                    <div class="card" style="max-width: 600px; margin: 0 auto;">
+                        <div class="card-header">
+                            <h3>Global Configuration</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label style="display: flex; items-center: center; gap: 0.5rem; margin-bottom: 1rem;">
+                                    <input type="checkbox" id="notifEnabled" class="accent-orange-500">
+                                    Broadcast Notifications Enabled
+                                </label>
                             </div>
-                            <!-- Notification Channels -->
-                            <div class="pt-8 border-t border-[#30363d]">
-                                <h4 class="text-white font-bold mb-6 flex items-center gap-2"><i data-lucide="bell" class="w-4 h-4 text-orange-500"></i> Notification Channels</h4>
-                                <div class="space-y-4">
-                                    <div class="flex items-center justify-between p-4 bg-[#0d1117] rounded border border-[#30363d]">
-                                        <div class="flex items-center gap-4">
-                                            <div class="p-2 bg-emerald-500/10 text-emerald-500 rounded"><i data-lucide="power" class="w-4 h-4"></i></div>
-                                            <div class="text-white font-bold text-sm">Enable Notifications</div>
-                                        </div>
-                                        <input type="checkbox" id="notifEnabled" class="w-4 h-4 accent-orange-500">
-                                    </div>
-
-                                    <div class="p-4 bg-[#0d1117] rounded border border-[#30363d] space-y-4">
-                                        <div class="flex items-center gap-4 mb-2">
-                                            <div class="p-2 bg-[#229ED9]/10 text-[#229ED9] rounded"><i data-lucide="send" class="w-4 h-4"></i></div>
-                                            <div class="text-white font-bold text-sm">Telegram Configuration</div>
-                                        </div>
-                                        <div class="grid grid-cols-1 gap-4">
-                                            <input type="text" id="tgToken" placeholder="Bot Token (e.g. 123456:ABC...)" class="bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
-                                            <input type="text" id="tgChat" placeholder="Chat ID (e.g. -100123456)" class="bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
-                                        </div>
-                                    </div>
-
-                                    <div class="p-4 bg-[#0d1117] rounded border border-[#30363d] space-y-4">
-                                        <div class="flex items-center gap-4 mb-2">
-                                            <div class="p-2 bg-[#5865F2]/10 text-[#5865F2] rounded"><i data-lucide="message-square" class="w-4 h-4"></i></div>
-                                            <div class="text-white font-bold text-sm">Discord Configuration</div>
-                                        </div>
-                                        <input type="text" id="dsWebhook" placeholder="Webhook URL" class="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
-                                    </div>
-
-                                    <button onclick="saveNotifSettings()" class="w-full py-3 bg-orange-600 text-black font-bold rounded uppercase tracking-widest text-[10px]">Save Notification Config</button>
-                                </div>
+                            <div class="form-group">
+                                <label>Telegram Bot Secret</label>
+                                <input type="password" id="tgToken" class="form-input" placeholder="000000:ABC...">
                             </div>
+                            <div class="form-group">
+                                <label>Telegram Destination ID</label>
+                                <input type="text" id="tgChat" class="form-input" placeholder="-100...">
+                            </div>
+                            <div class="form-group">
+                                <label>Discord Webhook URL</label>
+                                <input type="text" id="dsWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/...">
+                            </div>
+                            <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSettings()">Apply configuration</button>
                         </div>
                     </div>
                 </div>
@@ -311,136 +443,157 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
     </div>
 
     <!-- Modals -->
-    <div id="addServerModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-        <div class="glass w-full max-w-md p-6 rounded relative border-[#f0883e]/30">
-            <button onclick="toggleModal('addServerModal', false)" class="absolute top-4 right-4 text-slate-500 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
-            <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider">Register New Data Source</h3>
-            <form id="addServerForm" class="space-y-4">
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Display Name</label>
-                    <input type="text" id="nodeName" required class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f0883e]">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Host / Endpoint</label>
-                    <input type="text" id="nodeHost" required class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#f0883e]">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Architecture</label>
-                        <select id="nodeOS" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white">
-                            <option value="linux">Linux / x64</option>
-                            <option value="windows">Windows / x64</option>
-                        </select>
+    <div id="addNodeModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Register Data Source</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addNodeModal', false)"></i>
+            </div>
+            <form id="addNodeForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Display Name</label>
+                        <input type="text" id="nodeName" required class="form-input" placeholder="Production Server 01">
                     </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Scrape Port</label>
-                        <input type="number" id="nodePort" value="9100" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white">
+                    <div class="form-group">
+                        <label>Host Address</label>
+                        <input type="text" id="nodeHost" required class="form-input" placeholder="192.168.1.100">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>System OS</label>
+                            <select id="nodeOS" class="form-input">
+                                <option value="linux">Linux / POSIX</option>
+                                <option value="windows">Windows / NT</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Agent Port</label>
+                            <input type="number" id="nodePort" value="9100" class="form-input">
+                        </div>
                     </div>
                 </div>
-                <button type="submit" class="w-full bg-[#f0883e] text-black font-bold py-3 rounded text-sm uppercase tracking-widest mt-4">Connect</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addNodeModal', false)">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Connect Node</button>
+                </div>
             </form>
         </div>
     </div>
 
-    <div id="addAlertModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-        <div class="glass w-full max-w-md p-6 rounded relative border-blue-500/30">
-            <button onclick="toggleModal('addAlertModal', false)" class="absolute top-4 right-4 text-slate-500 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
-            <h3 class="text-lg font-bold text-white mb-6 uppercase tracking-wider">Configure Alert Rule</h3>
-            <form id="addAlertForm" class="space-y-4">
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Rule Name</label>
-                    <input type="text" id="alertName" required class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Metric</label>
-                        <select id="alertMetric" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white">
-                            <option value="cpu">CPU Usage</option>
-                            <option value="memory">RAM Usage</option>
-                            <option value="disk">Disk Space</option>
-                        </select>
+    <div id="addAlertModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Deploy Alerting Logic</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addAlertModal', false)"></i>
+            </div>
+            <form id="addAlertForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Policy Name</label>
+                        <input type="text" id="alertName" required class="form-input" placeholder="Critical CPU Threshold">
                     </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Threshold (%)</label>
-                        <input type="number" id="alertThreshold" value="80" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>Metric</label>
+                            <select id="alertMetric" class="form-input">
+                                <option value="cpu">CPU Load</option>
+                                <option value="memory">Memory Usage</option>
+                                <option value="disk">Storage Level</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Threshold (%)</label>
+                            <input type="number" id="alertThreshold" value="90" class="form-input">
+                        </div>
                     </div>
                 </div>
-                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded text-sm uppercase tracking-widest mt-4">Deploy Rule</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addAlertModal', false)">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Deploy Policy</button>
+                </div>
             </form>
         </div>
     </div>
 
     <script>
+        // Init Lucide
+        lucide.createIcons();
+
+        // State Management
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/login';
 
-        function toggleModal(id, show) {
-            const el = document.getElementById(id);
-            if (!el) return;
-            el.classList.toggle('hidden', !show);
-            el.classList.toggle('flex', show);
-        }
-
         let charts = {};
         let currentRange = '1h';
-        let servers = [];
+        let nodes = [];
 
-        lucide.createIcons();
-
-        function showSection(section) {
-            document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
-            const target = document.getElementById('section-' + section);
-            if (target) {
-                target.classList.remove('hidden');
-                document.querySelectorAll('nav button').forEach(b => {
-                    b.classList.toggle('sidebar-item-active', b.dataset.section === section);
-                });
-                document.getElementById('pageTitle').textContent = `General / ${section.charAt(0).toUpperCase() + section.slice(1)}`;
-                if (section === 'logs') loadAuditLogs();
-                if (section === 'alerts') loadAlerts();
-            }
+        function toggleModal(id, show) {
+            const el = document.getElementById(id);
+            el.classList.toggle('active', show);
         }
 
-        document.querySelectorAll('nav button').forEach(btn => {
+        function showSection(section) {
+            document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('section-' + section).classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(i => {
+                i.classList.toggle('active', i.dataset.section === section);
+            });
+            
+            document.getElementById('viewTitle').textContent = section.charAt(0).toUpperCase() + section.slice(1);
+            
+            if (section === 'explorer') loadAuditLogs();
+            if (section === 'alerts') loadAlertRules();
+            if (section === 'settings') loadSettings();
+        }
+
+        // Event Listeners
+        document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', () => showSection(btn.dataset.section));
         });
 
         document.querySelectorAll('.range-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('bg-[#f0883e]', 'text-black'));
-                document.querySelectorAll('.range-btn').forEach(b => b.classList.add('text-slate-400'));
-                btn.classList.remove('text-slate-400');
-                btn.classList.add('bg-[#f0883e]', 'text-black');
+                document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
                 currentRange = btn.dataset.range;
-                loadData();
+                refreshData();
             });
         });
 
+        document.getElementById('refreshBtn').addEventListener('click', refreshData);
         document.getElementById('logoutBtn').addEventListener('click', () => {
             localStorage.removeItem('token');
             window.location.href = '/login';
         });
 
-        document.getElementById('refreshBtn').addEventListener('click', () => loadData());
-        document.getElementById('addServerBtn').addEventListener('click', () => toggleModal('addServerModal', true));
-        document.getElementById('addAlertBtn').addEventListener('click', () => toggleModal('addAlertModal', true));
-
-        // Forms
-        document.getElementById('addServerForm').addEventListener('submit', async (e) => {
+        // Form Handlers
+        document.getElementById('addNodeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const resp = await fetch('/api/v1/servers', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
-                body: JSON.stringify({
-                    name: document.getElementById('nodeName').value,
-                    host: document.getElementById('nodeHost').value,
-                    os_type: document.getElementById('nodeOS').value,
-                    agent_port: parseInt(document.getElementById('nodePort').value)
-                })
-            });
-            if (resp.status === 401) { window.location.href = '/login'; return; }
-            if (resp.ok) { toggleModal('addServerModal', false); e.target.reset(); loadData(); }
-            else { alert('Deployment failed'); }
+            try {
+                const resp = await fetch('/api/v1/servers', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+                    body: JSON.stringify({
+                        name: document.getElementById('nodeName').value,
+                        host: document.getElementById('nodeHost').value,
+                        os_type: document.getElementById('nodeOS').value,
+                        agent_port: parseInt(document.getElementById('nodePort').value),
+                        enabled: true
+                    })
+                });
+                if (resp.ok) {
+                    toggleModal('addNodeModal', false);
+                    e.target.reset();
+                    refreshData();
+                } else {
+                    const err = await resp.json();
+                    alert('Deployment Failed: ' + (err.detail || 'Internal Error'));
+                }
+            } catch (err) {
+                alert('Connection Error');
+            }
         });
 
         document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
@@ -457,14 +610,16 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     severity: 'warning'
                 })
             });
-            if (resp.ok) { toggleModal('addAlertModal', false); e.target.reset(); loadAlerts(); }
+            if (resp.ok) {
+                toggleModal('addAlertModal', false);
+                e.target.reset();
+                loadAlertRules();
+            }
         });
 
         // Charts
-        function createChart(canvasId, label, color) {
-            const el = document.getElementById(canvasId);
-            if (!el) return null;
-            const ctx = el.getContext('2d');
+        function createLineChart(id, label, color) {
+            const ctx = document.getElementById(id).getContext('2d');
             return new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -473,11 +628,11 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         label: label,
                         data: [],
                         borderColor: color,
-                        borderWidth: 1.5,
-                        pointRadius: 0,
-                        backgroundColor: color + '11',
+                        backgroundColor: color + '22',
                         fill: true,
-                        tension: 0
+                        tension: 0.4,
+                        borderWidth: 2,
+                        pointRadius: 0
                     }]
                 },
                 options: {
@@ -485,109 +640,131 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { display: true, ticks: { color: '#444', font: { size: 9 } }, grid: { display: false } },
-                        y: { beginAtZero: true, grid: { color: '#222' }, ticks: { color: '#444', font: { size: 9 } } }
+                        x: { display: true, grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } },
+                        y: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', font: { size: 10 } } }
                     }
                 }
             });
         }
 
-        async function loadData() {
+        function initCharts() {
+            charts.cpu = createLineChart('cpuChart', 'CPU', '#f97316');
+            charts.mem = createLineChart('memChart', 'RAM', '#3b82f6');
+            charts.net = createLineChart('netChart', 'Traffic', '#10b981');
+            charts.disk = createLineChart('diskChart', 'Disk', '#f59e0b');
+        }
+
+        // Data Fetching
+        async function refreshData() {
+            document.getElementById('updateTimer').textContent = 'Syncing...';
             try {
                 const resp = await fetch('/api/v1/servers', {headers: {'Authorization': 'Bearer ' + token}});
                 if (resp.status === 401) { window.location.href = '/login'; return; }
                 const data = await resp.json();
-                servers = data.servers;
-                document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
-                updateUI();
-                loadTrends();
-            } catch (e) {}
+                nodes = data.servers;
+                
+                updateStats();
+                updateLiveTable();
+                updateNodeGrid();
+                updateTrends();
+                
+                document.getElementById('updateTimer').textContent = 'Last sync: ' + new Date().toLocaleTimeString();
+            } catch (e) {
+                document.getElementById('updateTimer').textContent = 'Sync Error';
+            }
         }
 
-        function updateUI() {
-            const online = servers.filter(s => s.last_status === 'up').length;
-            const offline = servers.length - online;
+        function updateStats() {
+            const online = nodes.filter(n => n.last_status === 'up').length;
+            const offline = nodes.length - online;
             document.getElementById('stat-online').textContent = online;
             document.getElementById('stat-offline').textContent = offline;
             
-            const cpu = servers.length ? servers.reduce((a, b) => a + (b.cpu_percent || 0), 0) / servers.length : 0;
-            const mem = servers.length ? servers.reduce((a, b) => a + (b.memory_percent || 0), 0) / servers.length : 0;
-            document.getElementById('stat-cpu-avg').textContent = cpu.toFixed(1) + '%';
-            document.getElementById('stat-mem-avg').textContent = mem.toFixed(1) + '%';
+            const avgCpu = nodes.length ? nodes.reduce((a, b) => a + (b.cpu_percent || 0), 0) / nodes.length : 0;
+            const avgMem = nodes.length ? nodes.reduce((a, b) => a + (b.memory_percent || 0), 0) / nodes.length : 0;
+            
+            document.getElementById('stat-cpu').innerHTML = `${avgCpu.toFixed(1)}<span>%</span>`;
+            document.getElementById('stat-mem').innerHTML = `${avgMem.toFixed(1)}<span>%</span>`;
+        }
 
+        function updateLiveTable() {
+            const body = document.getElementById('liveTableBody');
             const formatBytes = (b) => {
                 if (!b) return '0 B';
                 const i = Math.floor(Math.log(b) / Math.log(1024));
                 return (b / Math.pow(1024, i)).toFixed(1) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][i];
             };
 
-            const list = document.getElementById('quickServerList');
-            list.innerHTML = servers.map(s => `
-                <tr class="hover:bg-[#161b22] transition-all group">
-                    <td class="px-4 py-3 font-bold text-white">${s.name}</td>
-                    <td class="px-4 py-3">
-                        <span class="flex items-center gap-1.5 ${s.last_status === 'up' ? 'text-[#3fb950]' : 'text-[#f85149]'}">
-                            <span class="w-1.5 h-1.5 rounded-full bg-current pulsing-dot"></span>
-                            ${s.last_status.toUpperCase()}
-                        </span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <div class="flex items-center gap-2">
-                            <span class="w-8">${(s.cpu_percent || 0).toFixed(0)}%</span>
-                            <div class="w-16 bg-[#30363d] h-1.5 rounded-full overflow-hidden"><div class="bg-[#f0883e] h-full" style="width: ${s.cpu_percent || 0}%"></div></div>
+            body.innerHTML = nodes.map(n => `
+                <tr>
+                    <td>
+                        <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">
+                            <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
+                            ${n.last_status || 'unknown'}
                         </div>
                     </td>
-                    <td class="px-4 py-3">
-                        <div class="flex items-center gap-2">
-                            <span class="w-8">${(s.memory_percent || 0).toFixed(0)}%</span>
-                            <div class="w-16 bg-[#30363d] h-1.5 rounded-full overflow-hidden"><div class="bg-[#388bfd] h-full" style="width: ${s.memory_percent || 0}%"></div></div>
+                    <td class="font-bold text-white">${n.name}</td>
+                    <td class="text-mono text-xs text-slate-500">${n.host}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="width: 2.5rem;">${(n.cpu_percent || 0).toFixed(0)}%</span>
+                            <div class="progress-bar"><div class="progress-fill" style="width: ${n.cpu_percent || 0}%; background: var(--accent);"></div></div>
                         </div>
                     </td>
-                    <td class="px-4 py-3">${(s.disk_percent || 0).toFixed(0)}%</td>
-                    <td class="px-4 py-3 font-mono text-[10px] text-slate-500">${formatBytes(s.network_rx)} / ${formatBytes(s.network_tx)}</td>
-                    <td class="px-4 py-3 text-right">
-                        <button onclick="deleteServer(${s.id})" class="text-slate-600 hover:text-red-400"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="width: 2.5rem;">${(n.memory_percent || 0).toFixed(0)}%</span>
+                            <div class="progress-bar"><div class="progress-fill" style="width: ${n.memory_percent || 0}%; background: #3b82f6;"></div></div>
+                        </div>
                     </td>
+                    <td>${(n.disk_percent || 0).toFixed(0)}%</td>
+                    <td class="text-mono text-[10px] text-slate-500">${formatBytes(n.network_rx)} / ${formatBytes(n.network_tx)}</td>
                 </tr>
             `).join('');
+        }
 
-            const grid = document.getElementById('serverCards');
-            grid.innerHTML = servers.map(s => `
-                <div class="glass p-4 rounded flex flex-col gap-3 group relative">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <i data-lucide="${s.os_type === 'windows' ? 'monitor' : 'terminal'}" class="w-4 h-4 ${s.last_status === 'up' ? 'text-blue-400' : 'text-slate-600'}"></i>
-                            <span class="font-bold text-white text-xs">${s.name}</span>
+        function updateNodeGrid() {
+            const grid = document.getElementById('nodeListGrid');
+            grid.innerHTML = nodes.map(n => `
+                <div class="node-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <div>
+                            <div style="font-weight: 700; color: white;">${n.name}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">${n.host}</div>
                         </div>
-                        <div class="w-2 h-2 rounded-full ${s.last_status === 'up' ? 'bg-[#3fb950]' : 'bg-[#f85149]'} pulsing-dot"></div>
+                        <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">${n.last_status}</div>
                     </div>
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-[10px] font-bold text-slate-500"><span>CPU</span><span>${(s.cpu_percent || 0).toFixed(1)}%</span></div>
-                        <div class="bg-[#30363d] h-1 rounded-full overflow-hidden"><div class="bg-[#f0883e] h-full" style="width: ${s.cpu_percent || 0}%"></div></div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">System Load</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                        <div style="background: rgba(255,255,255,0.03); padding: 0.5rem; border-radius: 0.5rem;">
+                            <div style="font-size: 0.6rem; text-transform: uppercase;">CPU</div>
+                            <div style="font-weight: 700; color: var(--accent);">${(n.cpu_percent || 0).toFixed(1)}%</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 0.5rem; border-radius: 0.5rem;">
+                            <div style="font-size: 0.6rem; text-transform: uppercase;">RAM</div>
+                            <div style="font-weight: 700; color: #3b82f6;">${(n.memory_percent || 0).toFixed(1)}%</div>
+                        </div>
                     </div>
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-[10px] font-bold text-slate-500"><span>RAM</span><span>${(s.memory_percent || 0).toFixed(1)}%</span></div>
-                        <div class="bg-[#30363d] h-1 rounded-full overflow-hidden"><div class="bg-[#388bfd] h-full" style="width: ${s.memory_percent || 0}%"></div></div>
-                    </div>
-                    <div class="pt-2 flex items-center justify-between text-[9px] text-slate-600 font-bold uppercase">
-                        <span>${s.host}</span>
-                        <button onclick="deleteServer(${s.id})" class="opacity-0 group-hover:opacity-100 transition-all text-red-500 hover:scale-110"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                    <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+                        <button onclick="deleteNode(${n.id})" style="background: transparent; border: none; color: #f87171; cursor: pointer; opacity: 0.5;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
                     </div>
                 </div>
             `).join('');
             lucide.createIcons();
         }
 
-        async function loadTrends() {
+        async function updateTrends() {
             try {
                 const resp = await fetch('/api/v1/metrics/trend', {headers: {'Authorization': 'Bearer ' + token}});
-                if (resp.status === 401) { window.location.href = '/login'; return; }
-                if (!resp.ok) return;
                 const data = await resp.json();
-                if (!charts.cpu) charts.cpu = createChart('cpuChart', 'CPU', '#f0883e');
-                if (!charts.mem) charts.mem = createChart('memoryChart', 'Memory', '#388bfd');
                 
-                const labels = data.history.map(h => new Date(h.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+                const labels = data.history.map(h => {
+                    const d = new Date(h.timestamp);
+                    return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+                });
+
                 charts.cpu.data.labels = labels;
                 charts.cpu.data.datasets[0].data = data.history.map(h => h.cpu_avg);
                 charts.cpu.update('none');
@@ -595,56 +772,66 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 charts.mem.data.labels = labels;
                 charts.mem.data.datasets[0].data = data.history.map(h => h.mem_avg);
                 charts.mem.update('none');
-            } catch(e){}
+                
+                charts.net.data.labels = labels;
+                charts.net.data.datasets[0].data = data.history.map(h => (h.net_rx_avg + h.net_tx_avg) / (1024 * 1024));
+                charts.net.update('none');
+                
+                charts.disk.data.labels = labels;
+                // Since trend doesn't return disk avg in current API, we mock it or use 0
+                charts.disk.data.datasets[0].data = data.history.map(() => nodes.reduce((a, b) => a + (b.disk_percent || 0), 0) / (nodes.length || 1));
+                charts.disk.update('none');
+            } catch (e) {}
         }
 
-        async function loadAlerts() {
-            const resp = await fetch('/api/v1/alerts', {headers: {'Authorization': 'Bearer ' + token}});
-            if (resp.status === 401) { window.location.href = '/login'; return; }
-            if (!resp.ok) return;
+        async function loadAuditLogs() {
+            const resp = await fetch('/api/v1/audit-log?limit=100', {headers: {'Authorization': 'Bearer ' + token}});
             const data = await resp.json();
-            document.getElementById('alertsList').innerHTML = data.alerts.map(a => `
-                <div class="p-4 bg-[#0d1117] rounded border border-[#30363d] flex items-center justify-between">
-                    <div><div class="text-xs font-bold text-white">${a.name}</div><div class="text-[10px] text-slate-500">${a.metric} > ${a.threshold}%</div></div>
-                    <button onclick="deleteAlert(${a.id})" class="text-red-500/50 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+            const stream = document.getElementById('auditLogStream');
+            stream.innerHTML = data.logs.map(l => `
+                <div style="display: flex; gap: 1rem; margin-bottom: 0.25rem;">
+                    <span style="color: #64748b;">[${l.timestamp.split('T')[1].substring(0, 8)}]</span>
+                    <span style="color: #3b82f6; width: 100px;">${l.username}</span>
+                    <span style="color: #f8fafc;">${l.action}</span>
+                    <span style="color: #64748b;">${l.target || ''}</span>
+                </div>
+            `).join('');
+            stream.scrollTop = stream.scrollHeight;
+        }
+
+        async function loadAlertRules() {
+            const resp = await fetch('/api/v1/alerts', {headers: {'Authorization': 'Bearer ' + token}});
+            const data = await resp.json();
+            const grid = document.getElementById('alertRulesGrid');
+            grid.innerHTML = data.alerts.map(a => `
+                <div class="node-card" style="border-left: 4px solid ${a.severity === 'critical' ? 'var(--danger)' : 'var(--warning)'};">
+                    <div style="font-weight: 700; color: white; margin-bottom: 0.25rem;">${a.name}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">
+                        Trigger: <span style="color: white; font-family: monospace;">${a.metric} > ${a.threshold}%</span>
+                    </div>
+                    <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+                        <button onclick="deleteAlert(${a.id})" style="background: transparent; border: none; color: #f87171; cursor: pointer; opacity: 0.5;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
                 </div>
             `).join('');
             lucide.createIcons();
         }
 
-        async function loadAuditLogs() {
-            const resp = await fetch('/api/v1/audit-log?limit=50', {headers: {'Authorization': 'Bearer ' + token}});
-            if (resp.status === 401) { window.location.href = '/login'; return; }
-            if (!resp.ok) return;
-            const data = await resp.json();
-            document.getElementById('auditLogs').innerHTML = data.logs.map(l => `
-                <div class="flex gap-4">
-                    <span class="text-slate-600">[${l.timestamp.split('T')[1].substring(0, 8)}]</span>
-                    <span class="text-blue-400 font-bold">${l.username}</span>
-                    <span class="text-white">${l.action}</span>
-                    <span class="text-slate-500">${l.target || '-'}</span>
-                </div>
-            `).join('');
-        }
-
-        async function deleteServer(id) {
-            if (confirm('REMOVE NODE?')) {
+        async function deleteNode(id) {
+            if (confirm('Permanently decommission this node?')) {
                 await fetch(`/api/v1/servers/${id}`, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
-                loadData();
+                refreshData();
             }
         }
 
         async function deleteAlert(id) {
             await fetch(`/api/v1/alerts/${id}`, {method: 'DELETE', headers: {'Authorization': 'Bearer ' + token}});
-            loadAlerts();
+            loadAlertRules();
         }
 
-        async function changePassword() {
-            const p = prompt('NEW PASSWORD:');
-            if (p) await fetch('/api/v1/auth/reset-password', {method: 'POST', headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, body: JSON.stringify({new_password: p})});
-        }
-
-        async function loadNotifSettings() {
+        async function loadSettings() {
             const resp = await fetch('/api/v1/settings/notifications', {headers: {'Authorization': 'Bearer ' + token}});
             if (resp.ok) {
                 const data = await resp.json();
@@ -655,7 +842,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             }
         }
 
-        async function saveNotifSettings() {
+        async function saveSettings() {
             const data = {
                 enabled: document.getElementById('notifEnabled').checked,
                 telegram_bot_token: document.getElementById('tgToken').value,
@@ -667,23 +854,15 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
                 body: JSON.stringify(data)
             });
-            if (resp.ok) alert('Notification settings updated');
-            else alert('Failed to update settings');
+            if (resp.ok) alert('Configuration Saved Successfully');
+            else alert('Access Denied or Validation Failed');
         }
 
-        function initSettings() {
-            loadNotifSettings();
-        }
-
-        // Add to showSection
-        const oldShowSection = showSection;
-        showSection = function(section) {
-            oldShowSection(section);
-            if (section === 'settings') initSettings();
-        }
-
-        loadData();
-        setInterval(loadData, 10000);
+        // Initialization
+        initCharts();
+        refreshData();
+        setInterval(refreshData, 15000);
     </script>
 </body>
 </html>"""
+
