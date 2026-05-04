@@ -570,45 +570,176 @@ sudo systemctl start prometheus-node-exporter</textarea>
 
                 <!-- Section: Logs -->
                 <div id="section-logs" class="dashboard-section">
-                    <div class="card" style="height: 600px;">
-                        <div class="card-header">
-                            <h3>Audit Log Stream</h3>
-                            <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.7rem;" onclick="loadAuditLogs()">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <h2 style="font-size: 1.5rem; font-weight: 700;">Audit Log Stream</h2>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="text" id="logSearch" class="form-input" placeholder="Search logs..." style="width: 200px; padding: 0.3rem 0.75rem; font-size: 0.75rem;" oninput="filterLogs()">
+                            <select id="logFilter" class="form-input" style="width: 140px; padding: 0.3rem 0.5rem; font-size: 0.75rem;" onchange="filterLogs()">
+                                <option value="">All Actions</option>
+                                <option value="Add Server">Add Server</option>
+                                <option value="Delete Server">Delete Server</option>
+                                <option value="Alert Triggered">Alert Triggered</option>
+                                <option value="Exporter Down">Exporter Down</option>
+                                <option value="Login">Login</option>
+                            </select>
+                            <button class="btn btn-secondary" style="padding: 0.3rem 0.75rem; font-size: 0.7rem;" onclick="loadAuditLogs()">
                                 <i data-lucide="rotate-cw" style="width: 12px; height: 12px;"></i>
                             </button>
+                            <button class="btn btn-secondary" style="padding: 0.3rem 0.75rem; font-size: 0.7rem;" onclick="exportLogs()">
+                                <i data-lucide="download" style="width: 12px; height: 12px;"></i> Export
+                            </button>
                         </div>
+                    </div>
+                    <div class="card" style="height: 550px;">
                         <div class="card-body" id="auditLogStream" style="overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">
                             <!-- Log stream -->
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
+                        <div class="card" style="padding: 1rem; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: white;" id="logTotalCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Total Events</div>
+                        </div>
+                        <div class="card" style="padding: 1rem; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--danger);" id="logAlertCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Alerts Fired</div>
+                        </div>
+                        <div class="card" style="padding: 1rem; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);" id="logServerCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Server Actions</div>
+                        </div>
+                        <div class="card" style="padding: 1rem; text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;" id="logLoginCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">Logins</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Section: Settings -->
                 <div id="section-settings" class="dashboard-section">
-                    <div class="card" style="max-width: 600px; margin: 0 auto;">
-                        <div class="card-header">
-                            <h3>Global Configuration</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <!-- Notification Settings -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: var(--accent);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(249, 115, 22, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="bell" style="color: var(--accent); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Notification Channels</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                                        <input type="checkbox" id="notifEnabled" style="width: 16px; height: 16px;">
+                                        Broadcast Notifications Enabled
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label>Telegram Bot Token</label>
+                                    <input type="password" id="tgToken" class="form-input" placeholder="000000:ABC...">
+                                </div>
+                                <div class="form-group">
+                                    <label>Telegram Chat ID</label>
+                                    <input type="text" id="tgChat" class="form-input" placeholder="-100...">
+                                </div>
+                                <div class="form-group">
+                                    <label>Discord Webhook URL</label>
+                                    <input type="text" id="dsWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/...">
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                    <button class="btn btn-primary" style="flex: 1;" onclick="saveSettings()">Save</button>
+                                    <button class="btn btn-secondary" style="flex: 1;" onclick="testNotification()">
+                                        <i data-lucide="send" style="width: 14px; height: 14px; margin-right: 0.25rem;"></i> Test
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div class="card-body">
-                            <div class="form-group">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-                                    <input type="checkbox" id="notifEnabled" style="width: 16px; height: 16px;">
-                                    Broadcast Notifications Enabled
-                                </label>
+
+                        <!-- Scrape & System Settings -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: #3b82f6;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="settings-2" style="color: #3b82f6; width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>System Configuration</h3>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>Telegram Bot Secret</label>
-                                <input type="password" id="tgToken" class="form-input" placeholder="000000:ABC...">
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label>Default Scrape Interval (seconds)</label>
+                                    <input type="number" id="scrapeInterval" class="form-input" value="15" min="5" max="300">
+                                </div>
+                                <div class="form-group">
+                                    <label>Data Retention (days)</label>
+                                    <input type="number" id="dataRetention" class="form-input" value="30" min="1" max="365">
+                                </div>
+                                <div class="form-group">
+                                    <label>Default Node Port (Linux)</label>
+                                    <input type="number" id="defaultPortLinux" class="form-input" value="9100">
+                                </div>
+                                <div class="form-group">
+                                    <label>Default Node Port (Windows)</label>
+                                    <input type="number" id="defaultPortWindows" class="form-input" value="9182">
+                                </div>
+                                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSystemSettings()">Save System Config</button>
                             </div>
-                            <div class="form-group">
-                                <label>Telegram Destination ID</label>
-                                <input type="text" id="tgChat" class="form-input" placeholder="-100...">
+                        </div>
+
+                        <!-- System Info -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: var(--success);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(34, 197, 94, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="info" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>System Information</h3>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label>Discord Webhook URL</label>
-                                <input type="text" id="dsWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/...">
+                            <div class="card-body" style="font-size: 0.85rem;">
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Version</span>
+                                    <span style="color: white; font-weight: 600;">PyMon v0.1.0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Database</span>
+                                    <span style="color: white;">SQLite</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">API Port</span>
+                                    <span style="color: white;">8090</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Active Nodes</span>
+                                    <span style="color: var(--success); font-weight: 600;" id="settingsNodeCount">0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                                    <span style="color: var(--text-muted);">Uptime</span>
+                                    <span style="color: white;" id="settingsUptime">-</span>
+                                </div>
                             </div>
-                            <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSettings()">Apply Configuration</button>
+                        </div>
+
+                        <!-- Danger Zone -->
+                        <div class="card" style="border: 1px solid rgba(239, 68, 68, 0.2);">
+                            <div class="card-header" style="border-bottom-color: var(--danger);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="alert-triangle" style="color: var(--danger); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Danger Zone</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">These actions are irreversible. Proceed with caution.</p>
+                                <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); margin-bottom: 0.5rem;" onclick="if(confirm('Clear all audit logs?')) clearAuditLogs()">
+                                    <i data-lucide="trash" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Clear Audit Logs
+                                </button>
+                                <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="if(confirm('Clear ALL metric history? This cannot be undone!')) clearMetricHistory()">
+                                    <i data-lucide="database" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Clear Metric History
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
