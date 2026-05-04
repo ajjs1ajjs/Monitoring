@@ -184,10 +184,17 @@ class ScrapeManager:
             try:
                 name = None
                 value = None
+                labels = []
                 if "{" in line:
                     name_part, value_part = line.split("{", 1)
                     name = name_part.strip()
-                    value = float(value_part.rsplit("}", 1)[1].strip())
+                    labels_part, value_str = value_part.rsplit("}", 1)
+                    value = float(value_str.strip())
+                    for label_str in labels_part.split(","):
+                        if "=" in label_str:
+                            lname, lvalue = label_str.split("=", 1)
+                            lvalue = lvalue.strip('"')
+                            labels.append((lname.strip(), lvalue))
                 else:
                     parts = line.split()
                     if len(parts) >= 2:
@@ -198,6 +205,7 @@ class ScrapeManager:
                     metrics[name] = value
 
                     label_objs = list(target.labels.items()) if not target.honor_labels else []
+                    label_objs.extend(labels)
                     registry.register(name, MetricType.GAUGE, "", label_objs)
                     registry.set(name, value, label_objs)
 
@@ -225,38 +233,56 @@ class ScrapeManager:
                     cpu_user = max(cpu_user, v)
                 elif 'cpu_seconds_total' in k and 'mode="system"' in k:
                     cpu_system = max(cpu_system, v)
+                # Also check with underscores instead of quotes
+                if '_total{mode="idle"' in k or '_total{mode="idle"}' in k:
+                    cpu_idle = max(cpu_idle, v)
+                elif '_total{mode="user"' in k or '_total{mode="user"}' in k:
+                    cpu_user = max(cpu_user, v)
+                elif '_total{mode="system"' in k or '_total{mode="system"}' in k:
+                    cpu_system = max(cpu_system, v)
             
-            if cpu_idle > 0 and cpu_user > 0:
+            if cpu_idle > 0:
                 total_cpu = cpu_idle + cpu_user + cpu_system
                 if total_cpu > 0:
                     metrics['node_cpu_calculated'] = 100 * (1 - cpu_idle / total_cpu)
 
             for k, v in metrics.items():
-                if 'memory_MemTotal_bytes' in k:
+                if 'MemTotal_bytes' in k:
                     metrics['node_memory_total'] = v
-                elif 'memory_MemAvailable_bytes' in k:
+                elif 'MemAvailable_bytes' in k:
+                    metrics['node_memory_available'] = v
+                # Also check node_ version
+                if 'node_memory_MemTotal' in k:
+                    metrics['node_memory_total'] = v
+                elif 'node_memory_MemAvailable' in k:
                     metrics['node_memory_available'] = v
             
             if 'node_memory_total' in metrics and 'node_memory_available' in metrics:
                 mt = metrics['node_memory_total']
                 ma = metrics['node_memory_available']
-                if mt > 0:
+                if mt > 0 and ma > 0:
                     metrics['node_memory_calculated'] = 100 * (1 - ma / mt)
 
             for k, v in metrics.items():
-                if 'filesystem_size_bytes' in k:
-                    if 'node_disk_total' not in metrics or v > metrics['node_disk_total']:
+                if 'size_bytes' in k and 'filesystem' in k:
+                    if 'node_disk_total' not in metrics or v > metrics.get('node_disk_total', 0):
                         metrics['node_disk_total'] = v
-                elif 'filesystem_avail_bytes' in k:
-                    if 'node_disk_avail' not in metrics or v > metrics['node_disk_avail']:
+                elif 'avail_bytes' in k and 'filesystem' in k:
+                    if 'node_disk_avail' not in metrics or v > metrics.get('node_disk_avail', 0):
                         metrics['node_disk_avail'] = v
+                # Also check node_ version
+                if 'node_filesystem_size' in k:
+                    metrics['node_disk_total'] = v
+                elif 'node_filesystem_avail' in k:
+                    metrics['node_disk_avail'] = v
             
             if 'node_disk_total' in metrics and 'node_disk_avail' in metrics:
                 dt = metrics['node_disk_total']
                 da = metrics['node_disk_avail']
-                if dt > 0:
+                if dt > 0 and da > 0:
                     metrics['node_disk_calculated'] = 100 * (1 - da / dt)
-        except Exception:
+        except Exception as e:
+            print(f"Metric calc error: {e}")
             pass
 
         return metrics
