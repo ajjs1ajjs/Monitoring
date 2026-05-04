@@ -1646,9 +1646,9 @@ const Alerts = {
 
     async edit(id) {
         try {
-            const data = await API.get('/api/alerts');
-            const alert = data.alerts.find(a => a.id === id);
-            if (!alert) return;
+            const data = await API.get(`/api/alerts/${id}`);
+            const alert = data.alert;
+            if (!alert) { alert('Alert not found'); return; }
             document.getElementById('alert-id').value = alert.id;
             document.getElementById('alert-name').value = alert.name;
             document.getElementById('alert-type').value = alert.is_exporter_down ? 'exporter' : 'metric';
@@ -2483,6 +2483,16 @@ async def update_alert(alert_id: int, alert: AlertModel):
     conn.commit()
     conn.close()
     return {"status": "ok"}
+
+
+@router.get("/api/alerts/{alert_id}")
+async def get_single_alert(alert_id: int):
+    conn = get_db()
+    alert = conn.execute("SELECT * FROM alerts WHERE id = ?", (alert_id,)).fetchone()
+    conn.close()
+    if not alert:
+        return {"error": "Alert not found"}
+    return {"alert": dict(alert)}
 
 
 @router.delete("/api/alerts/{alert_id}")
