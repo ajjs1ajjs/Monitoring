@@ -65,7 +65,6 @@ def main():
             os.environ.setdefault("CONFIG_PATH", config_path)
 
             print(f"Initializing storage (SQLite)...", file=sys.stderr)
-            from pymon import web_dashboard_simple
             from pymon.auth import auth_config as auth_cfg
             from pymon.auth import init_auth_tables
             from pymon.storage import init_storage
@@ -89,8 +88,9 @@ def main():
             print(f"Initializing auth tables...", file=sys.stderr)
             init_auth_tables()
 
-            print("Initializing web tables (simple dashboard)...", file=sys.stderr)
-            web_dashboard_simple.init_web_tables()
+            print("Initializing web tables...", file=sys.stderr)
+            from pymon import web_dashboard
+            web_dashboard.init_web_tables()
 
             print(f"Starting PyMon server on {host}:{port}")
             print(f"Dashboard: http://{host}:{port}/dashboard/")
