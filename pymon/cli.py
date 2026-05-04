@@ -32,20 +32,23 @@ async def lifespan(app):
         conn.close()
 
         scrape_manager = ScrapeManager(config)
+        app.state.scrape_manager = scrape_manager
+        
         if servers:
             for server in servers:
                 scrape_manager.add_server_target(server)
 
-        scrape_manager.start()
-        if servers:
-            print(
-                f"Background scraping started (interval: {config.scrape_configs[0].scrape_interval if config.scrape_configs else 60}s, targets: {len(scrape_manager.targets)})",
-                file=sys.stderr,
-            )
-        else:
-            print("ScrapeManager initialized (ready for dynamic targets)", file=sys.stderr)
+        try:
+            scrape_manager.start()
+            if servers:
+                print(
+                    f"Background scraping started (targets: {len(scrape_manager.targets)})",
+                    file=sys.stderr,
+                )
+        except Exception as e:
+            print(f"Warning: Could not start background scraping loop: {e}", file=sys.stderr)
         
-        app.state.scrape_manager = scrape_manager
+        print("ScrapeManager initialized (ready for dynamic targets)", file=sys.stderr)
 
     except Exception as e:
         print(f"Warning: Could not start background scraping: {e}", file=sys.stderr)

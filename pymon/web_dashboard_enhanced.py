@@ -938,6 +938,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         function updateLiveTable(data) {
             const body = document.getElementById('liveTableBody');
+            if (!body) return;
             const targetData = data || nodes;
             const formatBytes = (b) => {
                 if (!b) return '0 B';
@@ -975,6 +976,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         function updateNodeGrid(data) {
             const grid = document.getElementById('nodeListGrid');
+            if (!grid) return;
             const targetData = data || nodes;
             grid.innerHTML = targetData.map(n => `
                 <div class="node-card">
