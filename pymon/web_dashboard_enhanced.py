@@ -508,7 +508,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
                                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Best-in-class agent for Windows Server monitoring.</p>
                                 <div class="form-group">
                                     <label style="font-size: 0.7rem; text-transform: uppercase;">PowerShell Install</label>
-                                    <textarea readonly class="form-input" style="height: 80px; font-family: monospace; font-size: 0.75rem; background: #020617;">msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.22.0/windows_exporter-0.22.0-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system"</textarea>
+                                    <textarea readonly class="form-input" style="height: 80px; font-family: monospace; font-size: 0.75rem; background: #020617;">msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.30.9/windows_exporter-0.30.9-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system"</textarea>
                                 </div>
                                 <div class="form-group">
                                     <label style="font-size: 0.7rem; text-transform: uppercase;">Agent Port</label>
