@@ -244,6 +244,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .action-btn { background: transparent; border: none; cursor: pointer; opacity: 0.6; transition: all 0.2s; padding: 4px; display: flex; align-items: center; justify-content: center; }
         .action-btn:hover { opacity: 1; transform: scale(1.1); }
         .action-btn:active { transform: scale(0.9); }
+
+        .search-box { display: flex; align-items: center; gap: 0.5rem; background: #020617; border: 1px solid var(--border); padding: 0.4rem 0.75rem; border-radius: 0.75rem; flex: 1; max-width: 300px; }
+        .search-box input { background: transparent; border: none; color: white; font-size: 0.85rem; width: 100%; outline: none; }
+        .search-box i { color: var(--text-muted); }
     </style>
 </head>
 <body>
@@ -411,14 +415,41 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
                 <!-- Section: Nodes -->
                 <div id="section-nodes" class="dashboard-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                        <h2 style="font-size: 1.5rem; font-weight: 700;">Managed Inventory</h2>
-                        <button class="btn btn-primary" onclick="toggleModal('addNodeModal', true)">
-                            <i data-lucide="plus" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 0.5rem;"></i> Register Node
-                        </button>
+                    <div class="card-header" style="border-bottom: none; padding-bottom: 0;">
+                        <h2 id="viewTitle">Infrastructure Inventory</h2>
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <div class="search-box">
+                                <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+                                <input type="text" id="nodeSearch" placeholder="Search nodes..." oninput="filterNodes()">
+                            </div>
+                            <select id="filterStatus" class="form-input" style="width: 120px; padding: 0.4rem;" onchange="filterNodes()">
+                                <option value="all">All Status</option>
+                                <option value="up">Online</option>
+                                <option value="down">Offline</option>
+                            </select>
+                            <button onclick="toggleModal('addNodeModal', true)" class="btn btn-primary" style="padding: 0.4rem 1rem;">
+                                <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Add Node
+                            </button>
+                        </div>
                     </div>
-                    <div class="stats-grid" id="nodeListGrid">
-                        <!-- Dynamic Nodes -->
+
+                    <div class="table-card" style="margin-top: 1rem;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="cursor: pointer;" onclick="sortNodes('last_status')">Status <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
+                                    <th style="cursor: pointer;" onclick="sortNodes('name')">Node Identity <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
+                                    <th>Endpoint</th>
+                                    <th style="cursor: pointer;" onclick="sortNodes('cpu_percent')">CPU <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
+                                    <th style="cursor: pointer;" onclick="sortNodes('memory_percent')">RAM <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
+                                    <th style="cursor: pointer;" onclick="sortNodes('disk_percent')">Storage <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
+                                    <th>Traffic (RX/TX)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="liveTableBody">
+                                <!-- Dynamic Content -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -833,6 +864,9 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         // Data Fetching
+        let sortKey = 'name';
+        let sortOrder = 1;
+
         async function refreshData() {
             document.getElementById('updateTimer').textContent = 'Syncing...';
             try {
@@ -841,15 +875,47 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 const data = await resp.json();
                 nodes = data.servers;
                 
-                updateStats();
-                updateLiveTable();
-                updateNodeGrid();
-                updateTrends();
+                filterNodes(); // This will also call update displays
                 
                 document.getElementById('updateTimer').textContent = 'Last sync: ' + new Date().toLocaleTimeString();
             } catch (e) {
                 document.getElementById('updateTimer').textContent = 'Sync Error';
             }
+        }
+
+        function filterNodes() {
+            const query = document.getElementById('nodeSearch').value.toLowerCase();
+            const statusFilter = document.getElementById('filterStatus').value;
+            
+            let filtered = nodes.filter(n => {
+                const matchesSearch = n.name.toLowerCase().includes(query) || n.host.toLowerCase().includes(query);
+                const matchesStatus = statusFilter === 'all' || n.last_status === statusFilter;
+                return matchesSearch && matchesStatus;
+            });
+            
+            // Apply sorting
+            filtered.sort((a, b) => {
+                const valA = a[sortKey] || 0;
+                const valB = b[sortKey] || 0;
+                if (valA < valB) return -1 * sortOrder;
+                if (valA > valB) return 1 * sortOrder;
+                return 0;
+            });
+            
+            updateStats();
+            updateLiveTable(filtered);
+            updateNodeGrid(filtered);
+            updateTrends();
+        }
+
+        function sortNodes(key) {
+            if (sortKey === key) {
+                sortOrder *= -1;
+            } else {
+                sortKey = key;
+                sortOrder = 1;
+            }
+            filterNodes();
         }
 
         function updateStats() {
@@ -870,15 +936,16 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             document.getElementById('stat-net').innerHTML = `${totalNet.toFixed(2)}<span>MB/s</span>`;
         }
 
-        function updateLiveTable() {
+        function updateLiveTable(data) {
             const body = document.getElementById('liveTableBody');
+            const targetData = data || nodes;
             const formatBytes = (b) => {
                 if (!b) return '0 B';
                 const i = Math.floor(Math.log(b) / Math.log(1024));
                 return (b / Math.pow(1024, i)).toFixed(1) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][i];
             };
 
-            body.innerHTML = nodes.map(n => `
+            body.innerHTML = targetData.map(n => `
                 <tr>
                     <td>
                         <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">
@@ -906,9 +973,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             `).join('');
         }
 
-        function updateNodeGrid() {
+        function updateNodeGrid(data) {
             const grid = document.getElementById('nodeListGrid');
-            grid.innerHTML = nodes.map(n => `
+            const targetData = data || nodes;
+            grid.innerHTML = targetData.map(n => `
                 <div class="node-card">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                         <div>
