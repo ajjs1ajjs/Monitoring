@@ -260,7 +260,7 @@ async def get_audit_log(limit: int = 100):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        logs = conn.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        logs = conn.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return {"logs": [dict(l) for l in logs]}
     finally:
         conn.close()
@@ -382,7 +382,7 @@ async def get_server_events(server_id: int, limit: int = 50):
     conn.row_factory = sqlite3.Row
     try:
         cursor = conn.execute(
-            "SELECT id, username, action, target, timestamp FROM audit_log WHERE target LIKE ? ORDER BY timestamp DESC LIMIT ?",
+            "SELECT id, username, action, target, timestamp FROM audit_logs WHERE target LIKE ? ORDER BY timestamp DESC LIMIT ?",
             (f"%{server_id}%", limit),
         )
         rows = cursor.fetchall()

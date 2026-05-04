@@ -107,7 +107,7 @@ def init_web_tables():
         except Exception:
             pass
 
-        c.execute("""CREATE TABLE IF NOT EXISTS audit_log (
+        c.execute("""CREATE TABLE IF NOT EXISTS audit_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT,
             action TEXT,
@@ -190,14 +190,7 @@ def init_web_tables():
             last_used TEXT
         )""")
 
-        c.execute("""CREATE TABLE IF NOT EXISTS audit_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            action TEXT NOT NULL,
-            details TEXT,
-            ip_address TEXT,
-            created_at TEXT
-        )""")
+
 
         c.execute("""CREATE TABLE IF NOT EXISTS maintenance_windows (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2297,7 +2290,7 @@ async def factory_reset(data: dict):
 
         conn = get_db()
         # Clear all data tables
-        tables = ["servers", "alerts", "api_keys", "audit_log", "maintenance_windows", "backups"]
+        tables = ["servers", "alerts", "api_keys", "audit_logs", "maintenance_windows", "backups"]
         for table in tables:
             try:
                 conn.execute(f"DELETE FROM {table}")
@@ -2406,7 +2399,7 @@ async def delete_api_key(key_id: int):
 @router.get("/api/audit-log")
 async def list_audit_log(limit: int = 100):
     conn = get_db()
-    logs = conn.execute("SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+    logs = conn.execute("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT ?", (limit,)).fetchall()
     conn.close()
     return {"logs": [dict(l) for l in logs]}
 
@@ -2415,8 +2408,8 @@ def log_audit(user_id: int, action: str, details: str = "", ip: str = ""):
     try:
         conn = get_db()
         conn.execute(
-            "INSERT INTO audit_log (user_id, action, details, ip_address, created_at) VALUES (?, ?, ?, ?, ?)",
-            (user_id, action, details, ip, datetime.now(timezone.utc).isoformat()),
+            "INSERT INTO audit_logs (username, action, target, timestamp) VALUES (?, ?, ?, ?)",
+            (user_id, action, details, datetime.now(timezone.utc).isoformat()),
         )
         conn.commit()
         conn.close()
