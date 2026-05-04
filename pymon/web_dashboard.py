@@ -100,6 +100,21 @@ def init_web_tables():
             raid_status TEXT,
             disk_info TEXT
         )""")
+        
+        # Schema Migration: Add missing columns if they don't exist
+        columns = [info[1] for info in c.execute("PRAGMA table_info(servers)").fetchall()]
+        needed = {
+            'disk_info': 'TEXT',
+            'os_type': "TEXT DEFAULT 'linux'",
+            'enabled': 'BOOLEAN DEFAULT 1',
+            'raid_status': 'TEXT'
+        }
+        for col, col_type in needed.items():
+            if col not in columns:
+                try:
+                    c.execute(f"ALTER TABLE servers ADD COLUMN {col} {col_type}")
+                except Exception: pass
+
         # Add indexes to improve query performance on common filters
         try:
             c.execute("CREATE INDEX IF NOT EXISTS idx_servers_last_status ON servers(last_status)")
