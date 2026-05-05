@@ -411,6 +411,18 @@ class ScrapeManager:
                         ),
                     )
 
+                    # Add to metrics history for charts
+                    try:
+                        c.execute(
+                            """INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info, timestamp)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (sid, cpu, memory, disk, network_rx, network_tx, disk_info_json, now),
+                        )
+                        # Keep only 7 days of history to prevent DB bloat
+                        c.execute("DELETE FROM metrics_history WHERE timestamp < datetime('now', '-7 days')")
+                    except Exception as he:
+                        print(f"History insert error: {he}")
+
                     # Broadcast update via WebSocket
                     try:
                         import asyncio
@@ -793,18 +805,18 @@ class ScrapeManager:
                                 import re
                                 mount_match = re.search(r'mountpoint="([^"]+)"', k)
                                 mount = mount_match.group(1) if mount_match else "unknown"
-                                
+
                                 total_fs = v
                                 # Шукаємо відповідний available
                                 avail_key = k.replace("size_bytes", "avail_bytes")
                                 avail_fs = metrics.get(avail_key, 0)
-                                
+
                                 if total_fs > 0 and avail_fs >= 0:
                                     usage = ((total_fs - avail_fs) / total_fs) * 100
                                     disk_usage = max(disk_usage, usage)
                                     disk_info_json[mount] = round(usage, 1)
                                     print(f"DEBUG DISK: {mount} = {usage:.1f}% (size={total_fs}, avail={avail_fs})")
-                        
+
                         metrics["disk_usage_percent"] = disk_usage
                         if disk_info_json:
                             metrics["_disk_info_json"] = json.dumps(disk_info_json)
@@ -845,12 +857,12 @@ class ScrapeManager:
                                 metrics["windows_logical_disk_free_bytes"] = info["free"]
                                 metrics["windows_logical_disk_size_bytes"] = info["size"]
                                 print(f"DEBUG DISK: C: = {pct:.1f}% (size={info['size']}, free={info['free']})")
-                    
+
                     # Set the main disk metric for Windows
                     if c_drive_percent > 0:
                         metrics["disk_usage_percent"] = c_drive_percent
                         print(f"DEBUG DISK: Set disk_usage_percent = {c_drive_percent:.1f}% for Windows")
-                    
+
                     metrics["_disk_info_json"] = json.dumps(disks_dict) if disks_dict else None
 
                     # Detect exporter version from build_info metrics

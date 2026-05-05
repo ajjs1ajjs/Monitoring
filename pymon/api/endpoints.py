@@ -1151,18 +1151,17 @@ async def get_metrics_trend(current_user: User = Depends(get_current_user)):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
+        # Use metrics_history for more reliable structured data
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
 
-        # Aggragate metrics into 1-minute buckets
-        # Note: strftime formatting depends on the SQLite version and how timestamps were stored
         query = """
             SELECT
                 substr(timestamp, 1, 16) as ts,
-                AVG(CASE WHEN name LIKE '%cpu%' THEN value END) as cpu_avg,
-                AVG(CASE WHEN name LIKE '%memory%' THEN value END) as mem_avg,
-                SUM(CASE WHEN name LIKE '%net%rx%' THEN value END) as net_rx,
-                SUM(CASE WHEN name LIKE '%net%tx%' THEN value END) as net_tx
-            FROM metrics
+                AVG(cpu_percent) as cpu_avg,
+                AVG(memory_percent) as mem_avg,
+                SUM(network_rx) as net_rx,
+                SUM(network_tx) as net_tx
+            FROM metrics_history
             WHERE timestamp > ?
             GROUP BY ts
             ORDER BY ts ASC
@@ -1175,15 +1174,15 @@ async def get_metrics_trend(current_user: User = Depends(get_current_user)):
             history.append(
                 {
                     "timestamp": r["ts"] + ":00Z",
-                    "cpu_avg": r["cpu_avg"] or 0,
-                    "mem_avg": r["mem_avg"] or 0,
+                    "cpu_avg": round(r["cpu_avg"] or 0, 1),
+                    "mem_avg": round(r["mem_avg"] or 0, 1),
                     "net_rx_avg": r["net_rx"] or 0,
                     "net_tx_avg": r["net_tx"] or 0,
                 }
             )
 
         if not history:
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(timezone.utc).isoformat()[:16] + ":00Z"
             history = [{"timestamp": now, "cpu_avg": 0, "mem_avg": 0, "net_rx_avg": 0, "net_tx_avg": 0}]
 
         return {"history": history}
