@@ -264,11 +264,27 @@ class ScrapeManager:
                 # Disk metrics - підтримка різних варіацій імен
                 k_lower = k.lower()
                 if "filesystem_size_bytes" in k_lower or "filesystem_size" in k_lower:
+                    # Try to extract mountpoint from labels embedded in metric name (if present)
+                    mount = None
+                    import re
+                    m = re.search(r'mountpoint="([^"]+)"', k)
+                    if m:
+                        mount = m.group(1)
+                    # Пропустимо невідомі mountpoint або системні
+                    if not mount or mount == "unknown" or mount.startswith("/proc") or mount.startswith("/sys"):
+                        continue
                     disk_total = max(disk_total, v)
-                    print(f"DEBUG DISK: Found filesystem_size: {k} = {v}")
+                    print(f"DEBUG DISK: Found filesystem_size for {mount}: {k} = {v}")
                 elif "filesystem_avail_bytes" in k_lower or "filesystem_available" in k_lower or "filesystem_free" in k_lower:
+                    mount = None
+                    import re
+                    m = re.search(r'mountpoint="([^"]+)"', k)
+                    if m:
+                        mount = m.group(1)
+                    if not mount or mount == "unknown" or mount.startswith("/proc") or mount.startswith("/sys"):
+                        continue
                     disk_avail = max(disk_avail, v)
-                    print(f"DEBUG DISK: Found filesystem_avail: {k} = {v}")
+                    print(f"DEBUG DISK: Found filesystem_avail for {mount}: {k} = {v}")
 
             # Calculate CPU
             if cpu_idle > 0:
