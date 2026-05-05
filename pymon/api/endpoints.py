@@ -63,6 +63,8 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+api = APIRouter()
+
 
 @api.websocket("/ws/metrics")
 async def websocket_endpoint(websocket: WebSocket):
@@ -75,8 +77,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 _limiter = Limiter(key_func=get_remote_address)
-
-api = APIRouter()
 
 
 def get_db():
