@@ -18,7 +18,12 @@ scrape_manager = None
 @asynccontextmanager
 async def lifespan(app):
     global scrape_manager
+    import asyncio
+
     from pymon import web_dashboard
+    from pymon.api.endpoints import manager
+
+    manager.set_loop(asyncio.get_event_loop())
 
     try:
         from pymon.config import load_config
@@ -33,7 +38,7 @@ async def lifespan(app):
 
         scrape_manager = ScrapeManager(config)
         app.state.scrape_manager = scrape_manager
-        
+
         if servers:
             for server in servers:
                 scrape_manager.add_server_target(server)
@@ -47,7 +52,7 @@ async def lifespan(app):
                 )
         except Exception as e:
             print(f"Warning: Could not start background scraping loop: {e}", file=sys.stderr)
-        
+
         print("ScrapeManager initialized (ready for dynamic targets)", file=sys.stderr)
 
     except Exception as e:
@@ -203,6 +208,7 @@ def main():
 
             print("Initializing web tables...", file=sys.stderr)
             from pymon import web_dashboard
+
             web_dashboard.init_web_tables()
 
             print(f"Starting PyMon server on {host}:{port}")

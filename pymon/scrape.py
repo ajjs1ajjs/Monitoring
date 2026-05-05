@@ -394,26 +394,24 @@ class ScrapeManager:
 
                     # Broadcast update via WebSocket
                     try:
-                        import asyncio
-
                         from pymon.api.endpoints import manager
 
-                        # Отримуємо основний цикл подій
-                        loop = asyncio.get_event_loop()
-                        # Плануємо виконання broadcast безпечно для потоку
-                        asyncio.run_coroutine_threadsafe(
-                            manager.broadcast(
-                                {
-                                    "type": "server_update",
-                                    "server_id": sid,
-                                    "cpu": cpu,
-                                    "memory": memory,
-                                    "disk": disk,
-                                    "status": "up",
-                                }
-                            ),
-                            loop,
-                        )
+                        if manager.loop:
+                            import asyncio
+
+                            asyncio.run_coroutine_threadsafe(
+                                manager.broadcast(
+                                    {
+                                        "type": "server_update",
+                                        "server_id": sid,
+                                        "cpu": cpu,
+                                        "memory": memory,
+                                        "disk": disk,
+                                        "status": "up",
+                                    }
+                                ),
+                                manager.loop,
+                            )
                     except Exception as e:
                         print(f"WS Broadcast error: {e}")
                 else:

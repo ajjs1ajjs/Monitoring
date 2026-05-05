@@ -45,6 +45,10 @@ from pymon.storage import get_storage
 class ConnectionManager:
     def __init__(self):
         self.active_connections: list[WebSocket] = []
+        self.loop = None
+
+    def set_loop(self, loop):
+        self.loop = loop
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
