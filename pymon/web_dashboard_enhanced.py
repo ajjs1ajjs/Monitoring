@@ -343,10 +343,6 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                             <div class="stat-label">Avg Disk</div>
                             <div class="stat-value" id="stat-disk">0<span>%</span></div>
                         </div>
-                        <div class="stat-card up">
-                            <div class="stat-label">Net Throughput</div>
-                            <div class="stat-value" id="stat-net">0<span>MB/s</span></div>
-                        </div>
                     </div>
 
                     <div class="chart-grid">
@@ -366,15 +362,6 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                             </div>
                             <div class="card-body">
                                 <canvas id="memChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Network Throughput</h3>
-                                <i data-lucide="activity" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="netChart"></canvas>
                             </div>
                         </div>
                         <div class="card">
@@ -403,7 +390,6 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                         <th>CPU</th>
                                         <th>RAM</th>
                                         <th>Disk</th>
-                                        <th>Traffic (RX/TX)</th>
                                     </tr>
                                 </thead>
                                 <tbody id="liveTableBody">
@@ -444,7 +430,6 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                     <th style="cursor: pointer;" onclick="sortNodes('cpu_percent')">CPU <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
                                     <th style="cursor: pointer;" onclick="sortNodes('memory_percent')">RAM <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
                                     <th style="cursor: pointer;" onclick="sortNodes('disk_percent')">Disk <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
-                                    <th>Traffic (RX/TX)</th>
                                     <th style="text-align: right;">Actions</th>
                                 </tr>
                             </thead>
@@ -1059,7 +1044,6 @@ sudo systemctl start prometheus-node-exporter</textarea>
         function initCharts() {
             charts.cpu = createLineChart('cpuChart', 'CPU', '#f97316');
             charts.mem = createLineChart('memChart', 'RAM', '#3b82f6');
-            charts.net = createLineChart('netChart', 'Net MB/s', '#10b981');
             charts.disk = createLineChart('diskChart', 'Disk %', '#f59e0b');
         }
 
@@ -1130,25 +1114,17 @@ sudo systemctl start prometheus-node-exporter</textarea>
             const avgCpu = nodes.reduce((a, b) => a + (b.cpu_percent || 0), 0) / count;
             const avgMem = nodes.reduce((a, b) => a + (b.memory_percent || 0), 0) / count;
             const avgDisk = nodes.reduce((a, b) => a + (b.disk_percent || 0), 0) / count;
-            const totalNet = nodes.reduce((a, b) => a + (b.network_rx || 0) + (b.network_tx || 0), 0) / (1024 * 1024);
 
             if (document.getElementById('stat-cpu')) document.getElementById('stat-cpu').innerHTML = `${avgCpu.toFixed(1)}<span>%</span>`;
             if (document.getElementById('stat-mem')) document.getElementById('stat-mem').innerHTML = `${avgMem.toFixed(1)}<span>%</span>`;
             if (document.getElementById('stat-disk')) document.getElementById('stat-disk').innerHTML = `${avgDisk.toFixed(1)}<span>%</span>`;
-            if (document.getElementById('stat-net')) document.getElementById('stat-net').innerHTML = `${totalNet.toFixed(2)}<span>MB/s</span>`;
-        }
-
+            }
         function updateLiveTable(data) {
             const overviewBody = document.getElementById('liveTableBody');
             const nodesBody = document.getElementById('nodesTableBody');
             if (!overviewBody && !nodesBody) return;
 
             const targetData = data || nodes;
-            const formatBytes = (b) => {
-                if (!b) return '0 B';
-                const i = Math.floor(Math.log(b) / Math.log(1024));
-                return (b / Math.pow(1024, i)).toFixed(1) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][i];
-            };
 
             const html = targetData.map(n => `
                 <tr>
@@ -1211,7 +1187,6 @@ sudo systemctl start prometheus-node-exporter</textarea>
                             })()}
                         </div>
                     </td>
-                    <td class="text-mono text-[10px] text-slate-500">${formatBytes(n.network_rx)} / ${formatBytes(n.network_tx)}</td>
                     <td style="text-align: right;">
                         <div style="display: flex; gap: 0.25rem; justify-content: flex-end;">
                             <button onclick="forceScrapeSingle(${n.id})" title="Force Scrape" class="action-btn" style="color: var(--accent);">
@@ -1230,7 +1205,6 @@ sudo systemctl start prometheus-node-exporter</textarea>
                     </td>
                 </tr>
             `).join('');
-
             if (overviewBody) {
                 overviewBody.innerHTML = html;
                 lucide.createIcons();
@@ -1310,10 +1284,6 @@ sudo systemctl start prometheus-node-exporter</textarea>
                 charts.mem.data.labels = labels;
                 charts.mem.data.datasets[0].data = data.history.map(h => h.mem_avg);
                 charts.mem.update('none');
-
-                charts.net.data.labels = labels;
-                charts.net.data.datasets[0].data = data.history.map(h => (h.net_rx_avg + h.net_tx_avg) / (1024 * 1024));
-                charts.net.update('none');
 
                 charts.disk.data.labels = labels;
                 charts.disk.data.datasets[0].data = data.history.map(h => h.disk_avg);
