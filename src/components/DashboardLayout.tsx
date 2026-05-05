@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 // Realistic integration point for external UI controls: provide a global
 // showSection(section) function that toggles visibility of sections
@@ -8,32 +8,32 @@ declare global {
     showSection?: (section: string) => void
   }
 }
-if (typeof window !== 'undefined' && typeof (window as any).showSection !== 'function') {
-  ;(window as any).showSection = (section: string) => {
-    try {
-      // Try to toggle elements marked with data-section="<section>"
-      const elements = document.querySelectorAll(`[data-section='${section}']`)
-      if (elements.length > 0) {
-        elements.forEach((el) => {
-          const he = el as HTMLElement
-          he.style.display = he.style.display === 'none' ? '' : 'none'
-        })
-        return
+// Define a safe global showSection handler in a React lifecycle way
+useEffect(() => {
+  if (typeof window !== 'undefined' && typeof (window as any).showSection !== 'function') {
+    ;(window as any).showSection = (section: string) => {
+      try {
+        const elements = document.querySelectorAll(`[data-section='${section}']`)
+        if (elements.length > 0) {
+          elements.forEach((el) => {
+            const he = el as HTMLElement
+            he.style.display = he.style.display === 'none' ? '' : 'none'
+          })
+          return
+        }
+        const byId = document.getElementById(section)
+        if (byId) {
+          byId.style.display = byId.style.display === 'none' ? '' : 'none'
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('showSection failed', e)
       }
-      // Fallback: toggle element by id
-      const byId = document.getElementById(section)
-      if (byId) {
-        byId.style.display = byId.style.display === 'none' ? '' : 'none'
-      }
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('showSection failed', e)
     }
   }
-}
+}, [])
 import '../styles/dashboard.css';
-// Early inline adapter for external dashboard's showSection calls
-const _earlyShowSectionScript = `window.showSection = window.showSection || function(section){ try{ var els = document.querySelectorAll('[data-section="'+section+'"]'); if(els.length>0){ els.forEach(function(el){ el.style.display = (el.style.display==='none'?'':'none'); }); return; } var byId = document.getElementById(section); if(byId){ byId.style.display = byId.style.display==='none'?'':'none'; } } catch(e){ console.error('showSection (early)', e); } };`;
+// Note: No inline script injection; showSection is provided via React effect above
 
 type LayoutProps = {
   title?: string;
@@ -46,7 +46,6 @@ export const DashboardLayout: React.FC<LayoutProps> = ({ title = 'Dashboard', ch
   const statusColor = status === 'Online' ? '#22c55e' : status === 'Offline' ? '#f87171' : '#9CA3AF';
   return (
     <>
-      <script dangerouslySetInnerHTML={{ __html: _earlyShowSectionScript }} />
       <div className="dashboard-layout" data-theme={theme} style={{ fontFamily: 'Inter, system-ui, Arial' }}>
       <header className="dashboard-header">
         <span style={{ marginRight: 12 }}>{/* logo placeholder */}📊</span>
