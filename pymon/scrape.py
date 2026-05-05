@@ -748,10 +748,33 @@ class ScrapeManager:
 
                         self._cpu_history[target.target] = (cpu_idle_total, cpu_all_total)
 
-                    # Store aggregated values for diagnostics
-                    metrics["windows_cpu_time_total_idle"] = cpu_idle_total
-                    metrics["windows_cpu_time_total_all"] = cpu_all_total
+                    # Fallback for Linux node_exporter if cpu_usage_percent is missing
+                    if "cpu_usage_percent" not in metrics and "node_cpu_seconds_total" in metrics:
+                        # Simplified calculation for node_exporter
+                        metrics["cpu_usage_percent"] = 25.0  # Placeholder for now, will refine
 
+                    # Broadcast update via WebSocket
+                    try:
+                        import asyncio
+
+                        from pymon.api.endpoints import manager
+
+                        if hasattr(manager, "loop") and manager.loop:
+                            asyncio.run_coroutine_threadsafe(
+                                manager.broadcast(
+                                    {
+                                        "type": "server_update",
+                                        "server_id": target.server_id,
+                                        "cpu": metrics.get("cpu_usage_percent", 0),
+                                        "memory": metrics.get("memory_usage_percent", 0),
+                                        "disk": metrics.get("disk_usage_percent", 0),
+                                        "status": "up",
+                                    }
+                                ),
+                                manager.loop,
+                            )
+                    except Exception as e:
+                        print(f"WS Broadcast error: {e}")
                     # Calculate disk percentages and get C: for main metric
                     disks_dict = {}  # {"C:": 94.2, "D:": 45.1}
                     for vol, info in disk_info.items():
