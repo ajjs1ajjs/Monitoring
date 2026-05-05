@@ -750,10 +750,28 @@ class ScrapeManager:
 
                         self._cpu_history[target.target] = (cpu_idle_total, cpu_all_total)
 
-                    # Fallback for Linux node_exporter if cpu_usage_percent is missing
-                    if "cpu_usage_percent" not in metrics and "node_cpu_seconds_total" in metrics:
-                        # Simplified calculation for node_exporter
-                        metrics["cpu_usage_percent"] = 25.0  # Placeholder for now, will refine
+                    # Handle Linux node_exporter metrics
+                    if "node_cpu_seconds_total" in metrics or "node_load1" in metrics:
+                        # CPU: use load1 as a fallback or calculation
+                        if "node_load1" in metrics:
+                            metrics["cpu_usage_percent"] = min(
+                                100, (metrics["node_load1"] / 4) * 100
+                            )  # Assuming 4 cores
+
+                        # RAM: calculate usage from MemTotal and MemAvailable
+                        if "node_memory_MemTotal_bytes" in metrics and "node_memory_MemAvailable_bytes" in metrics:
+                            total = metrics["node_memory_MemTotal_bytes"]
+                            avail = metrics["node_memory_MemAvailable_bytes"]
+                            metrics["memory_usage_percent"] = ((total - avail) / total) * 100
+
+                        # Disk: simple filesystem usage (mountpoint '/')
+                        for k, v in metrics.items():
+                            if k == "node_filesystem_size_bytes" and 'mountpoint="/"' in str(k):  # simplified check
+                                total_fs = v
+                                avail_fs = metrics.get("node_filesystem_avail_bytes", 0)
+                                if total_fs > 0:
+                                    metrics["disk_usage_percent"] = ((total_fs - avail_fs) / total_fs) * 100
+                                break
 
                     # Broadcast update via WebSocket
                     try:
