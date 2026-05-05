@@ -261,11 +261,14 @@ class ScrapeManager:
                 elif "MemAvailable" in k:
                     mem_avail = max(mem_avail, v)
 
-                # Disk metrics
-                if "filesystem_size_bytes" in k:
+                # Disk metrics - підтримка різних варіацій імен
+                k_lower = k.lower()
+                if "filesystem_size_bytes" in k_lower or "filesystem_size" in k_lower:
                     disk_total = max(disk_total, v)
-                elif "filesystem_avail_bytes" in k:
+                    print(f"DEBUG DISK: Found filesystem_size: {k} = {v}")
+                elif "filesystem_avail_bytes" in k_lower or "filesystem_available" in k_lower or "filesystem_free" in k_lower:
                     disk_avail = max(disk_avail, v)
+                    print(f"DEBUG DISK: Found filesystem_avail: {k} = {v}")
 
             # Calculate CPU
             if cpu_idle > 0:
@@ -766,16 +769,30 @@ class ScrapeManager:
 
                         # Disk: filesystem usage (all mountpoints)
                         disk_usage = 0
+                        disk_info_json = {}
                         for k, v in metrics.items():
-                            if k == "node_filesystem_size_bytes":
-                                # Це ім'я містить лейбли, розпарсимо їх
+                            k_lower = k.lower()
+                            if "filesystem_size_bytes" in k_lower:
+                                # Отримуємо mount point з лейблів
+                                import re
+                                mount_match = re.search(r'mountpoint="([^"]+)"', k)
+                                mount = mount_match.group(1) if mount_match else "unknown"
+                                
                                 total_fs = v
-                                # Знаходимо відповідний available через лейбли або просто пошук
-                                avail_fs = metrics.get(k.replace("size", "avail"), 0)
-                                if total_fs > 0:
+                                # Шукаємо відповідний available
+                                avail_key = k.replace("size_bytes", "avail_bytes")
+                                avail_fs = metrics.get(avail_key, 0)
+                                
+                                if total_fs > 0 and avail_fs >= 0:
                                     usage = ((total_fs - avail_fs) / total_fs) * 100
                                     disk_usage = max(disk_usage, usage)
+                                    disk_info_json[mount] = round(usage, 1)
+                                    print(f"DEBUG DISK: {mount} = {usage:.1f}% (size={total_fs}, avail={avail_fs})")
+                        
                         metrics["disk_usage_percent"] = disk_usage
+                        if disk_info_json:
+                            metrics["_disk_info_json"] = json.dumps(disk_info_json)
+                            print(f"DEBUG DISK: Final disk_usage_percent = {disk_usage:.1f}%")
 
                     # Broadcast update via WebSocket
                     try:
@@ -801,15 +818,23 @@ class ScrapeManager:
                         print(f"WS Broadcast error: {e}")
                     # Calculate disk percentages and get C: for main metric
                     disks_dict = {}  # {"C:": 94.2, "D:": 45.1}
+                    c_drive_percent = 0
                     for vol, info in disk_info.items():
                         if info["size"] > 0:
                             pct = 100 * (1 - info["free"] / info["size"])
                             info["percent"] = pct
                             disks_dict[vol] = round(pct, 1)
                             if "C:" in vol:
+                                c_drive_percent = pct
                                 metrics["windows_logical_disk_free_bytes"] = info["free"]
                                 metrics["windows_logical_disk_size_bytes"] = info["size"]
-
+                                print(f"DEBUG DISK: C: = {pct:.1f}% (size={info['size']}, free={info['free']})")
+                    
+                    # Set the main disk metric for Windows
+                    if c_drive_percent > 0:
+                        metrics["disk_usage_percent"] = c_drive_percent
+                        print(f"DEBUG DISK: Set disk_usage_percent = {c_drive_percent:.1f}% for Windows")
+                    
                     metrics["_disk_info_json"] = json.dumps(disks_dict) if disks_dict else None
 
                     # Detect exporter version from build_info metrics
@@ -817,35 +842,18 @@ class ScrapeManager:
                         if "build_info" in key or "exporter_build_info" in key:
                             metrics["_exporter_detected"] = True
                             break
-
-                    # Calculate disk percentages and get C: for main metric
-                    disks_dict = {}  # {"C:": 94.2, "D:": 45.1}
-                    for vol, info in disk_info.items():
-                        if info["size"] > 0:
-                            pct = 100 * (1 - info["free"] / info["size"])
-                            info["percent"] = pct
-                            disks_dict[vol] = round(pct, 1)
-                            if "C:" in vol:
-                                metrics["windows_logical_disk_free_bytes"] = info["free"]
-                                metrics["windows_logical_disk_size_bytes"] = info["size"]
 
                     # Publish per-disk usage as Prometheus metrics with volume label
                     try:
-                        registry.register("disk_usage_percent", MetricType.GAUGE, "Disk usage percent per volume", None)
-                        for vol, info in disk_info.items():
-                            vol_label = Label("volume", vol)
-                            percent = info.get("percent", 0)
-                            registry.set("disk_usage_percent", percent, [vol_label])
+                        if disk_info:
+                            registry.register("disk_usage_percent", MetricType.GAUGE, "Disk usage percent per volume", None)
+                            for vol, info in disk_info.items():
+                                vol_label = Label("volume", vol)
+                                percent = info.get("percent", 0)
+                                registry.set("disk_usage_percent", percent, [vol_label])
+                                print(f"DEBUG DISK: Published per-disk metric for {vol} = {percent:.1f}%")
                     except Exception as e:
                         print(f"[DEBUG] failed to publish per-disk metric: {e}")
-
-                    metrics["_disk_info_json"] = json.dumps(disks_dict) if disks_dict else None
-
-                    # Detect exporter version from build_info metrics
-                    for key in metrics:
-                        if "build_info" in key or "exporter_build_info" in key:
-                            metrics["_exporter_detected"] = True
-                            break
 
                     self._update_server_status(target.target, metrics, True, server_id=target.server_id)
                 else:

@@ -1502,14 +1502,14 @@ const Servers = {
                     <td>${s.os_type}</td>
                     <td>${(s.cpu_percent || 0).toFixed(1)}%</td>
                     <td>${(s.memory_percent || 0).toFixed(1)}%</td>
-                    <td>${(s.disk_percent || 0).toFixed(1)}%</td>
+                    <td>${Dashboard.renderDisk(s.disk_info)}</td>
                     <td class="text-muted">${s.last_check ? s.last_check.slice(11, 19) : '-'}</td>
                     <td>
                         <button class="btn btn-secondary btn-sm" onclick="Servers.scrape(${s.id})"><i class="fas fa-sync"></i></button>
                         <button class="btn btn-danger btn-sm" onclick="Servers.delete(${s.id})"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`;
-            }).join('') || '<tr><td colspan="11" class="text-muted" style="text-align: center; padding: 40px;">No servers</td></tr>';
+            }).join('') || '<tr><td colspan="10" class="text-muted" style="text-align: center; padding: 40px;">No servers</td></tr>';
         } catch (e) { console.error(e); }
     },
 

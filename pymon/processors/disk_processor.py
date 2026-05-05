@@ -42,11 +42,13 @@ class DiskProcessor(MetricProcessor):
 
             usage_percent: Optional[float] = None
 
-            if raw_total and raw_used and raw_total > 0:
+                 if raw_total and raw_used and raw_total > 0:
                 # Calculate overall utilization percentage based on total/used
                 usage_percent = (raw_used / raw_total) * 100.0
-            else:
-                print(f"[WARNING] Skipped invalid disk reading at {point.get('timestamp')}. Missing bytes data.")
+                 usage_percent = (raw_used / raw_total) * 100.0
+             else:
+                 # Log the failure to provide better debugging information for missing data points
+                 print(f"[WARNING] Skipping disk reading at {point.get('timestamp')}. Data missing: total={raw_total}, used={raw_used}. Check source exporter metrics.")
 
             if usage_percent is not None:
                 processed_results.append(
