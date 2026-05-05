@@ -11,7 +11,9 @@ $DownloadUrl = "https://dl.influxdata.com/telegraf/releases/telegraf-$LatestVers
 
 # 2. Download and Extract
 $TempPath = Join-Path $env:TEMP "telegraf_install"
-if (Test-Path $TempPath) { Remove-Item $TempPath -Recurse -Force }
+if (Test-Path $TempPath)
+{ Remove-Item $TempPath -Recurse -Force 
+}
 New-Item -ItemType Directory -Force -Path $TempPath | Out-Null
 
 $ZipPath = Join-Path $TempPath "telegraf.zip"
@@ -19,11 +21,13 @@ Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
 Expand-Archive -Path $ZipPath -DestinationPath $TempPath -Force
 
 # 3. Move files
-if (!(Test-Path $InstallPath)) { New-Item -ItemType Directory -Path $InstallPath | Out-Null }
+if (!(Test-Path $InstallPath))
+{ New-Item -ItemType Directory -Path $InstallPath | Out-Null 
+}
 Move-Item -Path "$TempPath\telegraf-$LatestVersion\*" -Destination $InstallPath -Force
 Remove-Item $TempPath -Recurse -Force
 
-# 4. Create Pymon-compatible config
+# 4. Create Pymon-compatible config (Fixed syntax for older Telegraf versions)
 $ConfigContent = @"
 [agent]
   interval = "10s"
@@ -61,22 +65,24 @@ $ConfigContent = @"
   [[processors.rename.replace]]
     measurement = "win_cpu"
     field = "Percent_Idle_Time"
-    rename = "windows_cpu_time_total_idle"
+    dest = "windows_cpu_time_total_idle"
   [[processors.rename.replace]]
     measurement = "win_cpu"
     field = "Percent_Processor_Time"
-    rename = "windows_cpu_time_total_all"
+    dest = "windows_cpu_time_total_all"
   [[processors.rename.replace]]
     measurement = "win_disk"
     field = "Free_Megabytes"
-    rename = "windows_logical_disk_free_bytes"
+    dest = "windows_logical_disk_free_bytes"
 "@
 
 $ConfigContent | Out-File -FilePath $ConfigPath -Encoding UTF8
 
-# 5. Install Service
-Set-Location -Path $InstallPath
-.\telegraf.exe --service install --config "$ConfigPath"
+# 5. Install/Restart Service
+# Stop if running to avoid locks
+if (Get-Service telegraf -ErrorAction SilentlyContinue)
+{ Stop-Service telegraf -Force 
+}
 Start-Service telegraf
 
-Write-Host "Telegraf installed and started on port 9273" -ForegroundColor Green
+Write-Host "Telegraf updated and restarted on port 9273" -ForegroundColor Green
