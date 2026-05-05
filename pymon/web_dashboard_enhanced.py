@@ -108,18 +108,19 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #020617;
-            --surface: #0f172a;
-            --surface-hover: #1e293b;
+            --bg: #0b0f1a;
+            --surface: #151c2c;
+            --surface-hover: #1e2638;
             --accent: #f97316;
             --accent-glow: rgba(249, 115, 22, 0.4);
-            --text: #f8fafc;
+            --text: #f1f5f9;
             --text-muted: #94a3b8;
-            --border: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.08);
             --success: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
             --sidebar-w: 260px;
+            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -129,127 +130,92 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .app-container { display: flex; height: 100vh; width: 100vw; }
 
         /* Sidebar */
-        aside { width: var(--sidebar-w); background: #020617; border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; }
-        .sidebar-header { padding: 2rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
+        aside { width: var(--sidebar-w); background: #080c14; border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; }
+        .sidebar-header { padding: 2.5rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
         .sidebar-header svg { color: var(--accent); width: 28px; height: 28px; }
-        .sidebar-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.025em; }
+        .sidebar-header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.025em; }
         .sidebar-header span { color: var(--accent); }
 
         .nav-section { padding: 0 1rem; flex: 1; }
-        .nav-label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 1.5rem 0 0.75rem 0.75rem; }
+        .nav-label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 2rem 0 0.75rem 0.75rem; }
 
-        .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.75rem; color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; background: transparent; width: 100%; text-align: left; margin-bottom: 0.25rem; }
+        .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; border-radius: 1rem; color: var(--text-muted); text-decoration: none; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; background: transparent; width: 100%; text-align: left; margin-bottom: 0.25rem; }
         .nav-item:hover { background: var(--surface-hover); color: var(--text); }
-        .nav-item.active { background: rgba(249, 115, 22, 0.1); color: var(--accent); }
+        .nav-item.active { background: rgba(249, 115, 22, 0.1); color: var(--accent); box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.2); }
         .nav-item.active svg { color: var(--accent); }
 
-        .sidebar-footer { padding: 1rem; border-top: 1px solid var(--border); }
-        .logout-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; color: #f87171; width: 100%; border: none; background: transparent; font-size: 0.9rem; cursor: pointer; border-radius: 0.75rem; transition: all 0.2s; }
-        .logout-btn:hover { background: rgba(239, 68, 68, 0.1); }
+        .sidebar-footer { padding: 1.5rem; border-top: 1px solid var(--border); }
+        .logout-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1.1rem; color: #fca5a5; width: 100%; border: none; background: rgba(239, 68, 68, 0.05); font-size: 0.9rem; font-weight: 600; cursor: pointer; border-radius: 1rem; transition: all 0.2s; }
+        .logout-btn:hover { background: rgba(239, 68, 68, 0.15); color: #f87171; }
 
         /* Main Content */
-        main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #030712; }
-        header { height: 64px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; background: rgba(2, 6, 23, 0.5); backdrop-filter: blur(10px); z-index: 40; }
-        .header-left h2 { font-size: 1rem; font-weight: 600; color: var(--text); }
+        main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #0a0e1a; }
+        header { height: 72px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2.5rem; background: rgba(11, 15, 26, 0.8); backdrop-filter: blur(12px); z-index: 40; }
+        .header-left h2 { font-size: 1.1rem; font-weight: 600; color: var(--text); }
 
-        .header-actions { display: flex; align-items: center; gap: 1rem; }
-        .range-selector { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.25rem; overflow-x: auto; max-width: 400px; }
-        .range-btn { padding: 0.25rem 0.6rem; border-radius: 0.375rem; border: none; background: transparent; color: var(--text-muted); font-size: 0.65rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
-        .range-btn.active { background: var(--surface-hover); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .header-actions { display: flex; align-items: center; gap: 1.25rem; }
+        .range-selector { display: flex; background: #080c14; border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.25rem; }
+        .range-btn { padding: 0.35rem 0.75rem; border-radius: 0.6rem; border: none; background: transparent; color: var(--text-muted); font-size: 0.7rem; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+        .range-btn.active { background: var(--surface-hover); color: var(--text); box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
 
-        .refresh-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
-        .refresh-btn:hover { border-color: var(--text-muted); color: var(--text); }
+        .refresh-btn { background: #080c14; border: 1px solid var(--border); border-radius: 0.75rem; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+        .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-        .content-scroll { flex: 1; overflow-y: auto; padding: 2rem; scroll-behavior: smooth; }
+        .content-scroll { flex: 1; overflow-y: auto; padding: 2.5rem; scroll-behavior: smooth; }
         .content-scroll::-webkit-scrollbar { width: 6px; }
         .content-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
-        /* Dashboard Grid */
-        .dashboard-section { display: none; animation: fadeIn 0.2s ease-out; }
+        /* Dashboard Components */
+        .dashboard-section { display: none; animation: fadeIn 0.3s ease-out; }
         .dashboard-section.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-        .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 1.5rem; border-radius: 1.25rem; position: relative; overflow: hidden; transition: transform 0.3s; }
-        .stat-card:hover { transform: translateY(-4px); }
-        .stat-card::after { content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px; background: transparent; }
-        .stat-card.up::after { background: var(--success); }
-        .stat-card.down::after { background: var(--danger); }
-        .stat-card.alert::after { background: var(--warning); }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.5rem; box-shadow: var(--card-shadow); display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s, border-color 0.2s; }
+        .card:hover { border-color: rgba(255,255,255,0.15); }
+        .card-header { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+        .card-header h3 { font-size: 1rem; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+        .card-body { padding: 1.5rem 2rem; flex: 1; }
 
-        .stat-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
-        .stat-value { font-size: 2rem; font-weight: 700; color: var(--text); display: flex; align-items: baseline; gap: 0.25rem; }
-        .stat-value span { font-size: 0.875rem; color: var(--text-muted); }
-
-        .chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
-        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.25rem; display: flex; flex-direction: column; }
-        .card-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-        .card-header h3 { font-size: 0.875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
-        .card-body { padding: 1.5rem; flex: 1; position: relative; min-height: 250px; }
+        /* Performance Overview Grid */
+        .performance-grid { display: grid; grid-template-columns: 1fr 400px; gap: 1.5rem; margin-top: 1.5rem; }
 
         /* Infrastructure Table */
-        .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.25rem; overflow: hidden; }
+        .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.5rem; box-shadow: var(--card-shadow); overflow: hidden; }
         table { width: 100%; border-collapse: collapse; text-align: left; }
-        th { padding: 1rem 1.5rem; background: rgba(0,0,0,0.2); color: var(--text-muted); font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
-        td { padding: 1rem 1.5rem; border-top: 1px solid var(--border); font-size: 0.875rem; vertical-align: middle; }
+        th { padding: 1.25rem 2rem; background: rgba(0,0,0,0.15); color: var(--text-muted); font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
+        td { padding: 1.5rem 2rem; border-top: 1px solid var(--border); font-size: 0.95rem; vertical-align: middle; transition: background 0.2s; }
         tr:hover td { background: rgba(255,255,255,0.02); }
 
-        .status-badge { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
-        .status-badge.up { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-        .status-badge.down { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-        .status-dot.pulse { animation: statusPulse 2s infinite; }
-        @keyframes statusPulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        /* Metric Display */
+        .metric-cell { display: flex; align-items: center; gap: 1rem; }
+        .metric-value { font-size: 1.5rem; font-weight: 700; color: #fff; min-width: 3.5rem; }
+        .metric-icon { color: var(--text-muted); width: 18px; height: 18px; opacity: 0.6; }
 
-        .progress-bar { width: 100px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
-        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        /* Thick Progress Bars */
+        .progress-container { flex: 1; height: 12px; background: rgba(0,0,0,0.3); border-radius: 6px; overflow: hidden; position: relative; }
+        .progress-bar-fill { height: 100%; border-radius: 6px; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); background: linear-gradient(90deg, #10b981 0%, #f59e0b 60%, #ef4444 100%); background-size: 200% 100%; }
 
-        /* Modals */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(8px); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 1rem; }
-        .modal-overlay.active { display: flex; }
-        .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 1.5rem; width: 100%; max-width: 480px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
-        .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-        .modal-body { padding: 1.5rem; }
-        .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; }
+        .status-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.85rem; border-radius: 12px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
+        .status-badge.up { background: rgba(16, 185, 129, 0.1); color: var(--success); box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.2); }
+        .status-badge.down { background: rgba(239, 68, 68, 0.1); color: var(--danger); box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.2); }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+        .status-dot.pulse { animation: statusPulse 2s infinite; box-shadow: 0 0 8px currentColor; }
 
-        .form-group { margin-bottom: 1.25rem; }
-        .form-group label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem; }
-        .form-input { width: 100%; background: #020617; border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 0.75rem; color: white; font-size: 0.9rem; }
-        .form-input:focus { outline: none; border-color: var(--accent); }
+        /* Event List */
+        .event-item { padding: 0.85rem 0; border-bottom: 1px solid rgba(255,255,255,0.03); display: grid; grid-template-columns: 80px 1fr 100px; align-items: center; gap: 1rem; }
+        .event-item:last-child { border-bottom: none; }
+        .event-status { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 6px; text-align: center; }
+        .event-status.critical { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+        .event-status.success { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+        .event-text { font-size: 0.85rem; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .event-time { font-size: 0.75rem; color: var(--text-muted); text-align: right; }
 
-        .btn { padding: 0.625rem 1.25rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid transparent; font-size: 0.875rem; }
-        .btn-primary { background: var(--accent); color: #000; }
-        .btn-primary:hover { background: #ea580c; transform: translateY(-1px); }
-        .btn-secondary { background: var(--surface-hover); color: var(--text); border-color: var(--border); }
-        .btn-secondary:hover { background: #334155; }
-
-        .node-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; transition: border-color 0.2s; position: relative; }
-        .node-card:hover { border-color: var(--text-muted); }
-
-        /* Explorer Tools */
-        .explorer-toolbar { display: flex; gap: 1rem; background: var(--surface); border: 1px solid var(--border); padding: 1rem; border-radius: 1rem; margin-bottom: 1.5rem; align-items: flex-end; }
-        .explorer-field { flex: 1; }
-        .explorer-field label { display: block; font-size: 0.65rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.5rem; text-transform: uppercase; }
-
-        /* Utility */
-        .hidden { display: none; }
-        .text-mono { font-family: 'JetBrains Mono', monospace; }
-        .font-bold { font-weight: 700; }
-        .text-slate-500 { color: #64748b; }
-        .text-white { color: #ffffff; }
-        .text-xs { font-size: 0.75rem; }
-        .animate-spin { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-        .action-btn { background: transparent; border: none; cursor: pointer; opacity: 0.6; transition: all 0.2s; padding: 4px; display: flex; align-items: center; justify-content: center; }
-        .action-btn:hover { opacity: 1; transform: scale(1.1); }
-        .action-btn:active { transform: scale(0.9); }
-
-        .search-box { display: flex; align-items: center; gap: 0.5rem; background: #020617; border: 1px solid var(--border); padding: 0.4rem 0.75rem; border-radius: 0.75rem; flex: 1; max-width: 300px; }
-        .search-box input { background: transparent; border: none; color: white; font-size: 0.85rem; width: 100%; outline: none; }
-        .search-box i { color: var(--text-muted); }
-    </style>
-</head>
+        /* Utilities */
+        .btn-primary { background: var(--accent); color: #000; box-shadow: 0 4px 14px 0 rgba(249, 115, 22, 0.3); }
+        .btn-secondary { background: var(--surface-hover); color: var(--text); border: 1px solid var(--border); }
+        .search-box { display: flex; align-items: center; gap: 0.75rem; background: #080c14; border: 1px solid var(--border); padding: 0.6rem 1rem; border-radius: 0.85rem; }
+        .search-box input { background: transparent; border: none; color: white; font-size: 0.9rem; width: 100%; outline: none; }
+    </style></head>
 <body>
     <div class="app-container">
         <!-- Sidebar -->
@@ -323,31 +289,39 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <!-- Section: Overview -->
                 <div id="section-overview" class="dashboard-section active">
                     <div class="table-card">
-                        <div class="card-header" style="padding: 1.5rem 2rem; background: rgba(0,0,0,0.1);">
+                        <div class="card-header" style="padding: 2rem 2.5rem; background: rgba(0,0,0,0.1);">
                             <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                                <h3 style="font-size: 1.25rem; color: #fff; text-transform: none; letter-spacing: -0.01em;">Live Infrastructure Status</h3>
-                                <span id="tableSyncTime" style="font-size: 0.75rem; color: var(--text-muted);">Syncing live data...</span>
+                                <h3 style="font-size: 1.5rem; color: #fff; text-transform: none; letter-spacing: -0.01em;">Live Infrastructure Status</h3>
+                                <span id="tableSyncTime" style="font-size: 0.85rem; color: var(--text-muted);">Syncing live data from nodes...</span>
                             </div>
-                            <div style="display: flex; gap: 1rem; align-items: center;">
-                                <div class="search-box" style="max-width: 250px; background: rgba(0,0,0,0.3);">
-                                    <i data-lucide="search" style="width: 14px; height: 14px;"></i>
-                                    <input type="text" id="liveSearch" placeholder="Search hosts..." oninput="filterLiveTable()">
+                            <div style="display: flex; gap: 1.25rem; align-items: center;">
+                                <div class="search-box" style="min-width: 300px; background: rgba(0,0,0,0.3);">
+                                    <i data-lucide="search" style="width: 16px; height: 16px; color: var(--text-muted);"></i>
+                                    <input type="text" id="liveSearch" placeholder="Search infrastructure..." oninput="filterLiveTable()">
                                 </div>
-                                <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" onclick="showSection('nodes')">
-                                    <i data-lucide="list" style="width: 14px; height: 14px; margin-right: 0.5rem; display: inline-block; vertical-align: middle;"></i>
+                                <button class="btn btn-secondary" style="padding: 0.65rem 1.25rem; font-weight: 700; font-size: 0.8rem;" onclick="showSection('nodes')">
+                                    <i data-lucide="layout-grid" style="width: 14px; height: 14px; margin-right: 0.65rem; display: inline-block; vertical-align: middle;"></i>
                                     Full Inventory
                                 </button>
                             </div>
                         </div>
                         <div style="overflow-x: auto;">
-                            <table style="min-width: 1000px;">
+                            <table style="min-width: 1200px;">
                                 <thead>
                                     <tr>
-                                        <th style="width: 120px;">Status</th>
-                                        <th style="width: 280px;">Node Identity</th>
-                                        <th style="width: 180px;">Endpoint</th>
-                                        <th>CPU Usage</th>
-                                        <th>RAM Usage</th>
+                                        <th style="width: 140px;">Status</th>
+                                        <th style="width: 300px;">Node Identity</th>
+                                        <th style="width: 200px;">Endpoint</th>
+                                        <th style="width: 280px;">
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                CPU Usage <i data-lucide="cpu" style="width: 12px; height: 12px; opacity: 0.5;"></i>
+                                            </div>
+                                        </th>
+                                        <th style="width: 280px;">
+                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                                RAM Usage <i data-lucide="memory-stick" style="width: 12px; height: 12px; opacity: 0.5;"></i>
+                                            </div>
+                                        </th>
                                         <th>Disk Distribution</th>
                                     </tr>
                                 </thead>
@@ -355,6 +329,53 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                     <!-- Dynamic -->
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+
+                    <div class="performance-grid">
+                        <!-- Left: Trends -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                    <h3>Infrastructure Performance Overview</h3>
+                                    <span style="font-size: 0.75rem; color: var(--text-muted);">Aggregated metrics across all clusters</span>
+                                </div>
+                                <div class="range-selector" style="transform: scale(0.9);">
+                                    <button class="range-btn active">1 Hour</button>
+                                    <button class="range-btn">3 Hours</button>
+                                </div>
+                            </div>
+                            <div class="card-body" style="padding: 2rem;">
+                                <div style="margin-bottom: 2.5rem;">
+                                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; display: flex; justify-content: space-between;">
+                                        <span>Average CPU of all hosts</span>
+                                        <span style="font-weight: 700; color: var(--accent);">Live Trend</span>
+                                    </div>
+                                    <div style="height: 120px; background: rgba(0,0,0,0.1); border-radius: 12px; position: relative; overflow: hidden;">
+                                        <canvas id="cpuTrendChart"></canvas>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; display: flex; justify-content: space-between;">
+                                        <span>RAM usage average for all hosts</span>
+                                        <span style="font-weight: 700; color: #3b82f6;">Live Trend</span>
+                                    </div>
+                                    <div style="height: 120px; background: rgba(0,0,0,0.1); border-radius: 12px; position: relative; overflow: hidden;">
+                                        <canvas id="memTrendChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Events -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Recent Alerts & Events</h3>
+                                <i data-lucide="bell" style="width: 16px; height: 16px; color: var(--text-muted);"></i>
+                            </div>
+                            <div class="card-body" id="recentEventsList" style="padding: 1.5rem 2rem;">
+                                <!-- Dynamic Events -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1057,7 +1078,9 @@ sudo systemctl start prometheus-node-exporter</textarea>
             if (document.getElementById('stat-cpu')) document.getElementById('stat-cpu').innerHTML = `${avgCpu.toFixed(1)}<span>%</span>`;
             if (document.getElementById('stat-mem')) document.getElementById('stat-mem').innerHTML = `${avgMem.toFixed(1)}<span>%</span>`;
             if (document.getElementById('stat-disk')) document.getElementById('stat-disk').innerHTML = `${avgDisk.toFixed(1)}<span>%</span>`;
-        }        function updateLiveTable(data) {
+        }
+
+        function updateLiveTable(data) {
             const overviewBody = document.getElementById('liveTableBody');
             const nodesBody = document.getElementById('nodesTableBody');
             if (!overviewBody && !nodesBody) return;
@@ -1073,76 +1096,69 @@ sudo systemctl start prometheus-node-exporter</textarea>
                         </div>
                     </td>
                     <td>
-                        <div class="font-bold text-white">${n.name}</div>
-                        <div style="font-size: 0.65rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.25rem;">
-                            <i data-lucide="package" style="width: 10px; height: 10px;"></i>
-                            ${n.os_type === 'windows' ? 'windows_exporter' : 'node_exporter'}
-                            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background: ${n.exporter_version === 'active' ? 'var(--success)' : (n.last_status === 'up' ? '#f59e0b' : 'var(--danger)')}; margin-left: 0.25rem;"></span>
-                        </div>
-                    </td>
-                    <td class="text-mono text-xs text-slate-500">${n.host}</td>
-                    <td>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="width: 2.5rem;">${(n.cpu_percent || 0).toFixed(0)}%</span>
-                            <div class="progress-bar"><div class="progress-fill" style="width: ${n.cpu_percent || 0}%; background: var(--accent);"></div></div>
+                        <div style="font-weight: 700; color: #fff; font-size: 1.1rem; margin-bottom: 0.25rem;">${n.name}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;">
+                            <i data-lucide="server" style="width: 12px; height: 12px;"></i>
+                            ${n.os_type === 'windows' ? 'Windows NT' : 'Linux Kernel'}
+                            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background: ${n.exporter_version === 'active' ? 'var(--success)' : (n.last_status === 'up' ? '#f59e0b' : 'var(--danger)')};"></span>
                         </div>
                     </td>
                     <td>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span style="width: 2.5rem;">${(n.memory_percent || 0).toFixed(0)}%</span>
-                            <div class="progress-bar"><div class="progress-fill" style="width: ${n.memory_percent || 0}%; background: #3b82f6;"></div></div>
+                        <div class="text-mono" style="font-size: 0.85rem; color: #94a3b8; background: rgba(0,0,0,0.2); padding: 0.25rem 0.6rem; border-radius: 6px; display: inline-block;">${n.host}</div>
+                    </td>
+                    <td>
+                        <div class="metric-cell">
+                            <span class="metric-value">${(n.cpu_percent || 0).toFixed(0)}%</span>
+                            <div class="progress-container">
+                                <div class="progress-bar-fill" style="width: ${n.cpu_percent || 0}%"></div>
+                            </div>
                         </div>
                     </td>
                     <td>
-                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <div class="metric-cell">
+                            <span class="metric-value">${(n.memory_percent || 0).toFixed(0)}%</span>
+                            <div class="progress-container">
+                                <div class="progress-bar-fill" style="width: ${n.memory_percent || 0}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 240px;">
                             ${(() => {
                                 try {
                                     const raw = n.disk_info;
                                     if (!raw || raw === 'null') throw 0;
                                     const disks = typeof raw === 'string' ? JSON.parse(raw) : raw;
-                                    if (Array.isArray(disks)) {
-                                        return disks.map(d => {
-                                            const pct = d.percent || 0;
-                                            return '<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.65rem;">' +
-                                                '<span style="min-width:1.8rem;color:white;font-weight:600;">' + (d.volume || '?') + '</span>' +
-                                                '<div class="progress-bar" style="height:4px;flex-grow:1;"><div class="progress-fill" style="width:' + pct + '%;background:' + (pct > 90 ? 'var(--danger)' : '#f59e0b') + ';"></div></div>' +
-                                                '<span style="min-width:2rem;text-align:right;opacity:0.7;">' + pct.toFixed(0) + '%</span></div>';
-                                        }).join('');
-                                    }
-                                    return Object.entries(disks).map(([vol, pct]) =>
-                                        '<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.65rem;">' +
-                                        '<span style="min-width:1.8rem;color:white;font-weight:600;">' + vol + '</span>' +
-                                        '<div class="progress-bar" style="height:4px;flex-grow:1;"><div class="progress-fill" style="width:' + pct + '%;background:' + (pct > 90 ? 'var(--danger)' : '#f59e0b') + ';"></div></div>' +
-                                        '<span style="min-width:2rem;text-align:right;opacity:0.7;">' + Math.round(pct) + '%</span></div>'
-                                    ).join('');
+                                    const diskArray = Array.isArray(disks) ? disks : Object.entries(disks).map(([vol, pct]) => ({volume: vol, percent: pct}));
+
+                                    return diskArray.map(d => {
+                                        const pct = d.percent || 0;
+                                        return \`
+                                            <div style="display:flex; align-items:center; gap:0.75rem;">
+                                                <span style="min-width:2.5rem; font-size:0.75rem; font-weight:700; color:#fff;">\${d.volume || '?'}</span>
+                                                <div class="progress-container" style="height:6px; background:rgba(0,0,0,0.2);">
+                                                    <div class="progress-bar-fill" style="width:\${pct}%; background:\${pct > 90 ? 'var(--danger)' : (pct > 75 ? 'var(--warning)' : '#3b82f6')}; height:100%;"></div>
+                                                </div>
+                                                <span style="min-width:2.2rem; text-align:right; font-size:0.75rem; color:var(--text-muted); font-weight:600;">\${pct.toFixed(0)}%</span>
+                                            </div>\`;
+                                    }).join('');
                                 } catch(e) {
                                     const p = n.disk_percent || 0;
-                                    return '<div style="display:flex;align-items:center;gap:0.4rem;font-size:0.65rem;">' +
-                                        '<span style="min-width:1.8rem;color:white;font-weight:600;">All</span>' +
-                                        '<div class="progress-bar" style="height:4px;flex-grow:1;"><div class="progress-fill" style="width:' + p + '%;background:' + (p > 90 ? 'var(--danger)' : '#f59e0b') + ';"></div></div>' +
-                                        '<span style="min-width:2rem;text-align:right;opacity:0.7;">' + Math.round(p) + '%</span></div>';
+                                    return \`
+                                        <div style="display:flex; align-items:center; gap:0.75rem;">
+                                            <span style="min-width:2.5rem; font-size:0.75rem; font-weight:700; color:#fff;">All</span>
+                                            <div class="progress-container" style="height:6px; background:rgba(0,0,0,0.2);">
+                                                <div class="progress-bar-fill" style="width:\${p}%; background:#3b82f6; height:100%;"></div>
+                                            </div>
+                                            <span style="min-width:2.2rem; text-align:right; font-size:0.75rem; color:var(--text-muted); font-weight:600;">\${p.toFixed(0)}%</span>
+                                        </div>\`;
                                 }
                             })()}
                         </div>
                     </td>
-                    <td style="text-align: right;">
-                        <div style="display: flex; gap: 0.25rem; justify-content: flex-end;">
-                            <button onclick="forceScrapeSingle(${n.id})" title="Force Scrape" class="action-btn" style="color: var(--accent);">
-                                <i data-lucide="zap" style="width: 14px; height: 14px;"></i>
-                            </button>
-                            <button onclick="showEditModal(${n.id})" title="Edit Node" class="action-btn" style="color: #3b82f6;">
-                                <i data-lucide="settings" style="width: 14px; height: 14px;"></i>
-                            </button>
-                            <button onclick="showDeployModal(${n.id})" title="Deploy Agent" class="action-btn" style="color: var(--success);">
-                                <i data-lucide="download-cloud" style="width: 14px; height: 14px;"></i>
-                            </button>
-                            <button onclick="deleteNode(${n.id})" title="Delete Node" class="action-btn" style="color: #f87171;">
-                                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-                            </button>
-                        </div>
-                    </td>
                 </tr>
-            `).join('');
+            \`).join('');
+
             if (overviewBody) {
                 overviewBody.innerHTML = html;
                 lucide.createIcons();
