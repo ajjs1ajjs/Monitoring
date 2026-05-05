@@ -1,6 +1,7 @@
 import React from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import Card from '../components/Card'
+import ProgressBar from '../components/ProgressBar'
 
 const ServersDashboard: React.FC = () => {
   const servers = [
@@ -11,7 +12,11 @@ const ServersDashboard: React.FC = () => {
       {servers.map((s) => (
         <Card key={s.name} title={s.name} className="col-span-2">
           <div style={{ padding: 8 }}>
-            <div>CPU: {s.cpu}</div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>CPU: {s.cpu}</div>
+            <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 12, color: '#94a3b8' }}>CPU usage</span>
+              <ProgressBar value={parseFloat(s.cpu)} height={12} />
+            </div>
             <div>Memory: {s.mem}</div>
             <div>Disk: {s.disk}</div>
             <div>Network: {s.net}</div>

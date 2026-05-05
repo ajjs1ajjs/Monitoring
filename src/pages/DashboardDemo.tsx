@@ -2,6 +2,7 @@ import React from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import ChartPanel from '../components/ChartPanel';
 import Card from '../components/Card';
+import InfraOverview from '../components/InfraOverview';
 import { useMetrics } from '../hooks/useMetrics';
 import { useExporterUrl } from '../hooks/useExporterUrl';
 import { EXPORTER_METRICS_ENDPOINT, EXPORTER_INTERVAL_MS } from '../config/exporterConfig';
@@ -78,6 +79,22 @@ const DashboardDemo: React.FC = () => {
         <div style={{ padding: 8 }}>
           <p style={{ margin: 0, color: '#cbd5e1' }}>Test PC</p>
           <p style={{ margin: '6px 0 0', fontSize: 12, color: '#8b9bb4' }}>CPU 3.9%, MEM 41.9%, DISK 59.6%</p>
+        </div>
+      </Card>
+      <InfraOverview cpu={cpu} ram={memory} />
+      <Card title="Recent Alerts & Events" className="col-span-4">
+        <div style={{ padding: 8 }}>
+          {[
+            { id: 1, level: 'Critical', text: 'Handartbase: system overload detected' },
+            { id: 2, level: 'Critical', text: 'Network: high latency observed' },
+            { id: 3, level: 'Warning', text: 'Disk space on server-01 reaching limit' },
+          ].map((e) => (
+            <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
+              <span style={{ width: 8, height: 8, borderRadius: 999, background: e.level === 'Critical' ? '#f87171' : '#f59e0b' }} />
+              <span style={{ fontWeight: 600, minWidth: 90 }}>{e.level}</span>
+              <span style={{ color: '#cbd5e1' }}>{e.text}</span>
+            </div>
+          ))}
         </div>
       </Card>
     </DashboardLayout>
