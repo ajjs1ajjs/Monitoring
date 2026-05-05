@@ -1,11 +1,16 @@
-import { useEffect, useState } from 'react';
-import { MetricsState } from '../types/metrics';
-import { EXPORTER_METRICS_ENDPOINT } from '../config/exporterConfig';
-import fetchMetrics from '../services/exporter';
+import { useEffect, useState } from "react";
+import { MetricsState } from "../types/metrics";
+import { EXPORTER_METRICS_ENDPOINT } from "../config/exporterConfig";
+import fetchMetrics from "../services/exporter";
 
 // Custom hook to fetch/exporter metrics periodically
 export function useMetrics(url?: string, intervalMs: number = 5000) {
-  const [data, setData] = useState<MetricsState>({ cpu: [], memory: [], disk: [], network: [] });
+  const [data, setData] = useState<MetricsState>({
+    cpu: [],
+    memory: [],
+    disk: [],
+    network: [],
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -27,7 +32,8 @@ export function useMetrics(url?: string, intervalMs: number = 5000) {
   }, [url, intervalMs]);
 
   // Normalize to chart-friendly Point[]
-  const toPoints = (arr: { t: number; v: number }[]) => arr.map((p, i) => ({ x: i, y: p.v }));
+  const toPoints = (arr: { t: number; v: number }[]) =>
+    arr.map((p) => ({ x: p.t, y: p.v }));
 
   const extrasRaw: any[] = (data as any).extras ?? [];
   const extras = extrasRaw.map((ex) => ({
