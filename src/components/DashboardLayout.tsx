@@ -1,4 +1,36 @@
 import React from 'react';
+
+// Realistic integration point for external UI controls: provide a global
+// showSection(section) function that toggles visibility of sections
+// identified by data-section attributes or by element id.
+declare global {
+  interface Window {
+    showSection?: (section: string) => void
+  }
+}
+if (typeof window !== 'undefined' && typeof (window as any).showSection !== 'function') {
+  ;(window as any).showSection = (section: string) => {
+    try {
+      // Try to toggle elements marked with data-section="<section>"
+      const elements = document.querySelectorAll(`[data-section='${section}']`)
+      if (elements.length > 0) {
+        elements.forEach((el) => {
+          const he = el as HTMLElement
+          he.style.display = he.style.display === 'none' ? '' : 'none'
+        })
+        return
+      }
+      // Fallback: toggle element by id
+      const byId = document.getElementById(section)
+      if (byId) {
+        byId.style.display = byId.style.display === 'none' ? '' : 'none'
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('showSection failed', e)
+    }
+  }
+}
 import '../styles/dashboard.css';
 
 type LayoutProps = {
