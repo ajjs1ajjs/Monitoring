@@ -1159,6 +1159,7 @@ async def get_metrics_trend(current_user: User = Depends(get_current_user)):
                 substr(timestamp, 1, 16) as ts,
                 AVG(cpu_percent) as cpu_avg,
                 AVG(memory_percent) as mem_avg,
+                AVG(disk_percent) as disk_avg,
                 SUM(network_rx) as net_rx,
                 SUM(network_tx) as net_tx
             FROM metrics_history
@@ -1176,6 +1177,7 @@ async def get_metrics_trend(current_user: User = Depends(get_current_user)):
                     "timestamp": r["ts"] + ":00Z",
                     "cpu_avg": round(r["cpu_avg"] or 0, 1),
                     "mem_avg": round(r["mem_avg"] or 0, 1),
+                    "disk_avg": round(r["disk_avg"] or 0, 1),
                     "net_rx_avg": r["net_rx"] or 0,
                     "net_tx_avg": r["net_tx"] or 0,
                 }

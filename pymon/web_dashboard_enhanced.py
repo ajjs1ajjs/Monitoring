@@ -70,7 +70,7 @@ LOGIN_HTML = r"""<!DOCTYPE html>
             e.preventDefault();
             const errorBox = document.getElementById('error');
             errorBox.style.display = 'none';
-            
+
             try {
                 const resp = await fetch('/api/v1/auth/login', {
                     method: 'POST',
@@ -80,7 +80,7 @@ LOGIN_HTML = r"""<!DOCTYPE html>
                         password: document.getElementById('password').value
                     })
                 });
-                
+
                 if (resp.ok) {
                     const data = await resp.json();
                     localStorage.setItem('token', data.access_token);
@@ -127,22 +127,22 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
         /* Layout */
         .app-container { display: flex; height: 100vh; width: 100vw; }
-        
+
         /* Sidebar */
         aside { width: var(--sidebar-w); background: #020617; border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; }
         .sidebar-header { padding: 2rem 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
         .sidebar-header svg { color: var(--accent); width: 28px; height: 28px; }
         .sidebar-header h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.025em; }
         .sidebar-header span { color: var(--accent); }
-        
+
         .nav-section { padding: 0 1rem; flex: 1; }
         .nav-label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 1.5rem 0 0.75rem 0.75rem; }
-        
+
         .nav-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; border-radius: 0.75rem; color: var(--text-muted); text-decoration: none; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: all 0.2s; border: none; background: transparent; width: 100%; text-align: left; margin-bottom: 0.25rem; }
         .nav-item:hover { background: var(--surface-hover); color: var(--text); }
         .nav-item.active { background: rgba(249, 115, 22, 0.1); color: var(--accent); }
         .nav-item.active svg { color: var(--accent); }
-        
+
         .sidebar-footer { padding: 1rem; border-top: 1px solid var(--border); }
         .logout-btn { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; color: #f87171; width: 100%; border: none; background: transparent; font-size: 0.9rem; cursor: pointer; border-radius: 0.75rem; transition: all 0.2s; }
         .logout-btn:hover { background: rgba(239, 68, 68, 0.1); }
@@ -151,12 +151,12 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #030712; }
         header { height: 64px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; background: rgba(2, 6, 23, 0.5); backdrop-filter: blur(10px); z-index: 40; }
         .header-left h2 { font-size: 1rem; font-weight: 600; color: var(--text); }
-        
+
         .header-actions { display: flex; align-items: center; gap: 1rem; }
         .range-selector { display: flex; background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.25rem; overflow-x: auto; max-width: 400px; }
         .range-btn { padding: 0.25rem 0.6rem; border-radius: 0.375rem; border: none; background: transparent; color: var(--text-muted); font-size: 0.65rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
         .range-btn.active { background: var(--surface-hover); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
-        
+
         .refresh-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 0.5rem; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
         .refresh-btn:hover { border-color: var(--text-muted); color: var(--text); }
 
@@ -176,7 +176,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .stat-card.up::after { background: var(--success); }
         .stat-card.down::after { background: var(--danger); }
         .stat-card.alert::after { background: var(--warning); }
-        
+
         .stat-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.5rem; }
         .stat-value { font-size: 2rem; font-weight: 700; color: var(--text); display: flex; align-items: baseline; gap: 0.25rem; }
         .stat-value span { font-size: 0.875rem; color: var(--text-muted); }
@@ -211,7 +211,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
         .modal-body { padding: 1.5rem; }
         .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.75rem; }
-        
+
         .form-group { margin-bottom: 1.25rem; }
         .form-group label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.5rem; }
         .form-input { width: 100%; background: #020617; border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 0.75rem; color: white; font-size: 0.9rem; }
@@ -222,7 +222,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .btn-primary:hover { background: #ea580c; transform: translateY(-1px); }
         .btn-secondary { background: var(--surface-hover); color: var(--text); border-color: var(--border); }
         .btn-secondary:hover { background: #334155; }
-        
+
         .node-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; transition: border-color 0.2s; position: relative; }
         .node-card:hover { border-color: var(--text-muted); }
 
@@ -270,7 +270,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <button class="nav-item" data-section="alerts">
                     <i data-lucide="bell-ring"></i> Alerting
                 </button>
-                
+
                 <div class="nav-label">Support</div>
                 <button class="nav-item" data-section="help">
                     <i data-lucide="help-circle"></i> Help & Agents
@@ -933,13 +933,13 @@ sudo systemctl start prometheus-node-exporter</textarea>
         function showSection(section) {
             document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
             document.getElementById('section-' + section).classList.add('active');
-            
+
             document.querySelectorAll('.nav-item').forEach(i => {
                 i.classList.toggle('active', i.dataset.section === section);
             });
-            
+
             document.getElementById('viewTitle').textContent = section.charAt(0).toUpperCase() + section.slice(1);
-            
+
             if (section === 'logs') loadAuditLogs();
             if (section === 'alerts') loadAlertRules();
             if (section === 'settings') loadSettings();
@@ -1041,7 +1041,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
                         fill: true,
                         tension: 0.4,
                         borderWidth: 2,
-                        pointRadius: 0
+                        pointRadius: 2
                     }]
                 },
                 options: {
@@ -1074,9 +1074,9 @@ sudo systemctl start prometheus-node-exporter</textarea>
                 if (!resp) return;
                 const data = await resp.json();
                 nodes = data.servers;
-                
+
                 filterNodes(); // This will also call update displays
-                
+
                 document.getElementById('updateTimer').textContent = 'Last sync: ' + new Date().toLocaleTimeString();
             } catch (e) {
                 document.getElementById('updateTimer').textContent = 'Sync Error';
@@ -1086,7 +1086,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
         function filterNodes() {
             const query = (document.getElementById('nodeSearch')?.value || '').toLowerCase();
             const statusFilter = document.getElementById('filterStatus')?.value || 'all';
-            
+
             let filtered = nodes.filter(n => {
                 const name = (n.name || '').toLowerCase();
                 const host = (n.host || '').toLowerCase();
@@ -1094,7 +1094,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
                 const matchesStatus = statusFilter === 'all' || n.last_status === statusFilter;
                 return matchesSearch && matchesStatus;
             });
-            
+
             // Apply sorting
             filtered.sort((a, b) => {
                 const valA = a[sortKey] || 0;
@@ -1103,7 +1103,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
                 if (valA > valB) return 1 * sortOrder;
                 return 0;
             });
-            
+
             updateStats();
             updateLiveTable(filtered);
             updateNodeGrid(filtered);
@@ -1125,13 +1125,13 @@ sudo systemctl start prometheus-node-exporter</textarea>
             const offline = nodes.length - online;
             document.getElementById('stat-online').textContent = online;
             document.getElementById('stat-offline').textContent = offline;
-            
+
             const count = nodes.length || 1;
             const avgCpu = nodes.reduce((a, b) => a + (b.cpu_percent || 0), 0) / count;
             const avgMem = nodes.reduce((a, b) => a + (b.memory_percent || 0), 0) / count;
             const avgDisk = nodes.reduce((a, b) => a + (b.disk_percent || 0), 0) / count;
             const totalNet = nodes.reduce((a, b) => a + (b.network_rx || 0) + (b.network_tx || 0), 0) / (1024 * 1024);
-            
+
             if (document.getElementById('stat-cpu')) document.getElementById('stat-cpu').innerHTML = `${avgCpu.toFixed(1)}<span>%</span>`;
             if (document.getElementById('stat-mem')) document.getElementById('stat-mem').innerHTML = `${avgMem.toFixed(1)}<span>%</span>`;
             if (document.getElementById('stat-disk')) document.getElementById('stat-disk').innerHTML = `${avgDisk.toFixed(1)}<span>%</span>`;
@@ -1142,7 +1142,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
             const overviewBody = document.getElementById('liveTableBody');
             const nodesBody = document.getElementById('nodesTableBody');
             if (!overviewBody && !nodesBody) return;
-            
+
             const targetData = data || nodes;
             const formatBytes = (b) => {
                 if (!b) return '0 B';
@@ -1296,7 +1296,12 @@ sudo systemctl start prometheus-node-exporter</textarea>
                 const resp = await apiFetch(`/api/v1/metrics/trend?range=${currentRange}`);
                 if (!resp) return;
                 const data = await resp.json();
-                const labels = data.history.map(h => h.timestamp.split('T')[1].substring(0, 5));
+
+                // Process labels - extract HH:mm from UTC timestamp
+                const labels = data.history.map(h => {
+                    const parts = h.timestamp.split('T');
+                    return parts.length > 1 ? parts[1].substring(0, 5) : h.timestamp;
+                });
 
                 charts.cpu.data.labels = labels;
                 charts.cpu.data.datasets[0].data = data.history.map(h => h.cpu_avg);
@@ -1311,9 +1316,11 @@ sudo systemctl start prometheus-node-exporter</textarea>
                 charts.net.update('none');
 
                 charts.disk.data.labels = labels;
-                charts.disk.data.datasets[0].data = data.history.map(h => nodes.reduce((a, b) => a + (b.disk_percent || 0), 0) / (nodes.length || 1));
+                charts.disk.data.datasets[0].data = data.history.map(h => h.disk_avg);
                 charts.disk.update('none');
-            } catch (e) {}
+            } catch (e) {
+                console.error("Trend update failed:", e);
+            }
         }
 
 
@@ -1412,7 +1419,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
         }
 
         // --- NEW FEATURES ---
-        
+
         // Auto-port selection
         document.getElementById('nodeOS').addEventListener('change', (e) => {
             document.getElementById('nodePort').value = (e.target.value === 'windows') ? 9182 : 9100;
@@ -1456,7 +1463,7 @@ function showDeployModal(id) {
             const node = nodes.find(n => n.id === id);
             if (!node) return;
             const isWin = node.os_type === 'windows';
-            let cmd = isWin 
+            let cmd = isWin
                 ? `msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.30.9/windows_exporter-0.30.9-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system"`
                 : `curl -sLO https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz && tar xvf node_exporter-1.7.0.linux-amd64.tar.gz && ./node_exporter-1.7.0.linux-amd64/node_exporter`;
             document.getElementById('deployCmd').value = cmd;
@@ -1540,4 +1547,3 @@ function showDeployModal(id) {
     </script>
 </body>
 </html>"""
-
