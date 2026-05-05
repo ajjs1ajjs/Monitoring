@@ -764,14 +764,18 @@ class ScrapeManager:
                             avail = metrics["node_memory_MemAvailable_bytes"]
                             metrics["memory_usage_percent"] = ((total - avail) / total) * 100
 
-                        # Disk: simple filesystem usage (mountpoint '/')
+                        # Disk: filesystem usage (all mountpoints)
+                        disk_usage = 0
                         for k, v in metrics.items():
-                            if k == "node_filesystem_size_bytes" and 'mountpoint="/"' in str(k):  # simplified check
+                            if k == "node_filesystem_size_bytes":
+                                # Це ім'я містить лейбли, розпарсимо їх
                                 total_fs = v
-                                avail_fs = metrics.get("node_filesystem_avail_bytes", 0)
+                                # Знаходимо відповідний available через лейбли або просто пошук
+                                avail_fs = metrics.get(k.replace("size", "avail"), 0)
                                 if total_fs > 0:
-                                    metrics["disk_usage_percent"] = ((total_fs - avail_fs) / total_fs) * 100
-                                break
+                                    usage = ((total_fs - avail_fs) / total_fs) * 100
+                                    disk_usage = max(disk_usage, usage)
+                        metrics["disk_usage_percent"] = disk_usage
 
                     # Broadcast update via WebSocket
                     try:
