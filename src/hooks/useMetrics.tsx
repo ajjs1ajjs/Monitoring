@@ -35,9 +35,9 @@ export function useMetrics(url?: string, intervalMs: number = 5000) {
   const toPoints = (arr: { t: number; v: number }[]) =>
     arr.map((p) => ({ x: p.t, y: p.v }));
 
-  const extrasRaw: any[] = (data as any).extras ?? [];
+  const extrasRaw = data?.extras || [];
   const extras = extrasRaw.map((ex) => ({
-    name: ex.name,
+    name: ex.name as string, // Assuming name should be a string here
     data: (ex.data ?? []).map((d: any, i: number) => ({ x: i, y: d.v })),
   }));
 

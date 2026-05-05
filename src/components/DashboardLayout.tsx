@@ -1,13 +1,31 @@
-import React, { useEffect } from 'react';
+import React, { useEffect } from 'react'
 
-// Realistic integration point for external UI controls: provide a global
-// showSection(section) function that toggles visibility of sections
-// identified by data-section attributes or by element id.
-declare global {
-  interface Window {
-    showSection?: (section: string) => void
-  }
-}
+export const DashboardLayout: React.FC<LayoutProps> = ({ title = 'Dashboard', children, status, theme = 'dark' }) => {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).showSection = (section: string) => {
+        try {
+          const elements = document.querySelectorAll(`[data-section='${section}']`)
+          if (elements.length > 0) {
+            elements.forEach((el) => {
+              const he = el as HTMLElement
+              he.style.display = he.style.display === 'none' ? '' : 'none'
+            })
+            return
+          }
+          const byId = document.getElementById(section)
+          if (byId) {
+            byId.style.display = byId.style.display === 'none' ? '' : 'none'
+          }
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('showSection failed', e)
+        }
+      }
+    }
+  }, [])
+
+  const statusColor = status === 'Online' ? '#22c55e' : status === 'Offline' ? '#f87171' : '#9CA3AF';
 // Define a safe global showSection handler in a React lifecycle way
 useEffect(() => {
   if (typeof window !== 'undefined' && typeof (window as any).showSection !== 'function') {
