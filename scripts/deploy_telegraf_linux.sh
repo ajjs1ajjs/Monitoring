@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Telegraf deployment for Linux
-# Configured for Prometheus output on port 9273
+# Configured for Prometheus output on port 9273 with Pymon-compatible metrics
 
 if [ "$EUID" -ne 0 ]; then
   echo "Please run as root"
@@ -37,12 +37,48 @@ cat <<EOF > /etc/telegraf/telegraf.conf
   collect_cpu_time = true
   report_active = true
 
+[[processors.rename]]
+  [[processors.rename.replace]]
+    measurement = "cpu"
+    dest = "node_cpu_seconds_total"
+    field = "usage_idle"
+    rename = "idle"
+  [[processors.rename.replace]]
+    measurement = "cpu"
+    field = "usage_user"
+    rename = "user"
+  [[processors.rename.replace]]
+    measurement = "cpu"
+    field = "usage_system"
+    rename = "system"
+
 [[inputs.disk]]
   ignore_fs = ["tmpfs", "devtmpfs", "devfs", "iso9660", "overlay", "aufs", "squashfs"]
 
+[[processors.rename]]
+  [[processors.rename.replace]]
+    measurement = "disk"
+    field = "total"
+    rename = "filesystem_size_bytes"
+  [[processors.rename.replace]]
+    measurement = "disk"
+    field = "free"
+    rename = "filesystem_avail_bytes"
+
+[[inputs.mem]]
+
+[[processors.rename]]
+  [[processors.rename.replace]]
+    measurement = "mem"
+    field = "total"
+    rename = "node_memory_MemTotal_bytes"
+  [[processors.rename.replace]]
+    measurement = "mem"
+    field = "available"
+    rename = "node_memory_MemAvailable_bytes"
+
 [[inputs.diskio]]
 [[inputs.kernel]]
-[[inputs.mem]]
 [[inputs.processes]]
 [[inputs.swap]]
 [[inputs.system]]

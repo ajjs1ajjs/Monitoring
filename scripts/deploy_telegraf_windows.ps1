@@ -15,7 +15,7 @@ if (Test-Path $TempPath) { Remove-Item $TempPath -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $TempPath | Out-Null
 
 $ZipPath = Join-Path $TempPath "telegraf.zip"
-Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath
+Invoke-WebRequest -Uri $DownloadUrl -OutFile $ZipPath -UseBasicParsing
 Expand-Archive -Path $ZipPath -DestinationPath $TempPath -Force
 
 # 3. Move files
@@ -23,7 +23,7 @@ if (!(Test-Path $InstallPath)) { New-Item -ItemType Directory -Path $InstallPath
 Move-Item -Path "$TempPath\telegraf-$LatestVersion\*" -Destination $InstallPath -Force
 Remove-Item $TempPath -Recurse -Force
 
-# 4. Create config
+# 4. Create Pymon-compatible config
 $ConfigContent = @"
 [agent]
   interval = "10s"
@@ -42,53 +42,34 @@ $ConfigContent = @"
 
 [[inputs.win_perf_counters]]
   UseWildcardsExpansion = true
-
   [[inputs.win_perf_counters.object]]
     ObjectName = "Processor"
     Instances = ["*"]
-    Counters = ["% Idle Time", "% Interrupt Time", "% Privileged Time", "% User Time", "% Processor Time", "% DPC Time", "Interrupts/sec", "DPCs Rate"]
+    Counters = ["% Idle Time", "% Processor Time"]
     Measurement = "win_cpu"
-
   [[inputs.win_perf_counters.object]]
     ObjectName = "LogicalDisk"
     Instances = ["*"]
-    Counters = ["% Idle Time", "% Disk Time","% Disk Read Time", "% Disk Write Time", "% Free Space", "Current Disk Queue Length", "Disk Reads/sec", "Disk Writes/sec", "Disk Transfers/sec", "Free Megabytes"]
+    Counters = ["% Free Space", "Free Megabytes"]
     Measurement = "win_disk"
-
-  [[inputs.win_perf_counters.object]]
-    ObjectName = "PhysicalDisk"
-    Instances = ["*"]
-    Counters = ["Disk Read Bytes/sec", "Disk Write Bytes/sec", "Current Disk Queue Length", "% Disk Time"]
-    Measurement = "win_physical_disk"
-
   [[inputs.win_perf_counters.object]]
     ObjectName = "Memory"
-    Counters = ["Available Bytes", "Cache Bytes", "Committed Bytes", "Pages/sec", "Pages Input/sec", "Pages Output/sec", "Pool Nonpaged Bytes", "Pool Paged Bytes", "System Cache Resident Bytes"]
+    Counters = ["Available Bytes"]
     Measurement = "win_mem"
 
-  [[inputs.win_perf_counters.object]]
-    ObjectName = "Network Interface"
-    Instances = ["*"]
-    Counters = ["Bytes Received/sec", "Bytes Sent/sec", "Packets Received/sec", "Packets Sent/sec", "Packets Outbound Errors", "Packets Received Errors"]
-    Measurement = "win_net"
-
-  [[inputs.win_perf_counters.object]]
-    ObjectName = "System"
-    Counters = ["Context Switches/sec", "System Calls/sec", "Processor Queue Length", "System Up Time", "Processes", "Threads"]
-    Measurement = "win_system"
-
-  [[inputs.win_perf_counters.object]]
-    ObjectName = "Paging File"
-    Instances = ["_Total"]
-    Counters = ["% Usage", "% Usage Peak"]
-    Measurement = "win_swap"
-
-  [[inputs.win_perf_counters.object]]
-    ObjectName = "TCPv4"
-    Counters = ["Connections Established", "Connections Active", "Connections Passive", "Connection Failures"]
-    Measurement = "win_tcp"
-
-[[inputs.win_services]]
+[[processors.rename]]
+  [[processors.rename.replace]]
+    measurement = "win_cpu"
+    field = "Percent_Idle_Time"
+    rename = "windows_cpu_time_total_idle"
+  [[processors.rename.replace]]
+    measurement = "win_cpu"
+    field = "Percent_Processor_Time"
+    rename = "windows_cpu_time_total_all"
+  [[processors.rename.replace]]
+    measurement = "win_disk"
+    field = "Free_Megabytes"
+    rename = "windows_logical_disk_free_bytes"
 "@
 
 $ConfigContent | Out-File -FilePath $ConfigPath -Encoding UTF8
