@@ -111,23 +111,24 @@ scrape_configs:
 
 ---
 
-## Data Sources (Telegraf)
+## Data Sources (Exporters)
 
-Ми використовуємо Telegraf як єдиний агент збору метрик.
+Ми використовуємо стандартні експортери Prometheus.
 
 ### Windows Server
 Виконайте PowerShell як Адміністратор:
 ```powershell
-iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/scripts/deploy_telegraf_windows.ps1' | iex
+iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/scripts/deploy_windows_exporter.ps1' | iex
 ```
+**Порт:** 9182
 
 ### Linux Server
 Виконайте команду в терміналі:
 ```bash
-curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/scripts/deploy_telegraf_linux.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/scripts/deploy_node_exporter.sh | sudo bash
 ```
+**Порт:** 9100
 
-**Порт:** 9273
 
 
 ---
