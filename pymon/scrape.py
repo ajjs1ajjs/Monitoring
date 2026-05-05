@@ -398,20 +398,22 @@ class ScrapeManager:
 
                         from pymon.api.endpoints import manager
 
-                        asyncio.create_task(
-                            manager.broadcast(
-                                {
-                                    "type": "server_update",
-                                    "server_id": sid,
-                                    "cpu": cpu,
-                                    "memory": memory,
-                                    "disk": disk,
-                                    "status": "up",
-                                }
+                        if manager.loop and manager.loop.is_running():
+                            asyncio.run_coroutine_threadsafe(
+                                manager.broadcast(
+                                    {
+                                        "type": "server_update",
+                                        "server_id": sid,
+                                        "cpu": cpu,
+                                        "memory": memory,
+                                        "disk": disk,
+                                        "status": "up",
+                                    }
+                                ),
+                                manager.loop,
                             )
-                        )
                     except Exception as e:
-                        print(f"WS Broadcast error: {e}")
+                        pass
                 else:
                     c.execute(
                         """UPDATE servers SET
