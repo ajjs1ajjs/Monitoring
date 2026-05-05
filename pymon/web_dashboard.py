@@ -710,11 +710,9 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                                     <th>CPU</th>
                                     <th>Memory</th>
                                     <th>Disk</th>
-                                    <th>Network</th>
                                     <th>Last Check</th>
                                     <th>Actions</th>
-                                </tr>
-                            </thead>
+                                    </tr></thead>
                             <tbody></tbody>
                         </table>
                     </div>
