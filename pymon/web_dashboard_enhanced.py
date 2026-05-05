@@ -322,74 +322,33 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             <div class="content-scroll">
                 <!-- Section: Overview -->
                 <div id="section-overview" class="dashboard-section active">
-                    <div class="stats-grid">
-                        <div class="stat-card up">
-                            <div class="stat-label">Active Nodes</div>
-                            <div class="stat-value" id="stat-online">0</div>
-                        </div>
-                        <div class="stat-card down">
-                            <div class="stat-label">Offline Nodes</div>
-                            <div class="stat-value" id="stat-offline">0</div>
-                        </div>
-                        <div class="stat-card alert">
-                            <div class="stat-label">Avg CPU</div>
-                            <div class="stat-value" id="stat-cpu">0<span>%</span></div>
-                        </div>
-                        <div class="stat-card up">
-                            <div class="stat-label">Avg RAM</div>
-                            <div class="stat-value" id="stat-mem">0<span>%</span></div>
-                        </div>
-                        <div class="stat-card alert">
-                            <div class="stat-label">Avg Disk</div>
-                            <div class="stat-value" id="stat-disk">0<span>%</span></div>
-                        </div>
-                    </div>
-
-                    <div class="chart-grid">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>CPU Usage Trends</h3>
-                                <i data-lucide="cpu" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="cpuChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Memory Utilization</h3>
-                                <i data-lucide="database" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="memChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Disk Distribution</h3>
-                                <i data-lucide="hard-drive" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
-                            </div>
-                            <div class="card-body">
-                                <canvas id="diskChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="table-card">
-                        <div class="card-header">
-                            <h3>Live Infrastructure Status</h3>
-                            <button class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.7rem;" onclick="showSection('nodes')">Detailed Inventory</button>
+                        <div class="card-header" style="padding: 1.5rem 2rem; background: rgba(0,0,0,0.1);">
+                            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                                <h3 style="font-size: 1.25rem; color: #fff; text-transform: none; letter-spacing: -0.01em;">Live Infrastructure Status</h3>
+                                <span id="tableSyncTime" style="font-size: 0.75rem; color: var(--text-muted);">Syncing live data...</span>
+                            </div>
+                            <div style="display: flex; gap: 1rem; align-items: center;">
+                                <div class="search-box" style="max-width: 250px; background: rgba(0,0,0,0.3);">
+                                    <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+                                    <input type="text" id="liveSearch" placeholder="Search hosts..." oninput="filterLiveTable()">
+                                </div>
+                                <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" onclick="showSection('nodes')">
+                                    <i data-lucide="list" style="width: 14px; height: 14px; margin-right: 0.5rem; display: inline-block; vertical-align: middle;"></i>
+                                    Full Inventory
+                                </button>
+                            </div>
                         </div>
                         <div style="overflow-x: auto;">
-                            <table>
+                            <table style="min-width: 1000px;">
                                 <thead>
                                     <tr>
-                                        <th>Status</th>
-                                        <th>Node Identity</th>
-                                        <th>Endpoint</th>
-                                        <th>CPU</th>
-                                        <th>RAM</th>
-                                        <th>Disk</th>
+                                        <th style="width: 120px;">Status</th>
+                                        <th style="width: 280px;">Node Identity</th>
+                                        <th style="width: 180px;">Endpoint</th>
+                                        <th>CPU Usage</th>
+                                        <th>RAM Usage</th>
+                                        <th>Disk Distribution</th>
                                     </tr>
                                 </thead>
                                 <tbody id="liveTableBody">
@@ -1052,23 +1011,37 @@ sudo systemctl start prometheus-node-exporter</textarea>
         let sortOrder = 1;
 
         async function refreshData() {
-            document.getElementById('updateTimer').textContent = 'Syncing...';
+            const syncEl = document.getElementById('updateTimer');
+            const tableSyncEl = document.getElementById('tableSyncTime');
+            if (syncEl) syncEl.textContent = 'Syncing...';
+
             try {
                 const resp = await apiFetch('/api/v1/servers');
                 if (!resp) return;
                 const data = await resp.json();
                 nodes = data.servers;
 
-                filterNodes(); // This will also call update displays
+                filterNodes();
+                filterLiveTable();
 
-                document.getElementById('updateTimer').textContent = 'Last sync: ' + new Date().toLocaleTimeString();
+                const timeStr = new Date().toLocaleTimeString();
+                if (syncEl) syncEl.textContent = 'Last sync: ' + timeStr;
+                if (tableSyncEl) tableSyncEl.textContent = 'Last update: ' + timeStr + ' • ' + nodes.length + ' active targets';
             } catch (e) {
-                document.getElementById('updateTimer').textContent = 'Sync Error';
+                if (syncEl) syncEl.textContent = 'Sync Error';
             }
         }
 
-        function filterNodes() {
-            const query = (document.getElementById('nodeSearch')?.value || '').toLowerCase();
+        function filterLiveTable() {
+            const query = (document.getElementById('liveSearch')?.value || '').toLowerCase();
+            const filtered = nodes.filter(n =>
+                (n.name || '').toLowerCase().includes(query) ||
+                (n.host || '').toLowerCase().includes(query)
+            );
+            updateLiveTable(filtered);
+        }
+
+        function filterNodes() {            const query = (document.getElementById('nodeSearch')?.value || '').toLowerCase();
             const statusFilter = document.getElementById('filterStatus')?.value || 'all';
 
             let filtered = nodes.filter(n => {
@@ -1511,7 +1484,6 @@ function showDeployModal(id) {
         }
 
         // Initialization
-        initCharts();
         refreshData();
         setInterval(refreshData, 15000);
     </script>
