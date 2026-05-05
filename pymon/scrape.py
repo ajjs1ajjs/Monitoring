@@ -398,7 +398,10 @@ class ScrapeManager:
 
                         from pymon.api.endpoints import manager
 
-                        asyncio.create_task(
+                        # Отримуємо основний цикл подій
+                        loop = asyncio.get_event_loop()
+                        # Плануємо виконання broadcast безпечно для потоку
+                        asyncio.run_coroutine_threadsafe(
                             manager.broadcast(
                                 {
                                     "type": "server_update",
@@ -408,7 +411,8 @@ class ScrapeManager:
                                     "disk": disk,
                                     "status": "up",
                                 }
-                            )
+                            ),
+                            loop,
                         )
                     except Exception as e:
                         print(f"WS Broadcast error: {e}")
