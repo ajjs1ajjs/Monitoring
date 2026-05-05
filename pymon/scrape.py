@@ -267,6 +267,7 @@ class ScrapeManager:
                     # Try to extract mountpoint from labels embedded in metric name (if present)
                     mount = None
                     import re
+
                     m = re.search(r'mountpoint="([^"]+)"', k)
                     if m:
                         mount = m.group(1)
@@ -275,9 +276,14 @@ class ScrapeManager:
                         continue
                     disk_total = max(disk_total, v)
                     print(f"DEBUG DISK: Found filesystem_size for {mount}: {k} = {v}")
-                elif "filesystem_avail_bytes" in k_lower or "filesystem_available" in k_lower or "filesystem_free" in k_lower:
+                elif (
+                    "filesystem_avail_bytes" in k_lower
+                    or "filesystem_available" in k_lower
+                    or "filesystem_free" in k_lower
+                ):
                     mount = None
                     import re
+
                     m = re.search(r'mountpoint="([^"]+)"', k)
                     if m:
                         mount = m.group(1)
@@ -735,6 +741,36 @@ class ScrapeManager:
                                 name = name_part.strip()
                                 value = float(value_str.strip())
 
+                                # node_exporter (Linux) disk parsing
+                                if name == "node_filesystem_free_bytes":
+                                    import re
+
+                                    mount_match = re.search(r'mountpoint="([^"]+)"', labels_part)
+                                    if mount_match:
+                                        mount = mount_match.group(1)
+                                        # Filter out system and pseudo filesystems
+                                        if not any(
+                                            x in mount
+                                            for x in ["/proc", "/sys", "/dev", "/run", "/tmp", "/var/lib/docker"]
+                                        ):
+                                            if mount not in disk_info:
+                                                disk_info[mount] = {"volume": mount, "free": 0, "size": 0}
+                                            disk_info[mount]["free"] = value
+
+                                if name == "node_filesystem_size_bytes":
+                                    import re
+
+                                    mount_match = re.search(r'mountpoint="([^"]+)"', labels_part)
+                                    if mount_match:
+                                        mount = mount_match.group(1)
+                                        if not any(
+                                            x in mount
+                                            for x in ["/proc", "/sys", "/dev", "/run", "/tmp", "/var/lib/docker"]
+                                        ):
+                                            if mount not in disk_info:
+                                                disk_info[mount] = {"volume": mount, "free": 0, "size": 0}
+                                            disk_info[mount]["size"] = value
+
                                 # Aggregate CPU idle time from windows_exporter
                                 if name == "windows_cpu_time_total":
                                     if 'mode="idle"' in labels_part:
@@ -803,6 +839,7 @@ class ScrapeManager:
                             if "filesystem_size_bytes" in k_lower:
                                 # Отримуємо mount point з лейблів
                                 import re
+
                                 mount_match = re.search(r'mountpoint="([^"]+)"', k)
                                 mount = mount_match.group(1) if mount_match else "unknown"
 
@@ -874,7 +911,9 @@ class ScrapeManager:
                     # Publish per-disk usage as Prometheus metrics with volume label
                     try:
                         if disk_info:
-                            registry.register("disk_usage_percent", MetricType.GAUGE, "Disk usage percent per volume", None)
+                            registry.register(
+                                "disk_usage_percent", MetricType.GAUGE, "Disk usage percent per volume", None
+                            )
                             for vol, info in disk_info.items():
                                 vol_label = Label("volume", vol)
                                 percent = info.get("percent", 0)
