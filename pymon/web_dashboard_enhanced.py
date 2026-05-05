@@ -865,7 +865,6 @@ sudo systemctl start prometheus-node-exporter</textarea>
         const token = localStorage.getItem('token');
         if (!token) window.location.href = '/login';
 
-        let charts = {};
         let currentRange = '1h';
         let nodes = [];
 
@@ -970,42 +969,6 @@ sudo systemctl start prometheus-node-exporter</textarea>
             }
         });
 
-        // Charts
-        function createLineChart(id, label, color) {
-            const ctx = document.getElementById(id).getContext('2d');
-            return new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: label,
-                        data: [],
-                        borderColor: color,
-                        backgroundColor: color + '22',
-                        fill: true,
-                        tension: 0.4,
-                        borderWidth: 2,
-                        pointRadius: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { display: true, grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } },
-                        y: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#64748b', font: { size: 10 } } }
-                    }
-                }
-            });
-        }
-
-        function initCharts() {
-            charts.cpu = createLineChart('cpuChart', 'CPU', '#f97316');
-            charts.mem = createLineChart('memChart', 'RAM', '#3b82f6');
-            charts.disk = createLineChart('diskChart', 'Disk %', '#f59e0b');
-        }
-
         // Data Fetching
         let sortKey = 'name';
         let sortOrder = 1;
@@ -1028,6 +991,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
                 if (syncEl) syncEl.textContent = 'Last sync: ' + timeStr;
                 if (tableSyncEl) tableSyncEl.textContent = 'Last update: ' + timeStr + ' • ' + nodes.length + ' active targets';
             } catch (e) {
+                console.error("Refresh failed:", e);
                 if (syncEl) syncEl.textContent = 'Sync Error';
             }
         }
@@ -1041,7 +1005,8 @@ sudo systemctl start prometheus-node-exporter</textarea>
             updateLiveTable(filtered);
         }
 
-        function filterNodes() {            const query = (document.getElementById('nodeSearch')?.value || '').toLowerCase();
+        function filterNodes() {
+            const query = (document.getElementById('nodeSearch')?.value || '').toLowerCase();
             const statusFilter = document.getElementById('filterStatus')?.value || 'all';
 
             let filtered = nodes.filter(n => {
@@ -1064,7 +1029,6 @@ sudo systemctl start prometheus-node-exporter</textarea>
             updateStats();
             updateLiveTable(filtered);
             updateNodeGrid(filtered);
-            updateTrends();
         }
 
         function sortNodes(key) {
@@ -1080,8 +1044,10 @@ sudo systemctl start prometheus-node-exporter</textarea>
         function updateStats() {
             const online = nodes.filter(n => n.last_status === 'up').length;
             const offline = nodes.length - online;
-            document.getElementById('stat-online').textContent = online;
-            document.getElementById('stat-offline').textContent = offline;
+            const elOnline = document.getElementById('stat-online');
+            const elOffline = document.getElementById('stat-offline');
+            if (elOnline) elOnline.textContent = online;
+            if (elOffline) elOffline.textContent = offline;
 
             const count = nodes.length || 1;
             const avgCpu = nodes.reduce((a, b) => a + (b.cpu_percent || 0), 0) / count;
@@ -1091,8 +1057,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
             if (document.getElementById('stat-cpu')) document.getElementById('stat-cpu').innerHTML = `${avgCpu.toFixed(1)}<span>%</span>`;
             if (document.getElementById('stat-mem')) document.getElementById('stat-mem').innerHTML = `${avgMem.toFixed(1)}<span>%</span>`;
             if (document.getElementById('stat-disk')) document.getElementById('stat-disk').innerHTML = `${avgDisk.toFixed(1)}<span>%</span>`;
-            }
-        function updateLiveTable(data) {
+        }        function updateLiveTable(data) {
             const overviewBody = document.getElementById('liveTableBody');
             const nodesBody = document.getElementById('nodesTableBody');
             if (!overviewBody && !nodesBody) return;
@@ -1237,36 +1202,6 @@ sudo systemctl start prometheus-node-exporter</textarea>
             `).join('');
             lucide.createIcons();
         }
-
-        async function updateTrends() {
-            try {
-                const resp = await apiFetch(`/api/v1/metrics/trend?range=${currentRange}`);
-                if (!resp) return;
-                const data = await resp.json();
-
-                // Process labels - extract HH:mm from UTC timestamp
-                const labels = data.history.map(h => {
-                    const parts = h.timestamp.split('T');
-                    return parts.length > 1 ? parts[1].substring(0, 5) : h.timestamp;
-                });
-
-                charts.cpu.data.labels = labels;
-                charts.cpu.data.datasets[0].data = data.history.map(h => h.cpu_avg);
-                charts.cpu.update('none');
-
-                charts.mem.data.labels = labels;
-                charts.mem.data.datasets[0].data = data.history.map(h => h.mem_avg);
-                charts.mem.update('none');
-
-                charts.disk.data.labels = labels;
-                charts.disk.data.datasets[0].data = data.history.map(h => h.disk_avg);
-                charts.disk.update('none');
-            } catch (e) {
-                console.error("Trend update failed:", e);
-            }
-        }
-
-
 
         async function loadAlertRules() {
             const resp = await apiFetch('/api/v1/alerts');
