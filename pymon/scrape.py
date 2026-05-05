@@ -693,21 +693,32 @@ class ScrapeManager:
                     # Logic to identify if it's Telegraf/Prometheus
                     metrics["_exporter_detected"] = True
 
-                    # Calculate CPU percentage from counters
-                    if cpu_all_total > 0:
-                        prev = self._cpu_history.get(target.target)
-                        if prev:
-                            idle_delta = cpu_idle_total - prev[0]
-                            all_delta = cpu_all_total - prev[1]
-                            if all_delta > 0:
-                                cpu_percent = 100 * (1 - (idle_delta / all_delta))
-                                metrics["cpu_usage_percent"] = max(0, min(100, cpu_percent))
+                    # Initialize variables for CPU calculation
+                    cpu_idle_total = 0.0
+                    cpu_all_total = 0.0
+                    # Handle windows-style cpu metrics if present
+                    if "windows_cpu_time_total_idle" in metrics:
+                        cpu_idle_total = metrics["windows_cpu_time_total_idle"]
+                        cpu_all_total = metrics["windows_cpu_time_total_all"]
 
-                        self._cpu_history[target.target] = (cpu_idle_total, cpu_all_total)
+                    # Aggregated values from Telegraf
+                    cpu_idle = metrics.get("win_cpu_Percent_Idle_Time", 0)
+                    cpu_total = 100.0  # Percent processor time is often absolute
 
-                    # Store aggregated values for diagnostics
-                    metrics["windows_cpu_time_total_idle"] = cpu_idle_total
-                    metrics["windows_cpu_time_total_all"] = cpu_all_total
+                    if "win_cpu_Percent_Processor_Time" in metrics:
+                        # Fallback calculation if needed
+                        cpu_percent = metrics["win_cpu_Percent_Processor_Time"]
+                        metrics["cpu_usage_percent"] = cpu_percent
+
+                    if "win_mem_Available_Bytes" in metrics:
+                        metrics["memory_usage_percent"] = (
+                            1 - (metrics["win_mem_Available_Bytes"] / 1024 / 1024 / 1024)
+                        ) * 100  # Rough estimate
+
+                    if "win_disk_Free_Megabytes" in metrics:
+                        metrics["disk_usage_percent"] = 100 - (
+                            metrics["win_disk_Free_Megabytes"] / 1000
+                        )  # Simple fallback
 
                     # Calculate disk percentages and get C: for main metric
                     disks_dict = {}  # {"C:": 94.2, "D:": 45.1}
