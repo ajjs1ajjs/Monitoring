@@ -32,6 +32,8 @@ if (typeof window !== 'undefined' && typeof (window as any).showSection !== 'fun
   }
 }
 import '../styles/dashboard.css';
+// Early inline adapter for external dashboard's showSection calls
+const _earlyShowSectionScript = `window.showSection = window.showSection || function(section){ try{ var els = document.querySelectorAll('[data-section="'+section+'"]'); if(els.length>0){ els.forEach(function(el){ el.style.display = (el.style.display==='none'?'':'none'); }); return; } var byId = document.getElementById(section); if(byId){ byId.style.display = byId.style.display==='none'?'':'none'; } } catch(e){ console.error('showSection (early)', e); } };`;
 
 type LayoutProps = {
   title?: string;
@@ -43,7 +45,9 @@ type LayoutProps = {
 export const DashboardLayout: React.FC<LayoutProps> = ({ title = 'Dashboard', children, status, theme = 'dark' }) => {
   const statusColor = status === 'Online' ? '#22c55e' : status === 'Offline' ? '#f87171' : '#9CA3AF';
   return (
-    <div className="dashboard-layout" data-theme={theme} style={{ fontFamily: 'Inter, system-ui, Arial' }}>
+    <>
+      <script dangerouslySetInnerHTML={{ __html: _earlyShowSectionScript }} />
+      <div className="dashboard-layout" data-theme={theme} style={{ fontFamily: 'Inter, system-ui, Arial' }}>
       <header className="dashboard-header">
         <span style={{ marginRight: 12 }}>{/* logo placeholder */}📊</span>
         <span style={{ fontWeight: 700 }}>{title}</span>
@@ -64,6 +68,7 @@ export const DashboardLayout: React.FC<LayoutProps> = ({ title = 'Dashboard', ch
       </header>
       <main className="dashboard-grid" style={{ paddingTop: 0 }}>{children}</main>
     </div>
+    </>
   );
 };
 
