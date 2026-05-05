@@ -684,41 +684,92 @@ class ScrapeManager:
                         except:
                             pass
 
-                    # Parse metrics using the new parser
-                    from pymon.services.metrics.parser import PrometheusParser
+                    # Parse metrics - support both node_exporter and windows_exporter
+                    from typing import Any
 
-                    parser = PrometheusParser()
-                    metrics = parser.parse(response.text)
-
-                    # Logic to identify if it's Telegraf/Prometheus
-                    metrics["_exporter_detected"] = True
-
-                    # Initialize variables for CPU calculation
+                    metrics: dict[str, Any] = {}
                     cpu_idle_total = 0.0
                     cpu_all_total = 0.0
-                    # Handle windows-style cpu metrics if present
-                    if "windows_cpu_time_total_idle" in metrics:
-                        cpu_idle_total = metrics["windows_cpu_time_total_idle"]
-                        cpu_all_total = metrics["windows_cpu_time_total_all"]
 
-                    # Aggregated values from Telegraf
-                    cpu_idle = metrics.get("win_cpu_Percent_Idle_Time", 0)
-                    cpu_total = 100.0  # Percent processor time is often absolute
+                    for line in response.text.split("\n"):
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        try:
+                            if "{" in line:
+                                name_part, rest = line.split("{", 1)
+                                labels_part, value_str = rest.rsplit("}", 1)
+                                name = name_part.strip()
+                                value = float(value_str.strip())
 
-                    if "win_cpu_Percent_Processor_Time" in metrics:
-                        # Fallback calculation if needed
-                        cpu_percent = metrics["win_cpu_Percent_Processor_Time"]
-                        metrics["cpu_usage_percent"] = cpu_percent
+                                # Aggregate CPU idle time from windows_exporter
+                                if name == "windows_cpu_time_total":
+                                    if 'mode="idle"' in labels_part:
+                                        cpu_idle_total += value
+                                    cpu_all_total += value
 
-                    if "win_mem_Available_Bytes" in metrics:
-                        metrics["memory_usage_percent"] = (
-                            1 - (metrics["win_mem_Available_Bytes"] / 1024 / 1024 / 1024)
-                        ) * 100  # Rough estimate
+                                # Collect ALL disks from windows_exporter
+                                import re
 
-                    if "win_disk_Free_Megabytes" in metrics:
-                        metrics["disk_usage_percent"] = 100 - (
-                            metrics["win_disk_Free_Megabytes"] / 1000
-                        )  # Simple fallback
+                                if name == "windows_logical_disk_free_bytes":
+                                    vol_match = re.search(r'volume="([^"]+)"', labels_part)
+                                    if vol_match:
+                                        vol = vol_match.group(1)
+                                        if vol not in disk_info:
+                                            disk_info[vol] = {"volume": vol, "free": 0, "size": 0}
+                                        disk_info[vol]["free"] = value
+                                if name == "windows_logical_disk_size_bytes":
+                                    vol_match = re.search(r'volume="([^"]+)"', labels_part)
+                                    if vol_match:
+                                        vol = vol_match.group(1)
+                                        if vol not in disk_info:
+                                            disk_info[vol] = {"volume": vol, "free": 0, "size": 0}
+                                        disk_info[vol]["size"] = value
+
+                                metrics[name] = value
+                            else:
+                                parts = line.split()
+                                if len(parts) >= 2:
+                                    name = parts[0]
+                                    value = float(parts[1])
+                                    metrics[name] = value
+                        except:
+                            continue
+
+                    # Calculate CPU percentage from counters
+                    if cpu_all_total > 0:
+                        prev = self._cpu_history.get(target.target)
+                        if prev:
+                            idle_delta = cpu_idle_total - prev[0]
+                            all_delta = cpu_all_total - prev[1]
+                            if all_delta > 0:
+                                cpu_percent = 100 * (1 - (idle_delta / all_delta))
+                                metrics["cpu_usage_percent"] = max(0, min(100, cpu_percent))
+
+                        self._cpu_history[target.target] = (cpu_idle_total, cpu_all_total)
+
+                    # Store aggregated values for diagnostics
+                    metrics["windows_cpu_time_total_idle"] = cpu_idle_total
+                    metrics["windows_cpu_time_total_all"] = cpu_all_total
+
+                    # Calculate disk percentages and get C: for main metric
+                    disks_dict = {}  # {"C:": 94.2, "D:": 45.1}
+                    for vol, info in disk_info.items():
+                        if info["size"] > 0:
+                            pct = 100 * (1 - info["free"] / info["size"])
+                            info["percent"] = pct
+                            disks_dict[vol] = round(pct, 1)
+                            if "C:" in vol:
+                                metrics["windows_logical_disk_free_bytes"] = info["free"]
+                                metrics["windows_logical_disk_size_bytes"] = info["size"]
+
+                    metrics["_disk_info_json"] = json.dumps(disks_dict) if disks_dict else None
+
+                    # Detect exporter version from build_info metrics
+                    for key in metrics:
+                        if "build_info" in key or "exporter_build_info" in key:
+                            metrics["_exporter_detected"] = True
+                            break
 
                     # Calculate disk percentages and get C: for main metric
                     disks_dict = {}  # {"C:": 94.2, "D:": 45.1}
