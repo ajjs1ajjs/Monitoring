@@ -1127,17 +1127,45 @@ async def update_server(
 async def delete_server(server_id: int, current_user: User = Depends(get_admin_user)):
     """Delete a monitored server and its historical metrics."""
     import sqlite3
+    from fastapi import Request
 
     db_path = os.getenv("DB_PATH", "pymon.db")
     conn = sqlite3.connect(db_path)
     try:
+        # Get server info first (host/port) to remove from ScrapeManager
+        server = conn.execute("SELECT host, agent_port FROM servers WHERE id = ?", (server_id,)).fetchone()
+        
+        # 1. Cleanup metrics history (important for foreign keys)
+        conn.execute("DELETE FROM metrics_history WHERE server_id = ?", (server_id,))
+        
+        # 2. Cleanup associated alerts
+        conn.execute("DELETE FROM alerts WHERE server_id = ?", (server_id,))
+        
+        # 3. Cleanup from metrics history (already done above, but emphasizing no other metrics tables exist)
+        
+        # 4. Finally delete the server
         cursor = conn.execute("DELETE FROM servers WHERE id = ?", (server_id,))
-        # Also cleanup metrics
-        conn.execute("DELETE FROM metrics WHERE labels LIKE ?", (f"%server_id={server_id}%",))
         conn.commit()
+
+        # 5. Remove from ScrapeManager if it exists
+        if server:
+            target_str = f"{server[0]}:{server[1]}"
+            try:
+                # Access scrape_manager via request.app.state if possible
+                # Or just use the global manager.scrape_manager if initialized
+                from pymon.api.endpoints import manager
+                if hasattr(manager, 'scrape_manager') and manager.scrape_manager:
+                    manager.scrape_manager.remove_target("agents", target_str)
+            except Exception as se:
+                print(f"ScrapeManager cleanup error: {se}")
+
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Server not found")
+        
         return {"status": "ok"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     finally:
         conn.close()
 
@@ -1174,7 +1202,7 @@ async def get_server_metrics_history(
 
         query = """
             SELECT
-                timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx
+                timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info
             FROM metrics_history
             WHERE server_id = ? AND timestamp > ?
             ORDER BY timestamp ASC
@@ -1192,6 +1220,7 @@ async def get_server_metrics_history(
                     "disk": round(r["disk_percent"] or 0, 1),
                     "net_rx": r["network_rx"] or 0,
                     "net_tx": r["network_tx"] or 0,
+                    "disk_info": json.loads(r["disk_info"]) if r["disk_info"] else None
                 }
             )
 

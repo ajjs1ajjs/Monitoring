@@ -1084,6 +1084,7 @@ sudo systemctl start prometheus-node-exporter</div>
         let currentRange = '1h';
         let nodes = [];
         let currentView = 'list';
+        let lastFetchedHistory = []; // Store history for detailed expansion
 
         function switchView(view) {
             currentView = view;
@@ -1661,8 +1662,17 @@ sudo systemctl start prometheus-node-exporter</div>
 
         async function deleteNode(id) {
             if (confirm('Permanently decommission this node?')) {
-                await apiFetch(`/api/v1/servers/${id}`, {method: 'DELETE'});
-                refreshData();
+                try {
+                    const resp = await apiFetch(`/api/v1/servers/${id}`, {method: 'DELETE'});
+                    if (resp && resp.ok) {
+                        refreshData();
+                    } else {
+                        const err = await resp.json();
+                        alert('Error: ' + (err.detail || 'Could not delete server'));
+                    }
+                } catch (err) {
+                    alert('Network error: ' + err);
+                }
             }
         }
 
@@ -2034,6 +2044,7 @@ function showDeployModal(id) {
                 if (!resp) return;
                 const data = await resp.json();
                 const history = data.history || [];
+                lastFetchedHistory = history; // Save for expandChart
 
                 const labels = history.map(h => new Date(h.timestamp).toLocaleTimeString());
                 const cpuData = history.map(h => h.cpu_avg !== undefined ? h.cpu_avg : h.cpu);
@@ -2090,20 +2101,90 @@ function showDeployModal(id) {
             
             if (expandedChart) expandedChart.destroy();
 
+            let datasets = [];
+            
+            if (type === 'disk' && lastFetchedHistory.length > 0 && lastFetchedHistory[0].disk_info) {
+                // Multi-line disk chart
+                const volumes = new Set();
+                lastFetchedHistory.forEach(h => {
+                    if (h.disk_info) {
+                        Object.keys(h.disk_info).forEach(v => {
+                            // Filter out noisy volumes (Windows & Linux)
+                            const vLower = v.toLowerCase();
+                            if (v.includes('HarddiskVolume') || 
+                                vLower.includes('/snap/') || 
+                                vLower.includes('docker') || 
+                                vLower.includes('kubelet') || 
+                                vLower.includes('tmpfs') || 
+                                vLower.includes('overlay') || 
+                                vLower.includes('shm') || 
+                                vLower.includes('/run/user/')) {
+                                return;
+                            }
+                            volumes.add(v);
+                        });
+                    }
+                });
+
+                const colors = ['#f97316', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+                let colorIdx = 0;
+
+                Array.from(volumes).sort().forEach(vol => {
+                    const data = lastFetchedHistory.map(h => (h.disk_info && h.disk_info[vol] !== undefined) ? h.disk_info[vol] : null);
+                    datasets.push({
+                        label: vol,
+                        data: data,
+                        borderColor: colors[colorIdx % colors.length],
+                        borderWidth: 3,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        fill: false
+                    });
+                    colorIdx++;
+                });
+            } else {
+                // Single line chart (CPU, RAM, Net or Aggregate Disk)
+                datasets = JSON.parse(JSON.stringify(sourceChart.data.datasets));
+                // Ensure label is descriptive
+                if (datasets.length > 0) datasets[0].label = type.toUpperCase();
+            }
+
             expandedChart = new Chart(ctx, {
                 type: 'line',
-                data: JSON.parse(JSON.stringify(sourceChart.data)), // Deep copy data
+                data: {
+                    labels: JSON.parse(JSON.stringify(sourceChart.data.labels)),
+                    datasets: datasets
+                },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: true, labels: { color: '#fff' } } },
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { 
+                        legend: { 
+                            display: true, 
+                            position: 'top',
+                            labels: { color: '#fff', usePointStyle: true, padding: 20 } 
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleColor: '#94a3b8',
+                            bodyColor: '#fff',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: true
+                        }
+                    },
                     scales: {
-                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', maxRotation: 0 } },
                         y: { 
                             beginAtZero: true, 
                             max: (type === 'net') ? undefined : 100,
                             grid: { color: 'rgba(255,255,255,0.1)' },
-                            ticks: { color: '#94a3b8' }
+                            ticks: { 
+                                color: '#94a3b8',
+                                callback: function(value) { return value + (type === 'net' ? ' MB' : '%'); }
+                            }
                         }
                     }
                 }
@@ -2139,8 +2220,9 @@ function showDeployModal(id) {
                             <span class="alert-title">${log.action}</span>
                             <span class="alert-time">${new Date(log.timestamp).toLocaleTimeString()}</span>
                         </div>
-                        <p class="alert-desc">${log.target}</p>
-                        <p style="font-size: 0.65rem; color: var(--text-muted); margin-top: 0.4rem;">By: ${log.username}</p>
+                        <p class="alert-desc" style="font-weight: 700; color: #fff; margin-bottom: 2px;">${log.target}</p>
+                        <p class="alert-desc" style="font-size: 0.75rem; opacity: 0.8;">${log.details || ''}</p>
+                        <p style="font-size: 0.65rem; color: var(--text-muted); margin-top: 0.5rem;">By: ${log.username}</p>
                     </div>
                 `).join('');
                 lucide.createIcons();

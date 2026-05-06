@@ -501,6 +501,10 @@ class ScrapeManager:
             config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
             notif_cfg = config.notifications
 
+            # Get server name
+            server = c.execute("SELECT name FROM servers WHERE id = ?", (server_id,)).fetchone()
+            server_name = server["name"] if server else f"ID {server_id}"
+
             for alert in alerts:
                 triggered = False
                 metric_val: float = 0.0
@@ -548,8 +552,8 @@ class ScrapeManager:
 
                     # Log to audit logs
                     c.execute(
-                        "INSERT INTO audit_logs (username, action, target, timestamp) VALUES (?, ?, ?, ?)",
-                        ("system", f"Alert Triggered: {alert['name']}", f"Server {server_id}", timestamp),
+                        "INSERT INTO audit_logs (username, action, target, details, timestamp) VALUES (?, ?, ?, ?, ?)",
+                        ("system", f"Alert Triggered: {alert['name']}", server_name, f"Value: {metric_val:.1f}% (Threshold: {alert['threshold']}%)", timestamp),
                     )
                     conn.commit()
 
@@ -614,8 +618,8 @@ class ScrapeManager:
 
             # Log to audit
             c.execute(
-                "INSERT INTO audit_logs (username, action, target, timestamp) VALUES (?, ?, ?, ?)",
-                ("system", "Exporter Down", f"{server_name} ({server_host})", timestamp),
+                "INSERT INTO audit_logs (username, action, target, details, timestamp) VALUES (?, ?, ?, ?, ?)",
+                ("system", "Exporter Down", f"{server_name}", f"Endpoint: {server_host} - Error: {error or 'unreachable'}", timestamp),
             )
             conn.commit()
             conn.close()
@@ -855,6 +859,10 @@ class ScrapeManager:
                                 mount_match = re.search(r'mountpoint="([^"]+)"', k)
                                 mount = mount_match.group(1) if mount_match else "unknown"
 
+                                # Filter out noisy Linux mountpoints (Snaps, Docker, temp filesystems)
+                                if any(noise in mount.lower() for noise in ['/snap/', 'docker', 'kubelet', 'tmpfs', 'overlay', 'shm', '/run/user/']):
+                                    continue
+
                                 total_fs = v
                                 # Шукаємо відповідний available
                                 avail_key = k.replace("size_bytes", "avail_bytes")
@@ -894,16 +902,28 @@ class ScrapeManager:
                     # Calculate disk percentages and get C: for main metric
                     disks_dict = {}  # {"C:": 94.2, "D:": 45.1}
                     c_drive_percent = 0
+                    filtered_disk_info = {}
+                    
                     for vol, info in disk_info.items():
+                        # Skip system/internal partitions (HarddiskVolume, Snap, Docker, etc)
+                        v_lower = vol.lower()
+                        if "HarddiskVolume" in vol or \
+                           any(noise in v_lower for noise in ['/snap/', 'docker', 'kubelet', 'tmpfs', 'overlay', 'shm', '/run/user/']):
+                            continue
+                        
                         if info["size"] > 0:
                             pct = 100 * (1 - info["free"] / info["size"])
                             info["percent"] = pct
                             disks_dict[vol] = round(pct, 1)
+                            filtered_disk_info[vol] = info
                             if "C:" in vol:
                                 c_drive_percent = pct
                                 metrics["windows_logical_disk_free_bytes"] = info["free"]
                                 metrics["windows_logical_disk_size_bytes"] = info["size"]
                                 print(f"DEBUG DISK: C: = {pct:.1f}% (size={info['size']}, free={info['free']})")
+
+                    # Use filtered info for publishing
+                    disk_info = filtered_disk_info
 
                     # Set the main disk metric for Windows
                     if c_drive_percent > 0:

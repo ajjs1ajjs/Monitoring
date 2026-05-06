@@ -150,8 +150,16 @@ def init_web_tables():
             username TEXT,
             action TEXT,
             target TEXT,
+            details TEXT,
             timestamp TEXT
         )""")
+
+        # Migration: Add details column if not exists
+        try:
+            c.execute("ALTER TABLE audit_logs ADD COLUMN details TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Already exists
 
         c.execute("""CREATE TABLE IF NOT EXISTS notifications (
             channel TEXT UNIQUE NOT NULL,
