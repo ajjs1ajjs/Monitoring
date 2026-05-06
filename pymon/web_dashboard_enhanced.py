@@ -1238,31 +1238,31 @@ sudo systemctl start prometheus-node-exporter</textarea>
 
                                     return diskArray.map(d => {
                                         const pct = d.percent || 0;
-                                        return \`
+                                        return `
                                             <div style="display:flex; align-items:center; gap:0.75rem;">
-                                                <span style="min-width:2.5rem; font-size:0.75rem; font-weight:700; color:#fff;">\${d.volume || '?'}</span>
+                                                <span style="min-width:2.5rem; font-size:0.75rem; font-weight:700; color:#fff;">${d.volume || '?'}</span>
                                                 <div class="progress-container" style="height:6px; background:rgba(0,0,0,0.2);">
-                                                    <div class="progress-bar-fill" style="width:\${pct}%; background:\${pct > 90 ? 'var(--danger)' : (pct > 75 ? 'var(--warning)' : '#3b82f6')}; height:100%;"></div>
+                                                    <div class="progress-bar-fill" style="width:${pct}%; background:${pct > 90 ? 'var(--danger)' : (pct > 75 ? 'var(--warning)' : '#3b82f6')}; height:100%;"></div>
                                                 </div>
-                                                <span style="min-width:2.2rem; text-align:right; font-size:0.75rem; color:var(--text-muted); font-weight:600;">\${pct.toFixed(0)}%</span>
-                                            </div>\`;
+                                                <span style="min-width:2.2rem; text-align:right; font-size:0.75rem; color:var(--text-muted); font-weight:600;">${pct.toFixed(0)}%</span>
+                                            </div>`;
                                     }).join('');
                                 } catch(e) {
                                     const p = n.disk_percent || 0;
-                                    return \`
+                                    return `
                                         <div style="display:flex; align-items:center; gap:0.75rem;">
                                             <span style="min-width:2.5rem; font-size:0.75rem; font-weight:700; color:#fff;">All</span>
                                             <div class="progress-container" style="height:6px; background:rgba(0,0,0,0.2);">
-                                                <div class="progress-bar-fill" style="width:\${p}%; background:#3b82f6; height:100%;"></div>
+                                                <div class="progress-bar-fill" style="width:${p}%; background:#3b82f6; height:100%;"></div>
                                             </div>
-                                            <span style="min-width:2.2rem; text-align:right; font-size:0.75rem; color:var(--text-muted); font-weight:600;">\${p.toFixed(0)}%</span>
-                                        </div>\`;
+                                            <span style="min-width:2.2rem; text-align:right; font-size:0.75rem; color:var(--text-muted); font-weight:600;">${p.toFixed(0)}%</span>
+                                        </div>`;
                                 }
                             })()}
                         </div>
                     </td>
                 </tr>
-            \`).join('');
+            `).join('');
 
             if (overviewBody) {
                 overviewBody.innerHTML = html;
