@@ -193,20 +193,13 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .refresh-btn { background: #080c14; border: 1px solid var(--border); border-radius: 0.75rem; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
         .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-        .content-scroll { flex: 1; overflow-x: auto; overflow-y: hidden; display: flex; flex-direction: row; gap: 2rem; padding: 2rem; align-items: flex-start; scroll-behavior: smooth; }
-        .content-scroll::-webkit-scrollbar { height: 8px; }
+        .content-scroll { flex: 1; overflow-y: auto; padding: 2.5rem; scroll-behavior: smooth; }
+        .content-scroll::-webkit-scrollbar { width: 6px; }
         .content-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 
         /* Dashboard Components */
-        .dashboard-section { display: flex; flex-direction: column; width: 450px; height: 100%; flex-shrink: 0; animation: none; overflow-y: auto; overflow-x: hidden; padding-right: 0.5rem; } 
-        .dashboard-section::-webkit-scrollbar { width: 4px; } 
-        .dashboard-section::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-        
-        /* Specific widths for sections */
-        #section-overview { width: 850px; }
-        #section-nodes { width: 500px; }
-        #section-alerts { width: 500px; }
-
+        .dashboard-section { display: none; animation: fadeIn 0.3s ease-out; }
+        .dashboard-section.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
         .card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.5rem; box-shadow: var(--card-shadow); display: flex; flex-direction: column; overflow: hidden; transition: transform 0.2s, border-color 0.2s; }
@@ -295,11 +288,53 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
     </style></head>
 <body>
     <div class="app-container">
+        <!-- Sidebar -->
+        <aside>
+            <div class="sidebar-header">
+                <i data-lucide="shield-check"></i>
+                <h1>PyMon<span>NOC</span></h1>
+            </div>
+
+            <nav class="nav-section">
+                <div class="nav-label">Monitoring</div>
+                <button class="nav-item active" data-section="overview">
+                    <i data-lucide="layout-dashboard"></i> Dashboard
+                </button>
+                <button class="nav-item" data-section="nodes">
+                    <i data-lucide="server"></i> Infrastructure
+                </button>
+                <button class="nav-item" data-section="alerts">
+                    <i data-lucide="bell-ring"></i> Alerting
+                </button>
+
+                <div class="nav-label">Support</div>
+                <button class="nav-item" data-section="help">
+                    <i data-lucide="help-circle"></i> Help & Agents
+                </button>
+                <div class="nav-label">Management</div>
+                <button class="nav-item" data-section="logs">
+                    <i data-lucide="list"></i> Audit Logs
+                </button>
+                <button class="nav-item" data-section="users">
+                    <i data-lucide="users"></i> Users
+                </button>
+                <button class="nav-item" data-section="settings">
+                    <i data-lucide="settings"></i> Configuration
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">
+                    <i data-lucide="log-out"></i> End Session
+                </button>
+            </div>
+        </aside>
+
         <!-- Main Content -->
         <main>
             <header>
                 <div class="header-left">
-                    <h2 id="viewTitle">PyMon NOC <span style="color: var(--accent); font-size: 0.8rem; margin-left: 0.5rem;">GLOBAL VIEW</span></h2>
+                    <h2 id="viewTitle">Overview</h2>
                 </div>
                 <div class="header-actions">
                     <span id="updateTimer" style="font-size: 0.7rem; color: var(--text-muted); font-family: monospace;">Syncing...</span>
@@ -323,6 +358,206 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             </header>
 
             <div class="content-scroll">
+                <!-- Section: Overview -->
+                <div id="section-overview" class="dashboard-section active">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Overview <span>Monitoring</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Аналіз продуктивності та статус інфраструктури</p>
+                        </div>
+                        <div class="overview-controls">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Сервер:</span>
+                                <select id="overviewNodeSelect" class="server-select" onchange="updateOverviewCharts()">
+                                    <option value="agg">Усі сервери (Агреговано)</option>
+                                </select>
+                        </div>
+                    </div>
+
+                    <div id="activeNodePanel" class="active-node-panel">
+                        <div style="background: rgba(249, 115, 22, 0.1); padding: 1rem; border-radius: 1rem; border: 1px solid rgba(249, 115, 22, 0.2);">
+                            <i data-lucide="server" class="text-accent" style="width: 24px; height: 24px;"></i>
+                        </div>
+                        <div class="node-info-item">
+                            <span class="node-info-label">Поточний сервер</span>
+                            <span id="activeNodeName" class="node-info-value">-</span>
+                        </div>
+                        <div class="node-info-item">
+                            <span class="node-info-label">Адреса вузла</span>
+                            <span id="activeNodeHost" class="node-info-value">-</span>
+                        </div>
+                        <div class="node-info-item">
+                            <span class="node-info-label">Операційна система</span>
+                            <span id="activeNodeOS" class="node-info-value">-</span>
+                        </div>
+                        <div class="node-info-item" style="margin-left: auto; text-align: right;">
+                            <span class="node-info-label">Останній статус</span>
+                            <div id="activeNodeStatusBadge"></div>
+                        </div>
+                    </div>
+
+                    <div class="overview-grid">
+                        <div class="charts-main">
+                            <div class="charts-container">
+                                <div class="chart-card">
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="cpu" class="text-accent" style="width: 16px; height: 16px;"></i>
+                                            Використання CPU (%)
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('cpu')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="cpuOverviewChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="chart-card">
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="database" class="text-success" style="width: 16px; height: 16px;"></i>
+                                            Використання RAM (%)
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('ram')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="ramOverviewChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="chart-card">
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="hard-drive" class="text-warning" style="width: 16px; height: 16px;"></i>
+                                            Використання диска (%)
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('disk')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="diskOverviewChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="chart-card">
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="activity" class="text-accent" style="width: 16px; height: 16px;"></i>
+                                            Мережева активність та трафік
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('net')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="netOverviewChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="timeline-card" style="margin-top: 1.5rem;">
+                                <div class="card-header" style="background: rgba(0,0,0,0.1);">
+                                    <h3>Історичні дані та події (Timeline Details)</h3>
+                                    <span id="timelineSyncTime" style="font-size: 0.7rem; color: var(--text-muted);"></span>
+                                </div>
+                                <div class="card-body" style="padding: 0;">
+                                    <table id="timelineTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Timestamp</th>
+                                                <th>Server</th>
+                                                <th>CPU</th>
+                                                <th>RAM</th>
+                                                <th>Disk</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="timelineTableBody">
+                                            <!-- Real-time timeline data -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alerts-sidebar">
+                            <div class="card" style="height: 100%;">
+                                <div class="card-header">
+                                    <h3>Recent Alerts & Events</h3>
+                                    <button class="refresh-btn" style="width: 24px; height: 24px;" onclick="loadRecentAlerts()"><i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i></button>
+                                </div>
+                                <div class="card-body" style="padding: 1rem;" id="recentAlertsFeed">
+                                    <!-- Alerts will be populated here -->
+                                    <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                        <i data-lucide="shield-check" style="width: 48px; height: 48px; margin: 0 auto 1rem; opacity: 0.2;"></i>
+                                        <p>Жодних активних сповіщень</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Nodes -->
+                <div id="section-nodes" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Infrastructure <span>Inventory</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Керування підключеними вузлами та джерелами даних</p>
+                        </div>
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <div class="search-box">
+                                <i data-lucide="search" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                                <input type="search" id="nodeSearch" placeholder="Пошук вузлів..." oninput="filterNodes()" autocomplete="off" spellcheck="false" class="server-select" style="min-width: 250px;">
+                            </div>
+                            <button onclick="toggleModal('addNodeModal', true)" class="btn btn-primary" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                                <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Add Node
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="timeline-card">
+                        <div class="card-body" style="padding: 0;">
+                            <table style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 120px;">Статус</th>
+                                        <th>Ідентифікатор вузла</th>
+                                        <th>Endpoint</th>
+                                        <th>CPU</th>
+                                        <th>RAM</th>
+                                        <th>Disk</th>
+                                        <th style="text-align: right;">Дії</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="nodesTableBody">
+                                    <!-- Dynamic Content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Alerts -->
+                <div id="section-alerts" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Alerting <span>Rules</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Налаштування логіки сповіщень та порогових значень</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="toggleModal('addAlertModal', true)" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                            <i data-lucide="bell-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Create Rule
+                        </button>
+                    </div>
+                    <div class="stats-grid" id="alertRulesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem;">
+                        <!-- Dynamic Alerts -->
+                    </div>
+                </div>
+
+
+
                 <!-- Section: Users -->
                 <div id="section-users" class="dashboard-section">
                     <div class="overview-header">
@@ -354,6 +589,66 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     </div>
                 </div>
 
+                <!-- Section: Help & Agents -->
+                <div id="section-help" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Help <span>& Agents</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Інструкції з розгортання агентів моніторингу</p>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <!-- Linux Agent -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: var(--success);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(34, 197, 94, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="terminal" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Linux node_exporter</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Стандартний агент Prometheus для систем Linux/Unix.</p>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Команда встановлення (Debian/Ubuntu)</label>
+                                    <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #34d399; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">sudo apt update && sudo apt install -y prometheus-node-exporter
+sudo systemctl enable prometheus-node-exporter
+sudo systemctl start prometheus-node-exporter</div>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Ручне завантаження</label>
+                                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Завантажити з <a href="https://github.com/prometheus/node_exporter/releases" target="_blank" style="color: var(--accent); font-weight: 600;">GitHub Releases</a></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Windows Agent -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: #3b82f6;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="monitor" style="color: #3b82f6; width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Windows Exporter</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Найкращий агент для моніторингу систем Windows Server.</p>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">PowerShell (від імені Адміністратора)</label>
+                                    <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #60a5fa; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.30.9/windows_exporter-0.30.9-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system"</div>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Порт агента</label>
+                                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">За замовчуванням: <strong style="color: white;">9182</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Section: Logs -->
                 <div id="section-logs" class="dashboard-section">
                     <div class="overview-header">
@@ -376,113 +671,23 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                             <!-- Log stream -->
                         </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
                         <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--accent);">
                             <div style="font-size: 1.5rem; font-weight: 700; color: white;" id="logTotalCount">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Total</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Total Events</div>
                         </div>
                         <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--danger);">
                             <div style="font-size: 1.5rem; font-weight: 700; color: var(--danger);" id="logAlertCount">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Alerts</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Alerts Fired</div>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Section: Help -->
-                <div id="section-help" class="dashboard-section">
-                    <div class="overview-header">
-                        <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">Help <span>& Agents</span></h2>
-                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Інструкції з розгортання агентів</p>
+                        <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--success);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);" id="logServerCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Server Actions</div>
                         </div>
-                    </div>
-                    <div class="card" style="margin-bottom: 1.5rem;">
-                        <div class="card-header" style="border-bottom-color: var(--success);">
-                            <h3>Linux node_exporter</h3>
+                        <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid #3b82f6;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;" id="logLoginCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Logins</div>
                         </div>
-                        <div class="card-body">
-                            <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; font-family: monospace; font-size: 0.75rem; color: #34d399; white-space: pre-wrap;">sudo apt update && sudo apt install -y prometheus-node-exporter</div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-header" style="border-bottom-color: #3b82f6;">
-                            <h3>Windows Exporter</h3>
-                        </div>
-                        <div class="card-body">
-                            <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; font-family: monospace; font-size: 0.75rem; color: #60a5fa; white-space: pre-wrap;">msiexec /i windows_exporter.msi</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Section: Nodes -->
-                <div id="section-nodes" class="dashboard-section">
-                    <div class="overview-header">
-                        <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">Infrastructure <span>Inventory</span></h2>
-                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Всі підключені вузли</p>
-                        </div>
-                        <button onclick="toggleModal('addNodeModal', true)" class="btn btn-primary" style="padding: 0.6rem 1rem;">
-                            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
-                        </button>
-                    </div>
-                    <div id="nodeListGrid" style="display: flex; flex-direction: column; gap: 1rem;">
-                        <!-- Nodes dynamic -->
-                    </div>
-                </div>
-
-                <!-- Section: Overview -->
-                <div id="section-overview" class="dashboard-section">
-                    <div class="overview-header">
-                        <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">Global <span>Metrics</span></h2>
-                        </div>
-                        <select id="overviewNodeSelect" class="server-select" onchange="updateOverviewCharts()" style="min-width: 150px;">
-                            <option value="agg">Усі сервери</option>
-                        </select>
-                    </div>
-
-                    <div id="activeNodePanel" class="active-node-panel">
-                        <div class="node-info-item">
-                            <span class="node-info-label">Server</span>
-                            <span id="activeNodeName" class="node-info-value">-</span>
-                        </div>
-                        <div id="activeNodeStatusBadge" style="margin-left: auto;"></div>
-                    </div>
-
-                    <div class="charts-main">
-                        <div class="charts-container">
-                            <div class="chart-card">
-                                <div class="chart-header-row"><div class="chart-title">CPU (%)</div></div>
-                                <div class="chart-canvas-wrapper"><canvas id="cpuOverviewChart"></canvas></div>
-                            </div>
-                            <div class="chart-card">
-                                <div class="chart-header-row"><div class="chart-title">RAM (%)</div></div>
-                                <div class="chart-canvas-wrapper"><canvas id="ramOverviewChart"></canvas></div>
-                            </div>
-                            <div class="chart-card">
-                                <div class="chart-header-row"><div class="chart-title">Disk (%)</div></div>
-                                <div class="chart-canvas-wrapper"><canvas id="diskOverviewChart"></canvas></div>
-                            </div>
-                            <div class="chart-card">
-                                <div class="chart-header-row"><div class="chart-title">Network</div></div>
-                                <div class="chart-canvas-wrapper"><canvas id="netOverviewChart"></canvas></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Section: Alerts -->
-                <div id="section-alerts" class="dashboard-section">
-                    <div class="overview-header">
-                        <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">Alerting <span>Rules</span></h2>
-                        </div>
-                        <button class="btn btn-primary" onclick="toggleModal('addAlertModal', true)">
-                            <i data-lucide="bell-plus" style="width: 14px; height: 14px;"></i>
-                        </button>
-                    </div>
-                    <div id="alertRulesGrid" style="display: flex; flex-direction: column; gap: 1rem;">
-                        <!-- Alerts dynamic -->
                     </div>
                 </div>
 
@@ -490,25 +695,162 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <div id="section-settings" class="dashboard-section">
                     <div class="overview-header">
                         <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">System <span>Config</span></h2>
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">System <span>Configuration</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Глобальні налаштування системи та каналів сповіщень</p>
                         </div>
                     </div>
-                    <div class="card" style="margin-bottom: 1.5rem;">
-                        <div class="card-header"><h3>System Info</h3></div>
-                        <div class="card-body" style="font-size: 0.8rem;">
-                            <div style="display: flex; justify-content: space-between; padding: 0.4rem 0;">
-                                <span style="color: var(--text-muted);">Status</span>
-                                <span style="color: var(--success);">ONLINE</span>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+                        <!-- Notification Channels -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: var(--accent);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(249, 115, 22, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="bell-ring" style="color: var(--accent); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Notification Channels</h3>
+                                </div>
+                                <div class="status-badge" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">
+                                    <input type="checkbox" id="notifEnabled" checked style="width: 14px; height: 14px; margin-right: 0.5rem; vertical-align: middle;"> Active
+                                </div>
                             </div>
-                            <div style="display: flex; justify-content: space-between; padding: 0.4rem 0;">
-                                <span style="color: var(--text-muted);">Nodes</span>
-                                <span id="settingsNodeCount">-</span>
+                            <div class="card-body">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                                    <div class="form-group">
+                                        <label>Telegram Bot Token</label>
+                                        <input type="password" id="tgToken" class="form-input" placeholder="712345678:AA...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Telegram Chat ID</label>
+                                        <input type="text" id="tgChat" class="form-input" placeholder="-100...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Discord Webhook</label>
+                                        <input type="password" id="dsWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>MS Teams Webhook</label>
+                                        <input type="password" id="tmWebhook" class="form-input" placeholder="https://outlook.office.com/webhook/...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP Server</label>
+                                        <input type="text" id="smtpServer" class="form-input" placeholder="smtp.gmail.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP Port</label>
+                                        <input type="number" id="smtpPort" class="form-input" value="587">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP User</label>
+                                        <input type="text" id="smtpUser" class="form-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP Password</label>
+                                        <input type="password" id="smtpPass" class="form-input">
+                                    </div>
+                                    <div class="form-group" style="grid-column: span 2;">
+                                        <label>Recipient Email</label>
+                                        <input type="email" id="emailTo" class="form-input" placeholder="admin@example.com">
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                    <button class="btn btn-primary" style="flex: 1; font-weight: 700;" onclick="saveSettings()">Save Configuration</button>
+                                    <button class="btn btn-secondary" style="flex: 1; font-weight: 700;" onclick="testNotification()">
+                                        <i data-lucide="send" style="width: 14px; height: 14px; margin-right: 0.25rem;"></i> Test
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Scrape & System Settings -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: #3b82f6;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="settings-2" style="color: #3b82f6; width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>System Configuration</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label>Default Scrape Interval (seconds)</label>
+                                    <input type="number" id="scrapeInterval" class="form-input" value="15" min="5" max="300">
+                                </div>
+                                <div class="form-group">
+                                    <label>Data Retention (days)</label>
+                                    <input type="number" id="dataRetention" class="form-input" value="30" min="1" max="365">
+                                </div>
+                                <div class="form-group">
+                                    <label>Default Node Port (Linux)</label>
+                                    <input type="number" id="defaultPortLinux" class="form-input" value="9100">
+                                </div>
+                                <div class="form-group">
+                                    <label>Default Node Port (Windows)</label>
+                                    <input type="number" id="defaultPortWindows" class="form-input" value="9182">
+                                </div>
+                                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSystemSettings()">Save System Config</button>
+                            </div>
+                        </div>
+
+                        <!-- System Info -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: var(--success);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(34, 197, 94, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="info" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>System Information</h3>
+                                </div>
+                            </div>
+                            <div class="card-body" style="font-size: 0.85rem;">
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Version</span>
+                                    <span style="color: white; font-weight: 600;">PyMon v1.0.0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Database</span>
+                                    <span style="color: white;">SQLite</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">API Port</span>
+                                    <span style="color: white;">10000</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Active Nodes</span>
+                                    <span style="color: var(--success); font-weight: 600;" id="settingsNodeCount">-</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Online Nodes</span>
+                                    <span style="color: var(--success); font-weight: 600;" id="settingsOnlineCount">-</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                                    <span style="color: var(--text-muted);">Uptime</span>
+                                    <span style="color: white;" id="settingsUptime">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Danger Zone -->
+                        <div class="card" style="border: 1px solid rgba(239, 68, 68, 0.2);">
+                            <div class="card-header" style="border-bottom-color: var(--danger);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="alert-triangle" style="color: var(--danger); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Danger Zone</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">These actions are irreversible. Proceed with caution.</p>
+                                <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); margin-bottom: 0.5rem;" onclick="if(confirm('Clear all audit logs?')) clearAuditLogs()">
+                                    <i data-lucide="trash" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Clear Audit Logs
+                                </button>
+                                <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="if(confirm('Clear ALL metric history? This cannot be undone!')) clearMetricHistory()">
+                                    <i data-lucide="database" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Clear Metric History
+                                </button>
                             </div>
                         </div>
                     </div>
-                    <button class="btn btn-secondary" style="width: 100%;" onclick="loadSettings()">
-                        <i data-lucide="refresh-cw" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Reload Settings
-                    </button>
                 </div>
             </div>
         </main>
@@ -801,10 +1143,22 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         }
 
         function showSection(section) {
-            const el = document.getElementById('section-' + section);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-            }
+            document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
+            document.getElementById('section-' + section).classList.add('active');
+
+            document.querySelectorAll('.nav-item').forEach(i => {
+                i.classList.toggle('active', i.dataset.section === section);
+            });
+
+            document.getElementById('viewTitle').textContent = {
+                'overview': 'Dashboard', 'nodes': 'Infrastructure', 'alerts': 'Alerting',
+                'help': 'Help & Agents', 'logs': 'Audit Logs', 'users': 'Users', 'settings': 'Configuration'
+            }[section] || section.charAt(0).toUpperCase() + section.slice(1);
+
+            if (section === 'logs') loadAuditLogs();
+            if (section === 'alerts') loadAlertRules();
+            if (section === 'settings') loadSettings();
+            if (section === 'users') loadUsers();
         }
 
         
@@ -1655,9 +2009,9 @@ function showDeployModal(id) {
                 }
             }
 
-            let url = `/api/v1/metrics/trend?range=${currentRange}`;
+            let url = '/api/v1/metrics/trend';
             if (serverId !== 'agg') {
-                url = `/api/v1/metrics/history/${serverId}?range=${currentRange}`;
+                url = `/api/v1/metrics/history/${serverId}`;
             }
 
             try {
@@ -1824,11 +2178,6 @@ function showDeployModal(id) {
         // Initialization
         refreshData();
         initOverviewCharts();
-        loadAuditLogs();
-        loadAlertRules();
-        loadSettings();
-        loadUsers();
-        
         setInterval(refreshData, 15000);
         setInterval(() => {
             updateOverviewCharts();
