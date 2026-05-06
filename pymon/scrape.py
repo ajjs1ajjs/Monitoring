@@ -86,11 +86,11 @@ class ScrapeManager:
         if result.success:
             self.scrape_success.inc()
             self.up_gauge.set(1, labels)
-            self._update_server_status(target.target, result.metrics or {}, True, server_id=target.server_id)
+            await self._update_server_status(target.target, result.metrics or {}, True, server_id=target.server_id)
         else:
             self.scrape_failures.inc()
             self.up_gauge.set(0, labels)
-            self._update_server_status(target.target, {}, False, result.error, server_id=target.server_id)
+            await self._update_server_status(target.target, {}, False, result.error, server_id=target.server_id)
 
         self.response_time.set(result.latency_ms / 1000, labels)
         return result
@@ -313,7 +313,7 @@ class ScrapeManager:
 
         return metrics
 
-    def _update_server_status(
+    async def _update_server_status(
         self, target: str, metrics: dict, success: bool, error: str = "", server_id: Optional[int] = None
     ):
         import os
@@ -464,9 +464,7 @@ class ScrapeManager:
                 # Phase 2.15: Check alerts for this server
                 if success:
                     try:
-                        import asyncio
-
-                        asyncio.run(self._check_alerts(sid, cpu, memory, disk, now))
+                        await self._check_alerts(sid, cpu, memory, disk, now)
                         # Clear down state if it was previously down
                         self._down_alerted.discard(sid)
                     except Exception as ae:
@@ -476,9 +474,7 @@ class ScrapeManager:
                     try:
                         if sid not in self._down_alerted:
                             self._down_alerted.add(sid)
-                            import asyncio
-
-                            asyncio.run(self._fire_exporter_down_alert(sid, target, error, now))
+                            await self._fire_exporter_down_alert(sid, target, error, now)
                     except Exception as ae:
                         print(f"Exporter Down alert failed: {ae}")
 
@@ -922,13 +918,13 @@ class ScrapeManager:
                     except Exception as e:
                         print(f"[DEBUG] failed to publish per-disk metric: {e}")
 
-                    self._update_server_status(target.target, metrics, True, server_id=target.server_id)
+                    asyncio.run(self._update_server_status(target.target, metrics, True, server_id=target.server_id))
                 else:
                     self.scrape_failures.inc()
                     self.up_gauge.set(0, labels)
-                    self._update_server_status(
+                    asyncio.run(self._update_server_status(
                         target.target, {}, False, f"HTTP {response.status_code}", server_id=target.server_id
-                    )
+                    ))
                     print(f"Scrape failed: {target.target} - HTTP {response.status_code}")
 
                 self.response_time.set(latency_ms / 1000, labels)
@@ -936,14 +932,14 @@ class ScrapeManager:
             except httpx.TimeoutException:
                 self.scrape_failures.inc()
                 print(f"Scrape timeout: {target.target}")
-                self._update_server_status(target.target, {}, False, "timeout", server_id=target.server_id)
+                asyncio.run(self._update_server_status(target.target, {}, False, "timeout", server_id=target.server_id))
             except httpx.ConnectError:
                 self.scrape_failures.inc()
                 print(f"Scrape connection refused: {target.target}")
-                self._update_server_status(target.target, {}, False, "connection_refused", server_id=target.server_id)
+                asyncio.run(self._update_server_status(target.target, {}, False, "connection_refused", server_id=target.server_id))
             except Exception as e:
                 print(f"Scrape error for {target.target}: {e}")
-                self._update_server_status(target.target, {}, False, str(e), server_id=target.server_id)
+                asyncio.run(self._update_server_status(target.target, {}, False, str(e), server_id=target.server_id))
 
             time.sleep(target.interval)
 
