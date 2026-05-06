@@ -234,6 +234,23 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .drawer-overlay.active .drawer { transform: translateX(0); }
         .drawer-header { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
         .drawer-body { padding: 2rem; flex: 1; overflow-y: auto; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 200; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+        .modal-overlay.active { display: flex; opacity: 1; }
+        .modal { background: #0f172a; border: 1px solid var(--border); border-radius: 1.5rem; width: 500px; max-width: 90vw; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .modal-header { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { font-size: 1.1rem; color: #fff; }
+        .modal-body { padding: 2rem; }
+        .modal-footer { padding: 1.25rem 2rem; background: rgba(0,0,0,0.1); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem; }
+        
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label { display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; font-weight: 700; }
+        .form-input { width: 100%; background: #080c14; border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 0.75rem; color: white; font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+        .form-input:focus { border-color: var(--accent); }
+        
+        .btn { padding: 0.6rem 1.5rem; border-radius: 0.75rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     </style></head>
 <body>
     <div class="app-container">

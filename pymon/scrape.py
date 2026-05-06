@@ -3,6 +3,8 @@
 import asyncio
 import json
 import time
+import os
+import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
@@ -316,9 +318,6 @@ class ScrapeManager:
     async def _update_server_status(
         self, target: str, metrics: dict, success: bool, error: str = "", server_id: Optional[int] = None
     ):
-        import os
-        import sqlite3
-
         try:
             db_path = os.getenv("DB_PATH", "pymon.db")
             conn = sqlite3.connect(db_path, timeout=5)
@@ -484,9 +483,6 @@ class ScrapeManager:
 
     async def _check_alerts(self, server_id: int, cpu: float, memory: float, disk: float, timestamp: str):
         """Check active alert rules for the server and dispatch notifications."""
-        import os
-        import sqlite3
-
         from pymon.notifications import dispatcher
 
         try:
@@ -857,8 +853,6 @@ class ScrapeManager:
 
                     # Broadcast update via WebSocket
                     try:
-                        import asyncio
-
                         from pymon.api.endpoints import manager
 
                         if hasattr(manager, "loop") and manager.loop:

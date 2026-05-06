@@ -102,7 +102,7 @@ def init_auth_tables():
     if not c.fetchone():
         password_hash = hash_password(auth_config.admin_password)
         c.execute(
-            "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) VALUES (?, ?, 1, 1, ?)",
+            "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) VALUES (?, ?, 1, 0, ?)",
             (auth_config.admin_username, password_hash, datetime.now(timezone.utc).isoformat()),
         )
         print(f"Created default user: {auth_config.admin_username}")
