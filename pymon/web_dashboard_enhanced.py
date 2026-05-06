@@ -371,6 +371,20 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 <select id="overviewNodeSelect" class="server-select" onchange="updateOverviewCharts()">
                                     <option value="agg">Усі сервери (Агреговано)</option>
                                 </select>
+                            </div>
+                            <div class="range-selector">
+                        <button class="range-btn" data-range="5m">5хв</button>
+                        <button class="range-btn" data-range="30m">30хв</button>
+                        <button class="range-btn active" data-range="1h">1 год</button>
+                        <button class="range-btn" data-range="6h">6 год</button>
+                        <button class="range-btn" data-range="12h">12 год</button>
+                        <button class="range-btn" data-range="24h">24 год</button>
+                        <button class="range-btn" data-range="3d">3 дні</button>
+                        <button class="range-btn" data-range="7d">7 днів</button>
+                        <button class="range-btn" data-range="15d">15 днів</button>
+                        <button class="range-btn" data-range="30d">30 днів</button>
+                        <button class="range-btn custom-btn" data-range="custom" onclick="promptCustomRange(this)">Власна...</button>
+                    </div>
                         </div>
                     </div>
 
@@ -2009,9 +2023,9 @@ function showDeployModal(id) {
                 }
             }
 
-            let url = '/api/v1/metrics/trend';
+            let url = `/api/v1/metrics/trend?range=${currentRange}`;
             if (serverId !== 'agg') {
-                url = `/api/v1/metrics/history/${serverId}`;
+                url = `/api/v1/metrics/history/${serverId}?range=${currentRange}`;
             }
 
             try {
