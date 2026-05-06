@@ -250,6 +250,20 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .text-success { color: var(--success); }
         .text-danger { color: var(--danger); }
 
+        /* Timeline Table Modernization */
+        .timeline-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.25rem; overflow: hidden; box-shadow: var(--card-shadow); }
+        .timeline-table { width: 100%; border-collapse: collapse; }
+        .timeline-table th { text-align: left; padding: 1.25rem 1.5rem; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.15); }
+        .timeline-table td { padding: 1.25rem 1.5rem; font-size: 0.85rem; border-bottom: 1px solid var(--border); vertical-align: middle; transition: background 0.2s; }
+        .timeline-table tr:last-child td { border-bottom: none; }
+        .timeline-table tr:hover td { background: rgba(255,255,255,0.02); }
+        
+        .timeline-time { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted); }
+        .timeline-server { font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.6rem; }
+        .timeline-metric { font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+        .status-dot.pulse { display: inline-block; width: 6px; height: 6px; background: var(--success); border-radius: 50%; margin-right: 6px; box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
         /* Expanded Chart Modal */
         #chartExpandModal .modal { width: 900px; max-width: 95vw; }
         #expandedChartContainer { height: 450px; width: 100%; position: relative; }
@@ -372,19 +386,6 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                     <option value="agg">Усі сервери (Агреговано)</option>
                                 </select>
                             </div>
-                            <div class="range-selector">
-                        <button class="range-btn" data-range="5m">5хв</button>
-                        <button class="range-btn" data-range="30m">30хв</button>
-                        <button class="range-btn active" data-range="1h">1 год</button>
-                        <button class="range-btn" data-range="6h">6 год</button>
-                        <button class="range-btn" data-range="12h">12 год</button>
-                        <button class="range-btn" data-range="24h">24 год</button>
-                        <button class="range-btn" data-range="3d">3 дні</button>
-                        <button class="range-btn" data-range="7d">7 днів</button>
-                        <button class="range-btn" data-range="15d">15 днів</button>
-                        <button class="range-btn" data-range="30d">30 днів</button>
-                        <button class="range-btn custom-btn" data-range="custom" onclick="promptCustomRange(this)">Власна...</button>
-                    </div>
                         </div>
                     </div>
 
@@ -477,7 +478,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                     <span id="timelineSyncTime" style="font-size: 0.7rem; color: var(--text-muted);"></span>
                                 </div>
                                 <div class="card-body" style="padding: 0;">
-                                    <table id="timelineTable">
+                                    <table class="timeline-table">
                                         <thead>
                                             <tr>
                                                 <th>Timestamp</th>
@@ -534,7 +535,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
                     <div class="timeline-card">
                         <div class="card-body" style="padding: 0;">
-                            <table style="width: 100%;">
+                            <table class="timeline-table">
                                 <thead>
                                     <tr>
                                         <th style="width: 120px;">Статус</th>
@@ -585,7 +586,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                     </div>
                     <div class="timeline-card">
                         <div class="card-body" style="padding: 0;">
-                            <table style="width: 100%;">
+                            <table class="timeline-table">
                                 <thead>
                                     <tr>
                                         <th>Користувач</th>
@@ -680,8 +681,8 @@ sudo systemctl start prometheus-node-exporter</div>
                             </button>
                         </div>
                     </div>
-                    <div class="card" style="height: 550px;">
-                        <div class="card-body" id="auditLogStream" style="overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">
+                    <div class="card" style="height: 550px; border: 1px solid var(--border);">
+                        <div class="card-body" id="auditLogStream" style="overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; padding: 1.5rem; line-height: 1.6;">
                             <!-- Log stream -->
                         </div>
                     </div>
@@ -1958,7 +1959,7 @@ function showDeployModal(id) {
                             gradient.addColorStop(1, color.replace('1)', '0.0)'));
                             return gradient;
                         },
-                        borderWidth: 3,
+                        borderWidth: 4,
                         fill: true,
                         tension: 0.4,
                         pointRadius: 0,
@@ -2157,15 +2158,20 @@ function showDeployModal(id) {
             
             tbody.innerHTML = sorted.map(n => `
                 <tr>
-                    <td style="font-family: 'JetBrains Mono'; font-size: 0.75rem; color: var(--text-muted);">${new Date(n.last_check).toLocaleTimeString()}</td>
-                    <td style="font-weight: 700; color: #fff;">${n.name}</td>
-                    <td><span class="text-accent">${(n.cpu_percent || 0).toFixed(1)}%</span></td>
-                    <td><span class="text-success">${(n.memory_percent || 0).toFixed(1)}%</span></td>
-                    <td><span class="text-warning">${(n.disk_percent || 0).toFixed(1)}%</span></td>
+                    <td><span class="timeline-time">${new Date(n.last_check).toLocaleTimeString()}</span></td>
+                    <td>
+                        <div class="timeline-server">
+                            <i data-lucide="${n.os?.toLowerCase().includes('win') ? 'monitor' : 'terminal'}" style="width: 14px; height: 14px; opacity: 0.5;"></i>
+                            ${n.name}
+                        </div>
+                    </td>
+                    <td><span class="timeline-metric text-accent">${(n.cpu_percent || 0).toFixed(1)}%</span></td>
+                    <td><span class="timeline-metric text-success">${(n.memory_percent || 0).toFixed(1)}%</span></td>
+                    <td><span class="timeline-metric text-warning">${(n.disk_percent || 0).toFixed(1)}%</span></td>
                     <td>
                         <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">
                             <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
-                            ${n.last_status}
+                            ${n.last_status.toUpperCase()}
                         </div>
                     </td>
                 </tr>
@@ -2173,6 +2179,7 @@ function showDeployModal(id) {
 
             const timeEl = document.getElementById('timelineSyncTime');
             if (timeEl) timeEl.textContent = 'Last update: ' + new Date().toLocaleTimeString();
+            lucide.createIcons();
         }
 
         function populateServerSelect() {
