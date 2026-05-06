@@ -100,7 +100,8 @@ def init_web_tables():
             network_tx REAL,
             uptime TEXT,
             raid_status TEXT,
-            disk_info TEXT
+            disk_info TEXT,
+            error_message TEXT
         )""")
 
         # Schema Migration: Add missing columns if they don't exist

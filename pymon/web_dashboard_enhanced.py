@@ -1051,27 +1051,49 @@ sudo systemctl start prometheus-node-exporter</textarea>
         // Form Handlers
         document.getElementById('addNodeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            console.log("Submitting Add Node form...");
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
             try {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Connecting...';
+                
+                const name = document.getElementById('nodeName').value;
+                const host = document.getElementById('nodeHost').value;
+                const os_type = document.getElementById('nodeOS').value;
+                const agent_port = parseInt(document.getElementById('nodePort').value) || 9100;
+                
+                console.log("Form data:", { name, host, os_type, agent_port });
+                
                 const resp = await apiFetch('/api/v1/servers', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        name: document.getElementById('nodeName').value,
-                        host: document.getElementById('nodeHost').value,
-                        os_type: document.getElementById('nodeOS').value,
-                        agent_port: parseInt(document.getElementById('nodePort').value),
+                        name, host, os_type, agent_port,
                         enabled: true
                     })
                 });
+                
                 if (resp && resp.ok) {
+                    console.log("Node added successfully");
                     toggleModal('addNodeModal', false);
                     e.target.reset();
-                    refreshData();
+                    await refreshData();
                 } else if (resp) {
                     const err = await resp.json();
-                    alert('Deployment Failed: ' + (err.detail || 'Internal Error'));
+                    console.error("Backend error:", err);
+                    alert('Deployment Failed: ' + (err.detail || JSON.stringify(err)));
+                } else {
+                    console.error("No response from apiFetch");
                 }
-            } catch (err) { alert('Connection Error'); }
+            } catch (err) { 
+                console.error("Submit error:", err);
+                alert('Connection Error: ' + err.message); 
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
         });
 
         document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
@@ -1260,6 +1282,11 @@ sudo systemctl start prometheus-node-exporter</textarea>
                                 }
                             })()}
                         </div>
+                    </td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem;" onclick="event.stopPropagation(); deleteNode(${n.id})">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px; color: var(--danger);"></i>
+                        </button>
                     </td>
                 </tr>
             `).join('');
