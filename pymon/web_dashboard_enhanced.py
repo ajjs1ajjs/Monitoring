@@ -339,15 +339,17 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                 <div class="header-actions">
                     <span id="updateTimer" style="font-size: 0.7rem; color: var(--text-muted); font-family: monospace;">Syncing...</span>
                     <div class="range-selector">
-                        <button class="range-btn" data-range="5m">5M</button>
-                        <button class="range-btn" data-range="15m">15M</button>
-                        <button class="range-btn" data-range="30m">30M</button>
-                        <button class="range-btn active" data-range="1h">1H</button>
-                        <button class="range-btn" data-range="3h">3H</button>
-                        <button class="range-btn" data-range="6h">6H</button>
-                        <button class="range-btn" data-range="12h">12H</button>
-                        <button class="range-btn" data-range="24h">24H</button>
-                        <button class="range-btn" data-range="7d">7D</button>
+                        <button class="range-btn" data-range="5m">5хв</button>
+                        <button class="range-btn" data-range="30m">30хв</button>
+                        <button class="range-btn active" data-range="1h">1 год</button>
+                        <button class="range-btn" data-range="6h">6 год</button>
+                        <button class="range-btn" data-range="12h">12 год</button>
+                        <button class="range-btn" data-range="24h">24 год</button>
+                        <button class="range-btn" data-range="3d">3 дні</button>
+                        <button class="range-btn" data-range="7d">7 днів</button>
+                        <button class="range-btn" data-range="15d">15 днів</button>
+                        <button class="range-btn" data-range="30d">30 днів</button>
+                        <button class="range-btn custom-btn" data-range="custom" onclick="promptCustomRange(this)">Власна...</button>
                     </div>
                     <button id="refreshBtn" class="refresh-btn">
                         <i data-lucide="rotate-cw"></i>
@@ -371,10 +373,18 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 </select>
                             </div>
                             <div class="range-selector">
-                                <button class="range-btn active" data-range="1h">1h</button>
-                                <button class="range-btn" data-range="6h">6h</button>
-                                <button class="range-btn" data-range="24h">24h</button>
-                            </div>
+                        <button class="range-btn" data-range="5m">5хв</button>
+                        <button class="range-btn" data-range="30m">30хв</button>
+                        <button class="range-btn active" data-range="1h">1 год</button>
+                        <button class="range-btn" data-range="6h">6 год</button>
+                        <button class="range-btn" data-range="12h">12 год</button>
+                        <button class="range-btn" data-range="24h">24 год</button>
+                        <button class="range-btn" data-range="3d">3 дні</button>
+                        <button class="range-btn" data-range="7d">7 днів</button>
+                        <button class="range-btn" data-range="15d">15 днів</button>
+                        <button class="range-btn" data-range="30d">30 днів</button>
+                        <button class="range-btn custom-btn" data-range="custom" onclick="promptCustomRange(this)">Власна...</button>
+                    </div>
                         </div>
                     </div>
 
@@ -1165,6 +1175,25 @@ sudo systemctl start prometheus-node-exporter</div>
             if (section === 'users') loadUsers();
         }
 
+        
+        function promptCustomRange(btn) {
+            const range = prompt("Введіть власний період (наприклад: 2h, 45m, 10d):", "2h");
+            if (range) {
+                document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+                
+                // Update all custom buttons to match
+                document.querySelectorAll('.custom-btn').forEach(b => {
+                    b.dataset.realRange = range;
+                    b.textContent = range;
+                    b.classList.add('active');
+                });
+                
+                currentRange = range;
+                refreshData();
+                if (typeof updateOverviewCharts === 'function') updateOverviewCharts();
+            }
+        }
+
         // Event Listeners
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', () => showSection(btn.dataset.section));
@@ -1172,9 +1201,21 @@ sudo systemctl start prometheus-node-exporter</div>
 
         document.querySelectorAll('.range-btn').forEach(btn => {
             btn.addEventListener('click', () => {
+                if (btn.dataset.range === 'custom') {
+                    if (!btn.dataset.realRange) return; // Wait for prompt if first time
+                    currentRange = btn.dataset.realRange;
+                } else {
+                    currentRange = btn.dataset.range;
+                }
+                
                 document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentRange = btn.dataset.range;
+                
+                // Synchronize active state across ALL buttons with same range
+                document.querySelectorAll(`.range-btn[data-range="${btn.dataset.range}"]`).forEach(b => b.classList.add('active'));
+                if (btn.dataset.range === 'custom') {
+                    document.querySelectorAll('.custom-btn').forEach(b => b.classList.add('active'));
+                }
+                
                 refreshData();
                 if (typeof updateOverviewCharts === 'function') updateOverviewCharts();
             });
@@ -1907,11 +1948,24 @@ function showDeployModal(id) {
                         label: label,
                         data: [],
                         borderColor: color,
-                        backgroundColor: color.replace('1)', '0.1)'),
-                        borderWidth: 2,
+                        backgroundColor: function(context) {
+                            const chart = context.chart;
+                            const {ctx, chartArea} = chart;
+                            if (!chartArea) return color.replace('1)', '0.1)');
+                            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                            gradient.addColorStop(0, color.replace('1)', '0.6)'));
+                            gradient.addColorStop(0.5, color.replace('1)', '0.2)'));
+                            gradient.addColorStop(1, color.replace('1)', '0.0)'));
+                            return gradient;
+                        },
+                        borderWidth: 3,
                         fill: true,
                         tension: 0.4,
-                        pointRadius: 0
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: color,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
                     }]
                 },
                 options: {
