@@ -2,7 +2,7 @@
 
 Complete API reference for PyMon Enterprise Server Monitoring.
 
-**Base URL:** `http://localhost:8090`
+**Base URL:** `http://localhost:10000`
 
 **Authentication:** All API endpoints (except `/api/v1/auth/login`) require JWT token in header:
 ```
@@ -741,7 +741,7 @@ Exceeding limits returns `429 Too Many Requests`.
 import requests
 
 # Login
-resp = requests.post('http://localhost:8090/api/v1/auth/login', json={
+resp = requests.post('http://localhost:10000/api/v1/auth/login', json={
     'username': 'admin',
     'password': 'changeme'
 })
@@ -749,12 +749,12 @@ token = resp.json()['access_token']
 
 # Get servers
 headers = {'Authorization': f'Bearer {token}'}
-resp = requests.get('http://localhost:8090/api/v1/servers', headers=headers)
+resp = requests.get('http://localhost:10000/api/v1/servers', headers=headers)
 servers = resp.json()['servers']
 
 # Get metrics history
 resp = requests.get(
-    'http://localhost:8090/api/v1/servers/history?range=1h&metric=cpu',
+    'http://localhost:10000/api/v1/servers/history?range=1h&metric=cpu',
     headers=headers
 )
 metrics = resp.json()
@@ -764,16 +764,16 @@ metrics = resp.json()
 
 ```bash
 # Login
-TOKEN=$(curl -s -X POST http://localhost:8090/api/v1/auth/login \
+TOKEN=$(curl -s -X POST http://localhost:10000/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"changeme"}' | jq -r '.access_token')
 
 # Get servers
-curl -X GET http://localhost:8090/api/v1/servers \
+curl -X GET http://localhost:10000/api/v1/servers \
   -H "Authorization: Bearer $TOKEN"
 
 # Get metrics history
-curl -X GET "http://localhost:8090/api/v1/servers/history?range=1h" \
+curl -X GET "http://localhost:10000/api/v1/servers/history?range=1h" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -783,20 +783,20 @@ curl -X GET "http://localhost:8090/api/v1/servers/history?range=1h" \
 const axios = require('axios');
 
 // Login
-const { data } = await axios.post('http://localhost:8090/api/v1/auth/login', {
+const { data } = await axios.post('http://localhost:10000/api/v1/auth/login', {
   username: 'admin',
   password: 'admin'
 });
 const token = data.access_token;
 
 // Get servers
-const servers = await axios.get('http://localhost:8090/api/v1/servers', {
+const servers = await axios.get('http://localhost:10000/api/v1/servers', {
   headers: { 'Authorization': `Bearer ${token}` }
 });
 
 // Get metrics history
 const metrics = await axios.get(
-  'http://localhost:8090/api/v1/servers/history?range=1h',
+  'http://localhost:10000/api/v1/servers/history?range=1h',
   { headers: { 'Authorization': `Bearer ${token}` } }
 );
 ```

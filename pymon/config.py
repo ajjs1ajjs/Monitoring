@@ -62,7 +62,7 @@ class NotificationConfig(BaseModel):
 class ServerConfig(BaseModel):
     """Configuration for the main monitoring server."""
 
-    port: int = 8090
+    port: int = 10000
     host: str = "0.0.0.0"
     domain: str = "localhost"
 
@@ -136,7 +136,7 @@ class PyMonConfig(BaseModel):
         if "server" in data:
             s = data["server"]
             config.server = ServerConfig(
-                port=s.get("port", 8090),
+                port=s.get("port", 10000),
                 host=s.get("host", "0.0.0.0"),
                 domain=s.get("domain", "localhost"),
             )

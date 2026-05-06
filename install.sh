@@ -29,7 +29,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-PORT=8090
+PORT=10000
 PYMON_VERSION="main"
 STORAGE="sqlite"
 
@@ -51,7 +51,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --port PORT       Set port (default: 8090)"
+            echo "  --port PORT       Set port (default: 10000)"
             echo "  --version VERSION Install specific version (e.g., v0.1.0 or main)"
             echo "  --storage TYPE    Storage backend: memory or sqlite (default: sqlite)"
             echo "  --help            Show this help message"

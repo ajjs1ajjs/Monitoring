@@ -6,7 +6,7 @@
 # =============================================================================
 server:
   host: 0.0.0.0 # Bind address (0.0.0.0 = all interfaces)
-  port: 8090 # Dashboard port
+  port: 10000 # Dashboard port
   domain: localhost # Domain or IP for external access
 
 # =============================================================================
@@ -36,7 +36,7 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - localhost:8090
+          - localhost:10000
         labels:
           env: production
           service: pymon
@@ -263,7 +263,7 @@ security:
   cors:
     enabled: true
     allow_origins:
-      - "http://localhost:8090"
+      - "http://localhost:10000"
       - "https://monitoring.example.com"
     allow_credentials: true
 

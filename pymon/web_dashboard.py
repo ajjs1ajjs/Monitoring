@@ -768,7 +768,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
                         <div id="tab-general" class="tab-content active">
                             <h4 style="margin-bottom: 16px;">Server Configuration</h4>
                             <div class="grid-2">
-                                <div class="form-group"><label>Server Port</label><input type="number" id="server-port" class="form-control" value="8090"></div>
+                                <div class="form-group"><label>Server Port</label><input type="number" id="server-port" class="form-control" value="10000"></div>
                                 <div class="form-group"><label>Server Host</label><input type="text" id="server-host" class="form-control" value="0.0.0.0"></div>
                             </div>
                             <div class="grid-2">
@@ -1700,7 +1700,7 @@ const Settings = {
         try {
             const data = await API.get('/api/settings');
             if (data.server) {
-                document.getElementById('server-port').value = data.server.port || 8090;
+                document.getElementById('server-port').value = data.server.port || 10000;
                 document.getElementById('server-host').value = data.server.host || '0.0.0.0';
             }
             if (data.storage) {

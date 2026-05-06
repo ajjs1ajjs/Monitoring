@@ -92,7 +92,7 @@ def create_app():
     if raw_origins:
         origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
     else:
-        origins = ["http://localhost:8090"]
+        origins = ["http://localhost:10000"]
 
     app.add_middleware(
         CORSMiddleware,
@@ -142,7 +142,7 @@ def main():
 
     server_parser = subparsers.add_parser("server", help="Start the monitoring server")
     server_parser.add_argument("--host", default="0.0.0.0", help="Host to bind")
-    server_parser.add_argument("--port", type=int, default=8090, help="Port to bind")
+    server_parser.add_argument("--port", type=int, default=10000, help="Port to bind")
     server_parser.add_argument("--config", "-c", default=None, help="Path to config file")
     server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite"], help="Storage backend")
     server_parser.add_argument("--db", default=None, help="Database path (defaults to config value)")

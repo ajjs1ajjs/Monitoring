@@ -74,7 +74,7 @@ import re
 from datetime import datetime
 
 # Configuration
-SERVER_URL = os.getenv("PYMON_SERVER", "http://localhost:8090")
+SERVER_URL = os.getenv("PYMON_SERVER", "http://localhost:10000")
 API_KEY = os.getenv("PYMON_API_KEY", "")
 HOSTNAME = socket.gethostname()
 AGENT_PORT = int(os.getenv("PYMON_AGENT_PORT", "9100"))
@@ -489,7 +489,7 @@ Type=simple
 User=$USER
 Group=$USER
 WorkingDirectory=$INSTALL_DIR
-Environment="PYMON_SERVER=http://your-pymon-server:8090"
+Environment="PYMON_SERVER=http://your-pymon-server:10000"
 Environment="PYMON_API_KEY=your-api-key"
 Environment="PYMON_AGENT_PORT=9100"
 Environment="PYTHONUNBUFFERED=1"

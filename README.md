@@ -38,7 +38,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1'))
 ```
 
-Once installed, the dashboard will be available at: `http://localhost:8090/dashboard/`  
+Once installed, the dashboard will be available at: `http://localhost:10000/dashboard/`  
 **Default Login:** `admin` / `changeme` *(Please change immediately after logging in)*
 
 ### Deploying Agents to Target Nodes

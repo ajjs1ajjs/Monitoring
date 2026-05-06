@@ -30,6 +30,6 @@ pip install -e . --no-deps -q
 
 # Run
 echo "[3/3] Starting server..."
-echo "Dashboard: http://localhost:8090/dashboard/"
+echo "Dashboard: http://localhost:10000/dashboard/"
 echo
 python3 -m pymon server

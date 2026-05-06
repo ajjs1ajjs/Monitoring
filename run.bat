@@ -5,7 +5,7 @@ REM Usage: run.bat [port]
 setlocal EnableDelayedExpansion
 
 set PORT=%1
-if "%PORT%"=="" set PORT=8090
+if "%PORT%"=="" set PORT=10000
 
 echo ========================================
 echo PyMon Server - Windows Edition

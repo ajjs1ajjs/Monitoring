@@ -2,7 +2,7 @@
 # Run as Administrator
 
 param(
-    [string]$Port = "8090",
+    [string]$Port = "10000",
     [string]$InstallDir = "C:\pymon",
     [switch]$Service,
     [switch]$Help
@@ -17,7 +17,7 @@ PyMon Installation Script
 Usage: .\install.ps1 [OPTIONS]
 
 Options:
-  -Port PORT       Set port (default: 8090)
+  -Port PORT       Set port (default: 10000)
   -InstallDir DIR  Installation directory (default: C:\pymon)
   -Service        Register as Windows service
   -Help          Show this help
