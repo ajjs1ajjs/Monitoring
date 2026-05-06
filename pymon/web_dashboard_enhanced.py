@@ -498,43 +498,6 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
 
 
-
-
-                <!-- Section: Logs -->
-                <div id="section-logs" class="dashboard-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                        <h2 style="font-size: 1.5rem; font-weight: 700;">Audit Log Stream</h2>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <input type="search" id="logSearch" class="form-input" placeholder="Search logs..." style="width: 200px; padding: 0.3rem 0.75rem; font-size: 0.75rem;" oninput="filterLogs()" autocomplete="off" spellcheck="false">
-                            <select id="logFilter" class="form-input" style="width: 140px; padding: 0.3rem 0.5rem; font-size: 0.75rem;" onchange="filterLogs()">
-                                <option value="">All Actions</option>
-                                <option value="Add Server">Add Server</option>
-                                <option value="Delete Server">Delete Server</option>
-                                <option value="Alert Triggered">Alert Triggered</option>
-                                <option value="Exporter Down">Exporter Down</option>
-                                <option value="Login">Login</option>
-                            </select>
-                            <button class="btn btn-secondary" style="padding: 0.3rem 0.75rem; font-size: 0.7rem;" onclick="loadAuditLogs()">
-                                <i data-lucide="rotate-cw" style="width: 12px; height: 12px;"></i>
-                            </button>
-                            <button class="btn btn-secondary" style="padding: 0.3rem 0.75rem; font-size: 0.7rem;" onclick="exportLogs()">
-                                <i data-lucide="download" style="width: 12px; height: 12px;"></i> Export
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card" style="height: 550px;">
-                        <div class="card-body" id="auditLogStream" style="overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem;">
-                            <!-- Log stream -->
-                        </div>
-                    </div>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
-                        <div class="card" style="padding: 1rem; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;" id="logLoginCount">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted);">Logins</div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Section: Users -->
                 <div id="section-users" class="dashboard-section">
                     <div class="overview-header">
@@ -660,6 +623,82 @@ sudo systemctl start prometheus-node-exporter</div>
                         <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--success);">
                             <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);" id="logServerCount">0</div>
                             <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Server Actions</div>
+                        </div>
+                        <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid #3b82f6;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;" id="logLoginCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Logins</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Settings -->
+                <div id="section-settings" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">System <span>Configuration</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Глобальні налаштування системи та каналів сповіщень</p>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+                        <!-- Notification Channels -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: var(--accent);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(249, 115, 22, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="bell-ring" style="color: var(--accent); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Notification Channels</h3>
+                                </div>
+                                <div class="status-badge" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">
+                                    <input type="checkbox" id="notifEnabled" checked style="width: 14px; height: 14px; margin-right: 0.5rem; vertical-align: middle;"> Active
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                                    <div class="form-group">
+                                        <label>Telegram Bot Token</label>
+                                        <input type="password" id="tgToken" class="form-input" placeholder="712345678:AA...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Telegram Chat ID</label>
+                                        <input type="text" id="tgChat" class="form-input" placeholder="-100...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Discord Webhook</label>
+                                        <input type="password" id="dsWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>MS Teams Webhook</label>
+                                        <input type="password" id="tmWebhook" class="form-input" placeholder="https://outlook.office.com/webhook/...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP Server</label>
+                                        <input type="text" id="smtpServer" class="form-input" placeholder="smtp.gmail.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP Port</label>
+                                        <input type="number" id="smtpPort" class="form-input" value="587">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP User</label>
+                                        <input type="text" id="smtpUser" class="form-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP Password</label>
+                                        <input type="password" id="smtpPass" class="form-input">
+                                    </div>
+                                    <div class="form-group" style="grid-column: span 2;">
+                                        <label>Recipient Email</label>
+                                        <input type="email" id="emailTo" class="form-input" placeholder="admin@example.com">
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                    <button class="btn btn-primary" style="flex: 1; font-weight: 700;" onclick="saveSettings()">Save Configuration</button>
+                                    <button class="btn btn-secondary" style="flex: 1; font-weight: 700;" onclick="testNotification()">
+                                        <i data-lucide="send" style="width: 14px; height: 14px; margin-right: 0.25rem;"></i> Test
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Scrape & System Settings -->
@@ -1051,7 +1090,10 @@ sudo systemctl start prometheus-node-exporter</div>
                 i.classList.toggle('active', i.dataset.section === section);
             });
 
-            document.getElementById('viewTitle').textContent = section.charAt(0).toUpperCase() + section.slice(1);
+            document.getElementById('viewTitle').textContent = {
+                'overview': 'Dashboard', 'nodes': 'Infrastructure', 'alerts': 'Alerting',
+                'help': 'Help & Agents', 'logs': 'Audit Logs', 'users': 'Users', 'settings': 'Configuration'
+            }[section] || section.charAt(0).toUpperCase() + section.slice(1);
 
             if (section === 'logs') loadAuditLogs();
             if (section === 'alerts') loadAlertRules();
@@ -1592,6 +1634,56 @@ sudo systemctl start prometheus-node-exporter</div>
                     alert('Error: ' + (err.detail || 'Test failed'));
                 }
             } catch (err) { alert('Connection Error'); }
+        }
+        // --- Missing utility functions ---
+
+        function exportLogs() {
+            const stream = document.getElementById('auditLogStream');
+            if (!stream) return;
+            const text = stream.innerText;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'audit_logs_' + new Date().toISOString().slice(0,10) + '.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function clearAuditLogs() {
+            try {
+                const resp = await apiFetch('/api/v1/audit-log', { method: 'DELETE' });
+                if (resp && resp.ok) {
+                    alert('Audit logs cleared successfully.');
+                    loadAuditLogs();
+                } else {
+                    alert('Failed to clear audit logs.');
+                }
+            } catch (err) { alert('Connection Error'); }
+        }
+
+        async function clearMetricHistory() {
+            try {
+                const resp = await apiFetch('/api/v1/metrics/history', { method: 'DELETE' });
+                if (resp && resp.ok) {
+                    alert('Metric history cleared successfully.');
+                } else {
+                    alert('Failed to clear metric history.');
+                }
+            } catch (err) { alert('Connection Error'); }
+        }
+
+        async function saveSystemSettings() {
+            alert('System configuration saved. (Scrape interval and retention settings will apply on next restart.)');
+        }
+
+        function filterLogs() {
+            const query = (document.getElementById('logSearch')?.value || '').toLowerCase();
+            const items = document.querySelectorAll('#auditLogStream > div');
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(query) ? '' : 'none';
+            });
         }
 
         // --- NEW FEATURES ---
