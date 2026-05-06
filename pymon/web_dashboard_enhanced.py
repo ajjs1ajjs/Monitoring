@@ -320,7 +320,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 </div>
                                 <div class="search-box" style="min-width: 300px; background: rgba(0,0,0,0.3);">
                                     <i data-lucide="search" style="width: 16px; height: 16px; color: var(--text-muted);"></i>
-                                    <input type="text" id="liveSearch" placeholder="Search infrastructure..." oninput="filterLiveTable()">
+                                    <input type="search" id="liveSearch" placeholder="Search infrastructure..." oninput="filterLiveTable()" autocomplete="off" spellcheck="false">
                                 </div>
                                 <button class="btn btn-secondary" style="padding: 0.65rem 1.25rem; font-weight: 700; font-size: 0.8rem;" onclick="showSection('nodes')">
                                     <i data-lucide="layout-grid" style="width: 14px; height: 14px; margin-right: 0.65rem; display: inline-block; vertical-align: middle;"></i>
@@ -411,7 +411,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         <div style="display: flex; gap: 1rem; align-items: center;">
                             <div class="search-box">
                                 <i data-lucide="search" style="width: 14px; height: 14px;"></i>
-                                <input type="text" id="nodeSearch" placeholder="Search nodes..." oninput="filterNodes()">
+                                <input type="search" id="nodeSearch" placeholder="Search nodes..." oninput="filterNodes()" autocomplete="off" spellcheck="false">
                             </div>
                             <select id="filterStatus" class="form-input" style="width: 120px; padding: 0.4rem;" onchange="filterNodes()">
                                 <option value="all">All Status</option>
@@ -562,7 +562,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
                         <h2 style="font-size: 1.5rem; font-weight: 700;">Audit Log Stream</h2>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <input type="text" id="logSearch" class="form-input" placeholder="Search logs..." style="width: 200px; padding: 0.3rem 0.75rem; font-size: 0.75rem;" oninput="filterLogs()">
+                            <input type="search" id="logSearch" class="form-input" placeholder="Search logs..." style="width: 200px; padding: 0.3rem 0.75rem; font-size: 0.75rem;" oninput="filterLogs()" autocomplete="off" spellcheck="false">
                             <select id="logFilter" class="form-input" style="width: 140px; padding: 0.3rem 0.5rem; font-size: 0.75rem;" onchange="filterLogs()">
                                 <option value="">All Actions</option>
                                 <option value="Add Server">Add Server</option>
