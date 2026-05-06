@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List
 
-import yaml  # type: ignore
+import yaml
 from pydantic import BaseModel, Field, ValidationError
 
 

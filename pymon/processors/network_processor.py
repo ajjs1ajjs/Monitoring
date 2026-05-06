@@ -1,6 +1,5 @@
 import statistics
-import time
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 # Assuming this relative import path is correct based on previous actions
 from ..services.metric_processor import MetricProcessor, RawMetricPoint

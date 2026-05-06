@@ -79,15 +79,14 @@ API_KEY = os.getenv("PYMON_API_KEY", "")
 HOSTNAME = socket.gethostname()
 AGENT_PORT = int(os.getenv("PYMON_AGENT_PORT", "9100"))
 
-def run_command(cmd, shell=False):
+def run_command(cmd, shell=True):
     """Run shell command and return output"""
     try:
-        if shell:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
-        else:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if not shell and isinstance(cmd, str):
+            cmd = cmd.split()
+        result = subprocess.run(cmd, shell=shell, capture_output=True, text=True, timeout=30)
         return result.stdout.strip() if result.returncode == 0 else ""
-    except:
+    except Exception as e:
         return ""
 
 def get_raid_info():

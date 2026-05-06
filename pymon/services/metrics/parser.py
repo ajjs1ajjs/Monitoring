@@ -1,5 +1,5 @@
-import re
-from typing import Dict, Any, Optional
+from typing import Any, Dict
+
 
 class MetricsParser:
     """Base class for metric parsers."""

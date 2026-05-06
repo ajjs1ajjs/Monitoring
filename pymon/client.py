@@ -5,8 +5,6 @@ from typing import Any
 
 import httpx
 
-from pymon.metrics.models import MetricType
-
 
 class PyMonClient:
     def __init__(self, base_url: str = "http://localhost:8090"):

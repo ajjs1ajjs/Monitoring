@@ -45,8 +45,8 @@ class ScrapeManager:
         self.targets: list[ScrapeTarget] = []
         self._running = False
         self._tasks: list = []
-        self._cpu_history = {}  # Store {target: (idle_last, total_last)}
-        self._down_alerted = set()  # Server IDs already alerted as down
+        self._cpu_history: dict[str, tuple[float, float]] = {}  # Store {target: (idle_last, total_last)}
+        self._down_alerted: set[int] = set()  # Server IDs already alerted as down
 
         self.scrape_total = Counter("pymon_scrape_total", "Total scrape attempts")
         self.scrape_success = Counter("pymon_scrape_success_total", "Successful scrapes")
@@ -185,7 +185,7 @@ class ScrapeManager:
             try:
                 name = None
                 value = None
-                labels = []
+                labels: list[Label] = []
                 if "{" in line:
                     name_part, value_part = line.split("{", 1)
                     name = name_part.strip()
@@ -195,7 +195,7 @@ class ScrapeManager:
                         if "=" in label_str:
                             lname, lvalue = label_str.split("=", 1)
                             lvalue = lvalue.strip('"')
-                            labels.append((lname.strip(), lvalue))
+                            labels.append(Label(name=lname.strip(), value=lvalue))
                 else:
                     parts = line.split()
                     if len(parts) >= 2:
@@ -206,7 +206,7 @@ class ScrapeManager:
                     metrics[name] = value
                     print(f"DEBUG PARSE: name={name}, value={value}")
 
-                    label_objs = list(target.labels.items()) if not target.honor_labels else []
+                    label_objs: list[Label] = [Label(name=k, value=v) for k, v in target.labels.items()] if not target.honor_labels else []
                     label_objs.extend(labels)
                     registry.register(name, MetricType.GAUGE, "", label_objs)
                     registry.set(name, value, label_objs)
@@ -449,7 +449,7 @@ class ScrapeManager:
                                 ),
                                 manager.loop,
                             )
-                    except Exception as e:
+                    except Exception:
                         pass
                 else:
                     c.execute(
@@ -511,7 +511,7 @@ class ScrapeManager:
 
             for alert in alerts:
                 triggered = False
-                metric_val = 0
+                metric_val: float = 0.0
 
                 if alert["metric"] == "cpu":
                     metric_val = cpu

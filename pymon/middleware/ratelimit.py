@@ -1,12 +1,11 @@
 """Rate limiting middleware for FastAPI applications."""
 
-import asyncio
 import time
-from collections import defaultdict, deque
+from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional
 
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 
 
 @dataclass
@@ -243,7 +242,7 @@ class CircuitBreaker:
 
             return result
 
-        except Exception as e:
+        except Exception:
             # Record failure
             self.failures += 1
             self.last_failure_time = time.monotonic()
@@ -269,7 +268,6 @@ class CircuitBreaker:
 # ============================================================================
 
 if __name__ == "__main__":
-    import asyncio
 
     # Example usage
     print("Rate limiting and circuit breaker middleware created successfully.")

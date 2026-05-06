@@ -1,9 +1,9 @@
 """Prometheus-compatible /metrics endpoint implementation."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter
 
 router = APIRouter()
 

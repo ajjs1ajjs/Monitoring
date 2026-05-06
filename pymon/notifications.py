@@ -1,9 +1,8 @@
 """Notification dispatching for PyMon"""
 
-import json
 import logging
+
 import httpx
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,7 @@ class NotificationDispatcher:
         """Send a message via Telegram Bot API"""
         if not bot_token or not chat_id:
             return False
-        
+
         url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         payload = {
             "chat_id": chat_id,
@@ -35,7 +34,7 @@ class NotificationDispatcher:
         """Send a message via Discord Webhook"""
         if not webhook_url:
             return False
-        
+
         payload = {
             "content": None,
             "embeds": [
@@ -64,7 +63,7 @@ class NotificationDispatcher:
         }
         """
         results = {}
-        
+
         if "telegram" in channels:
             tg = channels["telegram"]
             results["telegram"] = self.send_telegram(
@@ -72,14 +71,14 @@ class NotificationDispatcher:
                 tg.get("bot_token"),
                 tg.get("chat_id")
             )
-            
+
         if "discord" in channels:
             ds = channels["discord"]
             results["discord"] = self.send_discord(
                 message,
                 ds.get("webhook_url")
             )
-            
+
         return results
 
 dispatcher = NotificationDispatcher()

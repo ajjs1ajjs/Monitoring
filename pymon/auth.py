@@ -3,16 +3,15 @@
 import os
 import secrets
 import sqlite3
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from dataclasses import dataclass
 
 import bcrypt
 import jwt
-from fastapi import HTTPException, Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
-
 
 JWT_SECRET = os.getenv("JWT_SECRET", secrets.token_urlsafe(32))
 JWT_ALGORITHM = "HS256"
@@ -335,7 +334,7 @@ def list_users() -> list[dict]:
     ]
 
 
-def update_user(user_id: int, is_admin: bool = None, must_change_password: bool = None) -> bool:
+def update_user(user_id: int, is_admin: Optional[bool] = None, must_change_password: Optional[bool] = None) -> bool:
     conn = get_db()
     c = conn.cursor()
     if is_admin is not None:
@@ -345,7 +344,7 @@ def update_user(user_id: int, is_admin: bool = None, must_change_password: bool 
     updated = c.rowcount > 0
     conn.commit()
     conn.close()
-    return updated
+    return bool(updated)
 
 
 def delete_user(user_id: int) -> bool:
@@ -357,4 +356,4 @@ def delete_user(user_id: int) -> bool:
     deleted = c.rowcount > 0
     conn.commit()
     conn.close()
-    return deleted
+    return bool(deleted)

@@ -92,6 +92,6 @@ if __name__ == "__main__":
         x = 1 / 0
     except ZeroDivisionError as e:
         # Demonstrating how to log an error with a stack trace (exc_info=True)
-        logger.error(f"Caught critical division by zero error.", exc_info=e)  # type: ignore
+        logger.error("Caught critical division by zero error.", exc_info=e)  # type: ignore
 
     logger.warning("Configuration file check passed, but some parameters are deprecated.")

@@ -1,4 +1,3 @@
-import os
 path = 'd:/CODE/Monitoring/pymon/api/endpoints.py'
 with open(path, 'r') as f:
     content = f.read()

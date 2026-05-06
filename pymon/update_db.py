@@ -1,5 +1,4 @@
 import sqlite3
-import os
 
 db_path = 'd:/CODE/Monitoring/pymon.db'
 conn = sqlite3.connect(db_path)

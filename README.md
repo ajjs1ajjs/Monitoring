@@ -1,270 +1,100 @@
-# PyMon - Enterprise Server Monitoring
+<div align="center">
+  <h1>PyMon NOC</h1>
+  <p><b>Enterprise Infrastructure Monitoring & NOC Dashboard</b></p>
+  
+  [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
+  [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+  [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/ajjs1ajjs/Monitoring/blob/main/LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
-[![Version](https://img.shields.io/badge/Version-0.1.0-orange.svg)]()
-
-**Professional server monitoring dashboard with Grafana-style visualizations, real-time metrics, and alerts.**
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Dashboard-Grafana--style-blue" alt="Dashboard">
-  <img src="https://img.shields.io/badge/Features-20+-green" alt="Features">
-  <img src="https://img.shields.io/badge/Alerts-Telegram%20%7C%20Discord%20%7C%20Slack%20%7C%20Email-orange" alt="Alerts">
-</p>
+  <img src="https://img.shields.io/badge/Status-Production_Ready-success" alt="Production Ready">
+</div>
 
 ---
 
-## Quick Start
+**PyMon NOC** is a self-hosted, lightweight, and extremely fast infrastructure monitoring platform designed for both Linux and Windows environments. It features a modern, responsive Grafana-style dashboard, real-time metrics scraping, and integrated alerting rules.
 
-### Windows
+## ✨ Features
 
+- **Real-Time NOC Dashboard**: Beautiful dark-themed dashboard with live metrics, dynamic charts, and detailed Grid/List views.
+- **Cross-Platform Agents**: Support for standard Prometheus exporters (`node_exporter` for Linux, `windows_exporter` for Windows).
+- **Smart Alerting**: Configure critical thresholds for CPU, RAM, and Disk to receive instant notifications via Telegram or Discord.
+- **Role-Based Access Control**: Secure JWT authentication and user management built-in.
+- **Audit Logging**: Comprehensive tracking of all system events and user actions.
+- **Zero-Dependency Core**: Built on Python, SQLite/PostgreSQL, and Vanilla JS for maximum portability and speed.
+
+## 🚀 Quick Start
+
+### Installing the Management Server
+
+**Linux:**
+```bash
+curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
+```
+
+**Windows Server:**
 ```powershell
-# PowerShell (as Administrator)
 Set-ExecutionPolicy Bypass -Scope Process -Force
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
 iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1'))
 ```
 
-### Linux
+Once installed, the dashboard will be available at: `http://localhost:8090/dashboard/`  
+**Default Login:** `admin` / `changeme` *(Please change immediately after logging in)*
 
+### Deploying Agents to Target Nodes
+
+PyMon uses standard Prometheus exporters. You can deploy them easily to your servers:
+
+**Linux Node (node_exporter):**
 ```bash
-# Bash
-curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash
 ```
 
-### Manual
+**Windows Node (windows_exporter):**
+```powershell
+iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install_exporter.ps1' | iex
+```
+
+## 🛠️ Manual Installation & Development
 
 ```bash
-# Clone repository
+# Clone the repository
 git clone https://github.com/ajjs1ajjs/Monitoring.git
 cd Monitoring
 
-# Create virtual environment
+# Create a virtual environment
 python -m venv .venv
-
-# Activate
-# Linux/macOS:
-source .venv/bin/activate
-# Windows:
-.venv\Scripts\activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Start server
+# Start the server
 python -m pymon server
 ```
 
-**Access:** http://localhost:8090/dashboard/
+## ⚙️ Configuration
 
-**Default credentials:** `admin` / `changeme`
+PyMon uses a `config.yml` file located in the root directory. You can configure:
+- **Server**: Host, port, and domain.
+- **Storage**: Choose between SQLite (default) or PostgreSQL for massive scalability.
+- **Auth**: JWT expiration times and secrets.
+- **Scraping**: Polling intervals and timeout settings.
 
-> &#9888;&#65039; Change password after first login!
+## 📚 Documentation
 
----
+Detailed documentation can be found in the `docs/` folder:
+- [API Reference](docs/API.md)
+- [Architecture Overview](docs/ARCHITECTURE.md)
+- [Database Migration Guide](docs/MIGRATION.md)
 
-## Features
+## 🛡️ Security Best Practices
 
-| Category | Features |
-|----------|----------|
-| **Monitoring** | CPU, Memory, Disk, Network, Uptime |
-| **Dashboard** | Grafana-style dark theme, real-time charts, auto-refresh |
-| **Visualizations** | Line charts, disk breakdown, uptime timeline |
-| **OS Support** | Windows Server, Linux (all distros) |
-| **Alerts** | Telegram, Discord, Slack, Email |
-| **API** | Full REST API with JWT authentication |
-| **Export** | CSV, JSON data export |
+- Secure the dashboard behind a reverse proxy (Nginx/Traefik) with TLS.
+- Restrict agent ports (9100/9182) to only allow traffic from your PyMon server IP via firewall.
+- Regularly rotate your `JWT_SECRET`.
 
----
+## 📄 License
 
-## Configuration
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### config.yml
-
-```yaml
-server:
-  host: 0.0.0.0
-  port: 8090
-  domain: localhost
-
-storage:
-  backend: sqlite
-  path: pymon.db
-  retention_hours: 168
-
-auth:
-  admin_username: admin
-  admin_password: changeme  # &#9888;&#65039; CHANGE THIS!
-  jwt_expire_hours: 24
-
-scrape_configs:
-  - job_name: servers
-    scrape_interval: 15s
-    scrape_timeout: 10s
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - 192.168.1.100:9182  # Windows
-          - 192.168.1.101:9100  # Linux
-```
-
----
-
-## Data Sources (Exporters)
-
-Ми використовуємо стандартні експортери Prometheus.
-
-### Windows Server
-Виконайте PowerShell як Адміністратор:
-```powershell
-iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/scripts/deploy_windows_exporter.ps1' | iex
-```
-**Порт:** 9182
-
-### Linux Server
-Виконайте команду в терміналі:
-```bash
-curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/scripts/deploy_node_exporter.sh | sudo bash
-```
-**Порт:** 9100
-
-
-
----
-
-## API Reference
-
-### Authentication
-
-```bash
-# Login
-curl -X POST http://localhost:8090/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"changeme"}'
-
-# Response:
-# {"access_token":"...","token_type":"bearer","user":{"id":1,"username":"admin"...}}
-```
-
-### Add Server
-
-```bash
-TOKEN="your-token-here"
-
-curl -X POST http://localhost:8090/api/v1/servers \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Production","host":"192.168.1.100","os_type":"windows","agent_port":9182}'
-```
-
-### Get Metrics
-
-```bash
-# Historical metrics across servers
-curl "http://localhost:8090/api/v1/servers/history?range=1h&metric=cpu"
-
-# Disk breakdown
-curl "http://localhost:8090/api/v1/servers/1/disk-breakdown"
-
-# Export data
-curl "http://localhost:8090/api/v1/servers/1/export?format=csv&range=24h"
-```
-
----
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `STORAGE_BACKEND` | sqlite | Storage type |
-| `DB_PATH` | pymon.db | Database path |
-| `CONFIG_PATH` | config.yml | Config file |
-| `TLS_ENABLED` | false | Enable TLS |
-| `TLS_CERT` | - | TLS certificate |
-| `TLS_KEY` | - | TLS key |
-| `JWT_SECRET` | auto-generated | JWT secret |
-
----
-
-## Directory Structure
-
-```
-Monitoring/
-&#9500;&#9472;&#9472; pymon/
-&#9474;   &#9500;&#9472;&#9472; __init__.py          # Package init
-&#9474;   &#9500;&#9472;&#9472; cli.py               # CLI entry point
-&#9474;   &#9500;&#9472;&#9472; config.py            # Configuration
-&#9474;   &#9500;&#9472;&#9472; auth.py              # JWT Authentication
-&#9474;   &#9500;&#9472;&#9472; scrape.py            # Metrics scraping
-&#9474;   &#9500;&#9472;&#9472; middleware.py        # Error handling
-&#9474;   &#9500;&#9472;&#9472; validation.py        # Input validation
-&#9474;   &#9500;&#9472;&#9472; web_dashboard.py     # Legacy DB/table helpers
-&#9474;   &#9500;&#9472;&#9472; web_dashboard_enhanced.py  # Active dashboard UI
-&#9474;   &#9500;&#9472;&#9472; api/
-&#9474;   &#9474;   &#9492;&#9472;&#9472; endpoints.py     # API endpoints
-&#9474;   &#9500;&#9472;&#9472; metrics/             # Metrics modules
-&#9474;   &#9500;&#9472;&#9472; storage/             # Storage backends
-&#9474;   &#9492;&#9472;&#9472; storage/db_utils.py   # DB utilities
-&#9500;&#9472;&#9472; config.yml              # Configuration
-&#9500;&#9472;&#9472; requirements.txt        # Dependencies
-&#9500;&#9472;&#9472; run.sh                 # Linux start script
-&#9500;&#9472;&#9472; run.bat                # Windows start script
-&#9500;&#9472;&#9472; install.sh             # Linux installer
-&#9492;&#9472;&#9472; install.ps1            # Windows installer
-```
-
----
-
-## Troubleshooting
-
-### Port in use
-
-```bash
-# Linux
-sudo lsof -i :8090
-# or
-sudo netstat -tulpn | grep 8090
-
-# Windows
-netstat -ano | findstr :8090
-```
-
-### Charts no data
-
-```bash
-# Check exporter
-curl http://server:9182/metrics  # Windows
-curl http://server:9100/metrics  # Linux
-
-# Check scrape status in dashboard
-```
-
----
-
-## Security
-
-- &#9888;&#65039; Change default password immediately
-- &#128274; Use TLS in production
-- &#128273; Use API keys for integrations
-- &#128221; Review audit logs
-
----
-
-## Credits
-
-- [FastAPI](https://fastapi.tiangolo.com/) - Web framework
-- [SQLite](https://sqlite.org/) - Database
-- [Chart.js](https://chartjs.org/) - Charts
-- [windows_exporter](https://github.com/prometheus-community/windows_exporter)
-- [node_exporter](https://github.com/prometheus/node_exporter)
-
----
-
-## License
-
-MIT - See [LICENSE](LICENSE)
-
----
-
-**&#11088; Star if useful!**

@@ -2050,7 +2050,7 @@ async def scrape_server(server_id: int):
                         "free": float(d.get("FreeSpace", 0)),
                         "size": float(d.get("Size", 0)),
                     }
-    except Exception as e:
+    except Exception:
         pass
 
     try:

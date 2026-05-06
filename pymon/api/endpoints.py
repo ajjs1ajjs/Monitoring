@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
+from typing import Any
 from pydantic import BaseModel
 
 try:
@@ -180,9 +181,9 @@ async def create_user(data: dict, current_user: User = Depends(get_admin_user)):
 
     try:
         user = _create_user(
-            username=data.get("username"),
-            password=data.get("password", "changeme"),
-            is_admin=data.get("is_admin", False),
+            username=str(data.get("username", "")),
+            password=str(data.get("password", "changeme")),
+            is_admin=bool(data.get("is_admin", False)),
         )
         return {"status": "ok", "user_id": user.id}
     except Exception as e:
@@ -193,7 +194,10 @@ async def create_user(data: dict, current_user: User = Depends(get_admin_user)):
 async def update_user(user_id: int, data: dict, current_user: User = Depends(get_admin_user)):
     from pymon.auth import update_user as _update_user
 
-    _update_user(user_id, is_admin=data.get("is_admin"), must_change_password=data.get("must_change_password"))
+    is_admin = bool(data["is_admin"]) if "is_admin" in data else None
+    must_change_password = bool(data["must_change_password"]) if "must_change_password" in data else None
+
+    _update_user(user_id, is_admin=is_admin, must_change_password=must_change_password)
     return {"status": "ok"}
 
 
@@ -305,7 +309,6 @@ async def list_alerts(current_user: User = Depends(get_current_user)):
 
 @api.post("/alerts")
 async def create_alert(data: AlertCreate, current_user: User = Depends(get_current_user)):
-    import sqlite3
     from datetime import datetime, timezone
 
     conn = get_db()
@@ -523,7 +526,6 @@ async def export_server_data_json(
     current_user: User = Depends(get_current_user),
 ):
     """Export server metrics as JSON or CSV for a given range"""
-    import csv
     import io
 
     time_ranges = {
@@ -1018,7 +1020,6 @@ async def list_servers_api():
 
 @api.post("/servers")
 async def create_server(request: Request, data: ServerCreate, current_user: User = Depends(get_admin_user)):
-    import sqlite3
     from datetime import datetime, timezone
 
     conn = get_db()
@@ -1083,8 +1084,8 @@ async def update_server(
         if not server:
             raise HTTPException(status_code=404, detail="Server not found")
 
-        updates = []
-        params = []
+        updates: list[str] = []
+        params: list[Any] = []
         if data.name is not None:
             updates.append("name = ?")
             params.append(data.name)

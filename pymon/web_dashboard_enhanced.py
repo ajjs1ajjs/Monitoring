@@ -215,6 +215,25 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .btn-secondary { background: var(--surface-hover); color: var(--text); border: 1px solid var(--border); }
         .search-box { display: flex; align-items: center; gap: 0.75rem; background: #080c14; border: 1px solid var(--border); padding: 0.6rem 1rem; border-radius: 0.85rem; }
         .search-box input { background: transparent; border: none; color: white; font-size: 0.9rem; width: 100%; outline: none; }
+
+        /* View Toggle */
+        .view-toggle { display: flex; background: rgba(0,0,0,0.3); border-radius: 0.85rem; padding: 0.25rem; border: 1px solid var(--border); }
+        .view-btn { background: transparent; border: none; color: var(--text-muted); padding: 0.4rem 0.75rem; border-radius: 0.6rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .view-btn.active { background: var(--surface-hover); color: var(--text); box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
+
+        /* Grid View */
+        .nodes-grid { display: none; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; padding: 1.5rem 2.5rem 2.5rem 2.5rem; }
+        .nodes-grid.active { display: grid; }
+        .grid-node-card { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 1.5rem; padding: 1.5rem; cursor: pointer; transition: transform 0.2s, border-color 0.2s; }
+        .grid-node-card:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.02); }
+
+        /* Drawer */
+        .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .drawer-overlay.active { opacity: 1; pointer-events: auto; }
+        .drawer { position: absolute; right: 0; top: 0; bottom: 0; width: 450px; background: #0a0e14; border-left: 1px solid var(--border); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
+        .drawer-overlay.active .drawer { transform: translateX(0); }
+        .drawer-header { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
+        .drawer-body { padding: 2rem; flex: 1; overflow-y: auto; }
     </style></head>
 <body>
     <div class="app-container">
@@ -295,6 +314,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 <span id="tableSyncTime" style="font-size: 0.85rem; color: var(--text-muted);">Syncing live data from nodes...</span>
                             </div>
                             <div style="display: flex; gap: 1.25rem; align-items: center;">
+                                <div class="view-toggle">
+                                    <button class="view-btn active" onclick="switchView('list')" id="btnViewList" title="List View"><i data-lucide="list" style="width: 16px; height: 16px;"></i></button>
+                                    <button class="view-btn" onclick="switchView('grid')" id="btnViewGrid" title="Grid View"><i data-lucide="layout-grid" style="width: 16px; height: 16px;"></i></button>
+                                </div>
                                 <div class="search-box" style="min-width: 300px; background: rgba(0,0,0,0.3);">
                                     <i data-lucide="search" style="width: 16px; height: 16px; color: var(--text-muted);"></i>
                                     <input type="text" id="liveSearch" placeholder="Search infrastructure..." oninput="filterLiveTable()">
@@ -305,7 +328,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 </button>
                             </div>
                         </div>
-                        <div style="overflow-x: auto;">
+                        <div id="liveListContainer" style="overflow-x: auto;">
                             <table style="min-width: 1200px;">
                                 <thead>
                                     <tr>
@@ -330,6 +353,7 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 </tbody>
                             </table>
                         </div>
+                        <div id="liveGridContainer" class="nodes-grid"></div>
                     </div>
 
                     <div class="performance-grid">
@@ -717,6 +741,19 @@ sudo systemctl start prometheus-node-exporter</textarea>
     </div>
 
     <!-- Modals -->
+    <div id="nodeDrawer" class="drawer-overlay" onclick="if(event.target===this) closeDrawer()">
+        <div class="drawer">
+            <div class="drawer-header">
+                <div>
+                    <h2 id="drawerNodeName" style="font-size: 1.5rem; color: #fff;">Node Name</h2>
+                    <div id="drawerNodeStatus" class="status-badge up" style="margin-top: 0.5rem;">UP</div>
+                </div>
+                <i data-lucide="x" style="cursor: pointer; color: var(--text-muted);" onclick="closeDrawer()"></i>
+            </div>
+            <div class="drawer-body" id="drawerBody"></div>
+        </div>
+    </div>
+
     <div id="addNodeModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
@@ -888,6 +925,74 @@ sudo systemctl start prometheus-node-exporter</textarea>
 
         let currentRange = '1h';
         let nodes = [];
+        let currentView = 'list';
+
+        function switchView(view) {
+            currentView = view;
+            document.getElementById('btnViewList').classList.toggle('active', view === 'list');
+            document.getElementById('btnViewGrid').classList.toggle('active', view === 'grid');
+            document.getElementById('liveListContainer').style.display = view === 'list' ? 'block' : 'none';
+            document.getElementById('liveGridContainer').classList.toggle('active', view === 'grid');
+        }
+
+        function openDrawer(nodeId) {
+            const n = nodes.find(x => x.id === nodeId);
+            if (!n) return;
+            document.getElementById('drawerNodeName').textContent = n.name;
+            const statusBadge = document.getElementById('drawerNodeStatus');
+            statusBadge.className = 'status-badge ' + (n.last_status === 'up' ? 'up' : 'down');
+            statusBadge.innerHTML = `<span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span> ${n.last_status || 'unknown'}`;
+            
+            let diskHtml = '';
+            try {
+                const raw = n.disk_info;
+                if (raw && raw !== 'null') {
+                    const disks = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                    const diskArray = Array.isArray(disks) ? disks : Object.entries(disks).map(([vol, pct]) => ({volume: vol, percent: pct}));
+                    diskHtml = diskArray.map(d => {
+                        const pct = d.percent || 0;
+                        return \`
+                        <div style="margin-bottom: 1rem;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.4rem;">
+                                <span style="font-weight:700; color:#fff;">\${d.volume || '?'}</span>
+                                <span style="color:var(--text-muted);">\${pct.toFixed(0)}%</span>
+                            </div>
+                            <div class="progress-container" style="height:8px; background:rgba(0,0,0,0.2);">
+                                <div class="progress-bar-fill" style="width:\${pct}%; background:\${pct > 90 ? 'var(--danger)' : (pct > 75 ? 'var(--warning)' : '#3b82f6')}"></div>
+                            </div>
+                        </div>\`;
+                    }).join('');
+                }
+            } catch(e) {}
+
+            document.getElementById('drawerBody').innerHTML = \`
+                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">System Info</h4>
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; margin-bottom: 2rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.85rem;">
+                        <div><span style="color: var(--text-muted);">OS:</span> <br><strong style="color: #fff;">\${n.os_type || 'Unknown'}</strong></div>
+                        <div><span style="color: var(--text-muted);">IP:</span> <br><strong style="color: #fff; font-family: monospace;">\${n.host}</strong></div>
+                        <div><span style="color: var(--text-muted);">Port:</span> <br><strong style="color: #fff; font-family: monospace;">\${n.agent_port}</strong></div>
+                        <div><span style="color: var(--text-muted);">Added:</span> <br><strong style="color: #fff;">\${new Date(n.created_at).toLocaleDateString()}</strong></div>
+                    </div>
+                </div>
+                
+                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Storage Volumes</h4>
+                <div style="margin-bottom: 2rem;">
+                    \${diskHtml || '<div style="font-size:0.85rem; color:var(--text-muted);">No detailed disk data available</div>'}
+                </div>
+                
+                <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Actions</h4>
+                <div style="display: flex; gap: 1rem;">
+                    <button class="btn btn-secondary" onclick="closeDrawer(); showSection('nodes');" style="flex: 1;"><i data-lucide="server" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Manage Node</button>
+                </div>
+            \`;
+            lucide.createIcons();
+            document.getElementById('nodeDrawer').classList.add('active');
+        }
+
+        function closeDrawer() {
+            document.getElementById('nodeDrawer').classList.remove('active');
+        }
 
         function toggleModal(id, show) {
             const el = document.getElementById(id);
@@ -1088,7 +1193,7 @@ sudo systemctl start prometheus-node-exporter</textarea>
             const targetData = data || nodes;
 
             const html = targetData.map(n => `
-                <tr>
+                <tr style="cursor: pointer;" onclick="openDrawer(${n.id})">
                     <td>
                         <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}" title="${n.error_message || ''}">
                             <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
@@ -1165,6 +1270,46 @@ sudo systemctl start prometheus-node-exporter</textarea>
             }
             if (nodesBody) {
                 nodesBody.innerHTML = html;
+                lucide.createIcons();
+            }
+
+            const gridBody = document.getElementById('liveGridContainer');
+            if (gridBody) {
+                gridBody.innerHTML = targetData.map(n => \`
+                    <div class="grid-node-card" onclick="openDrawer(\${n.id})">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                            <div>
+                                <h3 style="font-size: 1.2rem; font-weight: 700; color: #fff;">\${n.name}</h3>
+                                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+                                    <i data-lucide="server" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> \${n.host}
+                                </div>
+                            </div>
+                            <div class="status-badge \${n.last_status === 'up' ? 'up' : 'down'}">
+                                <span class="status-dot \${n.last_status === 'up' ? 'pulse' : ''}"></span>
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.4rem;">
+                                    <span style="color: var(--text-muted);">CPU Usage</span>
+                                    <span style="color: #fff; font-weight: 700; font-size: 0.9rem;">\${(n.cpu_percent || 0).toFixed(0)}%</span>
+                                </div>
+                                <div class="progress-container" style="height: 10px;">
+                                    <div class="progress-bar-fill" style="width: \${n.cpu_percent || 0}%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.4rem;">
+                                    <span style="color: var(--text-muted);">RAM Usage</span>
+                                    <span style="color: #fff; font-weight: 700; font-size: 0.9rem;">\${(n.memory_percent || 0).toFixed(0)}%</span>
+                                </div>
+                                <div class="progress-container" style="height: 10px;">
+                                    <div class="progress-bar-fill" style="width: \${n.memory_percent || 0}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                \`).join('');
                 lucide.createIcons();
             }
         }
