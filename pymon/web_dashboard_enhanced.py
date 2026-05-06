@@ -951,41 +951,41 @@ sudo systemctl start prometheus-node-exporter</textarea>
                     const diskArray = Array.isArray(disks) ? disks : Object.entries(disks).map(([vol, pct]) => ({volume: vol, percent: pct}));
                     diskHtml = diskArray.map(d => {
                         const pct = d.percent || 0;
-                        return \`
+                        return `
                         <div style="margin-bottom: 1rem;">
                             <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.4rem;">
-                                <span style="font-weight:700; color:#fff;">\${d.volume || '?'}</span>
-                                <span style="color:var(--text-muted);">\${pct.toFixed(0)}%</span>
+                                <span style="font-weight:700; color:#fff;">${d.volume || '?'}</span>
+                                <span style="color:var(--text-muted);">${pct.toFixed(0)}%</span>
                             </div>
                             <div class="progress-container" style="height:8px; background:rgba(0,0,0,0.2);">
-                                <div class="progress-bar-fill" style="width:\${pct}%; background:\${pct > 90 ? 'var(--danger)' : (pct > 75 ? 'var(--warning)' : '#3b82f6')}"></div>
+                                <div class="progress-bar-fill" style="width:${pct}%; background:${pct > 90 ? 'var(--danger)' : (pct > 75 ? 'var(--warning)' : '#3b82f6')}"></div>
                             </div>
-                        </div>\`;
+                        </div>`;
                     }).join('');
                 }
             } catch(e) {}
 
-            document.getElementById('drawerBody').innerHTML = \`
+            document.getElementById('drawerBody').innerHTML = `
                 <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">System Info</h4>
                 <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; margin-bottom: 2rem;">
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.85rem;">
-                        <div><span style="color: var(--text-muted);">OS:</span> <br><strong style="color: #fff;">\${n.os_type || 'Unknown'}</strong></div>
-                        <div><span style="color: var(--text-muted);">IP:</span> <br><strong style="color: #fff; font-family: monospace;">\${n.host}</strong></div>
-                        <div><span style="color: var(--text-muted);">Port:</span> <br><strong style="color: #fff; font-family: monospace;">\${n.agent_port}</strong></div>
-                        <div><span style="color: var(--text-muted);">Added:</span> <br><strong style="color: #fff;">\${new Date(n.created_at).toLocaleDateString()}</strong></div>
+                        <div><span style="color: var(--text-muted);">OS:</span> <br><strong style="color: #fff;">${n.os_type || 'Unknown'}</strong></div>
+                        <div><span style="color: var(--text-muted);">IP:</span> <br><strong style="color: #fff; font-family: monospace;">${n.host}</strong></div>
+                        <div><span style="color: var(--text-muted);">Port:</span> <br><strong style="color: #fff; font-family: monospace;">${n.agent_port}</strong></div>
+                        <div><span style="color: var(--text-muted);">Added:</span> <br><strong style="color: #fff;">${new Date(n.created_at).toLocaleDateString()}</strong></div>
                     </div>
                 </div>
                 
                 <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Storage Volumes</h4>
                 <div style="margin-bottom: 2rem;">
-                    \${diskHtml || '<div style="font-size:0.85rem; color:var(--text-muted);">No detailed disk data available</div>'}
+                    ${diskHtml || '<div style="font-size:0.85rem; color:var(--text-muted);">No detailed disk data available</div>'}
                 </div>
                 
                 <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Actions</h4>
                 <div style="display: flex; gap: 1rem;">
                     <button class="btn btn-secondary" onclick="closeDrawer(); showSection('nodes');" style="flex: 1;"><i data-lucide="server" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Manage Node</button>
                 </div>
-            \`;
+            `;
             lucide.createIcons();
             document.getElementById('nodeDrawer').classList.add('active');
         }
@@ -1275,41 +1275,41 @@ sudo systemctl start prometheus-node-exporter</textarea>
 
             const gridBody = document.getElementById('liveGridContainer');
             if (gridBody) {
-                gridBody.innerHTML = targetData.map(n => \`
-                    <div class="grid-node-card" onclick="openDrawer(\${n.id})">
+                gridBody.innerHTML = targetData.map(n => `
+                    <div class="grid-node-card" onclick="openDrawer(${n.id})">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
                             <div>
-                                <h3 style="font-size: 1.2rem; font-weight: 700; color: #fff;">\${n.name}</h3>
+                                <h3 style="font-size: 1.2rem; font-weight: 700; color: #fff;">${n.name}</h3>
                                 <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-                                    <i data-lucide="server" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> \${n.host}
+                                    <i data-lucide="server" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> ${n.host}
                                 </div>
                             </div>
-                            <div class="status-badge \${n.last_status === 'up' ? 'up' : 'down'}">
-                                <span class="status-dot \${n.last_status === 'up' ? 'pulse' : ''}"></span>
+                            <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">
+                                <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
                             </div>
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 1.25rem;">
                             <div>
                                 <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.4rem;">
                                     <span style="color: var(--text-muted);">CPU Usage</span>
-                                    <span style="color: #fff; font-weight: 700; font-size: 0.9rem;">\${(n.cpu_percent || 0).toFixed(0)}%</span>
+                                    <span style="color: #fff; font-weight: 700; font-size: 0.9rem;">${(n.cpu_percent || 0).toFixed(0)}%</span>
                                 </div>
                                 <div class="progress-container" style="height: 10px;">
-                                    <div class="progress-bar-fill" style="width: \${n.cpu_percent || 0}%"></div>
+                                    <div class="progress-bar-fill" style="width: ${n.cpu_percent || 0}%"></div>
                                 </div>
                             </div>
                             <div>
                                 <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.4rem;">
                                     <span style="color: var(--text-muted);">RAM Usage</span>
-                                    <span style="color: #fff; font-weight: 700; font-size: 0.9rem;">\${(n.memory_percent || 0).toFixed(0)}%</span>
+                                    <span style="color: #fff; font-weight: 700; font-size: 0.9rem;">${(n.memory_percent || 0).toFixed(0)}%</span>
                                 </div>
                                 <div class="progress-container" style="height: 10px;">
-                                    <div class="progress-bar-fill" style="width: \${n.memory_percent || 0}%"></div>
+                                    <div class="progress-bar-fill" style="width: ${n.memory_percent || 0}%"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                \`).join('');
+                `).join('');
                 lucide.createIcons();
             }
         }
