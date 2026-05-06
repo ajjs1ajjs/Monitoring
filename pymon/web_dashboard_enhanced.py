@@ -1655,9 +1655,9 @@ function showDeployModal(id) {
                 }
             }
 
-            let url = '/api/v1/metrics/trend';
+            let url = `/api/v1/metrics/trend?range=${currentRange}`;
             if (serverId !== 'agg') {
-                url = `/api/v1/metrics/history/${serverId}`;
+                url = `/api/v1/metrics/history/${serverId}?range=${currentRange}`;
             }
 
             try {

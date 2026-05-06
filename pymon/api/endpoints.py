@@ -1142,26 +1142,43 @@ async def delete_server(server_id: int, current_user: User = Depends(get_admin_u
         conn.close()
 
 
+def parse_range_to_delta(range_str: str) -> timedelta:
+    """Parse range string (5m, 1h, 7d) to timedelta."""
+    import re
+    match = re.match(r"(\d+)([mhd])", range_str)
+    if not match:
+        return timedelta(hours=1)
+
+    val, unit = int(match.group(1)), match.group(2)
+    if unit == 'm': return timedelta(minutes=val)
+    if unit == 'h': return timedelta(hours=val)
+    if unit == 'd': return timedelta(days=val)
+    return timedelta(hours=1)
+
 @api.get("/metrics/history/{server_id}")
-async def get_server_metrics_history(server_id: int, current_user: User = Depends(get_current_user)):
+async def get_server_metrics_history(
+    server_id: int, 
+    range: str = Query("1h"),
+    current_user: User = Depends(get_current_user)
+):
     """Get historical metrics for a specific server."""
     import sqlite3
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
 
     db_path = os.getenv("DB_PATH", "pymon.db")
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        # Get metrics for the last hour
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        delta = parse_range_to_delta(range)
+        cutoff = (datetime.now(timezone.utc) - delta).isoformat()
 
         query = """
-            SELECT 
+            SELECT
                 timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx
             FROM metrics_history
             WHERE server_id = ? AND timestamp > ?
             ORDER BY timestamp ASC
-            LIMIT 120
+            LIMIT 500
         """
         rows = conn.execute(query, (server_id, cutoff)).fetchall()
 
@@ -1186,21 +1203,29 @@ async def get_server_metrics_history(server_id: int, current_user: User = Depend
 
 
 @api.get("/metrics/trend")
-async def get_metrics_trend(current_user: User = Depends(get_current_user)):
+async def get_metrics_trend(
+    range: str = Query("1h"),
+    current_user: User = Depends(get_current_user)
+):
     """Get aggregated metrics trend for the overview dashboard."""
     import sqlite3
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
 
     db_path = os.getenv("DB_PATH", "pymon.db")
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        # Use metrics_history for more reliable structured data
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        delta = parse_range_to_delta(range)
+        cutoff = (datetime.now(timezone.utc) - delta).isoformat()
 
-        query = """
+        # Dynamic grouping based on range to avoid too many points
+        group_fmt = "1, 16" # Minute level
+        if delta > timedelta(days=1): group_fmt = "1, 13" # Hour level
+        if delta > timedelta(days=7): group_fmt = "1, 10" # Day level
+
+        query = f"""
             SELECT
-                substr(timestamp, 1, 16) as ts,
+                substr(timestamp, {group_fmt}) as ts,
                 AVG(cpu_percent) as cpu_avg,
                 AVG(memory_percent) as mem_avg,
                 AVG(disk_percent) as disk_avg,
@@ -1210,15 +1235,20 @@ async def get_metrics_trend(current_user: User = Depends(get_current_user)):
             WHERE timestamp > ?
             GROUP BY ts
             ORDER BY ts ASC
-            LIMIT 60
+            LIMIT 100
         """
         rows = conn.execute(query, (cutoff,)).fetchall()
 
         history = []
         for r in rows:
+            ts = r["ts"]
+            if len(ts) == 16: ts += ":00Z"
+            elif len(ts) == 13: ts += ":00:00Z"
+            elif len(ts) == 10: ts += "T00:00:00Z"
+
             history.append(
                 {
-                    "timestamp": r["ts"] + ":00Z",
+                    "timestamp": ts,
                     "cpu_avg": round(r["cpu_avg"] or 0, 1),
                     "mem_avg": round(r["mem_avg"] or 0, 1),
                     "disk_avg": round(r["disk_avg"] or 0, 1),
@@ -1236,7 +1266,6 @@ async def get_metrics_trend(current_user: User = Depends(get_current_user)):
         return {"history": [], "error": str(e)}
     finally:
         conn.close()
-
 
 @api.get("/alerts")
 async def list_alerts_api(current_user: User = Depends(get_current_user)):
