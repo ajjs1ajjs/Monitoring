@@ -472,13 +472,13 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Standard Prometheus agent for Linux/Unix systems.</p>
                                 <div class="form-group">
                                     <label style="font-size: 0.7rem; text-transform: uppercase;">Install Command (Debian/Ubuntu)</label>
-                                    <textarea readonly class="form-input" style="height: 80px; font-family: monospace; font-size: 0.75rem; background: #020617;">sudo apt update && sudo apt install -y prometheus-node-exporter
+                                    <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #34d399; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">sudo apt update && sudo apt install -y prometheus-node-exporter
 sudo systemctl enable prometheus-node-exporter
-sudo systemctl start prometheus-node-exporter</textarea>
+sudo systemctl start prometheus-node-exporter</div>
                                 </div>
                                 <div class="form-group">
                                     <label style="font-size: 0.7rem; text-transform: uppercase;">Manual Download</label>
-                                    <p style="font-size: 0.75rem;">Download from <a href="https://github.com/prometheus/node_exporter/releases" target="_blank" style="color: var(--accent);">Official Releases</a></p>
+                                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Download from <a href="https://github.com/prometheus/node_exporter/releases" target="_blank" style="color: var(--accent); font-weight: 600;">Official Releases</a></p>
                                 </div>
                             </div>
                         </div>
@@ -496,12 +496,12 @@ sudo systemctl start prometheus-node-exporter</textarea>
                             <div class="card-body">
                                 <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Best-in-class agent for Windows Server monitoring.</p>
                                 <div class="form-group">
-                                    <label style="font-size: 0.7rem; text-transform: uppercase;">PowerShell Install</label>
-                                    <textarea readonly class="form-input" style="height: 80px; font-family: monospace; font-size: 0.75rem; background: #020617;">msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.30.9/windows_exporter-0.30.9-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system"</textarea>
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">PowerShell Install (Run as Admin)</label>
+                                    <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #60a5fa; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.30.9/windows_exporter-0.30.9-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system"</div>
                                 </div>
                                 <div class="form-group">
                                     <label style="font-size: 0.7rem; text-transform: uppercase;">Agent Port</label>
-                                    <p style="font-size: 0.75rem;">Default Port: <strong style="color: white;">9182</strong></p>
+                                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Default Port: <strong style="color: white;">9182</strong></p>
                                 </div>
                             </div>
                         </div>
@@ -808,9 +808,17 @@ sudo systemctl start prometheus-node-exporter</textarea>
                         <div class="form-group">
                             <label>Metric</label>
                             <select id="alertMetric" class="form-input">
-                                <option value="cpu">CPU Load</option>
-                                <option value="memory">Memory Usage</option>
-                                <option value="disk">Disk Usage</option>
+                                <option value="cpu">CPU Usage (%)</option>
+                                <option value="memory">RAM Usage (%)</option>
+                                <option value="disk">Disk Space (%)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Condition</label>
+                            <select id="alertCondition" class="form-input">
+                                <option value=">">Greater than</option>
+                                <option value="<">Less than</option>
+                                <option value="==">Equals</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -1098,23 +1106,33 @@ sudo systemctl start prometheus-node-exporter</textarea>
 
         document.getElementById('addAlertForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const resp = await apiFetch('/api/v1/alerts', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    name: document.getElementById('alertName').value,
-                    metric: document.getElementById('alertMetric').value,
-                    condition: '>',
-                    threshold: parseInt(document.getElementById('alertThreshold').value),
-                    duration: 60,
-                    severity: 'warning'
-                })
-            });
-            if (resp && resp.ok) {
-                toggleModal('addAlertModal', false);
-                e.target.reset();
-                loadAlertRules();
-            }
+            console.log("Submitting Add Alert form...");
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            
+            try {
+                submitBtn.disabled = true;
+                const resp = await apiFetch('/api/v1/alerts', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        name: document.getElementById('alertName').value,
+                        metric: document.getElementById('alertMetric').value,
+                        condition: document.getElementById('alertCondition').value,
+                        threshold: parseFloat(document.getElementById('alertThreshold').value),
+                        enabled: true
+                    })
+                });
+                if (resp && resp.ok) {
+                    toggleModal('addAlertModal', false);
+                    e.target.reset();
+                    alert('Alert Policy Deployed Successfully');
+                    loadAlertRules();
+                } else if (resp) {
+                    const err = await resp.json();
+                    alert('Deployment Failed: ' + (err.detail || JSON.stringify(err)));
+                }
+            } catch (err) { alert('Connection Error'); }
+            finally { submitBtn.disabled = false; }
         });
 
         // Data Fetching
