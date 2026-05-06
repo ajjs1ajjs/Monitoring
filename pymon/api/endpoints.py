@@ -1142,6 +1142,49 @@ async def delete_server(server_id: int, current_user: User = Depends(get_admin_u
         conn.close()
 
 
+@api.get("/metrics/history/{server_id}")
+async def get_server_metrics_history(server_id: int, current_user: User = Depends(get_current_user)):
+    """Get historical metrics for a specific server."""
+    import sqlite3
+    from datetime import datetime, timedelta, timezone
+
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        # Get metrics for the last hour
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+
+        query = """
+            SELECT 
+                timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx
+            FROM metrics_history
+            WHERE server_id = ? AND timestamp > ?
+            ORDER BY timestamp ASC
+            LIMIT 120
+        """
+        rows = conn.execute(query, (server_id, cutoff)).fetchall()
+
+        history = []
+        for r in rows:
+            history.append(
+                {
+                    "timestamp": r["timestamp"],
+                    "cpu": round(r["cpu_percent"] or 0, 1),
+                    "mem": round(r["memory_percent"] or 0, 1),
+                    "disk": round(r["disk_percent"] or 0, 1),
+                    "net_rx": r["network_rx"] or 0,
+                    "net_tx": r["network_tx"] or 0,
+                }
+            )
+
+        return {"history": history}
+    except Exception as e:
+        return {"history": [], "error": str(e)}
+    finally:
+        conn.close()
+
+
 @api.get("/metrics/trend")
 async def get_metrics_trend(current_user: User = Depends(get_current_user)):
     """Get aggregated metrics trend for the overview dashboard."""
@@ -1269,6 +1312,12 @@ class NotificationSettings(BaseModel):
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
     discord_webhook_url: str = ""
+    teams_webhook_url: str = ""
+    smtp_server: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_pass: str = ""
+    email_to: str = ""
 
 
 @api.get("/settings/notifications")
@@ -1297,11 +1346,54 @@ async def update_notif_settings(data: NotificationSettings, current_user: User =
     config_data["notifications"]["telegram_bot_token"] = data.telegram_bot_token
     config_data["notifications"]["telegram_chat_id"] = data.telegram_chat_id
     config_data["notifications"]["discord_webhook_url"] = data.discord_webhook_url
+    config_data["notifications"]["teams_webhook_url"] = data.teams_webhook_url
+    config_data["notifications"]["smtp_server"] = data.smtp_server
+    config_data["notifications"]["smtp_port"] = data.smtp_port
+    config_data["notifications"]["smtp_user"] = data.smtp_user
+    config_data["notifications"]["smtp_pass"] = data.smtp_pass
+    config_data["notifications"]["email_to"] = data.email_to
 
     with open(config_path, "w") as f:
         yaml.safe_dump(config_data, f)
 
     return {"status": "ok"}
+
+
+@api.post("/settings/notifications/test")
+async def test_notif_settings(current_user: User = Depends(get_admin_user)):
+    """Send a test notification to all configured channels"""
+    from pymon.config import load_config
+    from pymon.notifications import dispatcher
+
+    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+    notif_cfg = config.notifications
+
+    if not notif_cfg.enabled:
+        raise HTTPException(status_code=400, detail="Notifications are disabled")
+
+    msg = "<b>🔔 PyMon Test Notification</b>\n\nThis is a test message to verify your notification channel configuration."
+    
+    channels = {}
+    if notif_cfg.telegram_bot_token and notif_cfg.telegram_chat_id:
+        channels["telegram"] = {
+            "bot_token": notif_cfg.telegram_bot_token,
+            "chat_id": notif_cfg.telegram_chat_id,
+        }
+    if notif_cfg.discord_webhook_url:
+        channels["discord"] = {"webhook_url": notif_cfg.discord_webhook_url}
+    if notif_cfg.teams_webhook_url:
+        channels["teams"] = {"webhook_url": notif_cfg.teams_webhook_url}
+    if notif_cfg.smtp_server and notif_cfg.email_to:
+        channels["email"] = {
+            "smtp_server": notif_cfg.smtp_server,
+            "smtp_port": notif_cfg.smtp_port,
+            "smtp_user": notif_cfg.smtp_user,
+            "smtp_pass": notif_cfg.smtp_pass,
+            "email_to": notif_cfg.email_to,
+        }
+
+    results = dispatcher.dispatch("Test Notification", msg, channels)
+    return {"status": "ok", "results": results}
 
 
 @api.post("/servers/{server_id}/scrape")

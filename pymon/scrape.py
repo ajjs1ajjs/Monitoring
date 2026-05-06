@@ -532,6 +532,16 @@ class ScrapeManager:
                             }
                         if notif_cfg.discord_webhook_url:
                             channels["discord"] = {"webhook_url": notif_cfg.discord_webhook_url}
+                        if notif_cfg.teams_webhook_url:
+                            channels["teams"] = {"webhook_url": notif_cfg.teams_webhook_url}
+                        if notif_cfg.smtp_server and notif_cfg.email_to:
+                            channels["email"] = {
+                                "smtp_server": notif_cfg.smtp_server,
+                                "smtp_port": notif_cfg.smtp_port,
+                                "smtp_user": notif_cfg.smtp_user,
+                                "smtp_pass": notif_cfg.smtp_pass,
+                                "email_to": notif_cfg.email_to,
+                            }
 
                     if channels:
                         dispatcher.dispatch(alert["name"], msg, channels)
@@ -588,6 +598,16 @@ class ScrapeManager:
                     }
                 if notif_cfg.discord_webhook_url:
                     channels["discord"] = {"webhook_url": notif_cfg.discord_webhook_url}
+                if notif_cfg.teams_webhook_url:
+                    channels["teams"] = {"webhook_url": notif_cfg.teams_webhook_url}
+                if notif_cfg.smtp_server and notif_cfg.email_to:
+                    channels["email"] = {
+                        "smtp_server": notif_cfg.smtp_server,
+                        "smtp_port": notif_cfg.smtp_port,
+                        "smtp_user": notif_cfg.smtp_user,
+                        "smtp_pass": notif_cfg.smtp_pass,
+                        "email_to": notif_cfg.email_to,
+                    }
 
             if channels:
                 dispatcher.dispatch("Exporter Down", msg, channels)

@@ -176,81 +176,34 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .card-header h3 { font-size: 1rem; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
         .card-body { padding: 1.5rem 2rem; flex: 1; }
 
-        /* Performance Overview Grid */
-        .performance-grid { display: grid; grid-template-columns: 1fr 400px; gap: 1.5rem; margin-top: 1.5rem; }
+        /* Overview Redesign */
+        .overview-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; background: rgba(255,255,255,0.03); padding: 1rem 1.5rem; border-radius: 1rem; border: 1px solid var(--border); }
+        .overview-controls { display: flex; align-items: center; gap: 1rem; }
+        .server-select { background: #080c14; border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem; border-radius: 0.75rem; outline: none; font-family: inherit; font-size: 0.9rem; min-width: 200px; cursor: pointer; transition: border-color 0.2s; }
+        .server-select:focus { border-color: var(--accent); }
 
-        /* Infrastructure Table */
-        .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.5rem; box-shadow: var(--card-shadow); overflow: hidden; }
-        table { width: 100%; border-collapse: collapse; text-align: left; }
-        th { padding: 1.25rem 2rem; background: rgba(0,0,0,0.15); color: var(--text-muted); font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
-        td { padding: 1.5rem 2rem; border-top: 1px solid var(--border); font-size: 0.95rem; vertical-align: middle; transition: background 0.2s; }
-        tr:hover td { background: rgba(255,255,255,0.02); }
+        .overview-grid { display: grid; grid-template-columns: 1fr 350px; gap: 1.5rem; }
+        .charts-main { display: flex; flex-direction: column; gap: 1.5rem; }
+        .charts-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+        .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.25rem; padding: 1.5rem; position: relative; min-height: 300px; display: flex; flex-direction: column; transition: transform 0.2s; }
+        .chart-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.15); }
+        .chart-title { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .chart-canvas-wrapper { flex: 1; position: relative; }
 
-        /* Metric Display */
-        .metric-cell { display: flex; align-items: center; gap: 1rem; }
-        .metric-value { font-size: 1.5rem; font-weight: 700; color: #fff; min-width: 3.5rem; }
-        .metric-icon { color: var(--text-muted); width: 18px; height: 18px; opacity: 0.6; }
-
-        /* Thick Progress Bars */
-        .progress-container { flex: 1; height: 12px; background: rgba(0,0,0,0.3); border-radius: 6px; overflow: hidden; position: relative; }
-        .progress-bar-fill { height: 100%; border-radius: 6px; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); background: linear-gradient(90deg, #10b981 0%, #f59e0b 60%, #ef4444 100%); background-size: 200% 100%; }
-
-        .status-badge { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.85rem; border-radius: 12px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
-        .status-badge.up { background: rgba(16, 185, 129, 0.1); color: var(--success); box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.2); }
-        .status-badge.down { background: rgba(239, 68, 68, 0.1); color: var(--danger); box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.2); }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-        .status-dot.pulse { animation: statusPulse 2s infinite; box-shadow: 0 0 8px currentColor; }
-
-        /* Event List */
-        .event-item { padding: 0.85rem 0; border-bottom: 1px solid rgba(255,255,255,0.03); display: grid; grid-template-columns: 80px 1fr 100px; align-items: center; gap: 1rem; }
-        .event-item:last-child { border-bottom: none; }
-        .event-status { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 6px; text-align: center; }
-        .event-status.critical { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
-        .event-status.success { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
-        .event-text { font-size: 0.85rem; color: #cbd5e1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .event-time { font-size: 0.75rem; color: var(--text-muted); text-align: right; }
-
-        /* Utilities */
-        .btn-primary { background: var(--accent); color: #000; box-shadow: 0 4px 14px 0 rgba(249, 115, 22, 0.3); }
-        .btn-secondary { background: var(--surface-hover); color: var(--text); border: 1px solid var(--border); }
-        .search-box { display: flex; align-items: center; gap: 0.75rem; background: #080c14; border: 1px solid var(--border); padding: 0.6rem 1rem; border-radius: 0.85rem; }
-        .search-box input { background: transparent; border: none; color: white; font-size: 0.9rem; width: 100%; outline: none; }
-
-        /* View Toggle */
-        .view-toggle { display: flex; background: rgba(0,0,0,0.3); border-radius: 0.85rem; padding: 0.25rem; border: 1px solid var(--border); }
-        .view-btn { background: transparent; border: none; color: var(--text-muted); padding: 0.4rem 0.75rem; border-radius: 0.6rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
-        .view-btn.active { background: var(--surface-hover); color: var(--text); box-shadow: 0 2px 4px rgba(0,0,0,0.4); }
-
-        /* Grid View */
-        .nodes-grid { display: none; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; padding: 1.5rem 2.5rem 2.5rem 2.5rem; }
-        .nodes-grid.active { display: grid; }
-        .grid-node-card { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 1.5rem; padding: 1.5rem; cursor: pointer; transition: transform 0.2s, border-color 0.2s; }
-        .grid-node-card:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.02); }
-
-        /* Drawer */
-        .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
-        .drawer-overlay.active { opacity: 1; pointer-events: auto; }
-        .drawer { position: absolute; right: 0; top: 0; bottom: 0; width: 450px; background: #0a0e14; border-left: 1px solid var(--border); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
-        .drawer-overlay.active .drawer { transform: translateX(0); }
-        .drawer-header { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
-        .drawer-body { padding: 2rem; flex: 1; overflow-y: auto; }
-
-        /* Modal */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 200; display: none; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
-        .modal-overlay.active { display: flex; opacity: 1; }
-        .modal { background: #0f172a; border: 1px solid var(--border); border-radius: 1.5rem; width: 500px; max-width: 90vw; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-        .modal-header { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .modal-header h3 { font-size: 1.1rem; color: #fff; }
-        .modal-body { padding: 2rem; }
-        .modal-footer { padding: 1.25rem 2rem; background: rgba(0,0,0,0.1); border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem; }
+        .alerts-sidebar { display: flex; flex-direction: column; gap: 1rem; }
+        .timeline-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.25rem; overflow: hidden; }
         
-        .form-group { margin-bottom: 1.5rem; }
-        .form-group label { display: block; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; font-weight: 700; }
-        .form-input { width: 100%; background: #080c14; border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 0.75rem; color: white; font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
-        .form-input:focus { border-color: var(--accent); }
-        
-        .btn { padding: 0.6rem 1.5rem; border-radius: 0.75rem; font-weight: 700; font-size: 0.85rem; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .alert-item-v2 { background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1rem; border-left: 4px solid var(--accent); margin-bottom: 0.75rem; }
+        .alert-item-v2.critical { border-left-color: var(--danger); }
+        .alert-item-v2.warning { border-left-color: var(--warning); }
+        .alert-item-v2 .alert-header { display: flex; justify-content: space-between; margin-bottom: 0.25rem; }
+        .alert-item-v2 .alert-title { font-weight: 700; font-size: 0.9rem; color: #fff; }
+        .alert-item-v2 .alert-time { font-size: 0.7rem; color: var(--text-muted); }
+        .alert-item-v2 .alert-desc { font-size: 0.8rem; color: #94a3b8; line-height: 1.4; }
+
+        .text-accent { color: var(--accent); }
+        .text-success { color: var(--success); }
+        .text-danger { color: var(--danger); }
     </style></head>
 <body>
     <div class="app-container">
@@ -324,98 +277,105 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
             <div class="content-scroll">
                 <!-- Section: Overview -->
                 <div id="section-overview" class="dashboard-section active">
-                    <div class="table-card">
-                        <div class="card-header" style="padding: 2rem 2.5rem; background: rgba(0,0,0,0.1);">
-                            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                                <h3 style="font-size: 1.5rem; color: #fff; text-transform: none; letter-spacing: -0.01em;">Live Infrastructure Status</h3>
-                                <span id="tableSyncTime" style="font-size: 0.85rem; color: var(--text-muted);">Syncing live data from nodes...</span>
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Overview <span>Monitoring</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Аналіз продуктивності та статус інфраструктури</p>
+                        </div>
+                        <div class="overview-controls">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Сервер:</span>
+                                <select id="overviewNodeSelect" class="server-select" onchange="updateOverviewCharts()">
+                                    <option value="agg">Усі сервери (Агреговано)</option>
+                                </select>
                             </div>
-                            <div style="display: flex; gap: 1.25rem; align-items: center;">
-                                <div class="view-toggle">
-                                    <button class="view-btn active" onclick="switchView('list')" id="btnViewList" title="List View"><i data-lucide="list" style="width: 16px; height: 16px;"></i></button>
-                                    <button class="view-btn" onclick="switchView('grid')" id="btnViewGrid" title="Grid View"><i data-lucide="layout-grid" style="width: 16px; height: 16px;"></i></button>
-                                </div>
-                                <div class="search-box" style="min-width: 300px; background: rgba(0,0,0,0.3);">
-                                    <i data-lucide="search" style="width: 16px; height: 16px; color: var(--text-muted);"></i>
-                                    <input type="search" id="liveSearch" placeholder="Search infrastructure..." oninput="filterLiveTable()" autocomplete="off" spellcheck="false">
-                                </div>
-                                <button class="btn btn-secondary" style="padding: 0.65rem 1.25rem; font-weight: 700; font-size: 0.8rem;" onclick="showSection('nodes')">
-                                    <i data-lucide="layout-grid" style="width: 14px; height: 14px; margin-right: 0.65rem; display: inline-block; vertical-align: middle;"></i>
-                                    Full Inventory
-                                </button>
+                            <div class="range-selector">
+                                <button class="range-btn active" data-range="1h">1h</button>
+                                <button class="range-btn" data-range="6h">6h</button>
+                                <button class="range-btn" data-range="24h">24h</button>
                             </div>
                         </div>
-                        <div id="liveListContainer" style="overflow-x: auto;">
-                            <table style="min-width: 1200px;">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 140px;">Status</th>
-                                        <th style="width: 300px;">Node Identity</th>
-                                        <th style="width: 200px;">Endpoint</th>
-                                        <th style="width: 280px;">
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                CPU Usage <i data-lucide="cpu" style="width: 12px; height: 12px; opacity: 0.5;"></i>
-                                            </div>
-                                        </th>
-                                        <th style="width: 280px;">
-                                            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                RAM Usage <i data-lucide="memory-stick" style="width: 12px; height: 12px; opacity: 0.5;"></i>
-                                            </div>
-                                        </th>
-                                        <th>Disk Distribution</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="liveTableBody">
-                                    <!-- Dynamic -->
-                                </tbody>
-                            </table>
-                        </div>
-                        <div id="liveGridContainer" class="nodes-grid"></div>
                     </div>
 
-                    <div class="performance-grid">
-                        <!-- Left: Trends -->
-                        <div class="card">
-                            <div class="card-header">
-                                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                                    <h3>Infrastructure Performance Overview</h3>
-                                    <span style="font-size: 0.75rem; color: var(--text-muted);">Aggregated metrics across all clusters</span>
+                    <div class="overview-grid">
+                        <div class="charts-main">
+                            <div class="charts-container">
+                                <div class="chart-card">
+                                    <div class="chart-title">
+                                        <i data-lucide="cpu" class="text-accent" style="width: 16px; height: 16px;"></i>
+                                        Використання CPU (%)
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="cpuOverviewChart"></canvas>
+                                    </div>
                                 </div>
-                                <div class="range-selector" style="transform: scale(0.9);">
-                                    <button class="range-btn active">1 Hour</button>
-                                    <button class="range-btn">3 Hours</button>
+                                <div class="chart-card">
+                                    <div class="chart-title">
+                                        <i data-lucide="database" class="text-success" style="width: 16px; height: 16px;"></i>
+                                        Використання RAM (%)
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="ramOverviewChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="chart-card">
+                                    <div class="chart-title">
+                                        <i data-lucide="hard-drive" class="text-warning" style="width: 16px; height: 16px;"></i>
+                                        Використання диска (%)
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="diskOverviewChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="chart-card">
+                                    <div class="chart-title">
+                                        <i data-lucide="activity" class="text-accent" style="width: 16px; height: 16px;"></i>
+                                        Метрики експортера (node_exporter)
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="netOverviewChart"></canvas>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="card-body" style="padding: 2rem;">
-                                <div style="margin-bottom: 2.5rem;">
-                                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; display: flex; justify-content: space-between;">
-                                        <span>Average CPU of all hosts</span>
-                                        <span style="font-weight: 700; color: var(--accent);">Live Trend</span>
-                                    </div>
-                                    <div style="height: 120px; background: rgba(0,0,0,0.1); border-radius: 12px; position: relative; overflow: hidden;">
-                                        <canvas id="cpuTrendChart"></canvas>
-                                    </div>
+
+                            <div class="timeline-card" style="margin-top: 1.5rem;">
+                                <div class="card-header" style="background: rgba(0,0,0,0.1);">
+                                    <h3>Історичні дані та події (Timeline Details)</h3>
+                                    <span id="timelineSyncTime" style="font-size: 0.7rem; color: var(--text-muted);"></span>
                                 </div>
-                                <div>
-                                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; display: flex; justify-content: space-between;">
-                                        <span>RAM usage average for all hosts</span>
-                                        <span style="font-weight: 700; color: #3b82f6;">Live Trend</span>
-                                    </div>
-                                    <div style="height: 120px; background: rgba(0,0,0,0.1); border-radius: 12px; position: relative; overflow: hidden;">
-                                        <canvas id="memTrendChart"></canvas>
-                                    </div>
+                                <div class="card-body" style="padding: 0;">
+                                    <table id="timelineTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Timestamp</th>
+                                                <th>Server</th>
+                                                <th>CPU</th>
+                                                <th>RAM</th>
+                                                <th>Disk</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="timelineTableBody">
+                                            <!-- Real-time timeline data -->
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Right: Events -->
-                        <div class="card">
-                            <div class="card-header">
-                                <h3>Recent Alerts & Events</h3>
-                                <i data-lucide="bell" style="width: 16px; height: 16px; color: var(--text-muted);"></i>
-                            </div>
-                            <div class="card-body" id="recentEventsList" style="padding: 1.5rem 2rem;">
-                                <!-- Dynamic Events -->
+                        <div class="alerts-sidebar">
+                            <div class="card" style="height: 100%;">
+                                <div class="card-header">
+                                    <h3>Recent Alerts & Events</h3>
+                                    <button class="refresh-btn" style="width: 24px; height: 24px;" onclick="loadRecentAlerts()"><i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i></button>
+                                </div>
+                                <div class="card-body" style="padding: 1rem;" id="recentAlertsFeed">
+                                    <!-- Alerts will be populated here -->
+                                    <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                        <i data-lucide="shield-check" style="width: 48px; height: 48px; margin: 0 auto 1rem; opacity: 0.2;"></i>
+                                        <p>Жодних активних сповіщень</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -652,6 +612,35 @@ sudo systemctl start prometheus-node-exporter</div>
                                 <div class="form-group">
                                     <label>Discord Webhook URL</label>
                                     <input type="text" id="dsWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/...">
+                                </div>
+                                <div class="form-group">
+                                    <label>MS Teams Webhook URL</label>
+                                    <input type="text" id="tmWebhook" class="form-input" placeholder="https://outlook.office.com/webhook/...">
+                                </div>
+                                <div style="border-top: 1px solid var(--border); margin: 1.5rem 0; padding-top: 1.5rem;">
+                                    <h4 style="font-size: 0.8rem; color: #fff; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.1em;">Email Settings (SMTP)</h4>
+                                    <div class="form-group">
+                                        <label>SMTP Server</label>
+                                        <input type="text" id="smtpServer" class="form-input" placeholder="smtp.gmail.com">
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                                        <div class="form-group">
+                                            <label>SMTP Port</label>
+                                            <input type="number" id="smtpPort" class="form-input" value="587">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>SMTP User</label>
+                                            <input type="text" id="smtpUser" class="form-input" placeholder="user@example.com">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP Password</label>
+                                        <input type="password" id="smtpPass" class="form-input" placeholder="••••••••">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Recipient Email</label>
+                                        <input type="email" id="emailTo" class="form-input" placeholder="admin@example.com">
+                                    </div>
                                 </div>
                                 <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
                                     <button class="btn btn-primary" style="flex: 1;" onclick="saveSettings()">Save</button>
@@ -1051,6 +1040,7 @@ sudo systemctl start prometheus-node-exporter</div>
                 btn.classList.add('active');
                 currentRange = btn.dataset.range;
                 refreshData();
+                if (typeof updateOverviewCharts === 'function') updateOverviewCharts();
             });
         });
 
@@ -1490,6 +1480,12 @@ sudo systemctl start prometheus-node-exporter</div>
                 document.getElementById('tgToken').value = data.telegram_bot_token || '';
                 document.getElementById('tgChat').value = data.telegram_chat_id || '';
                 document.getElementById('dsWebhook').value = data.discord_webhook_url || '';
+                document.getElementById('tmWebhook').value = data.teams_webhook_url || '';
+                document.getElementById('smtpServer').value = data.smtp_server || '';
+                document.getElementById('smtpPort').value = data.smtp_port || 587;
+                document.getElementById('smtpUser').value = data.smtp_user || '';
+                document.getElementById('smtpPass').value = data.smtp_pass || '';
+                document.getElementById('emailTo').value = data.email_to || '';
             }
             // Update system info
             const serverResp = await apiFetch('/api/v1/servers');
@@ -1509,7 +1505,13 @@ sudo systemctl start prometheus-node-exporter</div>
                 enabled: document.getElementById('notifEnabled').checked,
                 telegram_bot_token: document.getElementById('tgToken').value,
                 telegram_chat_id: document.getElementById('tgChat').value,
-                discord_webhook_url: document.getElementById('dsWebhook').value
+                discord_webhook_url: document.getElementById('dsWebhook').value,
+                teams_webhook_url: document.getElementById('tmWebhook').value,
+                smtp_server: document.getElementById('smtpServer').value,
+                smtp_port: parseInt(document.getElementById('smtpPort').value),
+                smtp_user: document.getElementById('smtpUser').value,
+                smtp_pass: document.getElementById('smtpPass').value,
+                email_to: document.getElementById('emailTo').value
             };
             const resp = await apiFetch('/api/v1/settings/notifications', {
                 method: 'POST',
@@ -1517,6 +1519,21 @@ sudo systemctl start prometheus-node-exporter</div>
                 body: JSON.stringify(data)
             });
             if (resp && resp.ok) alert('Configuration Saved Successfully');
+        }
+
+        async function testNotification() {
+            try {
+                const resp = await apiFetch('/api/v1/settings/notifications/test', {
+                    method: 'POST'
+                });
+                if (resp && resp.ok) {
+                    const data = await resp.json();
+                    alert('Test notification dispatched. Check your channels.');
+                } else {
+                    const err = await resp.json();
+                    alert('Error: ' + (err.detail || 'Test failed'));
+                }
+            } catch (err) { alert('Connection Error'); }
         }
 
         // --- NEW FEATURES ---
@@ -1641,9 +1658,193 @@ function showDeployModal(id) {
             alert('Command copied to clipboard');
         }
 
+        // --- OVERVIEW CHARTS LOGIC ---
+        let overviewCharts = {
+            cpu: null,
+            ram: null,
+            disk: null,
+            net: null
+        };
+
+        function initOverviewCharts() {
+            const chartConfig = (label, color) => ({
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: label,
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: color.replace('1)', '0.1)'),
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: { 
+                            beginAtZero: true, 
+                            max: 100,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: '#94a3b8', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+
+            const ctxCpu = document.getElementById('cpuOverviewChart')?.getContext('2d');
+            const ctxRam = document.getElementById('ramOverviewChart')?.getContext('2d');
+            const ctxDisk = document.getElementById('diskOverviewChart')?.getContext('2d');
+            const ctxNet = document.getElementById('netOverviewChart')?.getContext('2d');
+
+            if (ctxCpu) overviewCharts.cpu = new Chart(ctxCpu, chartConfig('CPU', 'rgba(249, 115, 22, 1)'));
+            if (ctxRam) overviewCharts.ram = new Chart(ctxRam, chartConfig('RAM', 'rgba(16, 185, 129, 1)'));
+            if (ctxDisk) overviewCharts.disk = new Chart(ctxDisk, chartConfig('Disk', 'rgba(245, 158, 11, 1)'));
+            
+            if (ctxNet) {
+                const netCfg = chartConfig('Network', 'rgba(59, 130, 246, 1)');
+                netCfg.options.scales.y.max = undefined; // Auto-scale for net
+                overviewCharts.net = new Chart(ctxNet, netCfg);
+            }
+        }
+
+        async function updateOverviewCharts() {
+            const serverId = document.getElementById('overviewNodeSelect').value;
+            let url = '/api/v1/metrics/trend';
+            if (serverId !== 'agg') {
+                url = `/api/v1/metrics/history/${serverId}`;
+            }
+
+            try {
+                const resp = await apiFetch(url);
+                if (!resp) return;
+                const data = await resp.json();
+                const history = data.history || [];
+
+                const labels = history.map(h => new Date(h.timestamp).toLocaleTimeString());
+                const cpuData = history.map(h => h.cpu_avg !== undefined ? h.cpu_avg : h.cpu);
+                const ramData = history.map(h => h.mem_avg !== undefined ? h.mem_avg : h.mem);
+                const diskData = history.map(h => h.disk_avg !== undefined ? h.disk_avg : h.disk);
+                const netData = history.map(h => (h.net_rx_avg || 0) + (h.net_tx_avg || 0) || (h.net_rx || 0) + (h.net_tx || 0));
+
+                if (overviewCharts.cpu) {
+                    overviewCharts.cpu.data.labels = labels;
+                    overviewCharts.cpu.data.datasets[0].data = cpuData;
+                    overviewCharts.cpu.update('none');
+                }
+                if (overviewCharts.ram) {
+                    overviewCharts.ram.data.labels = labels;
+                    overviewCharts.ram.data.datasets[0].data = ramData;
+                    overviewCharts.ram.update('none');
+                }
+                if (overviewCharts.disk) {
+                    overviewCharts.disk.data.labels = labels;
+                    overviewCharts.disk.data.datasets[0].data = diskData;
+                    overviewCharts.disk.update('none');
+                }
+                if (overviewCharts.net) {
+                    overviewCharts.net.data.labels = labels;
+                    overviewCharts.net.data.datasets[0].data = netData;
+                    overviewCharts.net.update('none');
+                }
+            } catch (e) {
+                console.error("Failed to update overview charts:", e);
+            }
+        }
+
+        async function loadRecentAlerts() {
+            const feed = document.getElementById('recentAlertsFeed');
+            if (!feed) return;
+
+            try {
+                const resp = await apiFetch('/api/v1/audit-log?limit=10');
+                if (!resp) return;
+                const data = await resp.json();
+                const logs = data.logs || [];
+
+                if (logs.length === 0) {
+                    feed.innerHTML = `
+                        <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                            <i data-lucide="shield-check" style="width: 48px; height: 48px; margin: 0 auto 1rem; opacity: 0.2;"></i>
+                            <p>Жодних активних сповіщень</p>
+                        </div>`;
+                    lucide.createIcons();
+                    return;
+                }
+
+                feed.innerHTML = logs.map(log => `
+                    <div class="alert-item-v2 ${log.action.toLowerCase().includes('critical') ? 'critical' : log.action.toLowerCase().includes('warning') ? 'warning' : ''}">
+                        <div class="alert-header">
+                            <span class="alert-title">${log.action}</span>
+                            <span class="alert-time">${new Date(log.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                        <p class="alert-desc">${log.target}</p>
+                        <p style="font-size: 0.65rem; color: var(--text-muted); margin-top: 0.4rem;">By: ${log.username}</p>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            } catch (e) {
+                console.error("Failed to load alerts:", e);
+            }
+        }
+
+        function updateTimelineTable() {
+            const tbody = document.getElementById('timelineTableBody');
+            if (!tbody) return;
+
+            // Use the last 10 nodes' data as "live events"
+            const sorted = [...nodes].sort((a, b) => new Date(b.last_check) - new Date(a.last_check)).slice(0, 10);
+            
+            tbody.innerHTML = sorted.map(n => `
+                <tr>
+                    <td style="font-family: 'JetBrains Mono'; font-size: 0.75rem; color: var(--text-muted);">${new Date(n.last_check).toLocaleTimeString()}</td>
+                    <td style="font-weight: 700; color: #fff;">${n.name}</td>
+                    <td><span class="text-accent">${(n.cpu_percent || 0).toFixed(1)}%</span></td>
+                    <td><span class="text-success">${(n.memory_percent || 0).toFixed(1)}%</span></td>
+                    <td><span class="text-warning">${(n.disk_percent || 0).toFixed(1)}%</span></td>
+                    <td>
+                        <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">
+                            <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
+                            ${n.last_status}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            const timeEl = document.getElementById('timelineSyncTime');
+            if (timeEl) timeEl.textContent = 'Last update: ' + new Date().toLocaleTimeString();
+        }
+
+        function populateServerSelect() {
+            const select = document.getElementById('overviewNodeSelect');
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = '<option value="agg">Усі сервери (Агреговано)</option>';
+            nodes.forEach(n => {
+                const opt = document.createElement('option');
+                opt.value = n.id;
+                opt.textContent = `${n.name} (${n.host})`;
+                select.appendChild(opt);
+            });
+            select.value = currentVal;
+        }
+
         // Initialization
         refreshData();
+        initOverviewCharts();
         setInterval(refreshData, 15000);
+        setInterval(() => {
+            updateOverviewCharts();
+            loadRecentAlerts();
+            updateTimelineTable();
+            populateServerSelect();
+        }, 10000);
     </script>
 </body>
 </html>"""

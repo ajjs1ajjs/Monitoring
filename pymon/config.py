@@ -54,6 +54,9 @@ class NotificationConfig(BaseModel):
     # Discord
     discord_webhook_url: str = ""
 
+    # MS Teams
+    teams_webhook_url: str = ""
+
     # Generic webhook
     webhook_url: str = ""
     webhook_headers: Dict[str, str] = Field(default_factory=dict)
@@ -216,6 +219,7 @@ class PyMonConfig(BaseModel):
                 telegram_chat_id=n.get("telegram", {}).get("chat_id", ""),
                 slack_webhook_url=n.get("slack", {}).get("webhook_url", ""),
                 discord_webhook_url=n.get("discord", {}).get("webhook_url", ""),
+                teams_webhook_url=n.get("teams", {}).get("webhook_url", ""),
                 webhook_url=n.get("webhook", {}).get("url", ""),
                 webhook_headers=n.get("webhook", {}).get("headers", {}),
             )
@@ -275,6 +279,26 @@ class PyMonConfig(BaseModel):
                     for r in self.alerting_rules
                 ],
             },
+            "notifications": {
+                "enabled": self.notifications.enabled,
+                "telegram": {
+                    "bot_token": self.notifications.telegram_bot_token,
+                    "chat_id": self.notifications.telegram_chat_id,
+                },
+                "discord": {
+                    "webhook_url": self.notifications.discord_webhook_url,
+                },
+                "teams": {
+                    "webhook_url": self.notifications.teams_webhook_url,
+                },
+                "smtp": {
+                    "server": self.notifications.smtp_server,
+                    "port": self.notifications.smtp_port,
+                    "user": self.notifications.smtp_user,
+                    "pass": self.notifications.smtp_pass,
+                    "email_to": self.notifications.email_to,
+                }
+            }
         }
 
 
