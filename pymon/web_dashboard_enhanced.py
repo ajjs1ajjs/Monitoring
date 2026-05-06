@@ -182,12 +182,25 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .server-select { background: #080c14; border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem; border-radius: 0.75rem; outline: none; font-family: inherit; font-size: 0.9rem; min-width: 200px; cursor: pointer; transition: border-color 0.2s; }
         .server-select:focus { border-color: var(--accent); }
 
+        .active-node-panel { display: none; background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%); border: 1px solid rgba(255,255,255,0.1); border-radius: 1.25rem; padding: 1.5rem; margin-bottom: 1.5rem; align-items: center; gap: 2rem; animation: slideInDown 0.4s ease-out; }
+        .active-node-panel.active { display: flex; }
+        @keyframes slideInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .node-info-item { display: flex; flex-direction: column; gap: 0.25rem; }
+        .node-info-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em; }
+        .node-info-value { font-size: 1rem; font-weight: 700; color: #fff; }
+
         .overview-grid { display: grid; grid-template-columns: 1fr 350px; gap: 1.5rem; }
         .charts-main { display: flex; flex-direction: column; gap: 1.5rem; }
         .charts-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
         .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.25rem; padding: 1.5rem; position: relative; min-height: 300px; display: flex; flex-direction: column; transition: transform 0.2s; }
         .chart-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.15); }
-        .chart-title { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .chart-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+        .chart-title { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 0.5rem; }
+        .chart-actions { display: flex; gap: 0.5rem; }
+        .chart-action-btn { background: rgba(255,255,255,0.05); border: none; color: var(--text-muted); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .chart-action-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        
         .chart-canvas-wrapper { flex: 1; position: relative; }
 
         .alerts-sidebar { display: flex; flex-direction: column; gap: 1rem; }
@@ -204,6 +217,10 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         .text-accent { color: var(--accent); }
         .text-success { color: var(--success); }
         .text-danger { color: var(--danger); }
+
+        /* Expanded Chart Modal */
+        #chartExpandModal .modal { width: 900px; max-width: 95vw; }
+        #expandedChartContainer { height: 450px; width: 100%; position: relative; }
     </style></head>
 <body>
     <div class="app-container">
@@ -297,40 +314,82 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
                         </div>
                     </div>
 
+                    <div id="activeNodePanel" class="active-node-panel">
+                        <div style="background: rgba(249, 115, 22, 0.1); padding: 1rem; border-radius: 1rem; border: 1px solid rgba(249, 115, 22, 0.2);">
+                            <i data-lucide="server" class="text-accent" style="width: 24px; height: 24px;"></i>
+                        </div>
+                        <div class="node-info-item">
+                            <span class="node-info-label">Поточний сервер</span>
+                            <span id="activeNodeName" class="node-info-value">-</span>
+                        </div>
+                        <div class="node-info-item">
+                            <span class="node-info-label">Адреса вузла</span>
+                            <span id="activeNodeHost" class="node-info-value">-</span>
+                        </div>
+                        <div class="node-info-item">
+                            <span class="node-info-label">Операційна система</span>
+                            <span id="activeNodeOS" class="node-info-value">-</span>
+                        </div>
+                        <div class="node-info-item" style="margin-left: auto; text-align: right;">
+                            <span class="node-info-label">Останній статус</span>
+                            <div id="activeNodeStatusBadge"></div>
+                        </div>
+                    </div>
+
                     <div class="overview-grid">
                         <div class="charts-main">
                             <div class="charts-container">
                                 <div class="chart-card">
-                                    <div class="chart-title">
-                                        <i data-lucide="cpu" class="text-accent" style="width: 16px; height: 16px;"></i>
-                                        Використання CPU (%)
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="cpu" class="text-accent" style="width: 16px; height: 16px;"></i>
+                                            Використання CPU (%)
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('cpu')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
                                     </div>
                                     <div class="chart-canvas-wrapper">
                                         <canvas id="cpuOverviewChart"></canvas>
                                     </div>
                                 </div>
                                 <div class="chart-card">
-                                    <div class="chart-title">
-                                        <i data-lucide="database" class="text-success" style="width: 16px; height: 16px;"></i>
-                                        Використання RAM (%)
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="database" class="text-success" style="width: 16px; height: 16px;"></i>
+                                            Використання RAM (%)
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('ram')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
                                     </div>
                                     <div class="chart-canvas-wrapper">
                                         <canvas id="ramOverviewChart"></canvas>
                                     </div>
                                 </div>
                                 <div class="chart-card">
-                                    <div class="chart-title">
-                                        <i data-lucide="hard-drive" class="text-warning" style="width: 16px; height: 16px;"></i>
-                                        Використання диска (%)
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="hard-drive" class="text-warning" style="width: 16px; height: 16px;"></i>
+                                            Використання диска (%)
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('disk')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
                                     </div>
                                     <div class="chart-canvas-wrapper">
                                         <canvas id="diskOverviewChart"></canvas>
                                     </div>
                                 </div>
                                 <div class="chart-card">
-                                    <div class="chart-title">
-                                        <i data-lucide="activity" class="text-accent" style="width: 16px; height: 16px;"></i>
-                                        Метрики експортера (node_exporter)
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="activity" class="text-accent" style="width: 16px; height: 16px;"></i>
+                                            Мережева активність та трафік
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('net')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
                                     </div>
                                     <div class="chart-canvas-wrapper">
                                         <canvas id="netOverviewChart"></canvas>
@@ -383,154 +442,61 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
 
                 <!-- Section: Nodes -->
                 <div id="section-nodes" class="dashboard-section">
-                    <div class="card-header" style="border-bottom: none; padding-bottom: 0;">
-                        <h2 id="viewTitle">Infrastructure Inventory</h2>
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Infrastructure <span>Inventory</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Керування підключеними вузлами та джерелами даних</p>
+                        </div>
                         <div style="display: flex; gap: 1rem; align-items: center;">
                             <div class="search-box">
-                                <i data-lucide="search" style="width: 14px; height: 14px;"></i>
-                                <input type="search" id="nodeSearch" placeholder="Search nodes..." oninput="filterNodes()" autocomplete="off" spellcheck="false">
+                                <i data-lucide="search" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                                <input type="search" id="nodeSearch" placeholder="Пошук вузлів..." oninput="filterNodes()" autocomplete="off" spellcheck="false" class="server-select" style="min-width: 250px;">
                             </div>
-                            <select id="filterStatus" class="form-input" style="width: 120px; padding: 0.4rem;" onchange="filterNodes()">
-                                <option value="all">All Status</option>
-                                <option value="up">Online</option>
-                                <option value="down">Offline</option>
-                            </select>
-                            <button onclick="toggleModal('addNodeModal', true)" class="btn btn-primary" style="padding: 0.4rem 1rem;">
-                                <i data-lucide="plus" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Add Node
+                            <button onclick="toggleModal('addNodeModal', true)" class="btn btn-primary" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                                <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Add Node
                             </button>
                         </div>
                     </div>
 
-                    <div class="table-card" style="margin-top: 1rem;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th style="cursor: pointer;" onclick="sortNodes('last_status')">Status <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
-                                    <th style="cursor: pointer;" onclick="sortNodes('name')">Node Identity <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
-                                    <th>Endpoint</th>
-                                    <th style="cursor: pointer;" onclick="sortNodes('cpu_percent')">CPU <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
-                                    <th style="cursor: pointer;" onclick="sortNodes('memory_percent')">RAM <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
-                                    <th style="cursor: pointer;" onclick="sortNodes('disk_percent')">Disk <i data-lucide="chevrons-up-down" style="width: 10px;"></i></th>
-                                    <th style="text-align: right;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="nodesTableBody">
-                                <!-- Dynamic Content -->
-                            </tbody>
-                        </table>
+                    <div class="timeline-card">
+                        <div class="card-body" style="padding: 0;">
+                            <table style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 120px;">Статус</th>
+                                        <th>Ідентифікатор вузла</th>
+                                        <th>Endpoint</th>
+                                        <th>CPU</th>
+                                        <th>RAM</th>
+                                        <th>Disk</th>
+                                        <th style="text-align: right;">Дії</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="nodesTableBody">
+                                    <!-- Dynamic Content -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Section: Alerts -->
                 <div id="section-alerts" class="dashboard-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                        <h2 style="font-size: 1.5rem; font-weight: 700;">Active Alert Rules</h2>
-                        <button class="btn btn-primary" onclick="toggleModal('addAlertModal', true)">Create Logic Rule</button>
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Alerting <span>Rules</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Налаштування логіки сповіщень та порогових значень</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="toggleModal('addAlertModal', true)" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                            <i data-lucide="bell-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Create Rule
+                        </button>
                     </div>
-                    <div class="stats-grid" id="alertRulesGrid">
+                    <div class="stats-grid" id="alertRulesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem;">
                         <!-- Dynamic Alerts -->
                     </div>
                 </div>
 
-                <!-- Section: Help & Agents -->
-                <div id="section-help" class="dashboard-section">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                        <!-- Linux Agent -->
-                        <div class="card">
-                            <div class="card-header" style="border-bottom-color: var(--success);">
-                                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                    <div style="padding: 0.5rem; background: rgba(34, 197, 94, 0.1); border-radius: 0.5rem;">
-                                        <i data-lucide="terminal" style="color: var(--success); width: 20px; height: 20px;"></i>
-                                    </div>
-                                    <h3>Linux node_exporter</h3>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Standard Prometheus agent for Linux/Unix systems.</p>
-                                <div class="form-group">
-                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Install Command (Debian/Ubuntu)</label>
-                                    <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #34d399; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">sudo apt update && sudo apt install -y prometheus-node-exporter
-sudo systemctl enable prometheus-node-exporter
-sudo systemctl start prometheus-node-exporter</div>
-                                </div>
-                                <div class="form-group">
-                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Manual Download</label>
-                                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Download from <a href="https://github.com/prometheus/node_exporter/releases" target="_blank" style="color: var(--accent); font-weight: 600;">Official Releases</a></p>
-                                </div>
-                            </div>
-                        </div>
 
-                        <!-- Windows Agent -->
-                        <div class="card">
-                            <div class="card-header" style="border-bottom-color: #3b82f6;">
-                                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                    <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.5rem;">
-                                        <i data-lucide="monitor" style="color: #3b82f6; width: 20px; height: 20px;"></i>
-                                    </div>
-                                    <h3>Windows Exporter</h3>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Best-in-class agent for Windows Server monitoring.</p>
-                                <div class="form-group">
-                                    <label style="font-size: 0.7rem; text-transform: uppercase;">PowerShell Install (Run as Admin)</label>
-                                    <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #60a5fa; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.30.9/windows_exporter-0.30.9-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system"</div>
-                                </div>
-                                <div class="form-group">
-                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Agent Port</label>
-                                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Default Port: <strong style="color: white;">9182</strong></p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card" style="margin-top: 2rem;">
-                        <div class="card-header">
-                            <h3>Quick Setup Guide</h3>
-                        </div>
-                        <div class="card-body" style="font-size: 0.9rem; line-height: 1.6;">
-                            <ol style="padding-left: 1.5rem;">
-                                <li>Install the appropriate agent on your target server.</li>
-                                <li>Ensure the firewall allows traffic on port <strong style="color: var(--accent);">9100</strong> (Linux) or <strong style="color: var(--accent);">9182</strong> (Windows).</li>
-                                <li>Go to <strong>Infrastructure</strong> tab and click <strong>+ Add Node</strong>.</li>
-                                <li>Enter the IP address and the correct port.</li>
-                                <li>Wait 30-60 seconds for the first metrics to appear.</li>
-                            </ol>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Section: Users -->
-                <div id="section-users" class="dashboard-section">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-                        <h2 style="font-size: 1.5rem; font-weight: 700;">User Management</h2>
-                        <button class="btn btn-primary" onclick="showAddUserModal()">Create User</button>
-                    </div>
-                    <div class="card">
-                        <table class="inventory-table">
-                            <thead>
-                                <tr>
-                                    <th>Username</th>
-                                    <th>Role</th>
-                                    <th>Status</th>
-                                    <th>Last Login</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td class="font-bold text-white">admin</td>
-                                    <td><span class="status-badge up">Administrator</span></td>
-                                    <td>Active</td>
-                                    <td class="text-slate-500">Just now</td>
-                                    <td>
-                                        <button class="action-btn" style="color: #3b82f6;"><i data-lucide="edit-2" style="width: 14px; height: 14px;"></i></button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
 
 
 
@@ -563,92 +529,137 @@ sudo systemctl start prometheus-node-exporter</div>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
                         <div class="card" style="padding: 1rem; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: white;" id="logTotalCount">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted);">Total Events</div>
-                        </div>
-                        <div class="card" style="padding: 1rem; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--danger);" id="logAlertCount">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted);">Alerts Fired</div>
-                        </div>
-                        <div class="card" style="padding: 1rem; text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);" id="logServerCount">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted);">Server Actions</div>
-                        </div>
-                        <div class="card" style="padding: 1rem; text-align: center;">
                             <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;" id="logLoginCount">0</div>
                             <div style="font-size: 0.7rem; color: var(--text-muted);">Logins</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Section: Settings -->
-                <div id="section-settings" class="dashboard-section">
+                <!-- Section: Users -->
+                <div id="section-users" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">User <span>Management</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Керування обліковими записами та правами доступу</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="showAddUserModal()" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                            <i data-lucide="user-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Create User
+                        </button>
+                    </div>
+                    <div class="timeline-card">
+                        <div class="card-body" style="padding: 0;">
+                            <table style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Користувач</th>
+                                        <th>Роль</th>
+                                        <th>Статус</th>
+                                        <th>Останній вхід</th>
+                                        <th style="text-align: right;">Дії</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Help & Agents -->
+                <div id="section-help" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Help <span>& Agents</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Інструкції з розгортання агентів моніторингу</p>
+                        </div>
+                    </div>
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                        <!-- Notification Settings -->
+                        <!-- Linux Agent -->
                         <div class="card">
-                            <div class="card-header" style="border-bottom-color: var(--accent);">
+                            <div class="card-header" style="border-bottom-color: var(--success);">
                                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                    <div style="padding: 0.5rem; background: rgba(249, 115, 22, 0.1); border-radius: 0.5rem;">
-                                        <i data-lucide="bell" style="color: var(--accent); width: 20px; height: 20px;"></i>
+                                    <div style="padding: 0.5rem; background: rgba(34, 197, 94, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="terminal" style="color: var(--success); width: 20px; height: 20px;"></i>
                                     </div>
-                                    <h3>Notification Channels</h3>
+                                    <h3>Linux node_exporter</h3>
                                 </div>
                             </div>
                             <div class="card-body">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Стандартний агент Prometheus для систем Linux/Unix.</p>
                                 <div class="form-group">
-                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-                                        <input type="checkbox" id="notifEnabled" style="width: 16px; height: 16px;">
-                                        Broadcast Notifications Enabled
-                                    </label>
-                                </div>
-                                <div class="form-group">
-                                    <label>Telegram Bot Token</label>
-                                    <input type="password" id="tgToken" class="form-input" placeholder="000000:ABC...">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Команда встановлення (Debian/Ubuntu)</label>
+                                    <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #34d399; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">sudo apt update && sudo apt install -y prometheus-node-exporter
+sudo systemctl enable prometheus-node-exporter
+sudo systemctl start prometheus-node-exporter</div>
                                 </div>
                                 <div class="form-group">
-                                    <label>Telegram Chat ID</label>
-                                    <input type="text" id="tgChat" class="form-input" placeholder="-100...">
-                                </div>
-                                <div class="form-group">
-                                    <label>Discord Webhook URL</label>
-                                    <input type="text" id="dsWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/...">
-                                </div>
-                                <div class="form-group">
-                                    <label>MS Teams Webhook URL</label>
-                                    <input type="text" id="tmWebhook" class="form-input" placeholder="https://outlook.office.com/webhook/...">
-                                </div>
-                                <div style="border-top: 1px solid var(--border); margin: 1.5rem 0; padding-top: 1.5rem;">
-                                    <h4 style="font-size: 0.8rem; color: #fff; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.1em;">Email Settings (SMTP)</h4>
-                                    <div class="form-group">
-                                        <label>SMTP Server</label>
-                                        <input type="text" id="smtpServer" class="form-input" placeholder="smtp.gmail.com">
-                                    </div>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                                        <div class="form-group">
-                                            <label>SMTP Port</label>
-                                            <input type="number" id="smtpPort" class="form-input" value="587">
-                                        </div>
-                                        <div class="form-group">
-                                            <label>SMTP User</label>
-                                            <input type="text" id="smtpUser" class="form-input" placeholder="user@example.com">
-                                        </div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>SMTP Password</label>
-                                        <input type="password" id="smtpPass" class="form-input" placeholder="••••••••">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Recipient Email</label>
-                                        <input type="email" id="emailTo" class="form-input" placeholder="admin@example.com">
-                                    </div>
-                                </div>
-                                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                                    <button class="btn btn-primary" style="flex: 1;" onclick="saveSettings()">Save</button>
-                                    <button class="btn btn-secondary" style="flex: 1;" onclick="testNotification()">
-                                        <i data-lucide="send" style="width: 14px; height: 14px; margin-right: 0.25rem;"></i> Test
-                                    </button>
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Ручне завантаження</label>
+                                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Завантажити з <a href="https://github.com/prometheus/node_exporter/releases" target="_blank" style="color: var(--accent); font-weight: 600;">GitHub Releases</a></p>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Windows Agent -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: #3b82f6;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="monitor" style="color: #3b82f6; width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Windows Exporter</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Найкращий агент для моніторингу систем Windows Server.</p>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">PowerShell (від імені Адміністратора)</label>
+                                    <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #60a5fa; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.30.9/windows_exporter-0.30.9-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system"</div>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Порт агента</label>
+                                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">За замовчуванням: <strong style="color: white;">9182</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Logs -->
+                <div id="section-logs" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Audit <span>Log Stream</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Журнал подій та дій користувачів у системі</p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="search" id="logSearch" class="server-select" placeholder="Пошук..." style="width: 200px;" oninput="filterLogs()" autocomplete="off" spellcheck="false">
+                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem;" onclick="loadAuditLogs()">
+                                <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
+                            </button>
+                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem; font-weight: 700;" onclick="exportLogs()">
+                                <i data-lucide="download" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Export
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card" style="height: 550px;">
+                        <div class="card-body" id="auditLogStream" style="overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;">
+                            <!-- Log stream -->
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
+                        <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--accent);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: white;" id="logTotalCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Total Events</div>
+                        </div>
+                        <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--danger);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--danger);" id="logAlertCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Alerts Fired</div>
+                        </div>
+                        <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--success);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);" id="logServerCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Server Actions</div>
                         </div>
 
                         <!-- Scrape & System Settings -->
@@ -926,6 +937,25 @@ sudo systemctl start prometheus-node-exporter</div>
                     <button type="submit" class="btn btn-primary">Create User</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Chart Expansion Modal -->
+    <div id="chartExpandModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="expandedChartTitle">Detailed Analysis</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('chartExpandModal', false)"></i>
+            </div>
+            <div class="modal-body">
+                <div id="expandedChartContainer">
+                    <!-- Chart injected here -->
+                </div>
+                <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 0.75rem; border: 1px solid var(--border);">
+                    <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Insights & Legend</h4>
+                    <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.5;">Візуалізація історичних даних для обраного вузла. Використовуйте панель керування діапазоном для зміни масштабу часу.</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1371,43 +1401,40 @@ sudo systemctl start prometheus-node-exporter</div>
             if (!grid) return;
             const targetData = data || nodes;
             grid.innerHTML = targetData.map(n => `
-                <div class="node-card">
+                <div class="card" style="padding: 1.5rem; transition: transform 0.2s;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                         <div>
-                            <div style="font-weight: 700; color: white;">${n.name}</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted);">${n.host}</div>
+                            <div style="font-weight: 700; color: white; font-size: 1.1rem;">${n.name}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono';">${n.host}</div>
                         </div>
-                        <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">${n.last_status}</div>
-                    </div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">System Load</div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                        <div style="background: rgba(255,255,255,0.03); padding: 0.5rem; border-radius: 0.5rem;">
-                            <div style="font-size: 0.6rem; text-transform: uppercase;">CPU</div>
-                            <div style="font-weight: 700; color: var(--accent);">${(n.cpu_percent || 0).toFixed(1)}%</div>
-                        </div>
-                        <div style="background: rgba(255,255,255,0.03); padding: 0.5rem; border-radius: 0.5rem;">
-                            <div style="font-size: 0.6rem; text-transform: uppercase;">RAM</div>
-                            <div style="font-weight: 700; color: #3b82f6;">${(n.memory_percent || 0).toFixed(1)}%</div>
+                        <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">
+                            <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
+                            ${n.last_status}
                         </div>
                     </div>
-                    ${n.error_message ? `
-                    <div style="margin-top: 0.75rem; padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border-radius: 0.5rem; border-left: 2px solid var(--danger); font-size: 0.65rem; color: #fca5a5;">
-                        <i data-lucide="alert-circle" style="width: 10px; height: 10px; display: inline; margin-right: 0.25rem;"></i>
-                        ${n.error_message}
-                    </div>` : ''}
-                    <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button onclick="forceScrapeSingle(${n.id})" title="Force Scrape" style="background: transparent; border: none; color: var(--accent); cursor: pointer; opacity: 0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
+                        <div style="background: rgba(255,255,255,0.03); padding: 0.75rem; border-radius: 0.75rem; border: 1px solid var(--border);">
+                            <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.25rem;">CPU Load</div>
+                            <div style="font-weight: 700; color: var(--accent); font-size: 1rem;">${(n.cpu_percent || 0).toFixed(1)}%</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 0.75rem; border-radius: 0.75rem; border: 1px solid var(--border);">
+                            <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.25rem;">RAM Used</div>
+                            <div style="font-weight: 700; color: #3b82f6; font-size: 1rem;">${(n.memory_percent || 0).toFixed(1)}%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 1rem;">
+                        <div style="display: flex; gap: 0.75rem;">
+                            <button onclick="forceScrapeSingle(${n.id})" title="Force Scrape" class="chart-action-btn" style="color: var(--accent);">
                                 <i data-lucide="zap" style="width: 14px; height: 14px;"></i>
                             </button>
-                            <button onclick="showEditModal(${n.id})" title="Edit Node" style="background: transparent; border: none; color: #3b82f6; cursor: pointer; opacity: 0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+                            <button onclick="showEditModal(${n.id})" title="Edit Node" class="chart-action-btn" style="color: #3b82f6;">
                                 <i data-lucide="settings" style="width: 14px; height: 14px;"></i>
                             </button>
-                            <button onclick="showDeployModal(${n.id})" title="Deploy Agent" style="background: transparent; border: none; color: var(--success); cursor: pointer; opacity: 0.6;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6">
+                            <button onclick="showDeployModal(${n.id})" title="Deploy Agent" class="chart-action-btn" style="color: var(--success);">
                                 <i data-lucide="download-cloud" style="width: 14px; height: 14px;"></i>
                             </button>
                         </div>
-                        <button onclick="deleteNode(${n.id})" style="background: transparent; border: none; color: #f87171; cursor: pointer; opacity: 0.5;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.5">
+                        <button onclick="deleteNode(${n.id})" class="chart-action-btn" style="color: var(--danger);">
                             <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                         </button>
                     </div>
@@ -1422,13 +1449,24 @@ sudo systemctl start prometheus-node-exporter</div>
             const data = await resp.json();
             const grid = document.getElementById('alertRulesGrid');
             grid.innerHTML = data.alerts.map(a => `
-                <div class="node-card" style="border-left: 4px solid ${a.severity === 'critical' ? 'var(--danger)' : 'var(--warning)'};">
-                    <div style="font-weight: 700; color: white; margin-bottom: 0.25rem;">${a.name}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">
-                        Trigger: <span style="color: white; font-family: monospace;">${a.metric} > ${a.threshold}%</span>
+                <div class="card" style="border-left: 4px solid ${a.metric === 'cpu' ? 'var(--accent)' : (a.metric === 'memory' ? '#3b82f6' : 'var(--success)')}; padding: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <div>
+                            <h4 style="font-weight: 700; color: white; font-size: 1rem;">${a.name}</h4>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Logic Rule Active</div>
+                        </div>
+                        <div style="padding: 0.4rem; background: rgba(255,255,255,0.05); border-radius: 0.5rem;">
+                            <i data-lucide="activity" style="width: 16px; height: 16px; color: var(--text-muted);"></i>
+                        </div>
                     </div>
-                    <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
-                        <button onclick="deleteAlert(${a.id})" style="background: transparent; border: none; color: #f87171; cursor: pointer; opacity: 0.5;">
+                    <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--border);">
+                        <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Trigger Condition</div>
+                        <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem; color: #fff;">
+                            <span style="color: var(--accent);">${a.metric.toUpperCase()}</span> ${a.condition} <span style="color: var(--success);">${a.threshold}%</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                        <button onclick="deleteAlert(${a.id})" class="chart-action-btn" style="color: var(--danger);">
                             <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                         </button>
                     </div>
@@ -1443,13 +1481,33 @@ sudo systemctl start prometheus-node-exporter</div>
                 if (!resp) return;
                 const data = await resp.json();
                 const logs = data.logs || [];
-                document.getElementById('auditLogStream').innerHTML = logs.length ? logs.slice(0, 50).map(l => `
-                    <div style="padding: 0.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.7rem;">
-                        <span style="color: var(--text-muted);">${l.timestamp ? l.timestamp.slice(0, 19).replace('T', ' ') : '-'}</span>
-                        <span style="color: ${l.action === 'Exporter Down' ? 'var(--danger)' : 'white'};">${l.action}</span>
-                        <span style="color: var(--text-muted);">${l.target || '-'}</span>
+                const total = logs.length;
+                const alerts = logs.filter(l => l.action.includes('Alert') || l.action.includes('Down')).length;
+                const servers = logs.filter(l => l.action.includes('Server')).length;
+                const logins = logs.filter(l => l.action.includes('Login')).length;
+
+                document.getElementById('logTotalCount').textContent = total;
+                document.getElementById('logAlertCount').textContent = alerts;
+                document.getElementById('logServerCount').textContent = servers;
+                document.getElementById('logLoginCount').textContent = logins;
+
+                document.getElementById('auditLogStream').innerHTML = logs.length ? logs.map(l => `
+                    <div style="padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; transition: background 0.2s;">
+                        <div style="width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.03); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                            <i data-lucide="${l.action === 'Login' ? 'key' : (l.action.includes('Server') ? 'server' : 'bell')}" style="width: 14px; height: 14px; color: ${l.action.includes('Down') ? 'var(--danger)' : 'var(--text-muted)'};"></i>
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="font-weight: 600; color: #fff;">${l.action}</span>
+                                <span style="font-size: 0.7rem; color: var(--text-muted);">${l.timestamp ? l.timestamp.slice(0, 19).replace('T', ' ') : '-'}</span>
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem;">
+                                Target: <span style="color: #94a3b8;">${l.target || 'System'}</span> • Details: <span style="color: #94a3b8;">${l.details || 'No additional info'}</span>
+                            </div>
+                        </div>
                     </div>
-                `).join('') : '<div style="padding: 1rem; text-align: center; color: var(--text-muted);">No audit logs</div>';
+                `).join('') : '<div style="padding: 3rem; text-align: center; color: var(--text-muted);">No audit logs available</div>';
+                lucide.createIcons();
             } catch (e) { console.error(e); }
         }
 
@@ -1620,15 +1678,32 @@ function showDeployModal(id) {
                 const resp = await apiFetch('/api/v1/auth/users');
                 if (resp && resp.ok) {
                     const data = await resp.json();
-                    const tbody = document.querySelector('#section-users tbody');
-                    tbody.innerHTML = data.users.map(u => `
+                    document.getElementById('usersTableBody').innerHTML = data.users.map(u => `
                         <tr>
-                            <td class="font-bold text-white">${u.username}</td>
-                            <td><span class="status-badge ${u.is_admin ? 'up' : ''}">${u.is_admin ? 'Administrator' : 'User'}</span></td>
-                            <td>${u.must_change_password ? 'Password Change Required' : 'Active'}</td>
-                            <td class="text-slate-500">${u.last_login ? u.last_login.slice(0, 19).replace('T', ' ') : 'Never'}</td>
                             <td>
-                                <button class="action-btn" style="color: #ef4444;" onclick="deleteUser(${u.id})"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #ea580c); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; color: white;">
+                                        ${u.username.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span style="font-weight: 700; color: #fff;">${u.username}</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="status-badge" style="background: ${u.is_admin ? 'rgba(249, 115, 22, 0.1)' : 'rgba(255,255,255,0.05)'}; color: ${u.is_admin ? 'var(--accent)' : 'var(--text-muted)'}; border: 1px solid ${u.is_admin ? 'rgba(249, 115, 22, 0.2)' : 'var(--border)'};">
+                                    ${u.is_admin ? 'ADMIN' : 'USER'}
+                                </span>
+                            </td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                    <span class="status-dot pulse" style="background: var(--success);"></span>
+                                    <span style="font-size: 0.85rem; color: var(--text-muted);">Active</span>
+                                </div>
+                            </td>
+                            <td style="color: var(--text-muted); font-size: 0.85rem;">Just now</td>
+                            <td style="text-align: right;">
+                                <button class="chart-action-btn" onclick="deleteUser(${u.id})" style="color: var(--danger);">
+                                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                                </button>
                             </td>
                         </tr>
                     `).join('');
@@ -1665,6 +1740,7 @@ function showDeployModal(id) {
             disk: null,
             net: null
         };
+        let expandedChart = null;
 
         function initOverviewCharts() {
             const chartConfig = (label, color) => ({
@@ -1715,7 +1791,28 @@ function showDeployModal(id) {
         }
 
         async function updateOverviewCharts() {
-            const serverId = document.getElementById('overviewNodeSelect').value;
+            const select = document.getElementById('overviewNodeSelect');
+            const serverId = select.value;
+            const panel = document.getElementById('activeNodePanel');
+            
+            if (serverId === 'agg') {
+                panel.classList.remove('active');
+            } else {
+                const node = nodes.find(n => n.id == serverId);
+                if (node) {
+                    document.getElementById('activeNodeName').textContent = node.name;
+                    document.getElementById('activeNodeHost').textContent = node.host;
+                    document.getElementById('activeNodeOS').textContent = node.os_type || 'Unknown';
+                    document.getElementById('activeNodeStatusBadge').innerHTML = `
+                        <div class="status-badge ${node.last_status === 'up' ? 'up' : 'down'}">
+                            <span class="status-dot ${node.last_status === 'up' ? 'pulse' : ''}"></span>
+                            ${node.last_status}
+                        </div>`;
+                    panel.classList.add('active');
+                    lucide.createIcons();
+                }
+            }
+
             let url = '/api/v1/metrics/trend';
             if (serverId !== 'agg') {
                 url = `/api/v1/metrics/history/${serverId}`;
@@ -1753,9 +1850,56 @@ function showDeployModal(id) {
                     overviewCharts.net.data.datasets[0].data = netData;
                     overviewCharts.net.update('none');
                 }
+
+                if (expandedChart) {
+                    const type = expandedChart.canvas.id.replace('expandedChartCanvas-', '');
+                    let newData = [];
+                    if (type === 'cpu') newData = cpuData;
+                    else if (type === 'ram') newData = ramData;
+                    else if (type === 'disk') newData = diskData;
+                    else if (type === 'net') newData = netData;
+                    
+                    expandedChart.data.labels = labels;
+                    expandedChart.data.datasets[0].data = newData;
+                    expandedChart.update('none');
+                }
             } catch (e) {
                 console.error("Failed to update overview charts:", e);
             }
+        }
+
+        function expandChart(type) {
+            const container = document.getElementById('expandedChartContainer');
+            container.innerHTML = `<canvas id="expandedChartCanvas-${type}"></canvas>`;
+            
+            const sourceChart = overviewCharts[type];
+            if (!sourceChart) return;
+
+            const ctx = document.getElementById(`expandedChartCanvas-${type}`).getContext('2d');
+            
+            if (expandedChart) expandedChart.destroy();
+
+            expandedChart = new Chart(ctx, {
+                type: 'line',
+                data: JSON.parse(JSON.stringify(sourceChart.data)), // Deep copy data
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, labels: { color: '#fff' } } },
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                        y: { 
+                            beginAtZero: true, 
+                            max: (type === 'net') ? undefined : 100,
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('expandedChartTitle').textContent = type.toUpperCase() + ' Detailed Analysis';
+            toggleModal('chartExpandModal', true);
         }
 
         async function loadRecentAlerts() {
