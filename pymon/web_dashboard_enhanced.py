@@ -42,6 +42,38 @@ LOGIN_HTML = r"""<!DOCTYPE html>
         button:active { transform: translateY(0); }
 
         #error { color: #f87171; text-align: center; font-size: 0.75rem; font-weight: 600; margin-top: 1.5rem; display: none; padding: 0.75rem; background: rgba(248, 113, 113, 0.1); border-radius: 0.75rem; }
+        /* Forms & Buttons */
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .form-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 0.75rem; color: white; font-family: inherit; font-size: 0.9rem; transition: all 0.2s; }
+        .form-input:focus { border-color: var(--accent); outline: none; background: rgba(0,0,0,0.5); }
+        
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.75rem 1.25rem; border-radius: 0.75rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; border: none; font-family: inherit; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: #ea580c; transform: translateY(-1px); }
+        .btn-secondary { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); color: white; }
+        
+        .status-badge { display: inline-flex; align-items: center; padding: 0.25rem 0.6rem; border-radius: 1rem; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+        .status-badge.up { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+        .status-badge.down { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
+        .status-badge.warning { background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); }
+
+        /* Modals & Overlays */
+        .modal-overlay, .drawer-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .modal-overlay.active, .drawer-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 1.5rem; width: 100%; max-width: 500px; max-height: 90vh; display: flex; flex-direction: column; transform: scale(0.95); transition: transform 0.3s; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .modal-overlay.active .modal { transform: scale(1); }
+        .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { font-size: 1.25rem; font-weight: 700; color: white; }
+        .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem; background: rgba(0,0,0,0.2); border-radius: 0 0 1.5rem 1.5rem; }
+        
+        .drawer { position: absolute; right: 0; top: 0; bottom: 0; width: 450px; background: var(--surface); border-left: 1px solid var(--border); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: -10px 0 25px rgba(0,0,0,0.5); }
+        .drawer-overlay.active .drawer { transform: translateX(0); }
+        .drawer-header { padding: 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
+        .drawer-body { padding: 2rem; overflow-y: auto; flex: 1; }
+
     </style>
 </head>
 <body>
@@ -221,6 +253,38 @@ ENHANCED_DASHBOARD_HTML = r"""<!DOCTYPE html>
         /* Expanded Chart Modal */
         #chartExpandModal .modal { width: 900px; max-width: 95vw; }
         #expandedChartContainer { height: 450px; width: 100%; position: relative; }
+        /* Forms & Buttons */
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .form-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 0.75rem; color: white; font-family: inherit; font-size: 0.9rem; transition: all 0.2s; }
+        .form-input:focus { border-color: var(--accent); outline: none; background: rgba(0,0,0,0.5); }
+        
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.75rem 1.25rem; border-radius: 0.75rem; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; border: none; font-family: inherit; }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: #ea580c; transform: translateY(-1px); }
+        .btn-secondary { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--border); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); color: white; }
+        
+        .status-badge { display: inline-flex; align-items: center; padding: 0.25rem 0.6rem; border-radius: 1rem; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+        .status-badge.up { background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+        .status-badge.down { background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
+        .status-badge.warning { background: rgba(245, 158, 11, 0.1); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); }
+
+        /* Modals & Overlays */
+        .modal-overlay, .drawer-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .modal-overlay.active, .drawer-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 1.5rem; width: 100%; max-width: 500px; max-height: 90vh; display: flex; flex-direction: column; transform: scale(0.95); transition: transform 0.3s; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+        .modal-overlay.active .modal { transform: scale(1); }
+        .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { font-size: 1.25rem; font-weight: 700; color: white; }
+        .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        .modal-footer { padding: 1.5rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 1rem; background: rgba(0,0,0,0.2); border-radius: 0 0 1.5rem 1.5rem; }
+        
+        .drawer { position: absolute; right: 0; top: 0; bottom: 0; width: 450px; background: var(--surface); border-left: 1px solid var(--border); transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; flex-direction: column; box-shadow: -10px 0 25px rgba(0,0,0,0.5); }
+        .drawer-overlay.active .drawer { transform: translateX(0); }
+        .drawer-header { padding: 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
+        .drawer-body { padding: 2rem; overflow-y: auto; flex: 1; }
+
     </style></head>
 <body>
     <div class="app-container">
