@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyMon | Zenith NOC</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside>
+            <div class="sidebar-header">
+                <i data-lucide="shield-check"></i>
+                <h1>PyMon<span>NOC</span></h1>
+            </div>
+
+            <nav class="nav-section">
+                <div class="nav-label">Monitoring</div>
+                <button class="nav-item active" data-section="overview">
+                    <i data-lucide="layout-dashboard"></i> Dashboard
+                </button>
+                <button class="nav-item" data-section="nodes">
+                    <i data-lucide="server"></i> Infrastructure
+                </button>
+                <button class="nav-item" data-section="alerts">
+                    <i data-lucide="bell-ring"></i> Alerting
+                </button>
+
+                <div class="nav-label">Support</div>
+                <button class="nav-item" data-section="help">
+                    <i data-lucide="help-circle"></i> Help & Agents
+                </button>
+                <div class="nav-label">Management</div>
+                <button class="nav-item" data-section="logs">
+                    <i data-lucide="list"></i> Audit Logs
+                </button>
+                <button class="nav-item" data-section="users">
+                    <i data-lucide="users"></i> Users
+                </button>
+                <button class="nav-item" data-section="settings">
+                    <i data-lucide="settings"></i> Configuration
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">
+                    <i data-lucide="log-out"></i> End Session
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main>
+            <header>
+                <div class="header-left">
+                    <h2 id="viewTitle">Overview</h2>
+                </div>
+                <div class="header-actions">
+                    <span id="updateTimer" style="font-size: 0.7rem; color: var(--text-muted); font-family: monospace;">Syncing...</span>
+                    <div class="range-selector">
+                        <button class="range-btn" data-range="5m">5хв</button>
+                        <button class="range-btn" data-range="30m">30хв</button>
+                        <button class="range-btn active" data-range="1h">1 год</button>
+                        <button class="range-btn" data-range="6h">6 год</button>
+                        <button class="range-btn" data-range="12h">12 год</button>
+                        <button class="range-btn" data-range="24h">24 год</button>
+                        <button class="range-btn" data-range="3d">3 дні</button>
+                        <button class="range-btn" data-range="7d">7 днів</button>
+                        <button class="range-btn" data-range="15d">15 днів</button>
+                        <button class="range-btn" data-range="30d">30 днів</button>
+                        <button class="range-btn custom-btn" data-range="custom" onclick="promptCustomRange(this)">Власна...</button>
+                    </div>
+                    <button id="refreshBtn" class="refresh-btn">
+                        <i data-lucide="rotate-cw"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-scroll">
+                <!-- Section: Overview -->
+                <div id="section-overview" class="dashboard-section active">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Overview <span>Monitoring</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Аналіз продуктивності та статус інфраструктури</p>
+                        </div>
+                        <div class="overview-controls">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Сервер:</span>
+                                <select id="overviewNodeSelect" class="server-select" onchange="updateOverviewCharts()">
+                                    <option value="agg">Усі сервери (Агреговано)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="activeNodePanel" class="active-node-panel">
+                        <div style="background: rgba(249, 115, 22, 0.1); padding: 1rem; border-radius: 1rem; border: 1px solid rgba(249, 115, 22, 0.2);">
+                            <i data-lucide="server" class="text-accent" style="width: 24px; height: 24px;"></i>
+                        </div>
+                        <div class="node-info-item">
+                            <span class="node-info-label">Поточний сервер</span>
+                            <span id="activeNodeName" class="node-info-value">-</span>
+                        </div>
+                        <div class="node-info-item">
+                            <span class="node-info-label">Адреса вузла</span>
+                            <span id="activeNodeHost" class="node-info-value">-</span>
+                        </div>
+                        <div class="node-info-item">
+                            <span class="node-info-label">Операційна система</span>
+                            <span id="activeNodeOS" class="node-info-value">-</span>
+                        </div>
+                        <div class="node-info-item" style="margin-left: auto; text-align: right;">
+                            <span class="node-info-label">Останній статус</span>
+                            <div id="activeNodeStatusBadge"></div>
+                        </div>
+                    </div>
+
+                    <div class="overview-grid">
+                        <div class="charts-main">
+                            <div class="charts-container">
+                                <div class="chart-card">
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="cpu" class="text-accent" style="width: 16px; height: 16px;"></i>
+                                            Використання CPU (%)
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('cpu')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="cpuOverviewChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="chart-card">
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="database" class="text-success" style="width: 16px; height: 16px;"></i>
+                                            Використання RAM (%)
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('ram')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="ramOverviewChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="chart-card">
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="hard-drive" class="text-warning" style="width: 16px; height: 16px;"></i>
+                                            Використання диска (%)
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('disk')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="diskOverviewChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="chart-card">
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="activity" class="text-accent" style="width: 16px; height: 16px;"></i>
+                                            Мережева активність та трафік
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('net')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="netOverviewChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="timeline-card" style="margin-top: 1.5rem;">
+                                <div class="card-header" style="background: rgba(0,0,0,0.1);">
+                                    <h3>Історичні дані та події (Timeline Details)</h3>
+                                    <span id="timelineSyncTime" style="font-size: 0.7rem; color: var(--text-muted);"></span>
+                                </div>
+                                <div class="card-body" style="padding: 0;">
+                                    <table class="timeline-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Timestamp</th>
+                                                <th>Server</th>
+                                                <th>CPU</th>
+                                                <th>RAM</th>
+                                                <th>Disk</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="timelineTableBody">
+                                            <!-- Real-time timeline data -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alerts-sidebar">
+                            <div class="card" style="height: 100%;">
+                                <div class="card-header">
+                                    <h3>Recent Alerts & Events</h3>
+                                    <button class="refresh-btn" style="width: 24px; height: 24px;" onclick="loadRecentAlerts()"><i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i></button>
+                                </div>
+                                <div class="card-body" style="padding: 1rem;" id="recentAlertsFeed">
+                                    <!-- Alerts will be populated here -->
+                                    <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                        <i data-lucide="shield-check" style="width: 48px; height: 48px; margin: 0 auto 1rem; opacity: 0.2;"></i>
+                                        <p>Жодних активних сповіщень</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Nodes -->
+                <div id="section-nodes" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Infrastructure <span>Inventory</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Керування підключеними вузлами та джерелами даних</p>
+                        </div>
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <div class="search-box">
+                                <i data-lucide="search" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                                <input type="search" id="nodeSearch" placeholder="Пошук вузлів..." oninput="filterNodes()" autocomplete="off" spellcheck="false" class="server-select" style="min-width: 250px;">
+                            </div>
+                            <button onclick="toggleModal('addNodeModal', true)" class="btn btn-primary" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                                <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Add Node
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="timeline-card">
+                        <div class="card-body" style="padding: 0;">
+                            <table class="timeline-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 120px;">Статус</th>
+                                        <th>Ідентифікатор вузла</th>
+                                        <th>Endpoint</th>
+                                        <th>CPU</th>
+                                        <th>RAM</th>
+                                        <th>Disk</th>
+                                        <th style="text-align: right;">Дії</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="nodesTableBody">
+                                    <!-- Dynamic Content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Alerts -->
+                <div id="section-alerts" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Alerting <span>Rules</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Налаштування логіки сповіщень та порогових значень</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="toggleModal('addAlertModal', true)" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                            <i data-lucide="bell-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Create Rule
+                        </button>
+                    </div>
+                    <div class="stats-grid" id="alertRulesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem;">
+                        <!-- Dynamic Alerts -->
+                    </div>
+                </div>
+
+
+
+                <!-- Section: Users -->
+                <div id="section-users" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">User <span>Management</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Керування обліковими записами та правами доступу</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="showAddUserModal()" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                            <i data-lucide="user-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Create User
+                        </button>
+                    </div>
+                    <div class="timeline-card">
+                        <div class="card-body" style="padding: 0;">
+                            <table class="timeline-table">
+                                <thead>
+                                    <tr>
+                                        <th>Користувач</th>
+                                        <th>Роль</th>
+                                        <th>Статус</th>
+                                        <th>Останній вхід</th>
+                                        <th style="text-align: right;">Дії</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Help & Agents -->
+                <div id="section-help" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Help <span>& Agents</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Інструкції з розгортання агентів моніторингу</p>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <!-- Linux Agent -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: var(--success);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(34, 197, 94, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="terminal" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Linux node_exporter</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Стандартний агент Prometheus для систем Linux/Unix.</p>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Команда встановлення (Debian/Ubuntu)</label>
+                                    <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #34d399; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">curl -sLO https://github.com/prometheus/node_exporter/releases/download/v1.11.1/node_exporter-1.11.1.linux-amd64.tar.gz && tar xvf node_exporter-1.11.1.linux-amd64.tar.gz && cd node_exporter-1.11.1.linux-amd64 && ./node_exporter &</div>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Ручне завантаження</label>
+                                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">Завантажити з <a href="https://github.com/prometheus/node_exporter/releases" target="_blank" style="color: var(--accent); font-weight: 600;">GitHub Releases</a></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Windows Agent -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: #3b82f6;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="monitor" style="color: #3b82f6; width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Windows Exporter</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Найкращий агент для моніторингу систем Windows Server.</p>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">PowerShell (від імені Адміністратора)</label>
+                                    <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #60a5fa; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.31.6/windows_exporter-0.31.6-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system" /qn</div>
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">Порт агента</label>
+                                    <p style="font-size: 0.8rem; margin-top: 0.5rem;">За замовчуванням: <strong style="color: white;">9182</strong></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Logs -->
+                <div id="section-logs" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Audit <span>Log Stream</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Журнал подій та дій користувачів у системі</p>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="search" id="logSearch" class="server-select" placeholder="Пошук..." style="width: 200px;" oninput="filterLogs()" autocomplete="off" spellcheck="false">
+                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem;" onclick="loadAuditLogs()">
+                                <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
+                            </button>
+                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem; font-weight: 700;" onclick="exportLogs()">
+                                <i data-lucide="download" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Export
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card" style="height: 550px; border: 1px solid var(--border);">
+                        <div class="card-body" id="auditLogStream" style="overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; padding: 1.5rem; line-height: 1.6;">
+                            <!-- Log stream -->
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
+                        <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--accent);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: white;" id="logTotalCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Total Events</div>
+                        </div>
+                        <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--danger);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--danger);" id="logAlertCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Alerts Fired</div>
+                        </div>
+                        <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--success);">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);" id="logServerCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Server Actions</div>
+                        </div>
+                        <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid #3b82f6;">
+                            <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;" id="logLoginCount">0</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Logins</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: Settings -->
+                <div id="section-settings" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">System <span>Configuration</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Глобальні налаштування системи та каналів сповіщень</p>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+                        <!-- Notification Channels -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: var(--accent);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(249, 115, 22, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="bell-ring" style="color: var(--accent); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Notification Channels</h3>
+                                </div>
+                                <div class="status-badge" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">
+                                    <input type="checkbox" id="notifEnabled" checked style="width: 14px; height: 14px; margin-right: 0.5rem; vertical-align: middle;"> Active
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                                    <div class="form-group">
+                                        <label>Telegram Bot Token</label>
+                                        <input type="password" id="tgToken" class="form-input" placeholder="712345678:AA...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Telegram Chat ID</label>
+                                        <input type="text" id="tgChat" class="form-input" placeholder="-100...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Discord Webhook</label>
+                                        <input type="password" id="dsWebhook" class="form-input" placeholder="https://discord.com/api/webhooks/...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>MS Teams Webhook</label>
+                                        <input type="password" id="tmWebhook" class="form-input" placeholder="https://outlook.office.com/webhook/...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP Server</label>
+                                        <input type="text" id="smtpServer" class="form-input" placeholder="smtp.gmail.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP Port</label>
+                                        <input type="number" id="smtpPort" class="form-input" value="587">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP User</label>
+                                        <input type="text" id="smtpUser" class="form-input">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SMTP Password</label>
+                                        <input type="password" id="smtpPass" class="form-input">
+                                    </div>
+                                    <div class="form-group" style="grid-column: span 2;">
+                                        <label>Recipient Email</label>
+                                        <input type="email" id="emailTo" class="form-input" placeholder="admin@example.com">
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                    <button class="btn btn-primary" style="flex: 1; font-weight: 700;" onclick="saveSettings()">Save Configuration</button>
+                                    <button class="btn btn-secondary" style="flex: 1; font-weight: 700;" onclick="testNotification()">
+                                        <i data-lucide="send" style="width: 14px; height: 14px; margin-right: 0.25rem;"></i> Test
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Scrape & System Settings -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: #3b82f6;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="settings-2" style="color: #3b82f6; width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>System Configuration</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label>Default Scrape Interval (seconds)</label>
+                                    <input type="number" id="scrapeInterval" class="form-input" value="15" min="5" max="300">
+                                </div>
+                                <div class="form-group">
+                                    <label>Data Retention (days)</label>
+                                    <input type="number" id="dataRetention" class="form-input" value="30" min="1" max="365">
+                                </div>
+                                <div class="form-group">
+                                    <label>Default Node Port (Linux)</label>
+                                    <input type="number" id="defaultPortLinux" class="form-input" value="9100">
+                                </div>
+                                <div class="form-group">
+                                    <label>Default Node Port (Windows)</label>
+                                    <input type="number" id="defaultPortWindows" class="form-input" value="9182">
+                                </div>
+                                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSystemSettings()">Save System Config</button>
+                            </div>
+                        </div>
+
+                        <!-- System Info -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: var(--success);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(34, 197, 94, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="info" style="color: var(--success); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>System Information</h3>
+                                </div>
+                            </div>
+                            <div class="card-body" style="font-size: 0.85rem;">
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Version</span>
+                                    <span style="color: white; font-weight: 600;">PyMon v1.0.0</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Database</span>
+                                    <span style="color: white;">SQLite</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">API Port</span>
+                                    <span style="color: white;">10000</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Active Nodes</span>
+                                    <span style="color: var(--success); font-weight: 600;" id="settingsNodeCount">-</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <span style="color: var(--text-muted);">Online Nodes</span>
+                                    <span style="color: var(--success); font-weight: 600;" id="settingsOnlineCount">-</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
+                                    <span style="color: var(--text-muted);">Uptime</span>
+                                    <span style="color: white;" id="settingsUptime">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Danger Zone -->
+                        <div class="card" style="border: 1px solid rgba(239, 68, 68, 0.2);">
+                            <div class="card-header" style="border-bottom-color: var(--danger);">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="alert-triangle" style="color: var(--danger); width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Danger Zone</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">These actions are irreversible. Proceed with caution.</p>
+                                <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); margin-bottom: 0.5rem;" onclick="if(confirm('Clear all audit logs?')) clearAuditLogs()">
+                                    <i data-lucide="trash" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Clear Audit Logs
+                                </button>
+                                <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="if(confirm('Clear ALL metric history? This cannot be undone!')) clearMetricHistory()">
+                                    <i data-lucide="database" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Clear Metric History
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="nodeDrawer" class="drawer-overlay" onclick="if(event.target===this) closeDrawer()">
+        <div class="drawer">
+            <div class="drawer-header">
+                <div>
+                    <h2 id="drawerNodeName" style="font-size: 1.5rem; color: #fff;">Node Name</h2>
+                    <div id="drawerNodeStatus" class="status-badge up" style="margin-top: 0.5rem;">UP</div>
+                </div>
+                <i data-lucide="x" style="cursor: pointer; color: var(--text-muted);" onclick="closeDrawer()"></i>
+            </div>
+            <div class="drawer-body" id="drawerBody"></div>
+        </div>
+    </div>
+
+    <div id="addNodeModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Register Data Source</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addNodeModal', false)"></i>
+            </div>
+            <form id="addNodeForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Display Name</label>
+                        <input type="text" id="nodeName" required class="form-input" placeholder="Production Server 01">
+                    </div>
+                    <div class="form-group">
+                        <label>Host Address</label>
+                        <input type="text" id="nodeHost" required class="form-input" placeholder="192.168.1.100">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>System OS</label>
+                            <select id="nodeOS" class="form-input">
+                                <option value="linux">Linux / POSIX</option>
+                                <option value="windows">Windows / NT</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Agent Port</label>
+                            <input type="number" id="nodePort" value="9100" class="form-input">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addNodeModal', false)">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Connect Node</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="addAlertModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Deploy Alerting Logic</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addAlertModal', false)"></i>
+            </div>
+            <form id="addAlertForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Policy Name</label>
+                        <input type="text" id="alertName" required class="form-input" placeholder="Critical CPU Threshold">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>Metric</label>
+                            <select id="alertMetric" class="form-input">
+                                <option value="cpu">CPU Usage (%)</option>
+                                <option value="memory">RAM Usage (%)</option>
+                                <option value="disk">Disk Space (%)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Condition</label>
+                            <select id="alertCondition" class="form-input">
+                                <option value=">">Greater than</option>
+                                <option value="<">Less than</option>
+                                <option value="==">Equals</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Threshold (%)</label>
+                            <input type="number" id="alertThreshold" value="90" class="form-input">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addAlertModal', false)">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Deploy Policy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="editNodeModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Update Node Configuration</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('editNodeModal', false)"></i>
+            </div>
+            <form id="editNodeForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Display Name</label>
+                        <input type="text" id="editNodeName" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Host Address</label>
+                        <input type="text" id="editNodeHost" required class="form-input">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>System OS</label>
+                            <select id="editNodeOS" class="form-input">
+                                <option value="linux">Linux / POSIX</option>
+                                <option value="windows">Windows / NT</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Agent Port</label>
+                            <input type="number" id="editNodePort" class="form-input">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('editNodeModal', false)">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="deployModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="deployTitle">Deploy Agent</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('deployModal', false)"></i>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Execute this command on the target server to install the exporter:</p>
+                <div class="form-group">
+                    <textarea id="deployCmd" readonly class="form-input" style="height: 120px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; resize: none;"></textarea>
+                </div>
+                <button class="btn btn-secondary" style="width: 100%;" onclick="copyDeployCmd()">
+                    <i data-lucide="copy" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Copy to Clipboard
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addUserModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create User</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addUserModal', false)"></i>
+            </div>
+            <form id="addUserForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <input type="text" id="newUsername" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="newPassword" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <select id="newUserRole" class="form-input">
+                            <option value="false">User</option>
+                            <option value="true">Administrator</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addUserModal', false)">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create User</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Chart Expansion Modal -->
+    <div id="chartExpandModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="expandedChartTitle">Detailed Analysis</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('chartExpandModal', false)"></i>
+            </div>
+            <div class="modal-body">
+                <div id="expandedChartContainer">
+                    <!-- Chart injected here -->
+                </div>
+                <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 0.75rem; border: 1px solid var(--border);">
+                    <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Insights & Legend</h4>
+                    <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.5;">Візуалізація історичних даних для обраного вузла. Використовуйте панель керування діапазоном для зміни масштабу часу.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

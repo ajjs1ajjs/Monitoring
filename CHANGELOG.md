@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-05-10
+
+### 🏗️ Major Refactoring - Modular Architecture & Async Engine
+
+#### Added
+- **Modular API Architecture**: Decoupled monolithic `endpoints.py` into structured routers (`auth`, `servers`, `metrics`, `alerts`, etc.) under `pymon/api/routers/`.
+- **Frontend/Backend Separation**: Extracted all HTML/JS/CSS into `pymon/templates/` and `pymon/static/`.
+- **Async Scrape Manager**: Completely re-engineered the scraping engine using `asyncio` and `httpx.AsyncClient`, replacing legacy threading for high-performance monitoring.
+- **Unified Database Layer**: Centralized database initialization and management in `pymon/database.py`.
+
+#### Changed
+- **CLI**: Modernized `cli.py` to support the new modular app structure and async lifespan events.
+- **Agent Deployment**: Updated `node_exporter` and `windows_exporter` commands to latest 2026 versions in the dashboard.
+- **Performance**: Optimized metric parsing and history storage with better CPU/RAM/Disk calculation logic for both Linux and Windows.
+
+#### Removed
+- Legacy "God Object" files: `web_dashboard.py`, `web_dashboard_enhanced.py`, `web_dashboard_simple.py`, and `web_ui.py`.
+
+---
+
 ## [2.0.0] - 2026-03-19
 
 ### 🎉 Major Release - Enhanced Grafana-Style Dashboard
@@ -161,6 +181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Key Features |
 |---------|------|--------------|
+| 2.1.0 | 2026-05-10 | Modular architecture, Async scrape engine, Frontend/Backend decoupling |
 | 2.0.0 | 2026-03-19 | Enhanced Grafana-style dashboard, real-time charts, disk breakdown |
 | 1.5.0 | 2026-02-15 | RAID monitoring, backups, API keys |
 | 1.4.0 | 2026-01-20 | Multi-channel notifications, alert rules |

@@ -1,3 +1,3 @@
 """PyMon - Python Monitoring System (Prometheus + Grafana alternative)"""
 
-__version__ = "0.1.0"
+__version__ = "2.1.0"

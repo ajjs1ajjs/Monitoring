@@ -62,15 +62,15 @@ iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install_ex
 git clone https://github.com/ajjs1ajjs/Monitoring.git
 cd Monitoring
 
-# Create a virtual environment
+# Create and activate virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the package and dependencies
+pip install -e .
 
 # Start the server
-python -m pymon server
+pymon server
 ```
 
 ## ⚙️ Configuration

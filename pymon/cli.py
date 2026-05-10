@@ -19,9 +19,7 @@ scrape_manager = None
 async def lifespan(app):
     global scrape_manager
     import asyncio
-
-    from pymon import web_dashboard
-    from pymon.api.endpoints import manager
+    from pymon.api.deps import manager, get_db
 
     manager.set_loop(asyncio.get_event_loop())
 
@@ -32,28 +30,14 @@ async def lifespan(app):
         config_path = os.getenv("CONFIG_PATH", "config.yml")
         config = load_config(config_path)
 
-        conn = web_dashboard.get_db()
-        servers = conn.execute("SELECT * FROM servers WHERE enabled=1").fetchall()
-        conn.close()
-
         scrape_manager = ScrapeManager(config)
         app.state.scrape_manager = scrape_manager
 
-        if servers:
-            for server in servers:
-                scrape_manager.add_server_target(server)
-
         try:
-            scrape_manager.start()
-            if servers:
-                print(
-                    f"Background scraping started (targets: {len(scrape_manager.targets)})",
-                    file=sys.stderr,
-                )
+            await scrape_manager.start()
+            print(f"Background scraping started (Async mode)", file=sys.stderr)
         except Exception as e:
             print(f"Warning: Could not start background scraping loop: {e}", file=sys.stderr)
-
-        print("ScrapeManager initialized (ready for dynamic targets)", file=sys.stderr)
 
     except Exception as e:
         print(f"Warning: Could not start background scraping: {e}", file=sys.stderr)
@@ -62,17 +46,18 @@ async def lifespan(app):
     yield
 
     if scrape_manager:
-        scrape_manager.stop()
+        await scrape_manager.stop()
         print("Background scraping stopped", file=sys.stderr)
 
 
 def create_app():
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+    from fastapi.responses import FileResponse, RedirectResponse
     from fastapi.staticfiles import StaticFiles
+    from fastapi.templating import Jinja2Templates
+    from fastapi import Request
 
-    from pymon import web_dashboard_enhanced as web_dashboard
     from pymon.api.endpoints import api
 
     # Setup basic rotating logger for prod-like environments
@@ -86,13 +71,16 @@ def create_app():
         logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     app = FastAPI(title="PyMon", version=__version__, lifespan=lifespan)
+    
+    templates_dir = os.path.join(os.path.dirname(__file__), "templates")
+    templates = Jinja2Templates(directory=templates_dir)
 
     # Configure CORS origins from environment so prod can lock down access
     raw_origins = os.getenv("PYMON_ALLOWED_ORIGINS")
     if raw_origins:
         origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
     else:
-        origins = ["http://localhost:10000"]
+        origins = ["http://localhost:10000", "http://127.0.0.1:10000"]
 
     app.add_middleware(
         CORSMiddleware,
@@ -118,18 +106,18 @@ def create_app():
             return FileResponse(svg_path)
         return None
 
-    @app.get("/dashboard", response_class=HTMLResponse)
-    @app.get("/dashboard/", response_class=HTMLResponse)
-    async def dashboard():
-        return HTMLResponse(content=web_dashboard.ENHANCED_DASHBOARD_HTML)
+    @app.get("/dashboard")
+    @app.get("/dashboard/")
+    async def dashboard(request: Request):
+        return templates.TemplateResponse("dashboard.html", {"request": request})
 
-    @app.get("/", response_class=HTMLResponse)
+    @app.get("/")
     async def root():
         return RedirectResponse(url="/dashboard/")
 
-    @app.get("/login", response_class=HTMLResponse)
-    async def login_page():
-        return HTMLResponse(content=web_dashboard.LOGIN_HTML)
+    @app.get("/login")
+    async def login_page(request: Request):
+        return templates.TemplateResponse("login.html", {"request": request})
 
     return app
 
@@ -206,10 +194,9 @@ def main():
             print("Initializing auth tables...", file=sys.stderr)
             init_auth_tables()
 
-            print("Initializing web tables...", file=sys.stderr)
-            from pymon import web_dashboard
-
-            web_dashboard.init_web_tables()
+            print("Initializing database tables...", file=sys.stderr)
+            from pymon.database import init_database
+            init_database()
 
             print(f"Starting PyMon server on {host}:{port}")
             print(f"Dashboard: http://{host}:{port}/dashboard/")

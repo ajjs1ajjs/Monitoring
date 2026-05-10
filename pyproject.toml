@@ -1,6 +1,6 @@
 [project]
 name = "pymon"
-version = "0.1.0"
+version = "2.1.0"
 description = "PyMon - Python Monitoring System (Prometheus + Grafana alternative)"
 readme = "README.md"
 license = {text = "MIT"}
