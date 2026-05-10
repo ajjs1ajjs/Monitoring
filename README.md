@@ -13,14 +13,17 @@
 
 **PyMon NOC** is a self-hosted, lightweight, and extremely fast infrastructure monitoring platform designed for both Linux and Windows environments. It features a modern, responsive Grafana-style dashboard, real-time metrics scraping, and integrated alerting rules.
 
-## ✨ Features
+## ✨ Enterprise Features
 
-- **Real-Time NOC Dashboard**: Beautiful dark-themed dashboard with live metrics, dynamic charts, and detailed Grid/List views.
-- **Cross-Platform Agents**: Support for standard Prometheus exporters (`node_exporter` for Linux, `windows_exporter` for Windows).
-- **Smart Alerting**: Configure critical thresholds for CPU, RAM, and Disk to receive instant notifications via Telegram or Discord.
-- **Role-Based Access Control**: Secure JWT authentication and user management built-in.
-- **Audit Logging**: Comprehensive tracking of all system events and user actions.
-- **Zero-Dependency Core**: Built on Python, SQLite/PostgreSQL, and Vanilla JS for maximum portability and speed.
+- **Professional NOC Dashboard**: Beautiful dark-mode interface with live metric streaming, health indicators, and advanced drawer controls.
+- **Service Monitoring**: Independent HTTP/TCP external health checks to monitor websites and databases without agents.
+- **Maintenance Mode**: One-click maintenance mode for nodes to suppress alert spam during planned work.
+- **Anomaly Detection**: Intelligent monitoring that identifies sudden metric spikes (CPU/RAM surges) based on historical trends.
+- **Progressive Web App (PWA)**: Install PyMon on your mobile device as a standalone app with offline support and home screen access.
+- **Flapping Prevention**: Smart alerting logic that prevents notification spam during unstable network conditions.
+- **Health Reporting**: Generate professional 24-hour performance reports with trend charts, exportable to PDF.
+- **Cross-Platform Agents**: Auto-detects and displays versions for `node_exporter` (Linux) and `windows_exporter` (Windows).
+- **Scalable Backend**: Batch data writing and optimized history buffering for high-performance monitoring environments.
 
 ## 🚀 Quick Start
 

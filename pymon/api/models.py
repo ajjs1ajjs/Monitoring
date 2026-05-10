@@ -38,3 +38,15 @@ class BackupListResponse(BaseModel):
 class BackupCreateResponse(BaseModel):
     status: str
     filename: str | None = None
+
+
+class MaintenanceToggle(BaseModel):
+    is_maintenance: bool
+
+
+class ServiceCreate(BaseModel):
+    name: str
+    target_url: str
+    check_type: str = "http"
+    interval: int = 60
+    timeout: int = 10

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from pymon.api.routers import auth, servers, metrics, alerts, settings, logs
+from pymon.api.routers import auth, servers, metrics, alerts, settings, logs, services, reports
 from pymon.api.deps import manager
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -12,6 +12,8 @@ api.include_router(metrics.router)
 api.include_router(alerts.router)
 api.include_router(settings.router)
 api.include_router(logs.router)
+api.include_router(services.router)
+api.include_router(reports.router)
 
 @api.websocket("/ws/metrics")
 async def websocket_endpoint(websocket: WebSocket):

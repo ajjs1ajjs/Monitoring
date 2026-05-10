@@ -8,6 +8,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0f172a">
 </head>
 <body>
     <div class="app-container">
@@ -28,6 +30,9 @@
                 </button>
                 <button class="nav-item" data-section="alerts">
                     <i data-lucide="bell-ring"></i> Alerting
+                </button>
+                <button class="nav-item" data-section="services">
+                    <i data-lucide="globe"></i> Services
                 </button>
 
                 <div class="nav-label">Support</div>
@@ -146,7 +151,34 @@
                                         <div class="chart-actions">
                                             <button class="chart-action-btn" onclick="expandChart('ram')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
                                         </div>
-                                    </div>
+                                    </div>        <!-- Services Section -->
+        <section id="section-services" class="section">
+            <div class="header-v2">
+                <div class="header-left">
+                    <h1 class="page-title">Service Monitoring</h1>
+                    <p class="page-subtitle">HTTP/TCP external health checks</p>
+                </div>
+                <button class="btn btn-primary" onclick="toggleModal('addServiceModal', true)">
+                    <i data-lucide="plus"></i> Add Service
+                </button>
+            </div>
+            
+            <div class="card-v2" style="margin-top: 2rem;">
+                <table class="table-v2" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="text-align: left; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">
+                            <th style="padding: 1rem;">Service</th>
+                            <th style="padding: 1rem;">Type</th>
+                            <th style="padding: 1rem;">Status</th>
+                            <th style="padding: 1rem;">Latency</th>
+                            <th style="padding: 1rem;">Last Check</th>
+                            <th style="padding: 1rem; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="services-table-body"></tbody>
+                </table>
+            </div>
+        </section>
                                     <div class="chart-canvas-wrapper">
                                         <canvas id="ramOverviewChart"></canvas>
                                     </div>
@@ -277,6 +309,38 @@
                     </div>
                     <div class="stats-grid" id="alertRulesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem;">
                         <!-- Dynamic Alerts -->
+                    </div>
+                </div>
+
+                <!-- Section: Services -->
+                <div id="section-services" class="dashboard-section">
+                    <div class="overview-header">
+                        <div class="header-left">
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Service <span>Monitoring</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Зовнішні HTTP/TCP перевірки працездатності</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="toggleModal('addServiceModal', true)" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                            <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Add Service
+                        </button>
+                    </div>
+                    <div class="timeline-card">
+                        <div class="card-body" style="padding: 0;">
+                            <table class="timeline-table">
+                                <thead>
+                                    <tr>
+                                        <th>Сервіс</th>
+                                        <th>Тип</th>
+                                        <th>Статус</th>
+                                        <th>Затримка</th>
+                                        <th>Остання перевірка</th>
+                                        <th style="text-align: right;">Дії</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="servicesTableBody">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -777,6 +841,44 @@
                     <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.5;">Візуалізація історичних даних для обраного вузла. Використовуйте панель керування діапазоном для зміни масштабу часу.</p>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div id="addServiceModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Add Network Service</h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addServiceModal', false)"></i>
+            </div>
+            <form id="addServiceForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Service Name</label>
+                        <input type="text" id="serviceName" required class="form-input" placeholder="Website API">
+                    </div>
+                    <div class="form-group">
+                        <label>Target URL / Address</label>
+                        <input type="text" id="serviceUrl" required class="form-input" placeholder="https://api.myapp.com or 1.1.1.1:80">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label>Check Type</label>
+                            <select id="serviceType" class="form-input">
+                                <option value="http">HTTP(S) Request</option>
+                                <option value="tcp">TCP Connection</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Interval (s)</label>
+                            <input type="number" id="serviceInterval" value="60" class="form-input">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addServiceModal', false)">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Service</button>
+                </div>
+            </form>
         </div>
     </div>
 

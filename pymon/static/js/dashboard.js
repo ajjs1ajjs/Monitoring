@@ -54,10 +54,19 @@ function openDrawer(nodeId) {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.85rem;">
                 <div><span style="color: var(--text-muted);">OS:</span> <br><strong style="color: #fff;">${n.os_type || 'Unknown'}</strong></div>
                 <div><span style="color: var(--text-muted);">IP:</span> <br><strong style="color: #fff; font-family: monospace;">${n.host}</strong></div>
-                <div><span style="color: var(--text-muted);">Port:</span> <br><strong style="color: #fff; font-family: monospace;">${n.agent_port}</strong></div>
                 <div><span style="color: var(--text-muted);">Version:</span> <br><strong style="color: #fff;">${n.exporter_version || 'N/A'}</strong></div>
+                <div><span style="color: var(--text-muted);">Maintenance:</span> <br><strong style="color: ${n.is_maintenance ? 'var(--warning)' : 'var(--success)'};">${n.is_maintenance ? 'ON' : 'OFF'}</strong></div>
                 <div><span style="color: var(--text-muted);">Added:</span> <br><strong style="color: #fff;">${new Date(n.created_at).toLocaleDateString()}</strong></div>
             </div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+            <button onclick="toggleMaintenance(${n.id}, ${!n.is_maintenance})" class="btn" style="flex: 1; background: ${n.is_maintenance ? 'var(--success)' : 'var(--warning)'}; color: #000; font-weight: 600;">
+                ${n.is_maintenance ? 'Exit Maintenance' : 'Set Maintenance'}
+            </button>
+            <button onclick="generateReport(${n.id})" class="btn" style="flex: 1; border: 1px solid var(--border);">
+                Generate Report
+            </button>
         </div>
         
         <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Storage Volumes</h4>
@@ -253,14 +262,23 @@ async function refreshData() {
     if (syncEl) syncEl.textContent = 'Syncing...';
 
     try {
-        const resp = await apiFetch('/api/v1/servers');
-        if (!resp) return;
-        const data = await resp.json();
-        nodes = data.servers;
+        const [servResp, servicesResp] = await Promise.all([
+            apiFetch('/api/v1/servers'),
+            apiFetch('/api/v1/services')
+        ]);
 
-        filterNodes();
-        const liveSearch = document.getElementById('liveSearch');
-        if (liveSearch) filterLiveTable();
+        if (servResp && servResp.ok) {
+            const data = await servResp.json();
+            nodes = data.servers;
+            filterNodes();
+            const liveSearch = document.getElementById('liveSearch');
+            if (liveSearch) filterLiveTable();
+        }
+
+        if (servicesResp && servicesResp.ok) {
+            const services = await servicesResp.json();
+            updateServicesTable(services);
+        }
 
         const timeStr = new Date().toLocaleTimeString();
         if (syncEl) syncEl.textContent = 'Last sync: ' + timeStr;
@@ -1212,6 +1230,12 @@ function populateServerSelect() {
 }
 
 // Initialization
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/js/sw.js').catch(err => console.log('SW registration failed:', err));
+    });
+}
+
 const urlParams = new URLSearchParams(window.location.search);
 const urlSection = urlParams.get('section') || 'overview';
 showSection(urlSection);
@@ -1225,3 +1249,72 @@ setInterval(() => {
     updateTimelineTable();
     populateServerSelect();
 }, 10000);
+
+// --- NEW FEATURES ---
+
+const addServiceForm = document.getElementById('addServiceForm');
+if (addServiceForm) addServiceForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const resp = await apiFetch('/api/v1/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: document.getElementById('serviceName').value,
+            target_url: document.getElementById('serviceUrl').value,
+            check_type: document.getElementById('serviceType').value,
+            interval: parseInt(document.getElementById('serviceInterval').value)
+        })
+    });
+    if (resp && resp.ok) {
+        toggleModal('addServiceModal', false);
+        e.target.reset();
+        refreshData();
+    }
+});
+
+async function toggleMaintenance(serverId, status) {
+    try {
+        const resp = await apiFetch(`/api/v1/servers/${serverId}/maintenance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_maintenance: status })
+        });
+        if (resp && resp.ok) {
+            refreshData();
+            closeDrawer();
+        }
+    } catch (err) { console.error('Error toggling maintenance', err); }
+}
+
+function updateServicesTable(services) {
+    const tbody = document.getElementById('servicesTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = services.map(s => `
+        <tr>
+            <td>
+                <div style="font-weight: 600;">${s.name}</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">${s.target_url}</div>
+            </td>
+            <td><span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">${s.check_type.toUpperCase()}</span></td>
+            <td>
+                <span class="status-badge status-${s.last_status}">
+                    <span class="status-dot status-${s.last_status}"></span>
+                    ${s.last_status.toUpperCase()}
+                </span>
+            </td>
+            <td>${s.last_response_time ? s.last_response_time.toFixed(1) + 'ms' : '-'}</td>
+            <td>${s.last_check ? new Date(s.last_check).toLocaleTimeString() : 'Never'}</td>
+            <td style="text-align: right;">
+                <button onclick="deleteService(${s.id})" class="chart-action-btn" style="color: var(--danger);"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+            </td>
+        </tr>
+    `).join('');
+    lucide.createIcons();
+}
+
+async function deleteService(id) {
+    if (confirm('Delete this service?')) {
+        await apiFetch(`/api/v1/services/${id}`, { method: 'DELETE' });
+        refreshData();
+    }
+}

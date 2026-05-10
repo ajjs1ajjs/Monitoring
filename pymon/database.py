@@ -33,7 +33,10 @@ def init_database():
         network_tx REAL DEFAULT 0,
         uptime TEXT,
         disk_info TEXT,
-        exporter_version TEXT
+        exporter_version TEXT,
+        is_maintenance BOOLEAN DEFAULT 0,
+        flapping_count INTEGER DEFAULT 0,
+        last_flapping_change TEXT
     )""")
     
     # Metrics history table
@@ -70,6 +73,23 @@ def init_database():
         enabled BOOLEAN DEFAULT 1,
         created_at TEXT,
         FOREIGN KEY (server_id) REFERENCES servers(id)
+    )""")
+    
+    # Services table (HTTP/TCP Monitoring)
+    c.execute("""CREATE TABLE IF NOT EXISTS services (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        target_url TEXT NOT NULL,
+        check_type TEXT DEFAULT 'http', -- http, tcp
+        interval INTEGER DEFAULT 60,
+        timeout INTEGER DEFAULT 5,
+        enabled BOOLEAN DEFAULT 1,
+        is_maintenance BOOLEAN DEFAULT 0,
+        last_status TEXT DEFAULT 'unknown',
+        last_check TEXT,
+        last_response_time REAL,
+        error_message TEXT,
+        created_at TEXT
     )""")
     
     # Audit logs table

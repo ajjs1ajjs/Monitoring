@@ -105,6 +105,16 @@ async def delete_server(server_id: int, current_user: User = Depends(get_current
     finally:
         conn.close()
 
+@router.post("/{server_id}/maintenance")
+async def toggle_maintenance(server_id: int, data: api_models.MaintenanceToggle, current_user: User = Depends(get_current_user)):
+    conn = get_db()
+    try:
+        conn.execute("UPDATE servers SET is_maintenance = ? WHERE id = ?", (int(data.is_maintenance), server_id))
+        conn.commit()
+        return {"status": "ok", "is_maintenance": data.is_maintenance}
+    finally:
+        conn.close()
+
 @router.post("/{server_id}/scrape")
 async def force_scrape_server(server_id: int, current_user: User = Depends(get_current_user)):
     # This usually triggers a scrape job in ScrapeManager
