@@ -55,6 +55,7 @@ function openDrawer(nodeId) {
                 <div><span style="color: var(--text-muted);">OS:</span> <br><strong style="color: #fff;">${n.os_type || 'Unknown'}</strong></div>
                 <div><span style="color: var(--text-muted);">IP:</span> <br><strong style="color: #fff; font-family: monospace;">${n.host}</strong></div>
                 <div><span style="color: var(--text-muted);">Port:</span> <br><strong style="color: #fff; font-family: monospace;">${n.agent_port}</strong></div>
+                <div><span style="color: var(--text-muted);">Version:</span> <br><strong style="color: #fff;">${n.exporter_version || 'N/A'}</strong></div>
                 <div><span style="color: var(--text-muted);">Added:</span> <br><strong style="color: #fff;">${new Date(n.created_at).toLocaleDateString()}</strong></div>
             </div>
         </div>
@@ -354,7 +355,10 @@ function updateLiveTable(data) {
                 <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;">
                     <i data-lucide="server" style="width: 12px; height: 12px;"></i>
                     ${n.os_type === 'windows' ? 'Windows NT' : 'Linux Kernel'}
-                    <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background: ${n.exporter_version === 'active' ? 'var(--success)' : (n.last_status === 'up' ? '#f59e0b' : 'var(--danger)')};"></span>
+                    <span style="display:flex; align-items:center; gap:0.25rem; background: rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border);">
+                        <span style="display:inline-block; width:5px; height:5px; border-radius:50%; background: ${n.exporter_version && n.exporter_version !== 'unknown' ? 'var(--success)' : 'var(--text-muted)'};"></span>
+                        <span style="font-size: 0.65rem; color: ${n.exporter_version && n.exporter_version !== 'unknown' ? '#fff' : 'var(--text-muted)'}; font-family: 'JetBrains Mono';">${n.exporter_version || 'v?'}</span>
+                    </span>
                 </div>
             </td>
             <td>

@@ -49,6 +49,10 @@ class ScrapeManager:
         self._down_alerted: set[int] = set()
         self._prev_metrics: dict[int, dict] = {} # {server_id: {timestamp: float, metrics: dict}}
         
+        # Optimization: History Buffer
+        self._history_buffer = []
+        self._buffer_lock = asyncio.Lock()
+        
         # Prometheus Metrics
         self.scrape_total = Counter("pymon_scrape_total", "Total scrape attempts")
         self.scrape_success = Counter("pymon_scrape_success_total", "Successful scrapes")
@@ -88,10 +92,17 @@ class ScrapeManager:
         for target in self.targets:
             task = asyncio.create_task(self._scrape_loop(target))
             self._tasks.append(task)
-        logger.info("ScrapeManager started (Async mode)")
+            
+        # Start buffer flush loop
+        self._tasks.append(asyncio.create_task(self._flush_buffer_loop()))
+        
+        logger.info("ScrapeManager started (Async mode with Batch History)")
 
     async def stop(self):
         self._running = False
+        # Final flush
+        await self._flush_history()
+        
         for task in self._tasks:
             task.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
@@ -100,7 +111,7 @@ class ScrapeManager:
 
     async def _load_dynamic_targets(self):
         """Load servers from DB as scrape targets if not in config"""
-        db_path = os.getenv("DB_PATH", "pymon.db")
+        db_path = self.config.storage.path
         try:
             import sqlite3
             conn = sqlite3.connect(db_path)
@@ -116,8 +127,8 @@ class ScrapeManager:
                     job_name="dynamic_servers",
                     target=target_str,
                     metrics_path="/metrics",
-                    interval=self.config.global_config.scrape_interval,
-                    timeout=self.config.global_config.scrape_timeout,
+                    interval=self.config.global_config.scrape_interval if hasattr(self.config, "global_config") else 15,
+                    timeout=self.config.global_config.scrape_timeout if hasattr(self.config, "global_config") else 10,
                     labels={"server_id": str(r['id']), "name": r['name']},
                     server_id=r['id']
                 ))
@@ -183,11 +194,18 @@ class ScrapeManager:
 
     def _parse_metrics(self, text: str) -> dict:
         metrics = {}
+        # Version detection
+        version = "unknown"
+        
         for line in text.splitlines():
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
             
+            if "_exporter_build_info{" in line:
+                v_match = re.search(r'version="([^"]+)"', line)
+                if v_match: version = v_match.group(1)
+
             try:
                 # Basic Prometheus parser
                 if "{" in line:
@@ -195,20 +213,20 @@ class ScrapeManager:
                     labels_part, val_str = rest.rsplit("}", 1)
                     name = name.strip()
                     val = float(val_str.strip())
-                    # We store raw line as key for complex metrics or parse labels
-                    # For summary logic, we need specific keys
-                    metrics[line] = val # Store full line for regex matching later
-                    metrics[name] = val # Also store base name
+                    metrics[line] = val 
+                    metrics[name] = val 
                 else:
                     parts = line.split()
                     if len(parts) >= 2:
                         metrics[parts[0]] = float(parts[1])
             except:
                 continue
+        
+        metrics["__version__"] = version
         return metrics
 
     async def _update_server_status(self, target: ScrapeTarget, result: ScrapeResult, success: bool):
-        db_path = os.getenv("DB_PATH", "pymon.db")
+        db_path = self.config.storage.path
         try:
             import sqlite3
             conn = sqlite3.connect(db_path, timeout=10)
@@ -230,6 +248,7 @@ class ScrapeManager:
             if success:
                 # Extract core metrics
                 m = result.metrics or {}
+                version = m.get("__version__", "unknown")
                 
                 # CPU Calculation (Handling deltas for node_exporter)
                 cpu = self._find_metric(m, ["node_cpu_calculated", "windows_cpu_usage", "cpu_usage"])
@@ -309,15 +328,13 @@ class ScrapeManager:
                 c.execute("""UPDATE servers SET 
                              last_check = ?, last_status = 'up', error_message = NULL,
                              cpu_percent = ?, memory_percent = ?, disk_percent = ?,
-                             network_rx = ?, network_tx = ?, disk_info = ?
+                             network_rx = ?, network_tx = ?, disk_info = ?, exporter_version = ?
                              WHERE id = ?""",
-                          (now_iso, cpu, mem, disk, rx, tx, json.dumps(disk_info_final), sid))
+                          (now_iso, cpu, mem, disk, rx, tx, json.dumps(disk_info_final), version, sid))
                 
-                # History
-                c.execute("""INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, 
-                             network_rx, network_tx, disk_info, timestamp) 
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                          (sid, cpu, mem, disk, rx, tx, json.dumps(disk_info_final), now_iso))
+                # Buffer history for batch insert
+                async with self._buffer_lock:
+                    self._history_buffer.append((sid, cpu, mem, disk, rx, tx, json.dumps(disk_info_final), now_iso))
                 
                 # Check Alerts
                 await self._check_alerts(sid, cpu, mem, disk, target.labels.get("name", target.target))
@@ -345,6 +362,37 @@ class ScrapeManager:
         except Exception as e:
             logger.error(f"Error updating status for {target.target}: {e}")
 
+    async def _flush_buffer_loop(self):
+        while self._running:
+            await asyncio.sleep(10)
+            await self._flush_history()
+
+    async def _flush_history(self):
+        async with self._buffer_lock:
+            if not self._history_buffer:
+                return
+            batch = self._history_buffer[:]
+            self._history_buffer.clear()
+            
+        db_path = self.config.storage.path
+        try:
+            import sqlite3
+            conn = sqlite3.connect(db_path, timeout=30)
+            c = conn.cursor()
+            c.executemany("""INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, 
+                             network_rx, network_tx, disk_info, timestamp) 
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", batch)
+            
+            # Retention cleanup based on config
+            retention_h = self.config.storage.retention_hours
+            c.execute(f"DELETE FROM metrics_history WHERE timestamp < datetime('now', '-{retention_h} hours')")
+            
+            conn.commit()
+            conn.close()
+            logger.debug(f"Flushed {len(batch)} history records to DB")
+        except Exception as e:
+            logger.error(f"Failed to flush history buffer: {e}")
+
     def _find_metric(self, metrics: dict, keys: list) -> float:
         for k in keys:
             if k in metrics: return metrics[k]
@@ -359,7 +407,7 @@ class ScrapeManager:
         return total
 
     async def _check_alerts(self, sid: int, cpu: float, mem: float, disk: float, name: str):
-        db_path = os.getenv("DB_PATH", "pymon.db")
+        db_path = self.config.storage.path
         try:
             import sqlite3
             conn = sqlite3.connect(db_path)
@@ -398,7 +446,7 @@ class ScrapeManager:
             logger.error(f"Alert check failed for {name}: {e}")
 
     async def _fire_down_alert(self, sid: int, name: str, error: str):
-        db_path = os.getenv("DB_PATH", "pymon.db")
+        db_path = self.config.storage.path
         try:
             import sqlite3
             conn = sqlite3.connect(db_path)
