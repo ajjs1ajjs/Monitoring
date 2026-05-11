@@ -23,37 +23,37 @@
             <nav class="nav-section">
                 <div class="nav-label">Monitoring</div>
                 <button class="nav-item active" data-section="overview">
-                    <i data-lucide="layout-dashboard"></i> Dashboard
+                    <i data-lucide="layout-dashboard"></i> Панель керування
                 </button>
                 <button class="nav-item" data-section="nodes">
-                    <i data-lucide="server"></i> Infrastructure
+                    <i data-lucide="server"></i> Інфраструктура
                 </button>
                 <button class="nav-item" data-section="alerts">
-                    <i data-lucide="bell-ring"></i> Alerting
+                    <i data-lucide="bell-ring"></i> Сповіщення
                 </button>
                 <button class="nav-item" data-section="services">
-                    <i data-lucide="globe"></i> Services
+                    <i data-lucide="globe"></i> Сервіси
                 </button>
 
                 <div class="nav-label">Support</div>
                 <button class="nav-item" data-section="help">
-                    <i data-lucide="help-circle"></i> Help & Agents
+                    <i data-lucide="help-circle"></i> Довідка та Агенти
                 </button>
                 <div class="nav-label">Management</div>
                 <button class="nav-item" data-section="logs">
-                    <i data-lucide="list"></i> Audit Logs
+                    <i data-lucide="list"></i> Журнал аудиту
                 </button>
                 <button class="nav-item" data-section="users">
-                    <i data-lucide="users"></i> Users
+                    <i data-lucide="users"></i> Користувачі
                 </button>
                 <button class="nav-item" data-section="settings">
-                    <i data-lucide="settings"></i> Configuration
+                    <i data-lucide="settings"></i> Конфігурація
                 </button>
             </nav>
 
             <div class="sidebar-footer">
                 <button id="logoutBtn" class="logout-btn">
-                    <i data-lucide="log-out"></i> End Session
+                    <i data-lucide="log-out"></i> Вийти
                 </button>
             </div>
         </aside>
@@ -62,7 +62,7 @@
         <main>
             <header>
                 <div class="header-left">
-                    <h2 id="viewTitle">Overview</h2>
+                    <h2 id="viewTitle">Огляд</h2>
                 </div>
                 <div class="header-actions">
                     <span id="updateTimer" style="font-size: 0.7rem; color: var(--text-muted); font-family: monospace;">Syncing...</span>
@@ -90,7 +90,7 @@
                 <div id="section-overview" class="dashboard-section active">
                     <div class="overview-header">
                         <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">Overview <span>Monitoring</span></h2>
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Огляд <span>моніторингу</span></h2>
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Аналіз продуктивності та статус інфраструктури</p>
                         </div>
                         <div class="overview-controls">
@@ -228,7 +228,7 @@
                         <div class="alerts-sidebar">
                             <div class="card" style="height: 100%;">
                                 <div class="card-header">
-                                    <h3>Recent Alerts & Events</h3>
+                                    <h3>Останні сповіщення та події</h3>
                                     <button class="refresh-btn" style="width: 24px; height: 24px;" onclick="loadRecentAlerts()"><i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i></button>
                                 </div>
                                 <div class="card-body" style="padding: 1rem;" id="recentAlertsFeed">
@@ -247,7 +247,7 @@
                 <div id="section-nodes" class="dashboard-section">
                     <div class="overview-header">
                         <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">Infrastructure <span>Inventory</span></h2>
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Реєстр <span>інфраструктури</span></h2>
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Керування підключеними вузлами та джерелами даних</p>
                         </div>
                         <div style="display: flex; gap: 1rem; align-items: center;">
@@ -256,7 +256,7 @@
                                 <input type="search" id="nodeSearch" placeholder="Пошук вузлів..." oninput="filterNodes()" autocomplete="off" spellcheck="false" class="server-select" style="min-width: 250px;">
                             </div>
                             <button onclick="toggleModal('addNodeModal', true)" class="btn btn-primary" style="padding: 0.6rem 1.25rem; font-weight: 700;">
-                                <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Add Node
+                                <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Додати вузол
                             </button>
                         </div>
                     </div>
@@ -287,11 +287,11 @@
                 <div id="section-alerts" class="dashboard-section">
                     <div class="overview-header">
                         <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">Alerting <span>Rules</span></h2>
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Правила <span>сповіщень</span></h2>
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Налаштування логіки сповіщень та порогових значень</p>
                         </div>
                         <button class="btn btn-primary" onclick="toggleModal('addAlertModal', true)" style="padding: 0.6rem 1.25rem; font-weight: 700;">
-                            <i data-lucide="bell-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Create Rule
+                            <i data-lucide="bell-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Створити правило
                         </button>
                     </div>
                     <div class="stats-grid" id="alertRulesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem;">
@@ -303,11 +303,11 @@
                 <div id="section-services" class="dashboard-section">
                     <div class="overview-header">
                         <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">Service <span>Monitoring</span></h2>
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Моніторинг <span>сервісів</span></h2>
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Зовнішні HTTP/TCP перевірки працездатності</p>
                         </div>
                         <button class="btn btn-primary" onclick="toggleModal('addServiceModal', true)" style="padding: 0.6rem 1.25rem; font-weight: 700;">
-                            <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Add Service
+                            <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Додати сервіс
                         </button>
                     </div>
                     <div class="timeline-card">
@@ -337,11 +337,11 @@
                 <div id="section-users" class="dashboard-section">
                     <div class="overview-header">
                         <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">User <span>Management</span></h2>
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Керування <span>користувачами</span></h2>
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Керування обліковими записами та правами доступу</p>
                         </div>
                         <button class="btn btn-primary" onclick="showAddUserModal()" style="padding: 0.6rem 1.25rem; font-weight: 700;">
-                            <i data-lucide="user-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Create User
+                            <i data-lucide="user-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Створити користувача
                         </button>
                     </div>
                     <div class="timeline-card">
@@ -426,8 +426,8 @@
                 <div id="section-logs" class="dashboard-section">
                     <div class="overview-header">
                         <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">Audit <span>Log Stream</span></h2>
-                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Журнал подій та дій користувачів у системі</p>
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Журнал <span>аудиту</span></h2>
+                            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Журнал системних подій та дій користувачів</p>
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <input type="search" id="logSearch" class="server-select" placeholder="Пошук..." style="width: 200px;" oninput="filterLogs()" autocomplete="off" spellcheck="false">
@@ -435,7 +435,7 @@
                                 <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
                             </button>
                             <button class="btn btn-secondary" style="padding: 0.6rem 1rem; font-weight: 700;" onclick="exportLogs()">
-                                <i data-lucide="download" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Export
+                                <i data-lucide="download" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Експорт
                             </button>
                         </div>
                     </div>
@@ -447,19 +447,19 @@
                     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
                         <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--accent);">
                             <div style="font-size: 1.5rem; font-weight: 700; color: white;" id="logTotalCount">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Total Events</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Усього подій</div>
                         </div>
                         <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--danger);">
                             <div style="font-size: 1.5rem; font-weight: 700; color: var(--danger);" id="logAlertCount">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Alerts Fired</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Спрацювало сповіщень</div>
                         </div>
                         <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid var(--success);">
                             <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);" id="logServerCount">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Server Actions</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Дії серверів</div>
                         </div>
                         <div class="card" style="padding: 1rem; text-align: center; border-left: 4px solid #3b82f6;">
                             <div style="font-size: 1.5rem; font-weight: 700; color: #3b82f6;" id="logLoginCount">0</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Logins</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Входи</div>
                         </div>
                     </div>
                 </div>
@@ -468,7 +468,7 @@
                 <div id="section-settings" class="dashboard-section">
                     <div class="overview-header">
                         <div class="header-left">
-                            <h2 style="font-size: 1.4rem; font-weight: 800;">System <span>Configuration</span></h2>
+                            <h2 style="font-size: 1.4rem; font-weight: 800;">Системна <span>конфігурація</span></h2>
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Глобальні налаштування системи та каналів сповіщень</p>
                         </div>
                     </div>
@@ -480,7 +480,7 @@
                                     <div style="padding: 0.5rem; background: rgba(249, 115, 22, 0.1); border-radius: 0.5rem;">
                                         <i data-lucide="bell-ring" style="color: var(--accent); width: 20px; height: 20px;"></i>
                                     </div>
-                                    <h3>Notification Channels</h3>
+                                    <h3>Канали сповіщень</h3>
                                 </div>
                                 <div class="status-badge" style="background: rgba(16, 185, 129, 0.1); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2);">
                                     <input type="checkbox" id="notifEnabled" checked style="width: 14px; height: 14px; margin-right: 0.5rem; vertical-align: middle;"> Active
@@ -526,9 +526,9 @@
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                                    <button class="btn btn-primary" style="flex: 1; font-weight: 700;" onclick="saveSettings()">Save Configuration</button>
+                                    <button class="btn btn-primary" style="flex: 1; font-weight: 700;" onclick="saveSettings()">Зберегти налаштування</button>
                                     <button class="btn btn-secondary" style="flex: 1; font-weight: 700;" onclick="testNotification()">
-                                        <i data-lucide="send" style="width: 14px; height: 14px; margin-right: 0.25rem;"></i> Test
+                                        <i data-lucide="send" style="width: 14px; height: 14px; margin-right: 0.25rem;"></i> Тест
                                     </button>
                                 </div>
                             </div>
@@ -541,7 +541,7 @@
                                     <div style="padding: 0.5rem; background: rgba(59, 130, 246, 0.1); border-radius: 0.5rem;">
                                         <i data-lucide="settings-2" style="color: #3b82f6; width: 20px; height: 20px;"></i>
                                     </div>
-                                    <h3>System Configuration</h3>
+                                    <h3>Системні налаштування</h3>
                                 </div>
                             </div>
                             <div class="card-body">
@@ -561,7 +561,7 @@
                                     <label>Default Node Port (Windows)</label>
                                     <input type="number" id="defaultPortWindows" class="form-input" value="9182">
                                 </div>
-                                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSystemSettings()">Save System Config</button>
+                                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSystemSettings()">Зберегти систему</button>
                             </div>
                         </div>
 
@@ -572,16 +572,16 @@
                                     <div style="padding: 0.5rem; background: rgba(34, 197, 94, 0.1); border-radius: 0.5rem;">
                                         <i data-lucide="info" style="color: var(--success); width: 20px; height: 20px;"></i>
                                     </div>
-                                    <h3>System Information</h3>
+                                    <h3>Інформація про систему</h3>
                                 </div>
                             </div>
                             <div class="card-body" style="font-size: 0.85rem;">
                                 <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                                    <span style="color: var(--text-muted);">Version</span>
+                                    <span style="color: var(--text-muted);">Версія</span>
                                     <span style="color: white; font-weight: 600;">PyMon v1.0.0</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                                    <span style="color: var(--text-muted);">Database</span>
+                                    <span style="color: var(--text-muted);">База даних</span>
                                     <span style="color: white;">SQLite</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
@@ -589,15 +589,15 @@
                                     <span style="color: white;">10000</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                                    <span style="color: var(--text-muted);">Active Nodes</span>
+                                    <span style="color: var(--text-muted);">Активних вузлів</span>
                                     <span style="color: var(--success); font-weight: 600;" id="settingsNodeCount">-</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                                    <span style="color: var(--text-muted);">Online Nodes</span>
+                                    <span style="color: var(--text-muted);">Вузлів онлайн</span>
                                     <span style="color: var(--success); font-weight: 600;" id="settingsOnlineCount">-</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; padding: 0.5rem 0;">
-                                    <span style="color: var(--text-muted);">Uptime</span>
+                                    <span style="color: var(--text-muted);">Аптайм</span>
                                     <span style="color: white;" id="settingsUptime">-</span>
                                 </div>
                             </div>
@@ -610,7 +610,7 @@
                                     <div style="padding: 0.5rem; background: rgba(139, 92, 246, 0.1); border-radius: 0.5rem;">
                                         <i data-lucide="file-up" style="color: #8b5cf6; width: 20px; height: 20px;"></i>
                                     </div>
-                                    <h3>Config Migration</h3>
+                                    <h3>Міграція конфігурації</h3>
                                 </div>
                             </div>
                             <div class="card-body">
@@ -620,8 +620,8 @@
                                     <textarea id="promYamlInput" class="form-input" style="height: 120px; font-family: monospace; font-size: 0.75rem;" placeholder="scrape_configs: ..."></textarea>
                                 </div>
                                 <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                                    <button class="btn btn-primary" style="flex: 1;" onclick="importPromConfig()">Import Targets</button>
-                                    <button class="btn btn-secondary" style="flex: 1;" onclick="exportPyMonConfig()">Export Config</button>
+                                    <button class="btn btn-primary" style="flex: 1;" onclick="importPromConfig()">Імпорт вузлів</button>
+                                    <button class="btn btn-secondary" style="flex: 1;" onclick="exportPyMonConfig()">Експорт конфіга</button>
                                 </div>
                             </div>
                         </div>
@@ -633,16 +633,16 @@
                                     <div style="padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border-radius: 0.5rem;">
                                         <i data-lucide="alert-triangle" style="color: var(--danger); width: 20px; height: 20px;"></i>
                                     </div>
-                                    <h3>Danger Zone</h3>
+                                    <h3>Небезпечна зона</h3>
                                 </div>
                             </div>
                             <div class="card-body">
                                 <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">These actions are irreversible. Proceed with caution.</p>
                                 <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); margin-bottom: 0.5rem;" onclick="if(confirm('Clear all audit logs?')) clearAuditLogs()">
-                                    <i data-lucide="trash" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Clear Audit Logs
+                                    <i data-lucide="trash" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Очистити журнал аудиту
                                 </button>
                                 <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="if(confirm('Clear ALL metric history? This cannot be undone!')) clearMetricHistory()">
-                                    <i data-lucide="database" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Clear Metric History
+                                    <i data-lucide="database" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Очистити історію метрик
                                 </button>
                             </div>
                         </div>
@@ -669,36 +669,36 @@
     <div id="addNodeModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3>Register Data Source</h3>
+                <h3>Реєстрація джерела даних</h3>
                 <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addNodeModal', false)"></i>
             </div>
             <form id="addNodeForm">
                 <div class="modal-body">
                     <div class="form-group">
-                        <label>Display Name</label>
+                        <label>Назва для відображення</label>
                         <input type="text" id="nodeName" required class="form-input" placeholder="Production Server 01">
                     </div>
                     <div class="form-group">
-                        <label>Host Address</label>
+                        <label>Адреса хоста</label>
                         <input type="text" id="nodeHost" required class="form-input" placeholder="192.168.1.100">
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
-                            <label>System OS</label>
+                            <label>ОС системи</label>
                             <select id="nodeOS" class="form-input">
                                 <option value="linux">Linux / POSIX</option>
                                 <option value="windows">Windows / NT</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Agent Port</label>
+                            <label>Порт агента</label>
                             <input type="number" id="nodePort" value="9100" class="form-input">
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addNodeModal', false)">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Connect Node</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addNodeModal', false)">Скасувати</button>
+                    <button type="submit" class="btn btn-primary">Підключити вузол</button>
                 </div>
             </form>
         </div>
@@ -707,18 +707,18 @@
     <div id="addAlertModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3>Deploy Alerting Logic</h3>
+                <h3>Налаштування логіки сповіщень</h3>
                 <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addAlertModal', false)"></i>
             </div>
             <form id="addAlertForm">
                 <div class="modal-body">
                     <div class="form-group">
-                        <label>Policy Name</label>
+                        <label>Назва політики</label>
                         <input type="text" id="alertName" required class="form-input" placeholder="Critical CPU Threshold">
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
-                            <label>Metric</label>
+                            <label>Метрика</label>
                             <select id="alertMetric" class="form-input">
                                 <option value="cpu">CPU Usage (%)</option>
                                 <option value="memory">RAM Usage (%)</option>
@@ -728,7 +728,7 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Condition</label>
+                            <label>Умова</label>
                             <select id="alertCondition" class="form-input">
                                 <option value=">">Greater than</option>
                                 <option value="<">Less than</option>
@@ -736,14 +736,14 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Threshold (%)</label>
+                            <label>Поріг</label>
                             <input type="number" id="alertThreshold" value="90" class="form-input">
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addAlertModal', false)">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Deploy Policy</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addAlertModal', false)">Скасувати</button>
+                    <button type="submit" class="btn btn-primary">Застосувати правило</button>
                 </div>
             </form>
         </div>
@@ -752,7 +752,7 @@
     <div id="editNodeModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3>Update Node Configuration</h3>
+                <h3>Оновлення налаштувань вузла</h3>
                 <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('editNodeModal', false)"></i>
             </div>
             <form id="editNodeForm">
@@ -780,8 +780,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('editNodeModal', false)">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('editNodeModal', false)">Скасувати</button>
+                    <button type="submit" class="btn btn-primary">Зберегти зміни</button>
                 </div>
             </form>
         </div>
@@ -790,7 +790,7 @@
     <div id="deployModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3 id="deployTitle">Deploy Agent</h3>
+                <h3 id="deployTitle">Встановлення агента</h3>
                 <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('deployModal', false)"></i>
             </div>
             <div class="modal-body">
@@ -799,7 +799,7 @@
                     <textarea id="deployCmd" readonly class="form-input" style="height: 120px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; resize: none;"></textarea>
                 </div>
                 <button class="btn btn-secondary" style="width: 100%;" onclick="copyDeployCmd()">
-                    <i data-lucide="copy" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Copy to Clipboard
+                    <i data-lucide="copy" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Копіювати в буфер
                 </button>
             </div>
         </div>
@@ -808,21 +808,21 @@
     <div id="addUserModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3>Create User</h3>
+                <h3>Створити користувача</h3>
                 <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addUserModal', false)"></i>
             </div>
             <form id="addUserForm">
                 <div class="modal-body">
                     <div class="form-group">
-                        <label>Username</label>
+                        <label>Логін</label>
                         <input type="text" id="newUsername" class="form-input" required>
                     </div>
                     <div class="form-group">
-                        <label>Password</label>
+                        <label>Пароль</label>
                         <input type="password" id="newPassword" class="form-input" required>
                     </div>
                     <div class="form-group">
-                        <label>Role</label>
+                        <label>Роль</label>
                         <select id="newUserRole" class="form-input">
                             <option value="false">User</option>
                             <option value="true">Administrator</option>
@@ -830,8 +830,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addUserModal', false)">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create User</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addUserModal', false)">Скасувати</button>
+                    <button type="submit" class="btn btn-primary">Створити користувача</button>
                 </div>
             </form>
         </div>
@@ -841,7 +841,7 @@
     <div id="chartExpandModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3 id="expandedChartTitle">Detailed Analysis</h3>
+                <h3 id="expandedChartTitle">Детальний аналіз</h3>
                 <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('chartExpandModal', false)"></i>
             </div>
             <div class="modal-body">
@@ -859,36 +859,36 @@
     <div id="addServiceModal" class="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <h3>Add Network Service</h3>
+                <h3>Додати мережевий сервіс</h3>
                 <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addServiceModal', false)"></i>
             </div>
             <form id="addServiceForm">
                 <div class="modal-body">
                     <div class="form-group">
-                        <label>Service Name</label>
+                        <label>Назва сервісу</label>
                         <input type="text" id="serviceName" required class="form-input" placeholder="Website API">
                     </div>
                     <div class="form-group">
-                        <label>Target URL / Address</label>
+                        <label>Цільова URL / Адреса</label>
                         <input type="text" id="serviceUrl" required class="form-input" placeholder="https://api.myapp.com or 1.1.1.1:80">
                     </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
-                            <label>Check Type</label>
+                            <label>Тип перевірки</label>
                             <select id="serviceType" class="form-input">
                                 <option value="http">HTTP(S) Request</option>
                                 <option value="tcp">TCP Connection</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Interval (s)</label>
+                            <label>Інтервал (сек)</label>
                             <input type="number" id="serviceInterval" value="60" class="form-input">
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addServiceModal', false)">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Service</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addServiceModal', false)">Скасувати</button>
+                    <button type="submit" class="btn btn-primary">Додати сервіс</button>
                 </div>
             </form>
         </div>

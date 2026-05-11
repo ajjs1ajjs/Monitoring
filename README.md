@@ -6,47 +6,48 @@
   [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
   [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 
-  <img src="https://img.shields.io/badge/Status-Production_Ready-success" alt="Production Ready">
+  <img src="https://img.shields.io/badge/Статус-Production_Ready-success" alt="Production Ready">
 </div>
 
 ---
 
-**PyMon NOC** is a self-hosted, lightweight, and extremely fast infrastructure monitoring platform designed for both Linux and Windows environments. It features a modern, responsive Grafana-style dashboard, real-time metrics scraping, and integrated alerting rules.
+**PyMon NOC** — це легка, швидка та сучасна платформа для моніторингу інфраструктури, розроблена для роботи в середовищах Linux та Windows. Система включає професійну панель керування (NOC Dashboard) у стилі Grafana, збір метрик у реальному часі та гнучку систему сповіщень.
 
-## ✨ Enterprise Features
+## ✨ Основні можливості
 
-- **Professional NOC Dashboard**: Beautiful dark-mode interface with live metric streaming, health indicators, and advanced drawer controls.
-- **Service Monitoring**: Independent HTTP/TCP external health checks to monitor websites and databases without agents.
-- **Maintenance Mode**: One-click maintenance mode for nodes to suppress alert spam during planned work.
-- **Anomaly Detection**: Intelligent monitoring that identifies sudden metric spikes (CPU/RAM surges) based on historical trends.
-- **Progressive Web App (PWA)**: Install PyMon on your mobile device as a standalone app with offline support and home screen access.
-- **Flapping Prevention**: Smart alerting logic that prevents notification spam during unstable network conditions.
-- **Health Reporting**: Generate professional 24-hour performance reports with trend charts, exportable to PDF.
-- **Cross-Platform Agents**: Auto-detects and displays versions for `node_exporter` (Linux) and `windows_exporter` (Windows).
-- **Scalable Backend**: Batch data writing and optimized history buffering for high-performance monitoring environments.
+- **Професійний NOC Dashboard**: Сучасний інтерфейс у темній темі з потоковою передачею метрик, індикаторами здоров'я та зручним керуванням вузлами.
+- **Моніторинг сервісів**: Зовнішні перевірки HTTP/TCP для моніторингу сайтів та баз даних без необхідності встановлення агентів.
+- **Історія та Аналітика**: Зберігання історичних даних про затримки сервісів та продуктивність серверів.
+- **Режим обслуговування (Maintenance)**: Відключення сповіщень для вузлів одним кліком під час планових робіт.
+- **Детекція аномалій**: Інтелектуальний аналіз різких стрибків метрик (CPU/RAM) на основі історичних трендів.
+- **PWA (Progressive Web App)**: Встановлюйте PyMon на мобільний телефон як окремий додаток із доступом з головного екрана.
+- **Захист від "брязкання" (Flapping)**: Розумна логіка сповіщень, яка запобігає спаму повідомленнями при нестабільному з'єднанні.
+- **Звіти про здоров'я**: Генерація професійних 24-годинних звітів із графіками трендів у форматі PDF.
+- **Міграція з Prometheus**: Можливість імпорту існуючих конфігурацій `prometheus.yml` безпосередньо через інтерфейс.
 
-## 🚀 Quick Start
+## 🚀 Швидкий старт
 
-### Installing the Management Server
+### Встановлення сервера моніторингу
 
-**Linux:**
+**Для Linux:**
 ```bash
 curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
 ```
 
-**Windows Server:**
+**Для Windows Server (PowerShell від Адміністратора):**
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1'))
+iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1')) -Service
 ```
+*Використання прапорця `-Service` на Windows обов'язкове для роботи PyMon у фоновому режимі як системної служби.*
 
-Once installed, the dashboard will be available at: `http://localhost:10000/dashboard/`  
-**Default Login:** `admin` / `changeme` *(Please change immediately after logging in)*
+Після встановлення панель буде доступна за адресою: `http://<IP-адреса>:10000/dashboard/`  
+**Логін за замовчуванням:** `admin` / `changeme` *(Обов'язково змініть пароль після першого входу!)*
 
-### Deploying Agents to Target Nodes
+### Розгортання агентів на цільових вузлах
 
-PyMon uses standard Prometheus exporters. You can deploy them easily to your servers:
+PyMon використовує стандартні експортери Prometheus. Ви можете легко встановити їх:
 
 **Linux Node (node_exporter):**
 ```bash
@@ -55,49 +56,51 @@ curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/inst
 
 **Windows Node (windows_exporter):**
 ```powershell
-iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install_exporter.ps1' | iex
+msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.31.6/windows_exporter-0.31.6-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system" /qn
 ```
 
-## 🛠️ Manual Installation & Development
+## 🛠️ Ручне встановлення та розробка
 
 ```bash
-# Clone the repository
+# Клонування репозиторію
 git clone https://github.com/ajjs1ajjs/Monitoring.git
 cd Monitoring
 
-# Create and activate virtual environment
+# Створення та активація віртуального середовища
 python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# На Linux:
+source .venv/bin/activate
+# На Windows:
+.venv\Scripts\activate
 
-# Install the package and dependencies
+# Встановлення залежностей
 pip install -e .
 
-# Start the server
+# Запуск сервера
 pymon server
 ```
 
-## ⚙️ Configuration
+## ⚙️ Конфігурація
 
-PyMon uses a `config.yml` file located in the root directory. You can configure:
-- **Server**: Host, port, and domain.
-- **Storage**: Choose between SQLite (default) or PostgreSQL for massive scalability.
-- **Auth**: JWT expiration times and secrets.
-- **Scraping**: Polling intervals and timeout settings.
+PyMon використовує файл `config.yml` у кореневій директорії. Ви можете налаштувати:
+- **Server**: Порт, хост та домен.
+- **Storage**: SQLite (за замовчуванням) або PostgreSQL для великих інсталяцій.
+- **Auth**: Час дії JWT токенів та секрети.
+- **Scraping**: Інтервали збору даних та таймаути.
 
-## 📚 Documentation
+## 📚 Документація
 
-Detailed documentation can be found in the `docs/` folder:
+Детальну інформацію можна знайти в папці `docs/`:
 - [API Reference](docs/API.md)
-- [Architecture Overview](docs/ARCHITECTURE.md)
-- [Database Migration Guide](docs/MIGRATION.md)
+- [Огляд архітектури](docs/ARCHITECTURE.md)
+- [Керівництво з міграції БД](docs/MIGRATION.md)
 
-## 🛡️ Security Best Practices
+## 🛡️ Безпека
 
-- Secure the dashboard behind a reverse proxy (Nginx/Traefik) with TLS.
-- Restrict agent ports (9100/9182) to only allow traffic from your PyMon server IP via firewall.
-- Regularly rotate your `JWT_SECRET`.
+- Рекомендується використовувати PyMon за реверс-проксі (Nginx/Traefik) з підтримкою TLS.
+- Обмежуйте доступ до портів агентів (9100/9182) за допомогою фаєрволу, дозволяючи трафік лише з IP вашого сервера PyMon.
+- Регулярно змінюйте `JWT_SECRET` у налаштуваннях.
 
-## 📄 License
+## 📄 Ліцензія
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
+Цей проект розповсюджується під ліцензією MIT. Детальніше див. у файлі [LICENSE](LICENSE).

@@ -1,15 +1,37 @@
-Phase 2.9 — UI clean-up and user migration
-- Remove all traces of the old dashboard (dashboard_unified) from active usage. The file has been deleted, references updated, and a short deprecation notice is included in README.
-- Document user migration to Enhanced Dashboard and implement redirects to guide users to the new UI.
-- Ensure there is a clear path for future deprecations and a plan to remove the old UI from the codebase.
+# Керівництво з міграції та оновлення PyMon NOC
 
-Phase 2.10 — API contract (structure and docs)
-- Introduce explicit Pydantic models for new endpoints:
-  - /servers/{server_id}/export (AllServersExportResponse)
-  - /servers/metrics/history (HistoryAllResponse)
-  - /servers/{server_id}/uptime-timeline (UptimeTimelineResponse)
-- Update docs/API.md with examples and response contracts for new endpoints.
+Це керівництво допоможе вам перейти на нову версію PyMon NOC v1.0 та перенести налаштування з інших систем моніторингу.
 
-Phase 3–4 (overview)
-- Phase 3: Add tests for new endpoints, integrate tests into CI, and update architecture/docs.
-- Phase 4: Push toward full asynchronous paths, consider PostgreSQL for scale, TLS/secrets management, and enhanced monitoring.
+### 1. Оновлення з попередніх версій PyMon
+Якщо у вас вже встановлена стара версія PyMon:
+1. **Резервна копія**: Обов'язково збережіть файли `pymon.db` та `config.yml` перед оновленням.
+2. **Запуск оновлення**:
+   - **Windows**: Запустіть PowerShell від імені Адміністратора та виконайте:
+     ```powershell
+     .\install.ps1 -Service
+     ```
+   - **Linux**: Виконайте команду оновлення:
+     ```bash
+     curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/update.sh | sudo bash
+     ```
+Скрипт автоматично оновить програмний код, збереже ваші дані та переведе систему на роботу у фоновому режимі (як службу).
+
+### 2. Міграція з Prometheus
+Тепер ви можете легко перенести ваші цілі моніторингу з існуючих інсталяцій Prometheus:
+1. Перейдіть у розділ **Settings** -> **Config Migration** у дашборді.
+2. Вставте вміст вашого файлу `prometheus.yml` (секцію `scrape_configs`).
+3. Натисніть **Import Targets**. 
+Система просканує YAML, витягне всі IP-адреси та порти, і додасть їх до списку моніторингу PyMon, ігноруючи дублікати.
+
+### 3. Новий інтерфейс та структура даних
+Старий інтерфейс (`dashboard_unified`) повністю виведений з експлуатації. 
+- **Redirects**: Всі посилання автоматично перенаправляють на нову панель керування.
+- **Метрики**: Історія метрик тепер зберігається з вищою точністю. Старі дані будуть автоматично мігровані в нову структуру таблиць при першому запуску.
+
+### 4. Налаштування сповіщень (Alerting)
+З версії v1.0 змінено логіку обробки сповіщень:
+- **Service Alerts**: Тепер ви можете налаштовувати сповіщення окремо для HTTP-сайтів та TCP-портів.
+- **Anomaly Detection**: Новий алгоритм автоматично підлаштовується під "нормальну" поведінку вашого сервера, зменшуючи кількість хибних спрацювань.
+
+---
+*При виникненні проблем звертайтеся до розділу системних логів у папці `logs/` або переглядайте статус служби через `systemctl` (Linux) / `Task Scheduler` (Windows).*

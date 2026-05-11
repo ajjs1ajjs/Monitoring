@@ -1,32 +1,38 @@
-Phase 3–4 Architecture Overview
+# Огляд архітектури PyMon NOC
 
-- Overview
-  - PyMon backend is a FastAPI service exposing REST APIs for monitoring data and control operations.
-  - Data is stored in SQLite (default) with a Memory backend available for tests and small deployments. A future plan is PostgreSQL for scale.
-  - The UI is integrated via Enhanced Dashboard (web_dashboard_enhanced.py).
+### Загальний огляд
+- **Backend**: Побудований на базі **FastAPI**, що забезпечує високу продуктивність та асинхронну обробку запитів. Експонує REST API для збору метрик, керування серверами та сповіщеннями.
+- **Storage**: Використовує асинхронний доступ до **SQLite** (через `aiosqlite`) для зберігання історії метрик та конфігурацій. Підтримує автоматичну ротацію даних (retention).
+- **Frontend**: Сучасний односторінковий додаток (SPA) на базі Vanilla JS, CSS та Chart.js, інтегрований безпосередньо в FastAPI через Jinja2 шаблони.
 
-- Key Components
-  - API Layer (FastAPI)
-    - Endpoints for servers, metrics history, exports, backups, alerts, and admin tasks.
-    - History endpoints use a metrics_history table for time-series data.
-  - Storage Layer
-    - SQLiteStorage (async) for metrics history in prod-like usage.
-    - MemoryStorage for tests or small-scale usage.
-  - UI Layer
-    - Enhanced Dashboard (web_dashboard_enhanced.py) – main UI.
-    - Legacy dashboard routers are not mounted by the active app; remaining legacy modules are used only for database schema helpers until that initialization path is migrated.
+### Основні компоненти
+1. **API Layer (FastAPI)**:
+   - Обробка запитів від агентів та фронтенду.
+   - Керування автентифікацією (JWT).
+   - Експорт даних у формати CSV, JSON та PDF.
+2. **Scrape Manager (Async)**:
+   - Автономний цикл збору метрик, що працює у фоновому режимі.
+   - Підтримка паралельного опитування десятків вузлів.
+   - Обробка логіки сповіщень та виявлення аномалій.
+3. **Storage Layer**:
+   - `SQLiteStorage`: Основне сховище для продуктивних середовищ.
+   - `MemoryStorage`: Тимчасове сховище для тестів.
+4. **UI Layer**:
+   - Ефективна візуалізація часових рядів метрик.
+   - Динамічне керування статусами вузлів та сервісів.
 
-- Data Flow
-  - Collectors fetch metrics from exporters (node_exporter/windows_exporter/Telegraf) and push to metrics_history table via API endpoints and storage backends.
-  - Frontend consumes API endpoints to render charts and dashboards (CPU/Memory/Disk/Network, uptime, disk breakdown, etc.).
-  - Exports (CSV/JSON) provide data for reports.
+### Потік даних (Data Flow)
+- **Збір**: Менеджер збору (Scrape Manager) опитує агенти (`node_exporter`, `windows_exporter`) за розкладом.
+- **Зберігання**: Отримані дані буферизуються та записуються в базу даних `metrics_history` та `services_history`.
+- **Аналіз**: Система перевіряє отримані значення на відповідність правилам Alerting Rules.
+- **Візуалізація**: Користувач отримує дані через API, які відображаються на графіках у реальному часі.
 
-- Security & Deployment
-  - JWT-based authentication. Secrets via environment (JWT_SECRET) and possibly secret stores in future.
-  - CORS configurable via PYMON_ALLOWED_ORIGINS.
-  - Docker-based deployment via docker-compose and a multi-stage Dockerfile.
+### Безпека та розгортання
+- **Автентифікація**: Захист усіх критичних ендпоінтів через JWT токени.
+- **Service Mode**: На Windows проект реєструється як фонове завдання (Task Scheduler), на Linux — як системна служба `systemd`.
+- **Docker**: Повна підтримка контейнеризації через Dockerfile та docker-compose.yml.
 
-- Scaling Plan (Phase 4)
-  - Move to PostgreSQL for persistency and scaling.
-  - Fully asynchronous stack with asyncio-based storage adapters.
-  - TLS termination behind an ingress, and secrets managed via CI/CD vault/secret manager.
+### Плани на майбутнє
+- Інтеграція з **PostgreSQL** для підтримки надвеликих інфраструктур.
+- Розширення системи детекції аномалій на основі машинного навчання.
+- Підтримка мобільних пуш-повідомлень через PWA.
