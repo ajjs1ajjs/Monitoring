@@ -70,13 +70,16 @@ class ScrapeManager:
         if self._running: return
         self._running = True
         
-        print("[*] ScrapeManager: Loading targets from database...")
-        await self._load_dynamic_targets()
+        print("[*] ScrapeManager: Loading targets from database...", flush=True)
+        try:
+            await self._load_dynamic_targets()
+        except Exception as e:
+            print(f"[!] ScrapeManager: Failed to load targets: {e}", flush=True)
         
         # Start loops
         self._tasks.append(asyncio.create_task(self._flush_status_loop()))
         self._tasks.append(asyncio.create_task(self._dynamic_reload_loop()))
-        print(f"[OK] ScrapeManager: Started with {len(self.targets)} active targets")
+        print(f"[OK] ScrapeManager: Started with {len(self.targets)} active targets", flush=True)
 
     async def stop(self):
         self._running = False
@@ -226,9 +229,9 @@ class ScrapeManager:
                                  (st_srv, now, r.latency_ms, r.target.service_id))
             conn.commit()
             conn.close()
-            print(f"[*] ScrapeManager: Flushed {len(batch)} statuses to DB")
+            print(f"[*] ScrapeManager: Flushed {len(batch)} statuses to DB", flush=True)
         except Exception as e:
-            print(f"[!] ScrapeManager Flush Error: {e}")
+            print(f"[!] ScrapeManager Flush Error: {e}", flush=True)
 
     def _parse_metrics(self, text: str) -> dict:
         m = {"__version__": "unknown"}
