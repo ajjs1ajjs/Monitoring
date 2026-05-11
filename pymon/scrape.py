@@ -71,7 +71,8 @@ class ScrapeManager:
 
     async def reload_targets(self):
         try:
-            conn = sqlite3.connect(self.db_path, timeout=20)
+            conn = sqlite3.connect(self.db_path, timeout=30)
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.row_factory = sqlite3.Row
             # Servers
             rows = conn.execute("SELECT id, name, host, agent_port FROM servers WHERE enabled = 1").fetchall()
@@ -165,6 +166,8 @@ class ScrapeManager:
             self._status_buffer = []
         try:
             conn = sqlite3.connect(self.db_path, timeout=30)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
             now = datetime.now(timezone.utc).isoformat()
             for r in batch:
                 st = "online" if r.success else "offline"
@@ -195,6 +198,8 @@ class ScrapeManager:
             self._history_buffer = []
         try:
             conn = sqlite3.connect(self.db_path, timeout=30)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
             now = datetime.now(timezone.utc).isoformat()
             for r in batch:
                 conn.execute("INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, timestamp) VALUES (?, ?, ?, ?, ?)",
