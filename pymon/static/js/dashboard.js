@@ -1354,13 +1354,14 @@ async function importPromConfig() {
         });
         if (resp && resp.ok) {
             const data = await resp.json();
-            alert(`Success! Imported ${data.imported} new targets.`);
+            alert(`Успішно! Імпортовано ${data.imported} нових об'єктів.`);
             document.getElementById('promYamlInput').value = '';
             refreshData();
         } else {
-            alert('Import failed. Check YAML format.');
+            const errData = await resp.json();
+            alert('Помилка імпорту: ' + (errData.detail || 'Невідома помилка'));
         }
-    } catch (e) { alert('Error during import'); }
+    } catch (e) { alert('Помилка під час імпорту: ' + e); }
 }
 
 async function exportPyMonConfig() {

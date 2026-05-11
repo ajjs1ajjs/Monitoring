@@ -119,4 +119,6 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
         conn.close()
         return {"status": "ok", "imported": count}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse or import: {str(e)}")
+        import traceback
+        traceback.print_exc() # Print full error to server console
+        raise HTTPException(status_code=500, detail=f"Помилка парсингу або імпорту: {str(e)}")
