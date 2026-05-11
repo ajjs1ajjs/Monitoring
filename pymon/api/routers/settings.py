@@ -83,8 +83,9 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
                         t_str = str(target).strip()
                         if not t_str: continue
 
-                        # Handle URLs (blackbox) -> add as Services
+                        # Check if it's a URL (for Services)
                         if t_str.startswith(('http://', 'https://')):
+                            # This is a service
                             exists_srv = c.execute("SELECT 1 FROM services WHERE target_url = ?", (t_str,)).fetchone()
                             if not exists_srv:
                                 c.execute("INSERT INTO services (name, target_url, check_type, interval, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -93,16 +94,20 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
                             continue
                         
                         # Handle Servers (host:port)
+                        host = t_str
+                        port = 9182 # Default
+                        
                         if ':' in t_str:
                             parts = t_str.rsplit(':', 1)
-                            host = parts[0].strip('[] ')
-                            try:
+                            # Only treat as port if the part after : is numeric
+                            if parts[1].isdigit():
+                                host = parts[0].strip('[] ')
                                 port = int(parts[1])
-                            except:
-                                port = 9182
+                            else:
+                                # Not a port (maybe IPv6 or just a colon in name), keep as host
+                                host = t_str.strip('[] ')
                         else:
                             host = t_str.strip('[] ')
-                            port = 9182
                         
                         if not host: continue
 
