@@ -109,7 +109,7 @@ def create_app():
     @app.get("/dashboard")
     @app.get("/dashboard/")
     async def dashboard(request: Request):
-        return templates.TemplateResponse("dashboard.html", {"request": request})
+        return templates.TemplateResponse(request=request, name="dashboard.html")
 
     @app.get("/")
     async def root():
@@ -117,7 +117,7 @@ def create_app():
 
     @app.get("/login")
     async def login_page(request: Request):
-        return templates.TemplateResponse("login.html", {"request": request})
+        return templates.TemplateResponse(request=request, name="login.html")
 
     return app
 
