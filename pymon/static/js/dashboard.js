@@ -255,6 +255,7 @@ if (addAlertForm) addAlertForm.addEventListener('submit', async (e) => {
 // Data Fetching
 let sortKey = 'name';
 let sortOrder = 1;
+let services = [];
 
 async function refreshData() {
     const syncEl = document.getElementById('updateTimer');
@@ -276,7 +277,7 @@ async function refreshData() {
         }
 
         if (servicesResp && servicesResp.ok) {
-            const services = await servicesResp.json();
+            services = await servicesResp.json();
             updateServicesTable(services);
         }
 
@@ -900,7 +901,8 @@ let overviewCharts = {
     cpu: null,
     ram: null,
     disk: null,
-    net: null
+    net: null,
+    service: null
 };
 let expandedChart = null;
 
@@ -957,6 +959,7 @@ function initOverviewCharts() {
     if (ctxCpu) overviewCharts.cpu = new Chart(ctxCpu, chartConfig('CPU', 'rgba(249, 115, 22, 1)'));
     if (ctxRam) overviewCharts.ram = new Chart(ctxRam, chartConfig('RAM', 'rgba(16, 185, 129, 1)'));
     if (ctxDisk) overviewCharts.disk = new Chart(ctxDisk, chartConfig('Disk', 'rgba(245, 158, 11, 1)'));
+    if (ctxService) overviewCharts.service = new Chart(ctxService, chartConfig('Latency', 'rgba(16, 185, 129, 1)'));
     
     if (ctxNet) {
         const netCfg = chartConfig('Network', 'rgba(59, 130, 246, 1)');
@@ -1043,6 +1046,22 @@ async function updateOverviewCharts() {
     } catch (e) {
         console.error("Failed to update overview charts:", e);
     }
+
+    // Update Service Latency Chart
+    try {
+        const sResp = await apiFetch(`/api/v1/services/history?range=${currentRange}`);
+        if (sResp && sResp.ok) {
+            const sData = await sResp.json();
+            const sLabels = sData.map(h => new Date(h.timestamp).toLocaleTimeString());
+            const sLatency = sData.map(h => h.response_time);
+            
+            if (overviewCharts.service) {
+                overviewCharts.service.data.labels = sLabels;
+                overviewCharts.service.data.datasets[0].data = sLatency;
+                overviewCharts.service.update('none');
+            }
+        }
+    } catch(e) {}
 }
 
 function expandChart(type) {
@@ -1187,24 +1206,28 @@ function updateTimelineTable() {
     const tbody = document.getElementById('timelineTableBody');
     if (!tbody) return;
 
-    const sorted = [...nodes].sort((a, b) => new Date(b.last_check) - new Date(a.last_check)).slice(0, 10);
+    const all = [
+        ...nodes.map(n => ({...n, type: 'node'})),
+        ...services.map(s => ({...s, type: 'service', last_check: s.last_check, name: s.name}))
+    ];
+    const sorted = all.sort((a, b) => new Date(b.last_check) - new Date(a.last_check)).slice(0, 10);
     
-    tbody.innerHTML = sorted.map(n => `
+    tbody.innerHTML = sorted.map(item => `
         <tr>
-            <td><span class="timeline-time">${new Date(n.last_check).toLocaleTimeString()}</span></td>
+            <td><span class="timeline-time">${new Date(item.last_check).toLocaleTimeString()}</span></td>
             <td>
                 <div class="timeline-server">
-                    <i data-lucide="${(n.os_type || '').toLowerCase().includes('win') ? 'monitor' : 'terminal'}" style="width: 14px; height: 14px; opacity: 0.5;"></i>
-                    ${n.name}
+                    <i data-lucide="${item.type === 'service' ? 'globe' : ((item.os_type || '').toLowerCase().includes('win') ? 'monitor' : 'terminal')}" style="width: 14px; height: 14px; opacity: 0.5;"></i>
+                    ${item.name}
                 </div>
             </td>
-            <td><span class="timeline-metric text-accent">${(n.cpu_percent || 0).toFixed(1)}%</span></td>
-            <td><span class="timeline-metric text-success">${(n.memory_percent || 0).toFixed(1)}%</span></td>
-            <td><span class="timeline-metric text-warning">${(n.disk_percent || 0).toFixed(1)}%</span></td>
+            <td><span class="timeline-metric text-accent">${item.type === 'node' ? (item.cpu_percent || 0).toFixed(1) + '%' : '-'}</span></td>
+            <td><span class="timeline-metric text-success">${item.type === 'node' ? (item.memory_percent || 0).toFixed(1) + '%' : (item.response_time || item.last_response_time || 0).toFixed(1) + 'ms'}</span></td>
+            <td><span class="timeline-metric text-warning">${item.type === 'node' ? (item.disk_percent || 0).toFixed(1) + '%' : (item.check_type || '').toUpperCase()}</span></td>
             <td>
-                <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">
-                    <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
-                    ${(n.last_status || 'unknown').toUpperCase()}
+                <div class="status-badge ${item.last_status === 'up' ? 'up' : 'down'}">
+                    <span class="status-dot ${item.last_status === 'up' ? 'pulse' : ''}"></span>
+                    ${(item.last_status || 'unknown').toUpperCase()}
                 </div>
             </td>
         </tr>

@@ -183,7 +183,21 @@
                                     <div class="chart-canvas-wrapper">
                                         <canvas id="netOverviewChart"></canvas>
                                     </div>
-                                </div>
+                                    <div class="chart-card">
+                                     <div class="chart-header-row">
+                                         <div class="chart-title">
+                                             <i data-lucide="globe" class="text-success" style="width: 16px; height: 16px;"></i>
+                                             Затримка сервісів (ms)
+                                         </div>
+                                         <div class="chart-actions">
+                                             <button class="chart-action-btn" onclick="expandChart('service')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                         </div>
+                                     </div>
+                                     <div class="chart-canvas-wrapper">
+                                         <canvas id="serviceOverviewChart"></canvas>
+                                     </div>
+                                 </div>
+                             </div>
                             </div>
 
                             <div class="timeline-card" style="margin-top: 1.5rem;">
@@ -394,9 +408,9 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Найкращий агент для моніторингу систем Windows Server.</p>
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Найкращий агент для моніторингу систем Windows Server. Встановлюється як фонова служба.</p>
                                 <div class="form-group">
-                                    <label style="font-size: 0.7rem; text-transform: uppercase;">PowerShell (від імені Адміністратора)</label>
+                                    <label style="font-size: 0.7rem; text-transform: uppercase;">PowerShell (Обов'язково від імені Адміністратора)</label>
                                     <div style="background: #020617; padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border); font-family: monospace; font-size: 0.8rem; color: #60a5fa; margin-top: 0.5rem; white-space: pre-wrap; word-break: break-all;">msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.31.6/windows_exporter-0.31.6-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system" /qn</div>
                                 </div>
                                 <div class="form-group">

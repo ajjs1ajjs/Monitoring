@@ -31,6 +31,19 @@ async def create_service(data: api_models.ServiceCreate, current_user: User = De
     finally:
         conn.close()
 
+@router.get("/history")
+async def get_all_services_history(range: str = "1h", current_user: User = Depends(get_current_user)):
+    conn = get_db()
+    try:
+        if range.endswith('h'): h = int(range[:-1])
+        elif range.endswith('d'): h = int(range[:-1]) * 24
+        elif range.endswith('m'): h = int(range[:-1]) / 60
+        else: h = 1
+        rows = conn.execute("SELECT * FROM services_history WHERE timestamp > datetime('now', ?) ORDER BY timestamp ASC", (f'-{h} hours',)).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
 @router.delete("/{service_id}")
 async def delete_service(service_id: int, current_user: User = Depends(get_current_user)):
     conn = get_db()

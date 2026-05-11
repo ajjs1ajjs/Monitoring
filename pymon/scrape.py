@@ -51,6 +51,7 @@ class ScrapeManager:
         
         # Optimization: History Buffer
         self._history_buffer = []
+        self._service_history_buffer = []
         self._buffer_lock = asyncio.Lock()
         
         # Prometheus Metrics
@@ -438,6 +439,9 @@ class ScrapeManager:
             if s['is_maintenance'] == 0:
                 await self._check_service_alerts(s['id'], resp_time, 'up' if success else 'down', s['name'])
             
+            async with self._buffer_lock:
+                self._service_history_buffer.append((s['id'], 'up' if success else 'down', resp_time, datetime.now(timezone.utc).isoformat()))
+            
             conn.commit()
             conn.close()
         except: pass
@@ -463,13 +467,20 @@ class ScrapeManager:
                              network_rx, network_tx, disk_info, timestamp) 
                              VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", batch)
             
-            # Retention cleanup based on config
-            retention_h = self.config.storage.retention_hours
             c.execute(f"DELETE FROM metrics_history WHERE timestamp < datetime('now', '-{retention_h} hours')")
             
+            # Flush service history
+            async with self._buffer_lock:
+                s_batch = self._service_history_buffer[:]
+                self._service_history_buffer.clear()
+            
+            if s_batch:
+                c.executemany("INSERT INTO services_history (service_id, status, response_time, timestamp) VALUES (?, ?, ?, ?)", s_batch)
+                c.execute(f"DELETE FROM services_history WHERE timestamp < datetime('now', '-{retention_h} hours')")
+
             conn.commit()
             conn.close()
-            logger.debug(f"Flushed {len(batch)} history records to DB")
+            logger.debug(f"Flushed {len(batch)} node and {len(s_batch)} service history records to DB")
         except Exception as e:
             logger.error(f"Failed to flush history buffer: {e}")
 

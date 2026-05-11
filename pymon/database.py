@@ -99,6 +99,17 @@ def init_database():
         error_message TEXT,
         created_at TEXT
     )""")
+
+    # Services history table
+    c.execute("""CREATE TABLE IF NOT EXISTS services_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        service_id INTEGER,
+        status TEXT,
+        response_time REAL,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY (service_id) REFERENCES services(id)
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_services_history_sid_ts ON services_history(service_id, timestamp)")
     
     # Audit logs table
     c.execute("""CREATE TABLE IF NOT EXISTS audit_logs (
