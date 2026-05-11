@@ -71,17 +71,40 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
         for sc in scrape_configs:
             job_name = sc.get("job_name", "imported_job")
             for static_cfg in sc.get("static_configs", []):
-                for target in static_cfg.get("targets", []):
-                    # target is usually host:port
-                    host = target.split(':')[0]
-                    port = int(target.split(':')[1]) if ':' in target else 9100
-                    
-                    # Check if exists
-                    exists = c.execute("SELECT 1 FROM servers WHERE host = ? AND agent_port = ?", (host, port)).fetchone()
-                    if not exists:
-                        c.execute("INSERT INTO servers (name, host, agent_port, enabled, server_group) VALUES (?, ?, ?, ?, ?)",
-                                 (job_name, host, port, 1, "Imported"))
-                        count += 1
+                targets = static_cfg.get("targets", [])
+                if not isinstance(targets, list): continue
+                for target in targets:
+                    try:
+                        t_str = str(target)
+                        # Handle URLs (blackbox) -> add as Services
+                        if t_str.startswith(('http://', 'https://')):
+                            exists_srv = c.execute("SELECT 1 FROM services WHERE target_url = ?", (t_str,)).fetchone()
+                            if not exists_srv:
+                                c.execute("INSERT INTO services (name, target_url, check_type, interval, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                                         (job_name, t_str, 'http', 60, 1, datetime.now(timezone.utc).isoformat()))
+                                count += 1
+                            continue
+                        
+                        if ':' in t_str:
+                            parts = t_str.rsplit(':', 1)
+                            host = parts[0].strip('[] ')
+                            try:
+                                port = int(parts[1])
+                            except:
+                                port = 9182
+                        else:
+                            host = t_str.strip('[] ')
+                            port = 9182
+                        
+                        if not host: continue
+
+                        # Check if exists (Servers)
+                        exists = c.execute("SELECT 1 FROM servers WHERE host = ? AND agent_port = ?", (host, port)).fetchone()
+                        if not exists:
+                            c.execute("INSERT INTO servers (name, host, agent_port, enabled, server_group, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                                     (job_name, host, port, 1, "Imported", datetime.now(timezone.utc).isoformat()))
+                            count += 1
+                    except: continue
         conn.commit()
         conn.close()
         return {"status": "ok", "imported": count}
