@@ -104,19 +104,28 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
                                 host = parts[0].strip('[] ')
                                 port = int(parts[1])
                             else:
-                                # Not a port (maybe IPv6 or just a colon in name), keep as host
                                 host = t_str.strip('[] ')
                         else:
                             host = t_str.strip('[] ')
                         
                         if not host: continue
 
+                        # Auto-detect OS based on port
+                        os_type = 'linux'
+                        if port in [9182, 1030, 1035]:
+                            os_type = 'windows'
+                        elif port == 9100:
+                            os_type = 'linux'
+
                         # Check if exists (Servers)
-                        exists = c.execute("SELECT 1 FROM servers WHERE host = ? AND agent_port = ?", (host, port)).fetchone()
-                        if not exists:
-                            c.execute("INSERT INTO servers (name, host, agent_port, enabled, server_group, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                                     (job_name, host, port, 1, "Imported", datetime.now(timezone.utc).isoformat()))
+                        existing = c.execute("SELECT id FROM servers WHERE host = ? AND agent_port = ?", (host, port)).fetchone()
+                        if not existing:
+                            c.execute("INSERT INTO servers (name, host, agent_port, os_type, enabled, server_group, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                                     (job_name, host, port, os_type, 1, "Imported", datetime.now(timezone.utc).isoformat()))
                             count += 1
+                        else:
+                            # Update existing server group and OS type
+                            c.execute("UPDATE servers SET os_type = ?, server_group = ? WHERE id = ?", (os_type, job_name, existing['id']))
                     except Exception as e:
                         print(f"Import error for target {target}: {e}")
                         continue
