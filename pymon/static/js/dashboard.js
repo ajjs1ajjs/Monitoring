@@ -1,5 +1,5 @@
 // Init Lucide
-lucide.createIcons();
+if (window.lucide) lucide.createIcons();
 
 // State Management
 const token = localStorage.getItem('token');
@@ -301,8 +301,11 @@ function filterLiveTable() {
 }
 
 function filterNodes() {
-    const query = (document.getElementById('nodeSearch')?.value || '').toLowerCase();
-    const statusFilter = document.getElementById('filterStatus')?.value || 'all';
+    const nodeSearch = document.getElementById('nodeSearch');
+    const filterStatus = document.getElementById('filterStatus');
+    
+    const query = (nodeSearch?.value || '').toLowerCase();
+    const statusFilter = filterStatus?.value || 'all';
 
     let filtered = nodes.filter(n => {
         const name = (n.name || '').toLowerCase();
@@ -314,17 +317,18 @@ function filterNodes() {
 
     // Apply sorting
     filtered.sort((a, b) => {
-        const valA = a[sortKey] || 0;
-        const valB = b[sortKey] || 0;
-        if (valA < valB) return -1 * sortOrder;
-        if (valA > valB) return 1 * sortOrder;
-        return 0;
+        const valA = a[sortKey] || '';
+        const valB = b[sortKey] || '';
+        if (typeof valA === 'string') {
+            return valA.localeCompare(valB) * sortOrder;
+        }
+        return (valA - valB) * sortOrder;
     });
 
     updateStats();
     updateLiveTable(filtered);
     updateNodeGrid(filtered);
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function sortNodes(key) {
