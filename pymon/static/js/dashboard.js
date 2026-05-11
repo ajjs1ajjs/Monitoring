@@ -1341,3 +1341,39 @@ async function deleteService(id) {
         refreshData();
     }
 }
+
+async function importPromConfig() {
+    const yaml = document.getElementById('promYamlInput').value;
+    if (!yaml) return alert('Please paste Prometheus YAML first');
+    
+    try {
+        const resp = await apiFetch('/api/v1/settings/config/import-prometheus', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ yaml_content: yaml })
+        });
+        if (resp && resp.ok) {
+            const data = await resp.json();
+            alert(`Success! Imported ${data.imported} new targets.`);
+            document.getElementById('promYamlInput').value = '';
+            refreshData();
+        } else {
+            alert('Import failed. Check YAML format.');
+        }
+    } catch (e) { alert('Error during import'); }
+}
+
+async function exportPyMonConfig() {
+    try {
+        const resp = await apiFetch('/api/v1/settings/config/export');
+        if (resp && resp.ok) {
+            const data = await resp.json();
+            const blob = new Blob([data.content], { type: 'text/yaml' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'pymon_config_backup.yml';
+            a.click();
+        }
+    } catch (e) { alert('Export failed'); }
+}

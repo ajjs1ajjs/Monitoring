@@ -603,6 +603,29 @@
                             </div>
                         </div>
 
+                        <!-- Config Migration -->
+                        <div class="card">
+                            <div class="card-header" style="border-bottom-color: #8b5cf6;">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="padding: 0.5rem; background: rgba(139, 92, 246, 0.1); border-radius: 0.5rem;">
+                                        <i data-lucide="file-up" style="color: #8b5cf6; width: 20px; height: 20px;"></i>
+                                    </div>
+                                    <h3>Config Migration</h3>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">Import existing Prometheus configurations or backup your PyMon settings.</p>
+                                <div class="form-group">
+                                    <label>Paste Prometheus YAML</label>
+                                    <textarea id="promYamlInput" class="form-input" style="height: 120px; font-family: monospace; font-size: 0.75rem;" placeholder="scrape_configs: ..."></textarea>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                    <button class="btn btn-primary" style="flex: 1;" onclick="importPromConfig()">Import Targets</button>
+                                    <button class="btn btn-secondary" style="flex: 1;" onclick="exportPyMonConfig()">Export Config</button>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Danger Zone -->
                         <div class="card" style="border: 1px solid rgba(239, 68, 68, 0.2);">
                             <div class="card-header" style="border-bottom-color: var(--danger);">

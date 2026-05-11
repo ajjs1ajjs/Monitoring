@@ -42,7 +42,48 @@ async def save_notification_settings(data: dict, current_user: User = Depends(ge
     finally:
         conn.close()
 
-@router.post("/notifications/test")
-async def test_notifications(current_user: User = Depends(get_current_user)):
-    # Trigger test notification logic
-    return {"status": "test_dispatched"}
+@router.get("/config/export")
+async def export_config(current_user: User = Depends(get_current_user)):
+    config_path = os.getenv("CONFIG_PATH", "config.yml")
+    if not os.path.exists(config_path):
+        raise HTTPException(status_code=404, detail="Config file not found")
+    with open(config_path, 'r') as f:
+        return {"content": f.read()}
+
+@router.post("/config/import-prometheus")
+async def import_prometheus_config(data: dict, current_user: User = Depends(get_current_user)):
+    yaml_content = data.get("yaml_content")
+    if not yaml_content:
+        raise HTTPException(status_code=400, detail="No YAML content provided")
+    
+    import yaml
+    from pymon.config import load_config
+    
+    try:
+        prom_data = yaml.safe_load(yaml_content)
+        scrape_configs = prom_data.get("scrape_configs", [])
+        
+        # Save to DB as servers or update config.yml? 
+        # Better: Add to 'servers' table so they appear in UI
+        conn = get_db()
+        c = conn.cursor()
+        count = 0
+        for sc in scrape_configs:
+            job_name = sc.get("job_name", "imported_job")
+            for static_cfg in sc.get("static_configs", []):
+                for target in static_cfg.get("targets", []):
+                    # target is usually host:port
+                    host = target.split(':')[0]
+                    port = int(target.split(':')[1]) if ':' in target else 9100
+                    
+                    # Check if exists
+                    exists = c.execute("SELECT 1 FROM servers WHERE host = ? AND agent_port = ?", (host, port)).fetchone()
+                    if not exists:
+                        c.execute("INSERT INTO servers (name, host, agent_port, enabled, server_group) VALUES (?, ?, ?, ?, ?)",
+                                 (job_name, host, port, 1, "Imported"))
+                        count += 1
+        conn.commit()
+        conn.close()
+        return {"status": "ok", "imported": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse or import: {str(e)}")
