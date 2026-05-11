@@ -74,6 +74,7 @@ def get_db():
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA busy_timeout = 30000")
     except:
         pass
     return conn
@@ -244,9 +245,15 @@ def authenticate_user(username: str, password: str) -> Token:
         conn.close()
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    c.execute("UPDATE users SET last_login = ? WHERE id = ?", (datetime.now(timezone.utc).isoformat(), row["id"]))
-    conn.commit()
-    conn.close()
+    # Update last login time (don't fail login if DB is locked for this non-critical update)
+    try:
+        conn.execute("PRAGMA busy_timeout = 30000")
+        c.execute("UPDATE users SET last_login = ? WHERE id = ?", (datetime.now(timezone.utc).isoformat(), row["id"]))
+        conn.commit()
+    except Exception as e:
+        print(f"Warning: Could not update last_login: {e}")
+    finally:
+        conn.close()
 
     user = User(
         id=row["id"],

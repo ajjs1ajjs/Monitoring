@@ -38,6 +38,7 @@ def get_db():
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA busy_timeout = 30000")
     except:
         pass
     return conn
