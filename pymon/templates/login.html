@@ -64,6 +64,9 @@
     </div>
 
     <script>
+        // Clear old tokens on login page load to prevent 401 loops
+        localStorage.removeItem('token');
+
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const errorBox = document.getElementById('error');
