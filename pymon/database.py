@@ -1,148 +1,85 @@
-import os
 import sqlite3
-from datetime import datetime, timezone
+import os
+import logging
+from pymon.config import load_config
 
-def get_db_conn():
-    db_path = os.getenv("DB_PATH", "pymon.db")
-    conn = sqlite3.connect(db_path)
+logger = logging.getLogger(__name__)
+
+def get_db_connection():
+    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+    db_path = config.storage.path
+    
+    conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row
+    
+    # Enable WAL mode for better concurrency
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+    except Exception as e:
+        logger.warning(f"Could not set WAL mode: {e}")
+        
     return conn
 
-def init_database():
-    """Initialize all required database tables"""
-    conn = get_db_conn()
+def init_db():
+    conn = get_db_connection()
     c = conn.cursor()
     
     # Servers table
-    c.execute("""CREATE TABLE IF NOT EXISTS servers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        host TEXT NOT NULL,
-        os_type TEXT DEFAULT 'linux',
-        agent_port INTEGER DEFAULT 9100,
-        enabled BOOLEAN DEFAULT 1,
-        server_group TEXT,
-        created_at TEXT,
-        last_check TEXT,
-        last_status TEXT DEFAULT 'unknown',
-        error_message TEXT,
-        cpu_percent REAL DEFAULT 0,
-        memory_percent REAL DEFAULT 0,
-        disk_percent REAL DEFAULT 0,
-        network_rx REAL DEFAULT 0,
-        network_tx REAL DEFAULT 0,
-        uptime TEXT,
-        disk_info TEXT,
-        exporter_version TEXT,
-        is_maintenance BOOLEAN DEFAULT 0,
-        flapping_count INTEGER DEFAULT 0,
-        last_flapping_change TEXT
-    )""")
+    c.execute('''CREATE TABLE IF NOT EXISTS servers
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL,
+                  host TEXT NOT NULL,
+                  agent_port INTEGER DEFAULT 9100,
+                  server_group TEXT,
+                  os_type TEXT DEFAULT 'linux',
+                  enabled INTEGER DEFAULT 1,
+                  last_status TEXT DEFAULT 'unknown',
+                  last_check TEXT,
+                  cpu_percent REAL DEFAULT 0,
+                  memory_percent REAL DEFAULT 0,
+                  disk_percent REAL DEFAULT 0,
+                  exporter_version TEXT,
+                  error_message TEXT,
+                  is_maintenance INTEGER DEFAULT 0,
+                  flapping_count INTEGER DEFAULT 0,
+                  created_at TEXT)''')
     
-    # Metrics history table
-    c.execute("""CREATE TABLE IF NOT EXISTS metrics_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        server_id INTEGER,
-        cpu_percent REAL,
-        memory_percent REAL,
-        disk_percent REAL,
-        network_rx REAL,
-        network_tx REAL,
-        disk_info TEXT,
-        timestamp TEXT NOT NULL,
-        FOREIGN KEY (server_id) REFERENCES servers(id)
-    )""")
-    c.execute("CREATE INDEX IF NOT EXISTS idx_metrics_history_server_ts ON metrics_history(server_id, timestamp)")
-    
-    # Alerts table
-    c.execute("""CREATE TABLE IF NOT EXISTS alerts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        metric TEXT NOT NULL,
-        condition TEXT NOT NULL,
-        threshold REAL NOT NULL,
-        duration INTEGER DEFAULT 0,
-        severity TEXT DEFAULT 'warning',
-        server_id INTEGER,
-        service_id INTEGER,
-        notify_telegram BOOLEAN DEFAULT 0,
-        notify_discord BOOLEAN DEFAULT 0,
-        notify_slack BOOLEAN DEFAULT 0,
-        notify_email BOOLEAN DEFAULT 0,
-        notify_teams BOOLEAN DEFAULT 0,
-        description TEXT,
-        enabled BOOLEAN DEFAULT 1,
-        created_at TEXT,
-        FOREIGN KEY (server_id) REFERENCES servers(id),
-        FOREIGN KEY (service_id) REFERENCES services(id)
-    )""" )
-    
-    # Migrations
-    try:
-        c.execute("ALTER TABLE alerts ADD COLUMN service_id INTEGER")
-        conn.commit()
-    except: pass
-    
-    # Services table (HTTP/TCP Monitoring)
-    c.execute("""CREATE TABLE IF NOT EXISTS services (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        target_url TEXT NOT NULL,
-        check_type TEXT DEFAULT 'http', -- http, tcp
-        interval INTEGER DEFAULT 60,
-        timeout INTEGER DEFAULT 5,
-        enabled BOOLEAN DEFAULT 1,
-        is_maintenance BOOLEAN DEFAULT 0,
-        last_status TEXT DEFAULT 'unknown',
-        last_check TEXT,
-        last_response_time REAL,
-        error_message TEXT,
-        created_at TEXT
-    )""")
+    # Services table
+    c.execute('''CREATE TABLE IF NOT EXISTS services
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name TEXT NOT NULL,
+                  target_url TEXT NOT NULL,
+                  check_type TEXT DEFAULT 'http',
+                  interval INTEGER DEFAULT 60,
+                  enabled INTEGER DEFAULT 1,
+                  status TEXT DEFAULT 'unknown',
+                  last_check TEXT,
+                  response_time_ms REAL DEFAULT 0,
+                  created_at TEXT)''')
 
-    # Services history table
-    c.execute("""CREATE TABLE IF NOT EXISTS services_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        service_id INTEGER,
-        status TEXT,
-        response_time REAL,
-        timestamp TEXT NOT NULL,
-        FOREIGN KEY (service_id) REFERENCES services(id)
-    )""")
-    c.execute("CREATE INDEX IF NOT EXISTS idx_services_history_sid_ts ON services_history(service_id, timestamp)")
+    # Metrics history
+    c.execute('''CREATE TABLE IF NOT EXISTS metrics_history
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  server_id INTEGER,
+                  cpu_percent REAL,
+                  memory_percent REAL,
+                  disk_percent REAL,
+                  timestamp TEXT,
+                  FOREIGN KEY(server_id) REFERENCES servers(id))''')
     
-    # Audit logs table
-    c.execute("""CREATE TABLE IF NOT EXISTS audit_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT,
-        action TEXT NOT NULL,
-        target TEXT,
-        details TEXT,
-        timestamp TEXT NOT NULL
-    )""")
-    
-    # Backups table
-    c.execute("""CREATE TABLE IF NOT EXISTS backups (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        filename TEXT NOT NULL,
-        size_bytes INTEGER,
-        created_at TEXT NOT NULL
-    )""")
-    
-    # Notifications table
-    c.execute("""CREATE TABLE IF NOT EXISTS notifications (
-        channel TEXT PRIMARY KEY,
-        enabled BOOLEAN DEFAULT 0,
-        config TEXT
-    )""")
-    
-    # Default notification config if not exists
-    c.execute("SELECT 1 FROM notifications WHERE channel = 'all'")
-    if not c.fetchone():
-        import json
-        default_config = json.dumps({"enabled": False, "telegram_enabled": False, "discord_enabled": False})
-        c.execute("INSERT INTO notifications (channel, enabled, config) VALUES (?, ?, ?)", 
-                  ('all', 0, default_config))
-        
+    # Alerts history
+    c.execute('''CREATE TABLE IF NOT EXISTS alerts
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  server_id INTEGER,
+                  service_id INTEGER,
+                  alert_type TEXT,
+                  severity TEXT,
+                  message TEXT,
+                  timestamp TEXT,
+                  resolved INTEGER DEFAULT 0,
+                  resolved_at TEXT)''')
+
     conn.commit()
     conn.close()
+    logger.info("Database initialized with WAL mode")
