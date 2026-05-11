@@ -3,8 +3,8 @@ const ASSETS = [
   '/',
   '/static/css/dashboard.css',
   '/static/js/dashboard.js',
-  'https://unpkg.com/lucide@latest',
-  'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.min.js'
+  'https://unpkg.com/lucide@0.321.0/dist/umd/lucide.min.js',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
 ];
 
 self.addEventListener('install', (event) => {
