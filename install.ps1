@@ -3,10 +3,19 @@
 
 param(
     [string]$Port = "10000",
-    [string]$InstallDir = "C:\pymon",
+    [string]$InstallDir = "",
     [switch]$Service,
     [switch]$Help
 )
+
+# Auto-detect InstallDir if not provided
+if ($InstallDir -eq "") {
+    if (Test-Path ".\pymon\__init__.py") {
+        $InstallDir = (Get-Item ".").FullName
+    } else {
+        $InstallDir = "C:\pymon"
+    }
+}
 
 $ErrorActionPreference = "Stop"
 
@@ -202,26 +211,25 @@ Write-Success "Installed to: $InstallDir"
 
 # Run as service if requested
 if ($Service) {
-    Write-Info "Installing as Windows service..."
+    Write-Info "Registering PyMon as a background service via Task Scheduler..."
     
-    $serviceName = "PyMon"
-    $exePath = "$InstallDir\venv\Scripts\pymon.exe"
-    $pyScript = "$InstallDir\pymon\__main__.py"
+    $taskName = "PyMonServer"
+    $venvPython = "$InstallDir\venv\Scripts\python.exe"
+    $arguments = "-m pymon server --config `"$configPath`""
     
-    # Create service wrapper
-    $wrapperPath = "$InstallDir\pymon-service.py"
-    @"
-import sys
-sys.path.insert(0, r'$InstallDir')
-from pymon.cli import main
-if __name__ == '__main__':
-    main()
-"@ | Set-Content -Path $wrapperPath
+    $action = New-ScheduledTaskAction -Execute $venvPython -Argument $arguments -WorkingDirectory $InstallDir
+    $trigger = New-ScheduledTaskTrigger -AtStartup
+    $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
     
-    # Register with nssm if available, otherwise sc
-    $scPath = "sc.exe"
-    & $scPath create $serviceName binPath= "`"$venvPython`" `"$wrapperPath`" server --config `"$configPath`"" start= auto
-    & $scPath start $serviceName
+    try {
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings
+        Start-ScheduledTask -TaskName $taskName
+        Write-Success "PyMon registered and started as background task '$taskName'"
+    } catch {
+        Write-Warn "Failed to register task. Ensure you are running as Administrator."
+    }
 }
 
 # Final output
