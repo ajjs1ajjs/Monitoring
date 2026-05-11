@@ -183,48 +183,23 @@
                                     <div class="chart-canvas-wrapper">
                                         <canvas id="netOverviewChart"></canvas>
                                     </div>
-                                    <div class="chart-card">
-                                     <div class="chart-header-row">
-                                         <div class="chart-title">
-                                             <i data-lucide="globe" class="text-success" style="width: 16px; height: 16px;"></i>
-                                             Затримка сервісів (ms)
-                                         </div>
-                                         <div class="chart-actions">
-                                             <button class="chart-action-btn" onclick="expandChart('service')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
-                                         </div>
-                                     </div>
-                                     <div class="chart-canvas-wrapper">
-                                         <canvas id="serviceOverviewChart"></canvas>
-                                     </div>
-                                 </div>
-                             </div>
-                            </div>
-
-                            <div class="timeline-card" style="margin-top: 1.5rem;">
-                                <div class="card-header" style="background: rgba(0,0,0,0.1);">
-                                    <h3>Історичні дані та події (Timeline Details)</h3>
-                                    <span id="timelineSyncTime" style="font-size: 0.7rem; color: var(--text-muted);"></span>
                                 </div>
-                                <div class="card-body" style="padding: 0;">
-                                    <table class="timeline-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Timestamp</th>
-                                                <th>Server</th>
-                                                <th>CPU</th>
-                                                <th>RAM</th>
-                                                <th>Disk</th>
-                                                <th>Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="timelineTableBody">
-                                            <!-- Real-time timeline data -->
-                                        </tbody>
-                                    </table>
+                                <div class="chart-card" style="grid-column: span 2;">
+                                    <div class="chart-header-row">
+                                        <div class="chart-title">
+                                            <i data-lucide="globe" class="text-success" style="width: 16px; height: 16px;"></i>
+                                            Затримка сервісів (ms)
+                                        </div>
+                                        <div class="chart-actions">
+                                            <button class="chart-action-btn" onclick="expandChart('service')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="chart-canvas-wrapper">
+                                        <canvas id="serviceOverviewChart"></canvas>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-
                         <div class="alerts-sidebar">
                             <div class="card" style="height: 100%;">
                                 <div class="card-header">

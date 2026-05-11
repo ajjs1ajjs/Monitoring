@@ -80,7 +80,7 @@ async def update_server(server_id: int, data: ServerUpdate, current_user: User =
     try:
         fields = []
         params = []
-        for field, value in data.dict(exclude_unset=True).items():
+        for field, value in data.model_dump(exclude_unset=True).items():
             fields.append(f"{field} = ?")
             params.append(value)
         

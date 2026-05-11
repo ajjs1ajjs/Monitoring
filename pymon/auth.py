@@ -245,15 +245,11 @@ def authenticate_user(username: str, password: str) -> Token:
         conn.close()
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Update last login time (don't fail login if DB is locked for this non-critical update)
-    try:
-        conn.execute("PRAGMA busy_timeout = 30000")
-        c.execute("UPDATE users SET last_login = ? WHERE id = ?", (datetime.now(timezone.utc).isoformat(), row["id"]))
-        conn.commit()
-    except Exception as e:
-        print(f"Warning: Could not update last_login: {e}")
-    finally:
-        conn.close()
+    # Close connection immediately after auth to free it up
+    u_id = row["id"]
+    conn.close()
+
+    # (Background update disabled for stability)
 
     user = User(
         id=row["id"],

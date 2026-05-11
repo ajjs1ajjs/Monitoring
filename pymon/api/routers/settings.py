@@ -88,8 +88,9 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
                             # This is a service
                             exists_srv = c.execute("SELECT 1 FROM services WHERE target_url = ?", (t_str,)).fetchone()
                             if not exists_srv:
+                                svc_name = job_name if job_name != 'blackbox' else t_str
                                 c.execute("INSERT INTO services (name, target_url, check_type, interval, enabled, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                                         (job_name, t_str, 'http', 60, 1, datetime.now(timezone.utc).isoformat()))
+                                         (svc_name, t_str, 'http', 60, 1, datetime.now(timezone.utc).isoformat()))
                                 count += 1
                             continue
                         

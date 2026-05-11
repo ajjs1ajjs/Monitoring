@@ -288,10 +288,21 @@ def collect_metrics():
         "raid": get_raid_info()
     }
     
-    # Disk usage for all partitions
+    # Disk usage for all partitions (filtering out temp/unnecessary)
     partitions = []
     for part in psutil.disk_partitions():
         try:
+            mp = part.mountpoint.lower()
+            dev = part.device.lower()
+            fst = part.fstype.lower()
+            if 'docker' in mp or 'kubelet' in mp or 'tmpfs' in fst or 'squashfs' in fst or 'overlay' in fst:
+                continue
+            if mp.startswith('/snap/') or '/snap/' in mp:
+                continue
+            if mp == '/dev/shm' or mp.startswith('/run/user/'):
+                continue
+            if dev.startswith('/dev/loop'):
+                continue
             usage = psutil.disk_usage(part.mountpoint)
             partitions.append({
                 "device": part.device,

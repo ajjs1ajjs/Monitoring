@@ -41,16 +41,43 @@ async def ingest_metric(payload: MetricPayload, current_user: User = Depends(get
 
 @router.get("")
 async def list_metrics(current_user: User = Depends(get_current_user)):
-    return {"metrics": [m.to_dict() for m in registry.get_all_metrics()]}
+    registry_metrics = [m.to_dict() for m in registry.get_all_metrics()]
+
+    if registry_metrics:
+        return {"metrics": registry_metrics}
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT mh.server_id, s.name, mh.cpu_percent, mh.memory_percent,
+                   mh.disk_percent, mh.network_rx, mh.network_tx, mh.timestamp
+            FROM metrics_history mh
+            JOIN servers s ON s.id = mh.server_id
+            WHERE mh.timestamp = (SELECT MAX(timestamp) FROM metrics_history)
+            ORDER BY mh.timestamp DESC LIMIT 20
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        return {"metrics": [
+            {
+                "server_id": r[0], "server_name": r[1],
+                "cpu_percent": r[2], "memory_percent": r[3],
+                "disk_percent": r[4], "network_rx": r[5],
+                "network_tx": r[6], "timestamp": r[7]
+            } for r in rows
+        ]}
+    except Exception:
+        return {"metrics": registry_metrics}
 
 @router.get("/trend")
 async def get_metrics_trend(
-    range: str = Query("1h", pattern="^(5m|30m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
+    range: str = Query("1h", pattern="^(5m|15m|30m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
     current_user: User = Depends(get_current_user)
 ):
     """Aggregate trend for all servers"""
     time_ranges = {
-        "5m": "-5 minutes", "30m": "-30 minutes", "1h": "-1 hour",
+        "5m": "-5 minutes", "15m": "-15 minutes", "30m": "-30 minutes", "1h": "-1 hour",
         "6h": "-6 hours", "12h": "-12 hours", "24h": "-24 hours",
         "3d": "-3 days", "7d": "-7 days", "15d": "-15 days", "30d": "-30 days"
     }

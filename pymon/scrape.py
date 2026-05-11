@@ -1,263 +1,284 @@
 import asyncio
-import json
-import time
-import os
-import sqlite3
-import re
-import logging
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
+import sys
+        import json
+from datetime import datetime
 
-import httpx
-
-from pymon.config import PyMonConfig
-
-logger = logging.getLogger(__name__)
-
-@dataclass
-class ScrapeTarget:
-    job_name: str
-    target: str
-    server_id: Optional[int] = None
-    service_id: Optional[int] = None
-    interval: int = 60
-    timeout: int = 15
-
-@dataclass
-class ScrapeResult:
-    target: ScrapeTarget
-    success: bool
-    status_code: int = 0
-    latency_ms: float = 0
-    error: str = ""
-    metrics: dict = None
-    cpu: float = 0
-    mem: float = 0
-    disk: float = 0
-    version: str = "v?"
-    os_type: str = "linux"
+from pymon.api.deps import get_db, manager
 
 class ScrapeManager:
-    def __init__(self, config: PyMonConfig):
+    def __init__(self, config=None):
         self.config = config
-        self.targets: list[ScrapeTarget] = []
-        self._running = False
-        self._tasks = []
-        self._status_buffer = []
-        self._history_buffer = []
-        self._status_lock = asyncio.Lock()
-        self._history_lock = asyncio.Lock()
-        self._prev_metrics = {}
-        
-        limits = httpx.Limits(max_keepalive_connections=50, max_connections=200)
-        self._client = httpx.AsyncClient(timeout=15.0, follow_redirects=True, limits=limits, verify=False)
-        self.db_path = config.storage.path
+        self.interval = 15
+        if config:
+            self.interval = config.scrape_configs[0].scrape_interval if config.scrape_configs else 15
+        self.running = False
 
     async def start(self):
-        if self._running: return
-        self._running = True
-        print(f"[*] ScrapeManager: Starting (Full Mode) with DB {self.db_path}", flush=True)
-        await self.reload_targets()
-        
-        self._tasks.append(asyncio.create_task(self._reload_loop()))
-        self._tasks.append(asyncio.create_task(self._flush_status_loop()))
-        self._tasks.append(asyncio.create_task(self._flush_history_loop()))
-        print(f"[OK] ScrapeManager: Monitoring {len(self.targets)} targets", flush=True)
-
-    async def _reload_loop(self):
-        while self._running:
-            await asyncio.sleep(60)
-            await self.reload_targets()
-
-    async def reload_targets(self):
-        try:
-            conn = sqlite3.connect(self.db_path, timeout=30)
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.row_factory = sqlite3.Row
-            # Servers
-            rows = conn.execute("SELECT id, name, host, agent_port FROM servers WHERE enabled = 1").fetchall()
-            for r in rows:
-                url = f"{r['host']}:{r['agent_port']}"
-                if any(t.target == url and t.server_id == r['id'] for t in self.targets): continue
-                t = ScrapeTarget(job_name=r['name'], target=url, server_id=r['id'])
-                self.targets.append(t)
-                self._tasks.append(asyncio.create_task(self._scrape_loop(t)))
-            # Services
-            rows = conn.execute("SELECT id, name, target_url, interval, timeout, expected_status FROM services WHERE enabled = 1").fetchall()
-            for r in rows:
-                if any(t.service_id == r['id'] for t in self.targets): continue
-                t = ScrapeTarget(job_name=r['name'], target=r['target_url'], service_id=r['id'], interval=r['interval'] or 60)
-                self.targets.append(t)
-                self._tasks.append(asyncio.create_task(self._scrape_loop(t)))
-            conn.close()
-        except Exception as e:
-            print(f"[!] ScrapeManager DB Error: {e}", flush=True)
-
-    async def _scrape_loop(self, target: ScrapeTarget):
-        while self._running:
-            start_ts = time.time()
-            try:
-                url = target.target
-                if not url.startswith("http"): url = f"http://{url}"
-                if target.server_id and "/metrics" not in url: url = url.rstrip("/") + "/metrics"
-                
-                timeout = target.timeout or 10
-                resp = await self._client.get(url, timeout=timeout)
-                
-                expected = target.expected_status or 200
-                res = ScrapeResult(target=target, success=(resp.status_code == expected), status_code=resp.status_code)
-                res.latency_ms = (time.time() - start_ts) * 1000
-                
-                if res.success and target.server_id:
-                    res.metrics = self._parse_metrics(resp.text)
-                    self._process_metrics(res)
-                
-                await self._queue_result(res)
-                if res.success:
-                    print(f"[OK] Scraped: {target.target} ({res.latency_ms:.0f}ms)", flush=True)
-                else:
-                    print(f"[WRN] HTTP {resp.status_code}: {target.target}", flush=True)
-                    
-            except Exception as e:
-                res = ScrapeResult(target=target, success=False, error=str(e))
-                await self._queue_result(res)
-                print(f"[ERR] Failed: {target.target} - {e}", flush=True)
-            
-            await asyncio.sleep(60)
-
-    def _process_metrics(self, res: ScrapeResult):
-        m = res.metrics or {}
-        ver = m.get("__version__", "v?")
-        
-        # Auto-detect Agent and OS from metrics
-        agent = "Unknown"
-        if any(k.startswith("windows_") for k in m.keys()):
-            agent = "Windows Exporter"
-            res.os_type = "windows"
-        elif any(k.startswith("node_") for k in m.keys()):
-            agent = "Node Exporter"
-            res.os_type = "linux"
-        elif any(k.startswith("telegraf_") for k in m.keys()):
-            agent = "Telegraf"
-            # Telegraf can be both, but we'll try to guess
-            if any("windows" in k for k in m.keys()): res.os_type = "windows"
-        
-        res.version = f"{agent} ({ver})" if ver != "unknown" else agent
-        
-        # CPU
-        cpu = m.get("cpu_usage_percent") or m.get("windows_cpu_usage")
-        if cpu is None and "cpu_usage_idle" in m:
-            cpu = 100.0 - m["cpu_usage_idle"]
-        if cpu is None:
-            idle = self._sum(m, r'.*cpu.*idle.*')
-            total = self._sum(m, r'.*cpu.*')
-            if total and total > 0:
-                prev = self._prev_metrics.get(res.target.server_id, {})
-                if prev.get('total'):
-                    t_d = total - prev['total']
-                    i_d = idle - prev['idle']
-                    if t_d > 0: cpu = 100 * (1 - i_d / t_d)
-                self._prev_metrics[res.target.server_id] = {'idle': idle, 'total': total}
-        res.cpu = cpu or 0
-        # RAM
-        mem = m.get("memory_usage_percent") or m.get("windows_memory_usage") or m.get("mem_used_percent")
-        if mem is None:
-            t_m = m.get("node_memory_MemTotal_bytes") or m.get("windows_cs_physical_memory_bytes")
-            f_m = m.get("node_memory_MemAvailable_bytes") or m.get("windows_os_physical_memory_free_bytes")
-            if t_m and t_m > 0: mem = 100 * (1 - (f_m or 0) / t_m)
-        res.mem = mem or 0
-        res.disk = m.get("disk_usage_percent") or m.get("windows_disk_usage") or m.get("disk_used_percent") or 0
-
-    async def _queue_result(self, res: ScrapeResult):
-        async with self._status_lock:
-            self._status_buffer.append(res)
-        if res.success and res.target.server_id:
-            async with self._history_lock:
-                self._history_buffer.append(res)
-
-    async def _flush_status_loop(self):
-        while self._running:
-            await asyncio.sleep(5)
-            await self._flush_status_batch()
-
-    async def _flush_status_batch(self):
-        if not self._status_buffer: return
-        async with self._status_lock:
-            batch = self._status_buffer[:]
-            self._status_buffer = []
-        try:
-            conn = sqlite3.connect(self.db_path, timeout=30)
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")
-            now = datetime.now(timezone.utc).isoformat()
-            for r in batch:
-                st = "up" if r.success else "down"
-                if r.target.server_id:
-                    if r.success:
-                        conn.execute("UPDATE servers SET last_status=?, last_check=?, cpu_percent=?, memory_percent=?, disk_percent=?, exporter_version=?, os_type=?, error_message=NULL WHERE id=?",
-                                     (st, now, r.cpu, r.mem, r.disk, r.version, r.os_type, r.target.server_id))
-                    else:
-                        conn.execute("UPDATE servers SET last_status=?, last_check=?, error_message=? WHERE id=?",
-                                     (st, now, (r.error or f"HTTP {r.status_code}")[:200], r.target.server_id))
-                elif r.target.service_id:
-                    st_srv = "UP" if r.success else "DOWN"
-                    conn.execute("UPDATE services SET last_status=?, last_check=?, last_latency_ms=? WHERE id=?",
-                                 (st_srv, now, r.latency_ms, r.target.service_id))
-            conn.commit()
-            conn.close()
-        except: pass
-
-    async def _flush_history_loop(self):
-        while self._running:
-            await asyncio.sleep(60)
-            await self._flush_history_batch()
-
-    async def _flush_history_batch(self):
-        if not self._history_buffer: return
-        async with self._history_lock:
-            batch = self._history_buffer[:]
-            self._history_buffer = []
-        try:
-            conn = sqlite3.connect(self.db_path, timeout=30)
-            conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute("PRAGMA synchronous=NORMAL")
-            now = datetime.now(timezone.utc).isoformat()
-            for r in batch:
-                conn.execute("INSERT INTO metrics_history (server_id, cpu_percent, memory_percent, disk_percent, timestamp) VALUES (?, ?, ?, ?, ?)",
-                             (r.target.server_id, r.cpu, r.mem, r.disk, now))
-            conn.commit()
-            conn.close()
-        except: pass
-
-    def _parse_metrics(self, text: str) -> dict:
-        m = {"__version__": "unknown"}
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"): continue
-            if "_exporter_build_info{" in line:
-                match = re.search(r'version="([^"]+)"', line)
-                if match: m["__version__"] = match.group(1)
-            try:
-                if "{" in line:
-                    name = line.split("{", 1)[0].strip()
-                    val = float(line.rsplit("}", 1)[1].strip())
-                    m[name] = val
-                else:
-                    p = line.split()
-                    if len(p) >= 2: m[p[0]] = float(p[1])
-            except: continue
-        return m
-
-    def _sum(self, m, pattern):
-        total = 0.0
-        try:
-            regex = re.compile(pattern)
-            for k, v in m.items():
-                if regex.match(k): total += v
-        except: pass
-        return total
+        self.running = True
+        asyncio.create_task(self._scrape_loop())
 
     async def stop(self):
-        self._running = False
-        await self._client.aclose()
+        self.running = False
+
+    async def _scrape_loop(self):
+        await asyncio.sleep(5)
+        while self.running:
+            try:
+                await self.scrape_all()
+            except Exception as e:
+                import traceback
+                print(f"[ERROR] Scrape loop: {e}", file=sys.stderr)
+                traceback.print_exc(file=sys.stderr)
+            await asyncio.sleep(self.interval)
+
+    async def scrape_all(self):
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, host, agent_port, os_type, enabled FROM servers WHERE enabled=1")
+        servers = cursor.fetchall()
+        conn.close()
+
+        if not servers:
+            return
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            tasks = []
+            for s in servers:
+                sid, name, host, port, os_type, enabled = s
+                tasks.append(self._scrape_one(client, sid, name, host, port))
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            ok = 0
+            for r in results:
+                if r is True:
+                    ok += 1
+                elif isinstance(r, Exception):
+                    print(f"[ScrapeManager] Error: {type(r).__name__}: {r}", file=sys.stderr, flush=True)
+            if ok:
+                print(f"[ScrapeManager] Collected {ok}/{len(servers)} servers", flush=True)
+
+    async def _scrape_one(self, client, server_id, name, host, port):
+        url = f"http://{host}:{port}/metrics"
+        try:
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                return False
+            text = resp.text
+        except httpx.ConnectError:
+            return False
+        except httpx.TimeoutException:
+            return False
+        except Exception as e:
+            return False
+
+        data = self._parse_metrics(text, name)
+
+        conn = get_db()
+        cursor = conn.cursor()
+        now = datetime.now().isoformat()
+
+        try:
+            vols = data.get('volumes', [])
+            disk_json = json.dumps(vols)
+            vol_summary = json.dumps([{'volume': v['volume'], 'used_percent': v['used_percent']} for v in vols])
+            cursor.execute("""
+                INSERT INTO metrics_history
+                (timestamp, server_id, cpu_percent, memory_percent,
+                 disk_percent, network_rx, network_tx, disk_info)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (now, server_id,
+                  data.get('cpu', 0), data.get('memory', 0),
+                  data.get('disk', 0), data.get('net_rx', 0),
+                  data.get('net_tx', 0), disk_json))
+
+            cursor.execute("""
+                UPDATE servers SET last_status='up', last_check=?,
+                cpu_percent=?, memory_percent=?, disk_percent=?,
+                volumes=?
+                WHERE id=?
+            """, (now, data.get('cpu', 0), data.get('memory', 0),
+                  data.get('disk', 0), vol_summary, server_id))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            conn.close()
+            return False
+
+    def _parse_metrics(self, text, name=""):
+        result = {'cpu': 0, 'memory': 0, 'disk': 0, 'net_rx': 0, 'net_tx': 0, 'volumes': []}
+        metrics_map: dict[str, list[dict]] = {}
+
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            parts = line.rsplit(None, 1)
+            if len(parts) != 2:
+                continue
+            metric, val_str = parts
+            try:
+                val = float(val_str)
+            except ValueError:
+                continue
+
+            name_m = metric.split('{')[0] if '{' in metric else metric
+            if name_m.endswith('_total'):
+                continue
+            labels = {}
+            if '{' in metric:
+                lbl_str = metric[metric.index('{')+1:metric.index('}')]
+                for pair in lbl_str.split(','):
+                    if '=' in pair:
+                        k, v = pair.split('=', 1)
+                        labels[k.strip()] = v.strip('"')
+            metrics_map.setdefault(name_m, []).append({'val': val, 'labels': labels})
+
+        cpu_vals = [item['val'] for k, items in metrics_map.items() if 'windows_cpu_core_frequency_mhz' in k for item in items]
+        if cpu_vals:
+            result['cpu'] = round(min(max(cpu_vals[0] / 5000.0 * 100, 0), 100), 1)
+
+        mem_total_list = [item['val'] for k, items in metrics_map.items() if 'windows_cs_physical_memory_bytes' in k for item in items]
+        mem_free_list = [item['val'] for k, items in metrics_map.items() if 'windows_memory_available_bytes' in k for item in items]
+        total_mem = mem_total_list[0] if mem_total_list else 0
+        free_mem = mem_free_list[0] if mem_free_list else 0
+        if total_mem > 0:
+            result['memory'] = round(((total_mem - free_mem) / total_mem) * 100, 1)
+
+        disk_free_items = [item for k, items in metrics_map.items() if 'windows_logical_disk_free_bytes' in k for item in items]
+        disk_size_items = [item for k, items in metrics_map.items() if 'windows_logical_disk_size_bytes' in k for item in items]
+
+        vol_data = {}
+        for item in disk_free_items:
+            vol = item['labels'].get('volume', item['labels'].get('drive', 'ALL'))
+            vol_data.setdefault(vol, {})['free'] = item['val']
+        for item in disk_size_items:
+            vol = item['labels'].get('volume', item['labels'].get('drive', 'ALL'))
+            vol_data.setdefault(vol, {})['size'] = item['val']
+
+        def _should_include_volume(vol: str) -> bool:
+            vl = vol.lower()
+            if 'harddiskvolume' in vl:
+                return False
+            if vl.startswith('/snap/') or '/snap/' in vl:
+                return False
+            if 'docker' in vl or 'kubelet' in vl or 'tmpfs' in vl or 'overlay' in vl:
+                return False
+            if vl == 'shm' or vl.endswith('/shm') or '/shm' in vl:
+                return False
+            if '/run/user/' in vl:
+                return False
+            return True
+
+        total_free = 0
+        total_size = 0
+        for vol, d in vol_data.items():
+            if not _should_include_volume(vol):
+                continue
+            if 'size' in d and d['size'] > 0:
+                free = d.get('free', 0)
+                used_pct = round(((d['size'] - free) / d['size']) * 100, 1)
+                result['volumes'].append({
+                    'volume': vol,
+                    'size_bytes': d['size'],
+                    'free_bytes': free,
+                    'used_percent': used_pct
+                })
+                total_free += free
+                total_size += d['size']
+        if total_size > 0:
+            result['disk'] = round(((total_size - total_free) / total_size) * 100, 1)
+
+        nic_items = [item['val'] for k, items in metrics_map.items() if 'windows_net_current_bandwidth_bytes' in k for item in items]
+        if nic_items:
+            result['net_rx'] = sum(nic_items)
+            result['net_tx'] = sum(nic_items)
+
+        return result
+
+
+class ServiceChecker:
+    def __init__(self):
+        self.interval = 60
+        self.running = False
+
+    async def start(self):
+        self.running = True
+        asyncio.create_task(self._check_loop())
+
+    async def stop(self):
+        self.running = False
+
+    async def _check_loop(self):
+        await asyncio.sleep(10)
+        while self.running:
+            try:
+                await self.check_all()
+            except Exception as e:
+                import traceback
+                print(f"[ERROR] ServiceChecker: {e}", file=sys.stderr)
+                traceback.print_exc(file=sys.stderr)
+            await asyncio.sleep(self.interval)
+
+    async def check_all(self):
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, target_url, timeout, expected_status, enabled FROM services WHERE enabled=1")
+        services = cursor.fetchall()
+        conn.close()
+
+        if not services:
+            return
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            tasks = []
+            for s in services:
+                sid, name, url, timeout, expected, enabled = s
+                tasks.append(self._check_one(client, sid, name, url, timeout, expected))
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            ok = sum(1 for r in results if r is True)
+
+    async def _check_one(self, client, service_id, name, url, timeout, expected):
+        expected_status = int(expected) if expected else 200
+        start = datetime.now()
+        try:
+            resp = await client.get(url, timeout=timeout if timeout else 10)
+            latency = int((datetime.now() - start).total_seconds() * 1000)
+            status = 'up' if resp.status_code == expected_status else 'degraded'
+        except Exception:
+            latency = 0
+            status = 'down'
+
+        now = datetime.now().isoformat()
+        for attempt in range(3):
+            try:
+                conn = get_db()
+                conn.execute("UPDATE services SET status=?, last_check=?, response_time_ms=? WHERE id=?",
+                             (status, now, latency, service_id))
+                conn.execute("INSERT INTO services_history (service_id, status, latency_ms, timestamp) VALUES (?, ?, ?, ?)",
+                             (service_id, status, latency, now))
+                conn.commit()
+                conn.close()
+                return True
+            except Exception as e:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                if attempt == 2:
+                    print(f"[ServiceChecker] DB error for {name} ({url}): {e}", file=sys.stderr, flush=True)
+                    return False
+                await asyncio.sleep(0.2)
+        return False
+
+
+scraper = ScrapeManager()
+service_checker = ServiceChecker()
+
+def get_scraper():
+    return scraper
+
+async def start_scraper():
+    await scraper.start()
+    await service_checker.start()

@@ -67,8 +67,28 @@ class SystemCollector:
         try:
             import psutil
 
-            disk = psutil.disk_usage("/")
-            self.disk_gauge.set(disk.percent, self.labels)
+            for part in psutil.disk_partitions():
+                if 'cdrom' in part.opts or part.fstype == '':
+                    continue
+                mp = part.mountpoint.lower()
+                fst = part.fstype.lower()
+                dev = part.device.lower()
+                if 'harddiskvolume' in mp or 'harddiskvolume' in dev:
+                    continue
+                if 'docker' in mp or 'kubelet' in mp or 'tmpfs' in fst or 'squashfs' in fst or 'overlay' in fst:
+                    continue
+                if mp.startswith('/snap/') or '/snap/' in mp:
+                    continue
+                if mp == '/dev/shm' or mp.startswith('/run/user/'):
+                    continue
+                if dev.startswith('/dev/loop'):
+                    continue
+                try:
+                    usage = psutil.disk_usage(part.mountpoint)
+                    vol = part.mountpoint.rstrip('\\').rstrip('/')
+                    self.disk_gauge.set(usage.percent, self.labels + [Label("volume", vol)])
+                except PermissionError:
+                    continue
         except ImportError:
             self.disk_gauge.set(0, self.labels)
 

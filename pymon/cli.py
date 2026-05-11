@@ -25,29 +25,35 @@ async def lifespan(app):
 
     try:
         from pymon.config import load_config
-        from pymon.scrape import ScrapeManager
+        from pymon.scrape import ScrapeManager, ServiceChecker
 
         config_path = os.getenv("CONFIG_PATH", "config.yml")
         config = load_config(config_path)
 
         scrape_manager = ScrapeManager(config)
+        service_checker = ServiceChecker()
         app.state.scrape_manager = scrape_manager
+        app.state.service_checker = service_checker
 
         try:
             await scrape_manager.start()
-            print(f"Background scraping started (Async mode)", file=sys.stderr)
+            await service_checker.start()
+            print("Background scraping & service checker started", file=sys.stderr)
         except Exception as e:
-            print(f"Warning: Could not start background scraping loop: {e}", file=sys.stderr)
+            print(f"Warning: Could not start background tasks: {e}", file=sys.stderr)
 
     except Exception as e:
         print(f"Warning: Could not start background scraping: {e}", file=sys.stderr)
         app.state.scrape_manager = None
+        app.state.service_checker = None
 
     yield
 
     if scrape_manager:
         await scrape_manager.stop()
-        print("Background scraping stopped", file=sys.stderr)
+    if 'service_checker' in dir() and service_checker:
+        await service_checker.stop()
+    print("Background tasks stopped", file=sys.stderr)
 
 
 def create_app():

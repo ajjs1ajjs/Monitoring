@@ -43,7 +43,12 @@ def init_database():
                   error_message TEXT,
                   is_maintenance INTEGER DEFAULT 0,
                   flapping_count INTEGER DEFAULT 0,
+                  volumes TEXT DEFAULT '[]',
                   created_at TEXT)''')
+    try:
+        c.execute("ALTER TABLE servers ADD COLUMN volumes TEXT DEFAULT '[]'")
+    except sqlite3.OperationalError:
+        pass
     
     # Services table
     c.execute('''CREATE TABLE IF NOT EXISTS services
@@ -52,6 +57,8 @@ def init_database():
                   target_url TEXT NOT NULL,
                   check_type TEXT DEFAULT 'http',
                   interval INTEGER DEFAULT 60,
+                  timeout INTEGER DEFAULT 10,
+                  expected_status INTEGER DEFAULT 200,
                   enabled INTEGER DEFAULT 1,
                   status TEXT DEFAULT 'unknown',
                   last_check TEXT,
@@ -65,8 +72,16 @@ def init_database():
                   cpu_percent REAL,
                   memory_percent REAL,
                   disk_percent REAL,
+                  network_rx REAL DEFAULT 0,
+                  network_tx REAL DEFAULT 0,
+                  disk_info TEXT DEFAULT '{}',
                   timestamp TEXT,
                   FOREIGN KEY(server_id) REFERENCES servers(id))''')
+
+    try:
+        c.execute("ALTER TABLE metrics_history ADD COLUMN disk_info TEXT DEFAULT '{}'")
+    except sqlite3.OperationalError:
+        pass
     
     # Alerts history
     c.execute('''CREATE TABLE IF NOT EXISTS alerts
@@ -80,6 +95,29 @@ def init_database():
                   resolved INTEGER DEFAULT 0,
                   resolved_at TEXT)''')
 
+    # Services history
+    c.execute('''CREATE TABLE IF NOT EXISTS services_history
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  service_id INTEGER,
+                  status TEXT,
+                  latency_ms REAL,
+                  timestamp TEXT)''')
+
+    # Audit Log
+    c.execute('''CREATE TABLE IF NOT EXISTS audit_logs
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  action TEXT,
+                  details TEXT,
+                  ip_address TEXT,
+                  timestamp TEXT)''')
+    
+    # Notifications config
+    c.execute('''CREATE TABLE IF NOT EXISTS notifications
+                 (channel TEXT PRIMARY KEY,
+                  enabled INTEGER DEFAULT 1,
+                  config TEXT)''')
+    
     conn.commit()
     conn.close()
     logger.info("Database initialized with WAL mode")

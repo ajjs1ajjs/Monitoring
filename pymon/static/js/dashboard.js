@@ -18,6 +18,14 @@ function switchView(view) {
     document.getElementById('liveGridContainer').classList.toggle('active', view === 'grid');
 }
 
+function isUsefulVolume(vol) {
+    if (!vol) return false;
+    const v = vol.toLowerCase();
+    if (v.includes('harddiskvolume')) return false;
+    if (v.includes('/snap/') || v.includes('docker') || v.includes('kubelet') || v.includes('tmpfs') || v.includes('overlay') || v === 'shm' || v.includes('/run/user/')) return false;
+    return true;
+}
+
 function openDrawer(nodeId) {
     const n = nodes.find(x => x.id === nodeId);
     if (!n) return;
@@ -28,12 +36,12 @@ function openDrawer(nodeId) {
     
     let diskHtml = '';
     try {
-        const raw = n.disk_info;
-        if (raw && raw !== 'null') {
+        if (n.volumes) {
+            const raw = n.volumes;
             const disks = typeof raw === 'string' ? JSON.parse(raw) : raw;
-            const diskArray = Array.isArray(disks) ? disks : Object.entries(disks).map(([vol, pct]) => ({volume: vol, percent: pct}));
-            diskHtml = diskArray.map(d => {
-                const pct = d.percent || 0;
+            const diskArray = Array.isArray(disks) ? disks : [];
+            diskHtml = diskArray.filter(d => isUsefulVolume(d.volume)).map(d => {
+                const pct = (d.used_percent || d.percent || 0);
                 return `
                 <div style="margin-bottom: 1rem;">
                     <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.4rem;">
@@ -76,7 +84,7 @@ function openDrawer(nodeId) {
         
         <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Actions</h4>
         <div style="display: flex; gap: 1rem;">
-            <button class="btn btn-secondary" onclick="closeDrawer(); showSection('nodes');" style="flex: 1;"><i data-lucide="server" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Manage Node</button>
+            <button class="btn btn-secondary" onclick="closeDrawer(); showEditModal(${n.id});" style="flex: 1;"><i data-lucide="settings" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Manage Node</button>
         </div>
     `;
     lucide.createIcons();
@@ -171,13 +179,22 @@ if (logoutBtn) logoutBtn.addEventListener('click', () => {
 async function apiFetch(url, options = {}) {
     options.headers = options.headers || {};
     options.headers['Authorization'] = 'Bearer ' + token;
-    const resp = await fetch(url, options);
-    if (resp.status === 401) {
-        localStorage.removeItem('token');
-        window.location.href = '/login';
+    try {
+        const resp = await fetch(url, options);
+        if (resp.status === 401) {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+            return null;
+        }
+        if (!resp.ok) {
+            console.error(`API Error ${resp.status} on ${url}`);
+            return null;
+        }
+        return resp;
+    } catch (e) {
+        console.error(`Fetch error on ${url}:`, e);
         return null;
     }
-    return resp;
 }
 
 // Form Handlers
@@ -408,13 +425,13 @@ function updateLiveTable(data) {
                 <div style="display: flex; flex-direction: column; gap: 0.5rem; min-width: 240px;">
                     ${(() => {
                         try {
-                            const raw = n.disk_info;
+                            const raw = n.volumes;
                             if (!raw || raw === 'null') throw 0;
                             const disks = typeof raw === 'string' ? JSON.parse(raw) : raw;
-                            const diskArray = Array.isArray(disks) ? disks : Object.entries(disks).map(([vol, pct]) => ({volume: vol, percent: pct}));
+                            const diskArray = Array.isArray(disks) ? disks : [];
 
-                            return diskArray.map(d => {
-                                const pct = d.percent || 0;
+                            return diskArray.filter(d => isUsefulVolume(d.volume)).map(d => {
+                                const pct = (d.used_percent || d.percent || 0);
                                 return `
                                     <div style="display:flex; align-items:center; gap:0.75rem;">
                                         <span style="min-width:2.5rem; font-size:0.75rem; font-weight:700; color:#fff;">${d.volume || '?'}</span>
@@ -1058,6 +1075,7 @@ async function updateOverviewCharts() {
         const sResp = await apiFetch(`/api/v1/services/history?range=${currentRange}`);
         if (sResp && sResp.ok) {
             const sData = await sResp.json();
+            if (!Array.isArray(sData)) return;
             const sLabels = sData.map(h => new Date(h.timestamp).toLocaleTimeString());
             const sLatency = sData.map(h => h.response_time);
             
@@ -1067,7 +1085,7 @@ async function updateOverviewCharts() {
                 overviewCharts.service.update('none');
             }
         }
-    } catch(e) {}
+    } catch(e) { console.error("Service chart update failed:", e); }
 }
 
 function expandChart(type) {
@@ -1090,7 +1108,7 @@ function expandChart(type) {
             if (h.disk_info) {
                 Object.keys(h.disk_info).forEach(v => {
                     const vLower = v.toLowerCase();
-                    if (v.includes('HarddiskVolume') || 
+                    if (vLower.includes('harddiskvolume') || 
                         vLower.includes('/snap/') || 
                         vLower.includes('docker') || 
                         vLower.includes('kubelet') || 
@@ -1208,42 +1226,6 @@ async function loadRecentAlerts() {
     }
 }
 
-function updateTimelineTable() {
-    const tbody = document.getElementById('timelineTableBody');
-    if (!tbody) return;
-
-    const all = [
-        ...nodes.map(n => ({...n, type: 'node'})),
-        ...services.map(s => ({...s, type: 'service', last_check: s.last_check, name: s.name}))
-    ];
-    const sorted = all.sort((a, b) => new Date(b.last_check) - new Date(a.last_check)).slice(0, 10);
-    
-    tbody.innerHTML = sorted.map(item => `
-        <tr>
-            <td><span class="timeline-time">${new Date(item.last_check).toLocaleTimeString()}</span></td>
-            <td>
-                <div class="timeline-server">
-                    <i data-lucide="${item.type === 'service' ? 'globe' : ((item.os_type || '').toLowerCase().includes('win') ? 'monitor' : 'terminal')}" style="width: 14px; height: 14px; opacity: 0.5;"></i>
-                    ${item.name}
-                </div>
-            </td>
-            <td><span class="timeline-metric text-accent">${item.type === 'node' ? (item.cpu_percent || 0).toFixed(1) + '%' : '-'}</span></td>
-            <td><span class="timeline-metric text-success">${item.type === 'node' ? (item.memory_percent || 0).toFixed(1) + '%' : (item.response_time || item.last_response_time || 0).toFixed(1) + 'ms'}</span></td>
-            <td><span class="timeline-metric text-warning">${item.type === 'node' ? (item.disk_percent || 0).toFixed(1) + '%' : (item.check_type || '').toUpperCase()}</span></td>
-            <td>
-                <div class="status-badge ${item.last_status === 'up' ? 'up' : 'down'}">
-                    <span class="status-dot ${item.last_status === 'up' ? 'pulse' : ''}"></span>
-                    ${(item.last_status || 'unknown').toUpperCase()}
-                </div>
-            </td>
-        </tr>
-    `).join('');
-
-    const timeEl = document.getElementById('timelineSyncTime');
-    if (timeEl) timeEl.textContent = 'Last update: ' + new Date().toLocaleTimeString();
-    lucide.createIcons();
-}
-
 function populateServerSelect() {
     const select = document.getElementById('overviewNodeSelect');
     if (!select) return;
@@ -1275,7 +1257,6 @@ setInterval(refreshData, 60000);
 setInterval(() => {
     updateOverviewCharts();
     loadRecentAlerts();
-    updateTimelineTable();
     populateServerSelect();
 }, 60000);
 
@@ -1326,12 +1307,12 @@ function updateServicesTable(services) {
             </td>
             <td><span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">${s.check_type.toUpperCase()}</span></td>
             <td>
-                <span class="status-badge status-${s.last_status}">
-                    <span class="status-dot status-${s.last_status}"></span>
-                    ${s.last_status.toUpperCase()}
+                <span class="status-badge status-${(s.status || s.last_status || 'unknown')}">
+                    <span class="status-dot status-${(s.status || s.last_status || 'unknown')}"></span>
+                    ${(s.status || s.last_status || 'unknown').toUpperCase()}
                 </span>
             </td>
-            <td>${s.last_response_time ? s.last_response_time.toFixed(1) + 'ms' : '-'}</td>
+            <td>${(s.response_time_ms || s.last_response_time) ? (s.response_time_ms || s.last_response_time).toFixed(1) + 'ms' : '-'}</td>
             <td>${s.last_check ? new Date(s.last_check).toLocaleTimeString() : 'Never'}</td>
             <td style="text-align: right;">
                 <button onclick="deleteService(${s.id})" class="chart-action-btn" style="color: var(--danger);"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
@@ -1384,3 +1365,33 @@ async function exportPyMonConfig() {
         }
     } catch (e) { alert('Export failed'); }
 }
+
+async function generateReport(serverId) {
+    const btn = document.querySelector(`button[onclick="generateReport(${serverId})"]`);
+    const originalText = btn ? btn.innerHTML : null;
+    if (btn) btn.innerHTML = '<i class="animate-spin" data-lucide="refresh-cw" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Generating...';
+    if (window.lucide) lucide.createIcons();
+
+    try {
+        const resp = await apiFetch(`/api/v1/reports/server/${serverId}`);
+        if (resp && resp.ok) {
+            const html = await resp.text();
+            const w = window.open('', '_blank');
+            if (w) {
+                w.document.write(html);
+                w.document.close();
+            }
+        } else if (resp) {
+            const err = await resp.json();
+            alert('Report generation failed: ' + (err.detail || 'Internal error'));
+        }
+    } catch (e) {
+        alert('Could not connect to reporting engine');
+    } finally {
+        if (btn) btn.innerHTML = originalText;
+        if (window.lucide) lucide.createIcons();
+    }
+}
+
+// Final boot sequence handled by existing lifecycle intervals and initial calls above.
+
