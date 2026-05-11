@@ -21,7 +21,7 @@ def get_db_connection():
         
     return conn
 
-def init_db():
+def init_database():
     conn = get_db_connection()
     c = conn.cursor()
     
