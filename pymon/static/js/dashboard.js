@@ -557,7 +557,7 @@ async function loadAlertRules() {
             <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--border);">
                 <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Trigger Condition</div>
                 <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem; color: #fff;">
-                    <span style="color: var(--accent);">${a.metric.toUpperCase()}</span> ${a.condition} <span style="color: var(--success);">${a.threshold}%</span>
+                    <span style="color: var(--accent);">${a.metric.toUpperCase()}</span> ${a.condition} <span style="color: var(--success);">${a.threshold}${a.metric.includes('latency') ? 'ms' : (a.metric.includes('status') ? '' : '%')}</span>
                 </div>
             </div>
             <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.75rem;">

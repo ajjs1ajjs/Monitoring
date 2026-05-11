@@ -64,6 +64,7 @@ def init_database():
         duration INTEGER DEFAULT 0,
         severity TEXT DEFAULT 'warning',
         server_id INTEGER,
+        service_id INTEGER,
         notify_telegram BOOLEAN DEFAULT 0,
         notify_discord BOOLEAN DEFAULT 0,
         notify_slack BOOLEAN DEFAULT 0,
@@ -72,8 +73,15 @@ def init_database():
         description TEXT,
         enabled BOOLEAN DEFAULT 1,
         created_at TEXT,
-        FOREIGN KEY (server_id) REFERENCES servers(id)
-    )""")
+        FOREIGN KEY (server_id) REFERENCES servers(id),
+        FOREIGN KEY (service_id) REFERENCES services(id)
+    )""" )
+    
+    # Migrations
+    try:
+        c.execute("ALTER TABLE alerts ADD COLUMN service_id INTEGER")
+        conn.commit()
+    except: pass
     
     # Services table (HTTP/TCP Monitoring)
     c.execute("""CREATE TABLE IF NOT EXISTS services (

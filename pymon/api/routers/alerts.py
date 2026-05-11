@@ -17,6 +17,7 @@ class AlertCreate(BaseModel):
     duration: int = 0
     severity: str = "warning"
     server_id: int | None = None
+    service_id: int | None = None
     notify_telegram: bool = False
     notify_discord: bool = False
     notify_slack: bool = False
@@ -40,11 +41,11 @@ async def create_alert(data: AlertCreate, current_user: User = Depends(get_curre
     c = conn.cursor()
     try:
         c.execute(
-            """INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, 
+            """INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, service_id,
                notify_telegram, notify_discord, notify_slack, notify_email, notify_teams, description, enabled, created_at) 
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                data.name, data.metric, data.condition, data.threshold, data.duration, data.severity, data.server_id,
+                data.name, data.metric, data.condition, data.threshold, data.duration, data.severity, data.server_id, data.service_id,
                 int(data.notify_telegram), int(data.notify_discord), int(data.notify_slack), 
                 int(data.notify_email), int(data.notify_teams), data.description, int(data.enabled),
                 datetime.now(timezone.utc).isoformat()

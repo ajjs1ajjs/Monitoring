@@ -434,6 +434,10 @@ class ScrapeManager:
                          ('up' if success else 'down', datetime.now(timezone.utc).isoformat(), resp_time, error, s['id']))
             if not success and s['is_maintenance'] == 0:
                 await self._fire_down_alert(999000 + s['id'], f"Service: {s['name']}", error)
+            
+            if s['is_maintenance'] == 0:
+                await self._check_service_alerts(s['id'], resp_time, 'up' if success else 'down', s['name'])
+            
             conn.commit()
             conn.close()
         except: pass
@@ -520,6 +524,41 @@ class ScrapeManager:
             conn.close()
         except Exception as e:
             logger.error(f"Alert check failed for {name}: {e}")
+
+    async def _check_service_alerts(self, service_id: int, latency: float, status: str, name: str):
+        db_path = self.config.storage.path
+        try:
+            import sqlite3
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            alerts = conn.execute("SELECT * FROM alerts WHERE enabled = 1 AND (service_id = ? OR (service_id IS NULL AND server_id IS NULL AND metric LIKE 'service_%'))", (service_id,)).fetchall()
+            
+            notif_row = conn.execute("SELECT config FROM notifications WHERE channel = 'all'").fetchone()
+            notif_cfg = json.loads(notif_row[0]) if notif_row else {"enabled": False}
+            
+            for alert in alerts:
+                triggered = False
+                val = 0.0
+                if alert['metric'] == 'service_latency':
+                    val = latency
+                    if alert['condition'] == '>': triggered = val > alert['threshold']
+                    elif alert['condition'] == '<': triggered = val < alert['threshold']
+                elif alert['metric'] == 'service_status':
+                    val = 1 if status == 'up' else 0
+                    if alert['condition'] == '==': triggered = val == alert['threshold']
+                    elif alert['condition'] == '!=': triggered = val != alert['threshold']
+                
+                if triggered:
+                    msg = f"🚨 <b>{alert['name']}</b> on <b>{name}</b>\nValue: {val:.1f}\nThreshold: {alert['threshold']}"
+                    if notif_cfg.get('enabled'):
+                        dispatcher.dispatch(alert['name'], msg, notif_cfg)
+                    
+                    conn.execute("INSERT INTO audit_logs (username, action, target, details, timestamp) VALUES (?, ?, ?, ?, ?)",
+                                ("system", f"Alert: {alert['name']}", name, f"Value: {val:.1f}", datetime.now(timezone.utc).isoformat()))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Service alert check failed for {name}: {e}")
 
     async def _detect_anomalies(self, sid: int, cpu: float, mem: float, name: str):
         if sid not in self._history_points:
