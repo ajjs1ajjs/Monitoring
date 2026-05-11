@@ -57,6 +57,7 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
         raise HTTPException(status_code=400, detail="No YAML content provided")
     
     import yaml
+    from datetime import datetime, timezone
     from pymon.config import load_config
     
     try:
@@ -70,12 +71,18 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
         count = 0
         for sc in scrape_configs:
             job_name = sc.get("job_name", "imported_job")
-            for static_cfg in sc.get("static_configs", []):
+            static_configs = sc.get("static_configs", [])
+            if not isinstance(static_configs, list): continue
+
+            for static_cfg in static_configs:
                 targets = static_cfg.get("targets", [])
                 if not isinstance(targets, list): continue
+                
                 for target in targets:
                     try:
-                        t_str = str(target)
+                        t_str = str(target).strip()
+                        if not t_str: continue
+
                         # Handle URLs (blackbox) -> add as Services
                         if t_str.startswith(('http://', 'https://')):
                             exists_srv = c.execute("SELECT 1 FROM services WHERE target_url = ?", (t_str,)).fetchone()
@@ -85,6 +92,7 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
                                 count += 1
                             continue
                         
+                        # Handle Servers (host:port)
                         if ':' in t_str:
                             parts = t_str.rsplit(':', 1)
                             host = parts[0].strip('[] ')
@@ -104,7 +112,9 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
                             c.execute("INSERT INTO servers (name, host, agent_port, enabled, server_group, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                                      (job_name, host, port, 1, "Imported", datetime.now(timezone.utc).isoformat()))
                             count += 1
-                    except: continue
+                    except Exception as e:
+                        print(f"Import error for target {target}: {e}")
+                        continue
         conn.commit()
         conn.close()
         return {"status": "ok", "imported": count}
