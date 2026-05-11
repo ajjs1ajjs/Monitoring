@@ -56,27 +56,21 @@ class ScrapeManager:
         self._prev_metrics: dict[int, dict] = {}
         
         # Connection Pool
-        limits = httpx.Limits(max_keepalive_connections=50, max_connections=200)
-        self._client = httpx.AsyncClient(timeout=15.0, follow_redirects=True, limits=limits, verify=False)
+        limits = httpx.Limits(max_keepalive_connections=100, max_connections=300)
+        self._client = httpx.AsyncClient(timeout=10.0, follow_redirects=True, limits=limits, verify=False)
         
         self._build_targets()
 
     def _build_targets(self):
         self.targets = []
-        # Config-based targets are not used much in this project, mostly DB-based
-        pass
 
     async def start(self):
         if self._running: return
         self._running = True
         
         print("[*] ScrapeManager: Loading targets from database...", flush=True)
-        try:
-            await self._load_dynamic_targets()
-        except Exception as e:
-            print(f"[!] ScrapeManager: Failed to load targets: {e}", flush=True)
+        await self._load_dynamic_targets()
         
-        # Start loops
         self._tasks.append(asyncio.create_task(self._flush_status_loop()))
         self._tasks.append(asyncio.create_task(self._dynamic_reload_loop()))
         print(f"[OK] ScrapeManager: Started with {len(self.targets)} active targets", flush=True)
@@ -89,15 +83,17 @@ class ScrapeManager:
     async def _dynamic_reload_loop(self):
         while self._running:
             await asyncio.sleep(60)
-            await self._load_dynamic_targets()
+            try:
+                await self._load_dynamic_targets()
+            except: pass
 
     async def _load_dynamic_targets(self):
         db_path = self.config.storage.path
         try:
-            conn = sqlite3.connect(db_path)
+            conn = sqlite3.connect(db_path, timeout=20)
             conn.row_factory = sqlite3.Row
             
-            # 1. Load Servers
+            # Load Servers
             servers = conn.execute("SELECT * FROM servers WHERE enabled = 1").fetchall()
             for r in servers:
                 t_str = f"{r['host']}:{r['agent_port']}"
@@ -115,7 +111,7 @@ class ScrapeManager:
                 self.targets.append(target)
                 self._tasks.append(asyncio.create_task(self._scrape_loop(target)))
 
-            # 2. Load Services
+            # Load Services
             services = conn.execute("SELECT * FROM services WHERE enabled = 1").fetchall()
             for r in services:
                 if any(t.service_id == r['id'] for t in self.targets): continue
@@ -131,10 +127,9 @@ class ScrapeManager:
                 )
                 self.targets.append(target)
                 self._tasks.append(asyncio.create_task(self._scrape_loop(target)))
-                
             conn.close()
         except Exception as e:
-            print(f"[!] ScrapeManager Error: {e}")
+            print(f"[!] ScrapeManager Reload Error: {e}", flush=True)
 
     async def _scrape_loop(self, target: ScrapeTarget):
         while self._running:
@@ -145,7 +140,7 @@ class ScrapeManager:
                     self._process_metrics(res)
                 await self._queue_status(res)
             except Exception as e:
-                pass
+                logger.error(f"Loop error for {target.target}: {e}")
             
             wait = max(10, target.interval - (time.time() - start))
             await asyncio.sleep(wait)
@@ -159,8 +154,7 @@ class ScrapeManager:
             
         try:
             r = await self._client.get(url, timeout=target.timeout)
-            res.latency_ms = (time.time() - res.timestamp.timestamp()) * 1000 # Corrected latency
-            res.latency_ms = max(0, time.time() - res.timestamp.timestamp()) * 1000
+            res.latency_ms = (time.time() - start_time) * 1000 if 'start_time' in locals() else (time.time() - res.timestamp.timestamp()) * 1000
             res.status_code = r.status_code
             res.success = (r.status_code == 200)
             if res.success and target.metrics_path:
@@ -178,7 +172,7 @@ class ScrapeManager:
         if cpu is None:
             idle = self._sum(m, r'.*cpu.*idle.*')
             total = self._sum(m, r'.*cpu.*')
-            if total > 0:
+            if total and total > 0:
                 prev = self._prev_metrics.get(res.target.server_id, {})
                 if prev.get('total'):
                     t_d = total - prev['total']
@@ -192,7 +186,8 @@ class ScrapeManager:
         if mem is None:
             t_m = m.get("node_memory_MemTotal_bytes") or m.get("windows_cs_physical_memory_bytes")
             f_m = m.get("node_memory_MemAvailable_bytes") or m.get("windows_os_physical_memory_free_bytes")
-            if t_m and t_m > 0: mem = 100 * (1 - (f_m or 0) / t_m)
+            if t_m and t_m > 0: 
+                mem = 100 * (1 - (f_m or 0) / t_m)
         res.mem = mem or 0
         res.disk = m.get("disk_usage_percent") or m.get("windows_disk_usage") or 0
 
@@ -222,16 +217,16 @@ class ScrapeManager:
                                      (st, now, r.cpu, r.mem, r.disk, r.version, r.target.server_id))
                     else:
                         conn.execute("UPDATE servers SET last_status=?, last_check=?, error_message=? WHERE id=?",
-                                     (st, now, r.error[:200] if r.error else "Error", r.target.server_id))
+                                     (st, now, (r.error or f"HTTP {r.status_code}")[:200], r.target.server_id))
                 elif r.target.service_id:
                     st_srv = "UP" if r.success else "DOWN"
                     conn.execute("UPDATE services SET status=?, last_check=?, response_time_ms=? WHERE id=?",
                                  (st_srv, now, r.latency_ms, r.target.service_id))
             conn.commit()
             conn.close()
-            print(f"[*] ScrapeManager: Flushed {len(batch)} statuses to DB", flush=True)
+            print(f"[*] ScrapeManager: Updated {len(batch)} targets in DB", flush=True)
         except Exception as e:
-            print(f"[!] ScrapeManager Flush Error: {e}", flush=True)
+            print(f"[!] ScrapeManager DB Flush Error: {e}", flush=True)
 
     def _parse_metrics(self, text: str) -> dict:
         m = {"__version__": "unknown"}
@@ -243,9 +238,10 @@ class ScrapeManager:
                 if match: m["__version__"] = match.group(1)
             try:
                 if "{" in line:
-                    name, rest = line.split("{", 1)
-                    val = float(rest.rsplit("}", 1)[1].strip())
-                    m[name.strip()] = val
+                    parts = line.split("{", 1)
+                    name = parts[0].strip()
+                    val = float(line.rsplit("}", 1)[1].strip())
+                    m[name] = val
                 else:
                     p = line.split()
                     if len(p) >= 2: m[p[0]] = float(p[1])
@@ -254,7 +250,9 @@ class ScrapeManager:
 
     def _sum(self, m, pattern):
         total = 0.0
-        regex = re.compile(pattern)
-        for k, v in m.items():
-            if regex.match(k): total += v
+        try:
+            regex = re.compile(pattern)
+            for k, v in m.items():
+                if regex.match(k): total += v
+        except: pass
         return total
