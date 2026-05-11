@@ -324,6 +324,7 @@ function filterNodes() {
     updateStats();
     updateLiveTable(filtered);
     updateNodeGrid(filtered);
+    lucide.createIcons();
 }
 
 function sortNodes(key) {

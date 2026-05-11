@@ -251,9 +251,14 @@
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Керування підключеними вузлами та джерелами даних</p>
                         </div>
                         <div style="display: flex; gap: 1rem; align-items: center;">
+                            <select id="filterStatus" onchange="filterNodes()" class="server-select" style="min-width: 120px;">
+                                <option value="all">Усі статуси</option>
+                                <option value="up">Тільки UP</option>
+                                <option value="down">Тільки DOWN</option>
+                            </select>
                             <div class="search-box">
                                 <i data-lucide="search" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
-                                <input type="search" id="nodeSearch" placeholder="Пошук вузлів..." oninput="filterNodes()" autocomplete="off" spellcheck="false" class="server-select" style="min-width: 250px;">
+                                <input type="search" id="nodeSearch" placeholder="Пошук за назвою або IP..." oninput="filterNodes()" autocomplete="off" spellcheck="false" class="server-select" style="min-width: 250px;">
                             </div>
                             <button onclick="toggleModal('addNodeModal', true)" class="btn btn-primary" style="padding: 0.6rem 1.25rem; font-weight: 700;">
                                 <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Додати вузол
@@ -266,12 +271,12 @@
                             <table class="timeline-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 120px;">Статус</th>
-                                        <th>Ідентифікатор вузла</th>
-                                        <th>Endpoint</th>
-                                        <th>CPU</th>
-                                        <th>RAM</th>
-                                        <th>Disk</th>
+                                        <th style="width: 120px; cursor: pointer;" onclick="sortNodes('last_status')">Статус <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="cursor: pointer;" onclick="sortNodes('name')">Ідентифікатор вузла <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="cursor: pointer;" onclick="sortNodes('host')">Endpoint <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="cursor: pointer;" onclick="sortNodes('cpu_percent')">CPU <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="cursor: pointer;" onclick="sortNodes('memory_percent')">RAM <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="cursor: pointer;" onclick="sortNodes('disk_percent')">Disk <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
                                         <th style="text-align: right;">Дії</th>
                                     </tr>
                                 </thead>
