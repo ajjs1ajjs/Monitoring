@@ -197,7 +197,7 @@ class ScrapeManager:
                                      (st, now, (r.error or f"HTTP {r.status_code}")[:200], r.target.server_id))
                 elif r.target.service_id:
                     st_srv = "UP" if r.success else "DOWN"
-                    conn.execute("UPDATE services SET status=?, last_check=?, response_time_ms=? WHERE id=?",
+                    conn.execute("UPDATE services SET last_status=?, last_check=?, last_latency_ms=? WHERE id=?",
                                  (st_srv, now, r.latency_ms, r.target.service_id))
             conn.commit()
             conn.close()
