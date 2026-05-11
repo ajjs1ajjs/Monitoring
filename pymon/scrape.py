@@ -67,7 +67,9 @@ class ScrapeManager:
         self.up_gauge = Gauge("up", "Target availability (1=up, 0=down)")
         self.response_time = Gauge("pymon_response_time_seconds", "Response time in seconds")
         
-        self._client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
+        # Optimization: Connection Pool
+        limits = httpx.Limits(max_keepalive_connections=50, max_connections=200)
+        self._client = httpx.AsyncClient(timeout=15.0, follow_redirects=True, limits=limits)
         self._last_states: dict[int, str] = {}
         self._build_targets()
 
@@ -130,11 +132,11 @@ class ScrapeManager:
                     continue
                 
                 new_t = ScrapeTarget(
-                    job_name=r['server_group'] or "dynamic",
+                    job_name=r['name'] or r['server_group'] or "dynamic",
                     target=target_str,
                     metrics_path="/metrics",
                     interval=60,
-                    timeout=10,
+                    timeout=15,
                     labels={"server_id": str(r['id']), "name": r['name']},
                     server_id=r['id']
                 )
@@ -231,9 +233,15 @@ class ScrapeManager:
                 if r.success:
                     conn.execute("UPDATE servers SET last_status=?, last_check=?, cpu_percent=?, memory_percent=?, disk_percent=?, exporter_version=?, error_message=NULL WHERE id=?",
                                  (st, now, r.cpu, r.mem, r.disk, r.version, r.target.server_id))
+                    # Also update services if this is a service check
+                    conn.execute("UPDATE services SET status=?, last_check=?, response_time_ms=? WHERE target_url LIKE ?",
+                                 (st, now, r.latency_ms, f"%{r.target.target}%"))
                 else:
+                    err = r.error or f"HTTP {r.status_code}"
                     conn.execute("UPDATE servers SET last_status=?, last_check=?, error_message=? WHERE id=?",
-                                 (st, now, r.error, r.target.server_id))
+                                 (st, now, err, r.target.server_id))
+                    conn.execute("UPDATE services SET status=?, last_check=?, response_time_ms=? WHERE target_url LIKE ?",
+                                 (st, now, r.latency_ms, f"%{r.target.target}%"))
             conn.commit()
             conn.close()
         except Exception as e:
