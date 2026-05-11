@@ -36,6 +36,7 @@ class ScrapeResult:
     mem: float = 0
     disk: float = 0
     version: str = "v?"
+    os_type: str = "linux"
 
 class ScrapeManager:
     def __init__(self, config: PyMonConfig):
@@ -125,6 +126,11 @@ class ScrapeManager:
     def _process_metrics(self, res: ScrapeResult):
         m = res.metrics or {}
         res.version = m.get("__version__", "v?")
+        
+        # Auto-detect OS from metrics
+        is_windows = any(k.startswith("windows_") for k in m.keys())
+        res.os_type = "windows" if is_windows else "linux"
+        
         # CPU
         cpu = m.get("cpu_usage_percent") or m.get("windows_cpu_usage")
         if cpu is None:
@@ -173,8 +179,8 @@ class ScrapeManager:
                 st = "up" if r.success else "down"
                 if r.target.server_id:
                     if r.success:
-                        conn.execute("UPDATE servers SET last_status=?, last_check=?, cpu_percent=?, memory_percent=?, disk_percent=?, exporter_version=?, error_message=NULL WHERE id=?",
-                                     (st, now, r.cpu, r.mem, r.disk, r.version, r.target.server_id))
+                        conn.execute("UPDATE servers SET last_status=?, last_check=?, cpu_percent=?, memory_percent=?, disk_percent=?, exporter_version=?, os_type=?, error_message=NULL WHERE id=?",
+                                     (st, now, r.cpu, r.mem, r.disk, r.version, r.os_type, r.target.server_id))
                     else:
                         conn.execute("UPDATE servers SET last_status=?, last_check=?, error_message=? WHERE id=?",
                                      (st, now, (r.error or f"HTTP {r.status_code}")[:200], r.target.server_id))
