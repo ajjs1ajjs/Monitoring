@@ -170,7 +170,7 @@ class ScrapeManager:
             conn.execute("PRAGMA synchronous=NORMAL")
             now = datetime.now(timezone.utc).isoformat()
             for r in batch:
-                st = "online" if r.success else "offline"
+                st = "up" if r.success else "down"
                 if r.target.server_id:
                     if r.success:
                         conn.execute("UPDATE servers SET last_status=?, last_check=?, cpu_percent=?, memory_percent=?, disk_percent=?, exporter_version=?, error_message=NULL WHERE id=?",

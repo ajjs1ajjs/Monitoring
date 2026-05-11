@@ -955,6 +955,7 @@ function initOverviewCharts() {
     const ctxRam = document.getElementById('ramOverviewChart')?.getContext('2d');
     const ctxDisk = document.getElementById('diskOverviewChart')?.getContext('2d');
     const ctxNet = document.getElementById('netOverviewChart')?.getContext('2d');
+    const ctxService = document.getElementById('serviceOverviewChart')?.getContext('2d');
 
     if (ctxCpu) overviewCharts.cpu = new Chart(ctxCpu, chartConfig('CPU', 'rgba(249, 115, 22, 1)'));
     if (ctxRam) overviewCharts.ram = new Chart(ctxRam, chartConfig('RAM', 'rgba(16, 185, 129, 1)'));
