@@ -125,11 +125,22 @@ class ScrapeManager:
 
     def _process_metrics(self, res: ScrapeResult):
         m = res.metrics or {}
-        res.version = m.get("__version__", "v?")
+        ver = m.get("__version__", "v?")
         
-        # Auto-detect OS from metrics
-        is_windows = any(k.startswith("windows_") for k in m.keys())
-        res.os_type = "windows" if is_windows else "linux"
+        # Auto-detect Agent and OS from metrics
+        agent = "Unknown"
+        if any(k.startswith("windows_") for k in m.keys()):
+            agent = "Windows Exporter"
+            res.os_type = "windows"
+        elif any(k.startswith("node_") for k in m.keys()):
+            agent = "Node Exporter"
+            res.os_type = "linux"
+        elif any(k.startswith("telegraf_") for k in m.keys()):
+            agent = "Telegraf"
+            # Telegraf can be both, but we'll try to guess
+            if any("windows" in k for k in m.keys()): res.os_type = "windows"
+        
+        res.version = f"{agent} ({ver})" if ver != "unknown" else agent
         
         # CPU
         cpu = m.get("cpu_usage_percent") or m.get("windows_cpu_usage")
