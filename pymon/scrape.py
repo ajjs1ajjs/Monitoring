@@ -84,7 +84,7 @@ class ScrapeManager:
                 self.targets.append(t)
                 self._tasks.append(asyncio.create_task(self._scrape_loop(t)))
             # Services
-            rows = conn.execute("SELECT id, name, target_url, interval FROM services WHERE enabled = 1").fetchall()
+            rows = conn.execute("SELECT id, name, target_url, interval, timeout, expected_status FROM services WHERE enabled = 1").fetchall()
             for r in rows:
                 if any(t.service_id == r['id'] for t in self.targets): continue
                 t = ScrapeTarget(job_name=r['name'], target=r['target_url'], service_id=r['id'], interval=r['interval'] or 60)
@@ -102,8 +102,11 @@ class ScrapeManager:
                 if not url.startswith("http"): url = f"http://{url}"
                 if target.server_id and "/metrics" not in url: url = url.rstrip("/") + "/metrics"
                 
-                resp = await self._client.get(url, timeout=target.timeout)
-                res = ScrapeResult(target=target, success=(resp.status_code == 200), status_code=resp.status_code)
+                timeout = target.timeout or 10
+                resp = await self._client.get(url, timeout=timeout)
+                
+                expected = target.expected_status or 200
+                res = ScrapeResult(target=target, success=(resp.status_code == expected), status_code=resp.status_code)
                 res.latency_ms = (time.time() - start_ts) * 1000
                 
                 if res.success and target.server_id:
@@ -121,7 +124,7 @@ class ScrapeManager:
                 await self._queue_result(res)
                 print(f"[ERR] Failed: {target.target} - {e}", flush=True)
             
-            await asyncio.sleep(max(10, target.interval))
+            await asyncio.sleep(60)
 
     def _process_metrics(self, res: ScrapeResult):
         m = res.metrics or {}
@@ -144,6 +147,8 @@ class ScrapeManager:
         
         # CPU
         cpu = m.get("cpu_usage_percent") or m.get("windows_cpu_usage")
+        if cpu is None and "cpu_usage_idle" in m:
+            cpu = 100.0 - m["cpu_usage_idle"]
         if cpu is None:
             idle = self._sum(m, r'.*cpu.*idle.*')
             total = self._sum(m, r'.*cpu.*')
@@ -156,13 +161,13 @@ class ScrapeManager:
                 self._prev_metrics[res.target.server_id] = {'idle': idle, 'total': total}
         res.cpu = cpu or 0
         # RAM
-        mem = m.get("memory_usage_percent") or m.get("windows_memory_usage")
+        mem = m.get("memory_usage_percent") or m.get("windows_memory_usage") or m.get("mem_used_percent")
         if mem is None:
             t_m = m.get("node_memory_MemTotal_bytes") or m.get("windows_cs_physical_memory_bytes")
             f_m = m.get("node_memory_MemAvailable_bytes") or m.get("windows_os_physical_memory_free_bytes")
             if t_m and t_m > 0: mem = 100 * (1 - (f_m or 0) / t_m)
         res.mem = mem or 0
-        res.disk = m.get("disk_usage_percent") or m.get("windows_disk_usage") or 0
+        res.disk = m.get("disk_usage_percent") or m.get("windows_disk_usage") or m.get("disk_used_percent") or 0
 
     async def _queue_result(self, res: ScrapeResult):
         async with self._status_lock:

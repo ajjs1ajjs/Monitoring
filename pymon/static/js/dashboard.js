@@ -1267,13 +1267,13 @@ showSection(urlSection);
 
 refreshData();
 initOverviewCharts();
-setInterval(refreshData, 15000);
+setInterval(refreshData, 60000);
 setInterval(() => {
     updateOverviewCharts();
     loadRecentAlerts();
     updateTimelineTable();
     populateServerSelect();
-}, 10000);
+}, 60000);
 
 // --- NEW FEATURES ---
 
