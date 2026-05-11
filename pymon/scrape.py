@@ -102,6 +102,8 @@ class ScrapeManager:
         
         self._tasks.append(asyncio.create_task(self._service_monitoring_loop()))
         self._tasks.append(asyncio.create_task(self._flush_buffer_loop()))
+        self._tasks.append(asyncio.create_task(self._dynamic_reload_loop()))
+        logger.info("ScrapeManager started with dynamic reload enabled")
         
         logger.info("ScrapeManager started (Enhanced: Services, Maintenance, Flapping)")
 
@@ -116,30 +118,51 @@ class ScrapeManager:
         await self._client.aclose()
         logger.info("ScrapeManager stopped")
 
+    async def _dynamic_reload_loop(self):
+        """Periodically check for new servers in DB"""
+        while self._running:
+            try:
+                await asyncio.sleep(30) # Check every 30s
+                await self._load_dynamic_targets()
+            except Exception as e:
+                logger.error(f"Reload loop error: {e}")
+
     async def _load_dynamic_targets(self):
         """Load servers from DB as scrape targets if not in config"""
         db_path = self.config.storage.path
+        new_count = 0
         try:
             import sqlite3
             conn = sqlite3.connect(db_path)
             conn.row_factory = sqlite3.Row
             rows = conn.execute("SELECT * FROM servers WHERE enabled = 1").fetchall()
+            
             for r in rows:
                 target_str = f"{r['host']}:{r['agent_port']}"
                 # Avoid duplicates
                 if any(t.target == target_str for t in self.targets):
                     continue
-                    
-                self.targets.append(ScrapeTarget(
-                    job_name="dynamic_servers",
+                
+                new_target = ScrapeTarget(
+                    job_name=r['server_group'] or "dynamic_servers",
                     target=target_str,
                     metrics_path="/metrics",
-                    interval=self.config.global_config.scrape_interval if hasattr(self.config, "global_config") else 15,
+                    interval=self.config.global_config.scrape_interval if hasattr(self.config, "global_config") else 60,
                     timeout=self.config.global_config.scrape_timeout if hasattr(self.config, "global_config") else 10,
                     labels={"server_id": str(r['id']), "name": r['name']},
                     server_id=r['id']
-                ))
+                )
+                self.targets.append(new_target)
+                new_count += 1
+                
+                # Start scraping this new target immediately if already running
+                if self._running:
+                    task = asyncio.create_task(self._scrape_loop(new_target))
+                    self._tasks.append(task)
+            
             conn.close()
+            if new_count > 0:
+                logger.info(f"ScrapeManager: Added {new_count} new dynamic targets from DB")
         except Exception as e:
             logger.error(f"Error loading dynamic targets: {e}")
 
