@@ -70,12 +70,11 @@ def get_db():
     db_path = config.storage.path
     
     conn = sqlite3.connect(db_path, timeout=30)
-    # Enable WAL mode for better concurrency during high scrape load
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA busy_timeout = 30000")
-    except:
+    except Exception:
         pass
     return conn
 
