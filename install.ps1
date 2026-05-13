@@ -186,7 +186,7 @@ storage:
 
 auth:
   admin_username: admin
-  admin_password: changeme
+  admin_password: chang3m3N0w!
   jwt_expire_hours: 24
 
 scrape_configs:
@@ -243,7 +243,8 @@ Write-Host "  Port:     $Port" -ForegroundColor White
 Write-Host "  URL:      http://$serverIP`:$Port/dashboard/" -ForegroundColor White
 Write-Host ""
 Write-Host "  Username: admin" -ForegroundColor Yellow
-Write-Host "  Password: changeme" -ForegroundColor Yellow
+Write-Host "  Password: chang3m3N0w!" -ForegroundColor Yellow
+Write-Host "  IMPORTANT: Change this password immediately after login!" -ForegroundColor Red
 Write-Host ""
 Write-Host "  To start:" -ForegroundColor Cyan
 Write-Host "    Set-Location $InstallDir" -ForegroundColor White

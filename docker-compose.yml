@@ -18,7 +18,7 @@ services:
       - pymon-data:/data
       - ./config.yml:/config/config.yml
     environment:
-      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required! Set it in .env or environment}
       - CONFIG_PATH=/config/config.yml
       - DATA_DIR=/data
       - PYMON_ALLOWED_ORIGINS=http://localhost:10000,https://monitoring.example.com

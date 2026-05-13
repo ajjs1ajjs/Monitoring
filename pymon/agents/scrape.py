@@ -39,6 +39,7 @@ class ScrapeManager:
         servers = cursor.fetchall()
         
         if not servers:
+            conn.close()
             return
         
         print(f"[*] ScrapeManager: Scrapping {len(servers)} servers...")

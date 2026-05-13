@@ -121,17 +121,6 @@ class PyMonConfig(BaseModel):
                 print(f"- Field '{error['loc'][0]}': {error['msg']}")
             raise ValueError("Invalid configuration structure or data types.") from e
 
-    @classmethod
-    def from_dict(cls, data: dict) -> "PyMonConfig":
-        """Validates and constructs the config model from a dictionary."""
-        try:
-            return cls(**data)
-        except ValidationError as e:
-            print("\n[ERROR] Configuration Validation Failed:")
-            for error in e.errors():
-                print(f"- Field '{error['loc'][0]}': {error['msg']}")
-            raise ValueError("Invalid configuration structure or data types.") from e
-
     @classmethod  # type: ignore
     def from_dict(cls, data: dict) -> "PyMonConfig":
         config = cls()

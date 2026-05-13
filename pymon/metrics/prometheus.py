@@ -71,17 +71,18 @@ class PrometheusMetricsExporter:
             if "__name__" not in metric_name:
                 continue  # Skip non-standard metrics
 
-            help_text = f"Sample value of {metric_name.__name__}"  # type: ignore
+            metric_title = metric_name.get("__name__", key)
+            metric_help = metric_name.get("help", f"Sample value of {metric_title}")
 
             labels_str = ""
             for label, value in sorted(sample_data.items()):
                 if label.startswith("__"):
-                    continue  # Skip meta labels
+                    continue
                 labels_str += f'{label}="{value}",'
 
             if labels_str:
-                lines.append(f"# HELP {metric_name.__name__} {metric_name.help}")  # type: ignore
-                lines.append(f"# TYPE {metric_name.__name__} gauge")  # type: ignore
+                lines.append(f"# HELP {metric_title} {metric_help}")
+                lines.append(f"# TYPE {metric_title} gauge")
 
             for label, value in sorted(sample_data.items()):
                 if label.startswith("__"):

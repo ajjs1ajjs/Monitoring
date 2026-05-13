@@ -273,9 +273,12 @@ def change_password(user_id: int, current_password: str, new_password: str) -> b
         conn.close()
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
-    if len(new_password) < 6:
+    if len(new_password) < 12:
         conn.close()
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+        raise HTTPException(status_code=400, detail="Password must be at least 12 characters with uppercase, lowercase, and digit")
+    if not any(c.isupper() for c in new_password) or not any(c.islower() for c in new_password) or not any(c.isdigit() for c in new_password):
+        conn.close()
+        raise HTTPException(status_code=400, detail="Password must contain uppercase, lowercase, and digit")
 
     new_hash = hash_password(new_password)
     c.execute("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?", (new_hash, user_id))

@@ -29,11 +29,11 @@ def init_database(db_path):
     # Initialize all tables
     from pymon.auth import init_auth_tables
     from pymon.storage import init_storage
-    from pymon.web_dashboard import init_web_tables
+    from pymon.database import init_database
 
     init_storage(backend="sqlite", db_path=db_path)
     init_auth_tables()
-    init_web_tables()
+    init_database()
 
     # Add test data
     conn = sqlite3.connect(db_path)
