@@ -192,20 +192,53 @@ docker compose logs -f
 
 ### Linux (повне видалення)
 ```bash
+# 1. Backup (якщо треба зберегти дані)
+sudo cp /var/lib/pymon/pymon.db /tmp/pymon.db.backup
+sudo cp /etc/pymon/config.yml /tmp/config.yml.backup
+
+# 2. Зупинити та вимкнути службу
 sudo systemctl stop pymon
 sudo systemctl disable pymon
+
+# 3. Видалити файли служби
 sudo rm /etc/systemd/system/pymon.service
 sudo systemctl daemon-reload
+
+# 4. Видалити проект та дані
 sudo rm -rf /opt/pymon
 sudo rm -rf /etc/pymon
 sudo rm -rf /var/lib/pymon
+
+# 5. Видалити користувача
+sudo userdel -r pymon 2>/dev/null || true
+
+# 6. Перевірка
+sudo systemctl status pymon 2>/dev/null && echo "⚠ Ще існує" || echo "✓ Видалено"
 ```
 
-### Windows
+### Windows (повне видалення)
 ```powershell
-$taskName = "PyMon"
-Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-rm -r -Force C:\PyMon
+# 1. Backup (якщо треба зберегти дані)
+Copy-Item C:\pymon\pymon.db C:\pymon.db.backup -Force 2>$null
+Copy-Item C:\pymon\config.yml C:\config.yml.backup -Force 2>$null
+
+# 2. Зупинити задачу в планувальнику
+Stop-ScheduledTask -TaskName "PyMonServer" -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 3
+
+# 3. Вбити всі Python процеси що можуть блокувати файли
+Get-Process python* | ForEach-Object { $_.Kill() } 2>$null
+Get-Process python3* | ForEach-Object { $_.Kill() } 2>$null
+Start-Sleep -Seconds 2
+
+# 4. Видалити задачу з планувальника
+Unregister-ScheduledTask -TaskName "PyMonServer" -Confirm:$false 2>$null
+
+# 5. Видалити папку проекту
+rm -r -Force C:\pymon
+
+# 6. Перевірка
+if (-not (Test-Path C:\pymon)) { Write-Host "✓ Видалено" -ForegroundColor Green }
 ```
 
 ---
