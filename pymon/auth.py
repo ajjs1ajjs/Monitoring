@@ -55,11 +55,25 @@ class APIKeyCreate(BaseModel):
 class AuthConfig:
     db_path: str = "pymon.db"
     admin_username: str = "admin"
-    # Default admin password set to a non-empty change-me value to encourage rotation
     admin_password: str = "changeme"
 
 
-auth_config = AuthConfig()
+def _load_auth_config() -> AuthConfig:
+    """Load auth config from YAML config file, falling back to defaults."""
+    from pymon.config import load_config
+    try:
+        config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+        if hasattr(config, 'auth') and config.auth:
+            return AuthConfig(
+                admin_username=getattr(config.auth, 'admin_username', 'admin'),
+                admin_password=getattr(config.auth, 'admin_password', 'changeme'),
+            )
+    except Exception:
+        pass
+    return AuthConfig()
+
+
+auth_config = _load_auth_config()
 
 from pymon.api.deps import get_db
 
