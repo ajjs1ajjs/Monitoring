@@ -37,7 +37,9 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManage
 curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
 ```
 
-> **Важливо:** Після встановлення на Windows проект працюватиме як фонова служба (черер Task Scheduler), яка автоматично запускається при старті системи.
+> **Security (v2.1.0+):** Пароль треба змінити після першого входу. Мінімум 12 символів з upper+lower+digit. `config.yml` тепер в `.gitignore` — не комітьте секрети в git!
+
+> **Важливо:** На Windows проект працює як фонова служба (через Task Scheduler).
 
 ### 2. Розгортання агентів на серверах
 
@@ -56,7 +58,7 @@ curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/inst
 ## 🛠️ Додаткова інформація
 
 - **Доступ до панелі**: `http://<IP-адреса>:10000/dashboard/`
-- **Логін за замовчуванням**: `admin` / `changeme`
+- **Логін за замовчуванням**: `admin` / `chang3m3N0w!` (ЗМІНИТИ ПІСЛЯ ВХОДУ!)
 - **Конфігурація**: Файл `config.yml` у директорії проекту.
 - **База даних**: `pymon.db` (SQLite).
 

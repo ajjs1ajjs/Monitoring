@@ -61,22 +61,7 @@ class AuthConfig:
 
 auth_config = AuthConfig()
 
-
-def get_db():
-    import sqlite3
-    from pymon.config import load_config
-    
-    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
-    db_path = config.storage.path
-    
-    conn = sqlite3.connect(db_path, timeout=30)
-    try:
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA busy_timeout = 30000")
-    except Exception:
-        pass
-    return conn
+from pymon.api.deps import get_db
 
 
 def init_auth_tables():
