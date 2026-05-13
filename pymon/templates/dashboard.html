@@ -794,6 +794,55 @@
             <form id="addUserForm">
                 <div class="modal-body">
                     <div class="form-group">
+                        <label>Ім'я користувача</label>
+                        <input type="text" id="newUsername" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Пароль</label>
+                        <input type="password" id="newUserPassword" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Роль</label>
+                        <select id="newUserRole" class="form-input">
+                            <option value="false">User</option>
+                            <option value="true">Administrator</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addUserModal', false)">Скасувати</button>
+                    <button type="submit" class="btn btn-primary">Створити користувача</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="changePasswordModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Зміна пароля: <span id="changePwdUsername" style="color: var(--accent);"></span></h3>
+                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('changePasswordModal', false)"></i>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="changePwdUserId">
+                <div class="form-group">
+                    <label>Новий пароль</label>
+                    <input type="password" id="changePwdNewPassword" class="form-input" required minlength="12" placeholder="Мін. 12 символів, upper+lower+digit">
+                </div>
+                <div class="form-group">
+                    <label>Підтвердження пароля</label>
+                    <input type="password" id="changePwdConfirmPassword" class="form-input" required placeholder="Повторіть новий пароль">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="toggleModal('changePasswordModal', false)">Скасувати</button>
+                <button type="button" class="btn btn-primary" onclick="changeUserPassword()">Змінити пароль</button>
+            </div>
+        </div>
+    </div>
+            <form id="addUserForm">
+                <div class="modal-body">
+                    <div class="form-group">
                         <label>Логін</label>
                         <input type="text" id="newUsername" class="form-input" required>
                     </div>

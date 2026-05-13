@@ -62,10 +62,19 @@ async def create_user(data: dict, current_user: User = Depends(get_admin_user)):
 
 @router.put("/users/{user_id}")
 async def update_user(user_id: int, data: dict, current_user: User = Depends(get_admin_user)):
-    from pymon.auth import update_user as _update_user
+    from pymon.auth import update_user as _update_user, set_password as _set_password
     is_admin = bool(data["is_admin"]) if "is_admin" in data else None
     must_change_password = bool(data["must_change_password"]) if "must_change_password" in data else None
-    _update_user(user_id, is_admin=is_admin, must_change_password=must_change_password)
+
+    if "password" in data and data["password"]:
+        if len(data["password"]) < 12:
+            raise HTTPException(status_code=400, detail="Password must be at least 12 characters")
+        _set_password(user_id, data["password"])
+        return {"status": "ok", "password_changed": True}
+
+    if is_admin is not None or must_change_password is not None:
+        _update_user(user_id, is_admin=is_admin, must_change_password=must_change_password)
+
     return {"status": "ok"}
 
 @router.delete("/users/{user_id}")

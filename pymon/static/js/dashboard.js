@@ -889,8 +889,11 @@ async function loadUsers() {
                             </div>
                         </td>
                         <td style="color: var(--text-muted); font-size: 0.85rem;">Just now</td>
-                        <td style="text-align: right;">
-                            <button class="chart-action-btn" onclick="deleteUser(${u.id})" style="color: var(--danger);">
+                        <td style="text-align: right; display: flex; gap: 0.4rem; justify-content: flex-end;">
+                            <button class="chart-action-btn" onclick="showChangePasswordModal(${u.id}, '${u.username}')" style="color: var(--accent);" title="Change password">
+                                <i data-lucide="key" style="width: 14px; height: 14px;"></i>
+                            </button>
+                            <button class="chart-action-btn" onclick="deleteUser(${u.id})" style="color: var(--danger);" title="Delete user">
                                 <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                             </button>
                         </td>
@@ -903,12 +906,50 @@ async function loadUsers() {
 }
 
 async function deleteUser(id) {
-    if (confirm('Delete this user?')) {
-        try {
-            await apiFetch(`/api/v1/auth/users/${id}`, {method: 'DELETE'});
-            loadUsers();
-        } catch (err) { alert('Delete failed'); }
+    if (!confirm('Видалити цього користувача?')) return;
+    try {
+        await apiFetch(`/api/v1/auth/users/${id}`, {method: 'DELETE'});
+        loadUsers();
+    } catch (err) { alert('Помилка видалення'); }
+}
+
+function showChangePasswordModal(userId, username) {
+    document.getElementById('changePwdUserId').value = userId;
+    document.getElementById('changePwdUsername').textContent = username;
+    document.getElementById('changePwdNewPassword').value = '';
+    document.getElementById('changePwdConfirmPassword').value = '';
+    toggleModal('changePasswordModal', true);
+}
+
+async function changeUserPassword() {
+    const userId = document.getElementById('changePwdUserId').value;
+    const newPassword = document.getElementById('changePwdNewPassword').value;
+    const confirmPassword = document.getElementById('changePwdConfirmPassword').value;
+
+    if (!newPassword || newPassword.length < 12) {
+        return alert('Пароль має бути мінімум 12 символів');
     }
+    if (newPassword !== confirmPassword) {
+        return alert('Паролі не співпадають');
+    }
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+        return alert('Пароль має містити велику літеру, малу літеру та цифру');
+    }
+
+    try {
+        const resp = await apiFetch(`/api/v1/auth/users/${userId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: newPassword})
+        });
+        if (resp && resp.ok) {
+            alert('✅ Пароль змінено');
+            toggleModal('changePasswordModal', false);
+        } else {
+            const err = resp ? await resp.json() : {};
+            alert('Помилка: ' + (err.detail || 'Failed to change password'));
+        }
+    } catch (err) { alert('Connection Error'); }
 }
 
 function copyDeployCmd() {

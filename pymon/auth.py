@@ -260,6 +260,24 @@ def authenticate_user(username: str, password: str) -> Token:
     return Token(access_token=token, user=user)
 
 
+def set_password(user_id: int, new_password: str) -> bool:
+    """Admin-only: set a user's password without requiring current password."""
+    if len(new_password) < 12:
+        raise HTTPException(status_code=400, detail="Password must be at least 12 characters")
+    if not any(c.isupper() for c in new_password) or not any(c.islower() for c in new_password) or not any(c.isdigit() for c in new_password):
+        raise HTTPException(status_code=400, detail="Password must contain uppercase, lowercase, and digit")
+    conn = get_db()
+    c = conn.cursor()
+    new_hash = hash_password(new_password)
+    c.execute("UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?", (new_hash, user_id))
+    if c.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    conn.commit()
+    conn.close()
+    return True
+
+
 def change_password(user_id: int, current_password: str, new_password: str) -> bool:
     conn = get_db()
     conn.row_factory = sqlite3.Row
