@@ -55,11 +55,60 @@ curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/inst
 
 ---
 
+## 📚 Документація
+
+| Документ | Опис |
+|----------|------|
+| **[docs/COMMANDS.md](docs/COMMANDS.md)** | Повний довідник команд (Linux + Windows) |
+| **[docs/API.md](docs/API.md)** | REST API reference |
+| **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** | Усунення несправностей |
+| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Архітектура проекту |
+| **[docs/MIGRATION.md](docs/MIGRATION.md)** | Міграція з інших систем |
+
+## 🔧 Basic Commands
+
+### Linux
+```bash
+# Service
+sudo systemctl start|stop|restart|status pymon
+sudo journalctl -u pymon -f
+
+# Deploy
+sudo ./deploy.sh
+sudo ./deploy.sh --remove
+
+# Update
+sudo ./update.sh
+
+# Direct
+python -m pymon.cli server --config config.yml
+```
+
+### Windows
+```powershell
+# Install
+.\install.ps1
+.\install.ps1 -Service
+
+# Direct
+python -m pymon.cli server
+
+# Test
+python -m pytest tests/ -v
+```
+
+### Docker
+```bash
+docker compose up -d
+curl http://localhost:10000/api/v1/health
+```
+
+---
+
 ## 🛠️ Додаткова інформація
 
 - **Доступ до панелі**: `http://<IP-адреса>:10000/dashboard/`
 - **Логін за замовчуванням**: `admin` / `chang3m3N0w!` (ЗМІНИТИ ПІСЛЯ ВХОДУ!)
-- **Конфігурація**: Файл `config.yml` у директорії проекту.
-- **База даних**: `pymon.db` (SQLite).
-
-Детальна документація доступна в папці `docs/`.
+- **Конфігурація**: `config.yml` (в `.gitignore` — не комітити!)
+- **База даних**: `pymon.db` (SQLite)
+- **Пароль**: мін. 12 символів, upper+lower+digit
