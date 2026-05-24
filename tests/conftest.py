@@ -98,3 +98,12 @@ def client(init_database, db_path):
     app = create_app()
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture(scope="function")
+def auth_client(client, init_database):
+    """Create test client that is already authenticated"""
+    from pymon.auth import create_token
+    token = create_token(user_id=1, username="admin", is_admin=True, must_change=False)
+    client.headers.update({"Authorization": f"Bearer {token}"})
+    yield client

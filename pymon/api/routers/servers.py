@@ -1,15 +1,19 @@
-import os
+import csv
+import io
 import json
+import os
 import sqlite3
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
+
 import aiosqlite
-from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Any
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
 
-from pymon.auth import User, get_current_user
-from pymon.api.deps import get_db
 from pymon.api import models as api_models
+from pymon.api.deps import get_db
+from pymon.auth import User, get_current_user
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
@@ -37,31 +41,268 @@ async def list_servers(current_user: User = Depends(get_current_user)):
     finally:
         conn.close()
 
-@router.post("")
-async def create_server(data: ServerCreate, current_user: User = Depends(get_current_user)):
-    conn = get_db()
-    c = conn.cursor()
+
+@router.get("/history")
+async def get_aggregated_history(
+    range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
+    current_user: User = Depends(get_current_user),
+):
+    """Aggregated metrics history for all servers."""
+    time_ranges = {
+        "5m": "-5 minutes", "15m": "-15 minutes", "1h": "-1 hour",
+        "6h": "-6 hours", "12h": "-12 hours", "24h": "-24 hours",
+        "3d": "-3 days", "7d": "-7 days", "15d": "-15 days", "30d": "-30 days",
+    }
+    time_filter = time_ranges.get(range, "-1 hour")
+    db_path = os.getenv("DB_PATH", "pymon.db")
+    servers_data = []
     try:
-        c.execute(
-            "INSERT INTO servers (name, host, os_type, agent_port, enabled, server_group, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (
-                data.name,
-                data.host,
-                data.os_type,
-                data.agent_port,
-                int(data.enabled),
-                data.server_group,
-                datetime.now(timezone.utc).isoformat(),
-            ),
-        )
-        conn.commit()
-        server_id = c.lastrowid
-        return {"status": "ok", "id": server_id}
+        async with aiosqlite.connect(db_path) as db:
+            db.row_factory = sqlite3.Row
+            cursor = await db.execute("SELECT id, name, host FROM servers ORDER BY name")
+            servers = await cursor.fetchall()
+            for srv in servers:
+                c2 = await db.execute(
+                    """
+                    SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info
+                    FROM metrics_history
+                    WHERE server_id = ? AND timestamp > datetime('now', ?)
+                    ORDER BY timestamp
+                    """,
+                    (srv["id"], time_filter),
+                )
+                rows = await c2.fetchall()
+                history = []
+                for r in rows:
+                    dinfo = None
+                    try:
+                        if r[6]:
+                            dinfo = json.loads(r[6])
+                    except Exception:
+                        pass
+                    history.append({
+                        "timestamp": r[0], "cpu": r[1], "mem": r[2],
+                        "disk": r[3], "net_rx": r[4], "net_tx": r[5], "disk_info": dinfo,
+                    })
+                servers_data.append({"id": srv["id"], "name": srv["name"], "host": srv["host"], "history": history})
     except Exception as e:
-        conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    return {"range": range, "servers": servers_data}
+
+
+@router.get("/{server_id}/history-detail")
+async def get_server_history_detail(
+    server_id: int,
+    range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
+    current_user: User = Depends(get_current_user),
+):
+    """Alias for /{server_id}/history to match test expectations."""
+    from pymon.api.routers.servers import get_server_history
+    return await get_server_history(server_id, range)
+
+
+@router.get("/{server_id}/disk-breakdown")
+async def get_disk_breakdown(
+    server_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Get disk breakdown for a server from its volumes JSON."""
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT volumes FROM servers WHERE id = ?", (server_id,)).fetchone()
+        if not row or not row[0]:
+            return {"disks": []}
+        volumes = json.loads(row[0])
+        disks = []
+        for v in volumes:
+            size_gb = round(v["size"] / (1024**3), 2) if v.get("size") else 0
+            free_gb = round(v["free"] / (1024**3), 2) if v.get("free") else 0
+            used_gb = round(size_gb - free_gb, 2)
+            percent = round((used_gb / size_gb) * 100, 1) if size_gb > 0 else 0
+            disks.append({
+                "volume": v.get("volume", ""),
+                "size_gb": size_gb,
+                "free_gb": free_gb,
+                "used_gb": used_gb,
+                "percent": percent,
+            })
+        return {"disks": disks}
     finally:
         conn.close()
+
+
+@router.get("/{server_id}/uptime-timeline")
+async def get_uptime_timeline(
+    server_id: int,
+    days: int = Query(7, ge=1, le=90),
+    current_user: User = Depends(get_current_user),
+):
+    """Get uptime timeline for a server."""
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT id FROM servers WHERE id = ?", (server_id,)).fetchone()
+        if not row:
+            return {"timeline": [], "uptime_percent": 0}
+        cursor = conn.execute(
+            """
+            SELECT timestamp, cpu_percent
+            FROM metrics_history
+            WHERE server_id = ? AND timestamp > datetime('now', ?)
+            ORDER BY timestamp
+            """,
+            (server_id, f"-{days} days"),
+        )
+        rows = cursor.fetchall()
+        if not rows:
+            return {"timeline": [], "uptime_percent": 0}
+        total = len(rows)
+        up_count = sum(1 for r in rows if r["cpu_percent"] is not None)
+        timeline = []
+        for r in rows:
+            status = "up" if r["cpu_percent"] is not None else "down"
+            timeline.append({"timestamp": r[0], "status": status})
+        uptime_percent = round((up_count / total) * 100, 2) if total > 0 else 0
+        return {"timeline": timeline, "uptime_percent": uptime_percent}
+    finally:
+        conn.close()
+
+
+@router.get("/{server_id}/export")
+async def export_server(
+    server_id: int,
+    range: str = Query("24h", pattern="^(1h|6h|12h|24h|3d|7d)$"),
+    format: str = Query("json", pattern="^(json|csv)$"),
+    current_user: User = Depends(get_current_user),
+):
+    """Export server metrics as JSON or CSV."""
+    time_ranges = {
+        "1h": "-1 hour", "6h": "-6 hours", "12h": "-12 hours",
+        "24h": "-24 hours", "3d": "-3 days", "7d": "-7 days",
+    }
+    time_filter = time_ranges.get(range, "-24 hours")
+    conn = get_db()
+    try:
+        server = conn.execute("SELECT name, host FROM servers WHERE id = ?", (server_id,)).fetchone()
+        if not server:
+            raise HTTPException(status_code=404, detail="Server not found")
+        rows = conn.execute(
+            """
+            SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx
+            FROM metrics_history
+            WHERE server_id = ? AND timestamp > datetime('now', ?)
+            ORDER BY timestamp
+            """,
+            (server_id, time_filter),
+        ).fetchall()
+        data = [
+            {
+                "timestamp": r["timestamp"], "cpu": r["cpu_percent"],
+                "memory": r["memory_percent"], "disk": r["disk_percent"],
+                "network_rx": r["network_rx"], "network_tx": r["network_tx"],
+            }
+            for r in rows
+        ]
+        if format == "csv":
+            output = io.StringIO()
+            writer = csv.writer(output)
+            if data:
+                writer.writerow(data[0].keys())
+                for d in data:
+                    writer.writerow(d.values())
+            else:
+                writer.writerow(["timestamp", "cpu", "memory", "disk", "network_rx", "network_tx"])
+            return PlainTextResponse(output.getvalue(), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=server_{server_id}_{range}.csv"})
+        return {"server": dict(server), "range": range, "data": data}
+    finally:
+        conn.close()
+
+
+@router.get("/export")
+async def export_all_servers(
+    range: str = Query("24h", pattern="^(1h|6h|12h|24h|3d|7d)$"),
+    format: str = Query("json", pattern="^(json|csv)$"),
+    current_user: User = Depends(get_current_user),
+):
+    """Export all servers' metrics."""
+    time_ranges = {
+        "1h": "-1 hour", "6h": "-6 hours", "12h": "-12 hours",
+        "24h": "-24 hours", "3d": "-3 days", "7d": "-7 days",
+    }
+    time_filter = time_ranges.get(range, "-24 hours")
+    conn = get_db()
+    try:
+        servers = conn.execute("SELECT id, name, host FROM servers ORDER BY name").fetchall()
+        result = []
+        for s in servers:
+            rows = conn.execute(
+                """
+                SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx
+                FROM metrics_history
+                WHERE server_id = ? AND timestamp > datetime('now', ?)
+                ORDER BY timestamp
+                """,
+                (s["id"], time_filter),
+            ).fetchall()
+            result.append({
+                "id": s["id"], "name": s["name"], "host": s["host"],
+                "data": [
+                    {
+                        "timestamp": r["timestamp"], "cpu": r["cpu_percent"],
+                        "memory": r["memory_percent"], "disk": r["disk_percent"],
+                        "network_rx": r["network_rx"], "network_tx": r["network_tx"],
+                    }
+                    for r in rows
+                ],
+            })
+        return {"range": range, "servers": result}
+    finally:
+        conn.close()
+
+
+@router.get("/compare")
+async def compare_servers(
+    metric: str = Query("cpu", pattern="^(cpu|memory|disk)$"),
+    range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d)$"),
+    current_user: User = Depends(get_current_user),
+):
+    """Compare a metric across all servers."""
+    column_map = {"cpu": "cpu_percent", "memory": "memory_percent", "disk": "disk_percent"}
+    col = column_map.get(metric, "cpu_percent")
+    time_ranges = {
+        "5m": "-5 minutes", "15m": "-15 minutes", "1h": "-1 hour",
+        "6h": "-6 hours", "12h": "-12 hours", "24h": "-24 hours",
+        "3d": "-3 days", "7d": "-7 days",
+    }
+    time_filter = time_ranges.get(range, "-1 hour")
+    conn = get_db()
+    try:
+        servers = conn.execute("SELECT id, name FROM servers ORDER BY name").fetchall()
+        result = []
+        for s in servers:
+            rows = conn.execute(
+                f"""
+                SELECT timestamp, {col}
+                FROM metrics_history
+                WHERE server_id = ? AND timestamp > datetime('now', ?) AND {col} IS NOT NULL
+                ORDER BY timestamp
+                """,
+                (s["id"], time_filter),
+            ).fetchall()
+            values = [r[1] for r in rows]
+            avg = sum(values) / len(values) if values else 0
+            result.append({
+                "server_id": s["id"],
+                "server_name": s["name"],
+                "metric": metric,
+                "average": round(avg, 2),
+                "min": round(min(values), 2) if values else 0,
+                "max": round(max(values), 2) if values else 0,
+                "data_points": len(values),
+            })
+        return {"metric": metric, "range": range, "servers": result}
+    finally:
+        conn.close()
+
 
 @router.get("/{server_id}")
 async def get_server(server_id: int, current_user: User = Depends(get_current_user)):

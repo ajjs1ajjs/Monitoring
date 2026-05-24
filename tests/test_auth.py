@@ -34,7 +34,7 @@ def test_decode_token_rejects_invalid_signature():
             "user_id": 1,
             "exp": datetime.now(timezone.utc) + timedelta(hours=1),
         },
-        "wrong-secret",
+        "a" * 32,  # Minimum 32-byte key for HS256
         algorithm=auth.JWT_ALGORITHM,
     )
 
