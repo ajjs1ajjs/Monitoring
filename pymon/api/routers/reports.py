@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import HTMLResponse
-from pymon.auth import User, get_current_user
-from pymon.api.deps import get_db
-import sqlite3
 import json
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import HTMLResponse
+
+from pymon.api.deps import get_db
+from pymon.auth import User, get_current_user
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -14,18 +15,18 @@ async def generate_server_report(server_id: int, current_user: User = Depends(ge
     try:
         server = conn.execute("SELECT name, host FROM servers WHERE id = ?", (server_id,)).fetchone()
         if not server: raise HTTPException(status_code=404, detail="Server not found")
-            
+
         history = conn.execute("""
             SELECT timestamp, cpu_percent, memory_percent 
             FROM metrics_history 
             WHERE server_id = ? AND timestamp > datetime('now', '-24 hours')
             ORDER BY timestamp ASC
         """, (server_id,)).fetchall()
-        
+
         labels = [row[0] for row in history]
         cpu_data = [row[1] for row in history]
         mem_data = [row[2] for row in history]
-        
+
         html = f"""
         <!DOCTYPE html>
         <html>

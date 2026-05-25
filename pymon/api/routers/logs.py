@@ -1,8 +1,7 @@
-import os
-import sqlite3
 from fastapi import APIRouter, Depends, Query
-from pymon.auth import User, get_current_user
+
 from pymon.api.deps import get_db
+from pymon.auth import User, get_current_user
 
 router = APIRouter(prefix="/audit-log", tags=["logs"])
 

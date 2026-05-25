@@ -97,8 +97,8 @@ class NotificationDispatcher:
     def send_email(self, message: str, subject: str, config: dict):
         """Send a message via SMTP"""
         import smtplib
-        from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
 
         smtp_server = config.get("smtp_server")
         smtp_port = config.get("smtp_port", 587)
@@ -106,20 +106,26 @@ class NotificationDispatcher:
         smtp_pass = config.get("smtp_pass")
         email_to = config.get("email_to")
 
-        if not all([smtp_server, smtp_user, email_to]):
+        if not smtp_server or not smtp_user or not email_to:
             return False
 
+        smtp_server_str = str(smtp_server)
+        smtp_port_int = int(smtp_port) if smtp_port else 587
+        smtp_user_str = str(smtp_user)
+        smtp_pass_str = str(smtp_pass) if smtp_pass else ""
+        email_to_str = str(email_to)
+
         msg = MIMEMultipart()
-        msg['From'] = smtp_user
-        msg['To'] = email_to
+        msg['From'] = smtp_user_str
+        msg['To'] = email_to_str
         msg['Subject'] = subject
         msg.attach(MIMEText(message, 'html'))
 
         try:
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
-                if smtp_pass:
+            with smtplib.SMTP(smtp_server_str, smtp_port_int) as server:
+                if smtp_pass_str:
                     server.starttls()
-                    server.login(smtp_user, smtp_pass)
+                    server.login(smtp_user_str, smtp_pass_str)
                 server.send_message(msg)
             return True
         except Exception as e:

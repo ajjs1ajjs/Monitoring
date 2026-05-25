@@ -79,6 +79,9 @@
                         <button class="range-btn" data-range="30d">30 днів</button>
                         <button class="range-btn custom-btn" data-range="custom" onclick="promptCustomRange(this)">Власна...</button>
                     </div>
+                    <button id="themeToggleBtn" class="refresh-btn" title="Змінити тему">
+                        <i data-lucide="sun" id="themeIcon"></i>
+                    </button>
                     <button id="refreshBtn" class="refresh-btn">
                         <i data-lucide="rotate-cw"></i>
                     </button>
@@ -923,6 +926,7 @@
         </div>
     </div>
 
+    <audio id="alertSound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-84.wav" preload="auto"></audio>
     <script src="/static/js/dashboard.js?v=1.1"></script>
 </body>
 </html>

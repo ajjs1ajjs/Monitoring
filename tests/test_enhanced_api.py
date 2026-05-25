@@ -68,6 +68,25 @@ class TestServersApi:
 
         assert response.status_code == 401
 
+    def test_create_server_endpoint_allows_post(self, auth_client):
+        payload = {
+            "name": "Test Server",
+            "host": "localhost",
+            "os_type": "linux",
+            "agent_port": 9100,
+            "enabled": True,
+            "server_group": "Testing"
+        }
+        response = auth_client.post("/api/v1/servers", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert "id" in data
+
+    def test_force_scrape_server_endpoint_allows_post(self, auth_client):
+        response = auth_client.post("/api/v1/servers/1/scrape")
+        assert response.status_code in (200, 500, 503)
+
 
 class TestDiskBreakdown:
     """Tests for /api/v1/servers/{id}/disk-breakdown endpoint"""

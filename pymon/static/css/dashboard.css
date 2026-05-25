@@ -157,3 +157,64 @@ header { height: 72px; border-bottom: 1px solid var(--border); display: flex; al
 .drawer-overlay.active .drawer { transform: translateX(0); }
 .drawer-header { padding: 2rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; }
 .drawer-body { padding: 2rem; overflow-y: auto; flex: 1; }
+
+/* Transitions & Light Theme */
+body, aside, main, header, .card, .form-input, .range-selector, .refresh-btn, .server-select {
+    transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+body.light-theme {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface-hover: #f1f5f9;
+    --accent: #f97316;
+    --accent-glow: rgba(249, 115, 22, 0.2);
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --border: rgba(15, 23, 42, 0.08);
+    --card-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+}
+
+body.light-theme aside {
+    background: #f1f5f9;
+}
+body.light-theme main {
+    background: #f8fafc;
+}
+body.light-theme header {
+    background: rgba(255, 255, 255, 0.8);
+}
+body.light-theme .range-selector,
+body.light-theme .refresh-btn,
+body.light-theme .server-select {
+    background: #ffffff;
+}
+body.light-theme .timeline-table th {
+    background: #f1f5f9;
+}
+body.light-theme .alert-item-v2 {
+    background: #f8fafc;
+}
+body.light-theme .form-input {
+    background: #f8fafc;
+    color: #0f172a;
+}
+body.light-theme .modal-footer {
+    background: #f8fafc;
+}
+body.light-theme .card-header h3,
+body.light-theme .node-info-value,
+body.light-theme .alert-item-v2 .alert-title,
+body.light-theme .timeline-server,
+body.light-theme .modal-header h3,
+body.light-theme .drawer-header h3 {
+    color: #0f172a;
+}
+body.light-theme .btn-secondary {
+    background: #ffffff;
+    color: #0f172a;
+}
+body.light-theme .btn-secondary:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}

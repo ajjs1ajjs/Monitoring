@@ -1,9 +1,10 @@
-import os
 import json
-import sqlite3
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
-from pymon.auth import User, get_current_user
+
 from pymon.api.deps import get_db
+from pymon.auth import User, get_current_user
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -16,7 +17,7 @@ async def get_notification_settings(current_user: User = Depends(get_current_use
         row = conn.execute("SELECT config FROM notifications WHERE channel = 'all'").fetchone()
         if row:
             return json.loads(row[0])
-        
+
         # Fallback: if they are per-channel, we might need to aggregate
         rows = conn.execute("SELECT * FROM notifications").fetchall()
         config = {"enabled": True}
@@ -55,16 +56,17 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
     yaml_content = data.get("yaml_content")
     if not yaml_content:
         raise HTTPException(status_code=400, detail="No YAML content provided")
-    
-    import yaml
+
     from datetime import datetime, timezone
-    from pymon.config import load_config
-    
+
+    import yaml  # type: ignore
+
+
     try:
         prom_data = yaml.safe_load(yaml_content)
         scrape_configs = prom_data.get("scrape_configs", [])
-        
-        # Save to DB as servers or update config.yml? 
+
+        # Save to DB as servers or update config.yml?
         # Better: Add to 'servers' table so they appear in UI
         conn = get_db()
         c = conn.cursor()
@@ -77,7 +79,7 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
             for static_cfg in static_configs:
                 targets = static_cfg.get("targets", [])
                 if not isinstance(targets, list): continue
-                
+
                 for target in targets:
                     try:
                         t_str = str(target).strip()
@@ -93,11 +95,11 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
                                          (svc_name, t_str, 'http', 60, 1, datetime.now(timezone.utc).isoformat()))
                                 count += 1
                             continue
-                        
+
                         # Handle Servers (host:port)
                         host = t_str
                         port = 9182 # Default
-                        
+
                         if ':' in t_str:
                             parts = t_str.rsplit(':', 1)
                             # Only treat as port if the part after : is numeric
@@ -108,7 +110,7 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
                                 host = t_str.strip('[] ')
                         else:
                             host = t_str.strip('[] ')
-                        
+
                         if not host: continue
 
                         # Auto-detect OS based on port

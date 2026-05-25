@@ -19,7 +19,8 @@ scrape_manager = None
 async def lifespan(app):
     global scrape_manager
     import asyncio
-    from pymon.api.deps import manager, get_db
+
+    from pymon.api.deps import manager
 
     manager.set_loop(asyncio.get_event_loop())
 
@@ -57,12 +58,11 @@ async def lifespan(app):
 
 
 def create_app():
-    from fastapi import FastAPI
+    from fastapi import FastAPI, Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import FileResponse, RedirectResponse
     from fastapi.staticfiles import StaticFiles
     from fastapi.templating import Jinja2Templates
-    from fastapi import Request
 
     from pymon.api.endpoints import api
 
@@ -77,7 +77,7 @@ def create_app():
         logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     app = FastAPI(title="PyMon", version=__version__, lifespan=lifespan)
-    
+
     templates_dir = os.path.join(os.path.dirname(__file__), "templates")
     templates = Jinja2Templates(directory=templates_dir)
 

@@ -1,11 +1,10 @@
-import os
-import sqlite3
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from pymon.auth import User, get_current_user
 from pymon.api.deps import get_db
+from pymon.auth import User, get_current_user
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -46,7 +45,7 @@ async def create_alert(data: AlertCreate, current_user: User = Depends(get_curre
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 data.name, data.metric, data.condition, data.threshold, data.duration, data.severity, data.server_id, data.service_id,
-                int(data.notify_telegram), int(data.notify_discord), int(data.notify_slack), 
+                int(data.notify_telegram), int(data.notify_discord), int(data.notify_slack),
                 int(data.notify_email), int(data.notify_teams), data.description, int(data.enabled),
                 datetime.now(timezone.utc).isoformat()
             )

@@ -1,7 +1,7 @@
-from fastapi import APIRouter
-from pymon.api.routers import auth, servers, metrics, alerts, settings, logs, services, reports, backup
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+
 from pymon.api.deps import manager
-from fastapi import WebSocket, WebSocketDisconnect
+from pymon.api.routers import alerts, auth, backup, logs, metrics, reports, servers, services, settings
 
 api = APIRouter()
 

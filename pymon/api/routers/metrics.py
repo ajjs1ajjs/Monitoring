@@ -1,15 +1,14 @@
 import os
 import sqlite3
+
 import aiosqlite
-from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from typing import Any
 
+from pymon.api.deps import get_db
 from pymon.auth import User, get_current_user
-from pymon.api.deps import get_db, manager
 from pymon.metrics.collector import registry
-from pymon.metrics.models import Label, MetricType, Metric
+from pymon.metrics.models import Label, Metric, MetricType
 from pymon.storage import get_storage
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])
@@ -83,7 +82,7 @@ async def get_metrics_trend(
     }
     time_filter = time_ranges.get(range, "-1 hour")
     db_path = os.getenv("DB_PATH", "pymon.db")
-    
+
     try:
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = sqlite3.Row

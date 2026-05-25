@@ -1230,6 +1230,8 @@ function expandChart(type) {
     toggleModal('chartExpandModal', true);
 }
 
+let seenAlertIds = new Set();
+
 async function loadRecentAlerts() {
     const feed = document.getElementById('recentAlertsFeed');
     if (!feed) return;
@@ -1239,6 +1241,24 @@ async function loadRecentAlerts() {
         if (!resp) return;
         const data = await resp.json();
         const logs = data.logs || [];
+
+        let hasNewCritical = false;
+        logs.forEach(log => {
+            if (!seenAlertIds.has(log.id)) {
+                seenAlertIds.add(log.id);
+                const actionLower = log.action.toLowerCase();
+                if (actionLower.includes('critical') || actionLower.includes('warning') || actionLower.includes('alert')) {
+                    hasNewCritical = true;
+                }
+            }
+        });
+
+        if (hasNewCritical && seenAlertIds.size > logs.length) {
+            const audio = document.getElementById('alertSound');
+            if (audio) {
+                audio.play().catch(err => console.log('Sound play blocked by browser policy:', err));
+            }
+        }
 
         if (logs.length === 0) {
             feed.innerHTML = `
@@ -1281,6 +1301,78 @@ function populateServerSelect() {
     select.value = currentVal;
 }
 
+// WebSocket Connection
+let ws = null;
+function connectWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/metrics`;
+    
+    ws = new WebSocket(wsUrl);
+    
+    ws.onopen = () => {
+        console.log('WebSocket connected');
+        const timerEl = document.getElementById('updateTimer');
+        if (timerEl) timerEl.textContent = 'Live';
+    };
+    
+    ws.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            console.log('WS Message received:', data);
+            if (data.type === 'metrics_updated') {
+                const select = document.getElementById('overviewNodeSelect');
+                if (select && (select.value === 'agg' || select.value == data.server_id)) {
+                    refreshData();
+                    updateOverviewCharts();
+                } else if (!select) {
+                    refreshData();
+                }
+            }
+        } catch (e) {
+            console.error('WS parse error:', e);
+        }
+    };
+    
+    ws.onerror = (err) => {
+        console.error('WS Error:', err);
+    };
+    
+    ws.onclose = () => {
+        console.log('WebSocket connection closed. Reconnecting in 5s...');
+        const timerEl = document.getElementById('updateTimer');
+        if (timerEl) timerEl.textContent = 'Offline (Reconnecting...)';
+        setTimeout(connectWebSocket, 5000);
+    };
+}
+
+// Theme Toggle
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    const body = document.body;
+    const icon = document.getElementById('themeIcon');
+    const toggleBtn = document.getElementById('themeToggleBtn');
+    
+    if (savedTheme === 'light') {
+        body.classList.add('light-theme');
+        if (icon) icon.setAttribute('data-lucide', 'moon');
+    } else {
+        body.classList.remove('light-theme');
+        if (icon) icon.setAttribute('data-lucide', 'sun');
+    }
+    if (window.lucide) lucide.createIcons();
+    
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            const isLight = body.classList.toggle('light-theme');
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+            if (icon) {
+                icon.setAttribute('data-lucide', isLight ? 'moon' : 'sun');
+                if (window.lucide) lucide.createIcons();
+            }
+        });
+    }
+}
+
 // Initialization
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -1294,6 +1386,9 @@ showSection(urlSection);
 
 refreshData();
 initOverviewCharts();
+connectWebSocket();
+initTheme();
+
 setInterval(refreshData, 60000);
 setInterval(() => {
     updateOverviewCharts();

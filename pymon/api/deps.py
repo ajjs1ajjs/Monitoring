@@ -1,6 +1,8 @@
 import os
 import sqlite3
-from fastapi import WebSocket, WebSocketDisconnect
+
+from fastapi import WebSocket
+
 
 class ConnectionManager:
     def __init__(self):
@@ -32,7 +34,7 @@ def get_db():
     from pymon.config import load_config
     config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
     db_path = config.storage.path
-    
+
     conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row
     try:

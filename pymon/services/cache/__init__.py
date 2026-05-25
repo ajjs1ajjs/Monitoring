@@ -12,7 +12,7 @@ import asyncio
 import hashlib
 import json
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, Optional
 
 # Використовуємо aioredis для повної асинхронності
 
@@ -464,7 +464,6 @@ class CacheManager:
         cached_data = await self.get(cache_key)
 
         if cached_data is not None:
-            uptime_percent = cached_data.get("uptime_percent", 100.0)
             return {**cached_data, "cache_age": asyncio.get_event_loop().time() - cached_data.get("_timestamp", 0)}
 
         # Показати приклад структури

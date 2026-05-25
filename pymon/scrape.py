@@ -3,7 +3,10 @@ import json
 import sys
 from datetime import datetime
 
+import httpx
+
 from pymon.api.deps import get_db, manager
+
 
 class ScrapeManager:
     def __init__(self, config=None):
@@ -68,7 +71,7 @@ class ScrapeManager:
             return False
         except httpx.TimeoutException:
             return False
-        except Exception as e:
+        except Exception:
             return False
 
         data = self._parse_metrics(text, name)
@@ -100,8 +103,9 @@ class ScrapeManager:
                   data.get('disk', 0), vol_summary, server_id))
             conn.commit()
             conn.close()
+            await manager.broadcast({"type": "metrics_updated", "server_id": server_id})
             return True
-        except Exception as e:
+        except Exception:
             conn.close()
             return False
 
@@ -236,8 +240,7 @@ class ServiceChecker:
                 sid, name, url, timeout, expected, enabled = s
                 tasks.append(self._check_one(client, sid, name, url, timeout, expected))
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            ok = sum(1 for r in results if r is True)
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _check_one(self, client, service_id, name, url, timeout, expected):
         expected_status = int(expected) if expected else 200

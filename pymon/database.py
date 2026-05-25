@@ -1,6 +1,7 @@
-import sqlite3
-import os
 import logging
+import os
+import sqlite3
+
 from pymon.config import load_config
 
 logger = logging.getLogger(__name__)
@@ -8,23 +9,23 @@ logger = logging.getLogger(__name__)
 def get_db_connection():
     config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
     db_path = config.storage.path
-    
+
     conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row
-    
+
     # Enable WAL mode for better concurrency
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
     except Exception as e:
         logger.warning(f"Could not set WAL mode: {e}")
-        
+
     return conn
 
 def init_database():
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     # Servers table
     c.execute('''CREATE TABLE IF NOT EXISTS servers
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,7 +50,7 @@ def init_database():
         c.execute("ALTER TABLE servers ADD COLUMN volumes TEXT DEFAULT '[]'")
     except sqlite3.OperationalError:
         pass
-    
+
     # Services table
     c.execute('''CREATE TABLE IF NOT EXISTS services
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,7 +83,7 @@ def init_database():
         c.execute("ALTER TABLE metrics_history ADD COLUMN disk_info TEXT DEFAULT '{}'")
     except sqlite3.OperationalError:
         pass
-    
+
     # Alerts history
     c.execute('''CREATE TABLE IF NOT EXISTS alerts
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,13 +112,13 @@ def init_database():
                   details TEXT,
                   ip_address TEXT,
                   timestamp TEXT)''')
-    
+
     # Notifications config
     c.execute('''CREATE TABLE IF NOT EXISTS notifications
                  (channel TEXT PRIMARY KEY,
                   enabled INTEGER DEFAULT 1,
                   config TEXT)''')
-    
+
     conn.commit()
     conn.close()
     logger.info("Database initialized with WAL mode")

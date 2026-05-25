@@ -3,12 +3,11 @@ import io
 import json
 import os
 import sqlite3
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import datetime
 
 import aiosqlite
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from pymon.api import models as api_models
@@ -38,6 +37,26 @@ async def list_servers(current_user: User = Depends(get_current_user)):
     try:
         rows = conn.execute("SELECT * FROM servers ORDER BY name").fetchall()
         return {"servers": [dict(r) for r in rows]}
+    finally:
+        conn.close()
+
+
+@router.post("")
+async def create_server(data: ServerCreate, current_user: User = Depends(get_current_user)):
+    conn = get_db()
+    try:
+        cursor = conn.cursor()
+        now = datetime.now().isoformat()
+        cursor.execute(
+            """
+            INSERT INTO servers (name, host, agent_port, os_type, enabled, server_group, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (data.name, data.host, data.agent_port, data.os_type, int(data.enabled), data.server_group, now)
+        )
+        conn.commit()
+        server_id = cursor.lastrowid
+        return {"status": "ok", "id": server_id}
     finally:
         conn.close()
 
@@ -324,10 +343,10 @@ async def update_server(server_id: int, data: ServerUpdate, current_user: User =
         for field, value in data.model_dump(exclude_unset=True).items():
             fields.append(f"{field} = ?")
             params.append(value)
-        
+
         if not fields:
             return {"status": "ok"}
-            
+
         params.append(server_id)
         conn.execute(f"UPDATE servers SET {', '.join(fields)} WHERE id = ?", params)
         conn.commit()
@@ -357,10 +376,27 @@ async def toggle_maintenance(server_id: int, data: api_models.MaintenanceToggle,
         conn.close()
 
 @router.post("/{server_id}/scrape")
-async def force_scrape_server(server_id: int, current_user: User = Depends(get_current_user)):
-    # This usually triggers a scrape job in ScrapeManager
-    # For now we'll just return OK, or we can import ScrapeManager if needed
-    return {"status": "scrape_queued"}
+async def force_scrape_server(server_id: int, request: Request, current_user: User = Depends(get_current_user)):
+    scrape_manager = getattr(request.app.state, "scrape_manager", None)
+    if not scrape_manager:
+        raise HTTPException(status_code=503, detail="Scraper manager not initialized")
+
+    conn = get_db()
+    try:
+        s = conn.execute("SELECT id, name, host, agent_port, os_type, enabled FROM servers WHERE id = ?", (server_id,)).fetchone()
+        if not s:
+            raise HTTPException(status_code=404, detail="Server not found")
+
+        sid, name, host, port, os_type, enabled = s
+        import httpx
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            success = await scrape_manager._scrape_one(client, sid, name, host, port)
+            if success:
+                return {"status": "success"}
+            else:
+                raise HTTPException(status_code=500, detail="Scrape failed or node is offline")
+    finally:
+        conn.close()
 
 @router.get("/{server_id}/history", response_model=api_models.HistoryResponse)
 async def get_server_history(
@@ -413,7 +449,7 @@ async def get_server_summary(server_id: int):
     try:
         last_status = conn.execute("SELECT last_status FROM servers WHERE id = ?", (server_id,)).fetchone()
         status = last_status[0] if last_status else "unknown"
-        
+
         cursor = conn.execute(
             "SELECT AVG(cpu_percent), AVG(memory_percent), AVG(disk_percent) FROM metrics_history WHERE server_id = ? AND timestamp > datetime('now', '-1 hour')",
             (server_id,),

@@ -1,8 +1,9 @@
+
 from fastapi import APIRouter, Depends, HTTPException
-from pymon.auth import User, get_current_user
-from pymon.api.deps import get_db
+
 from pymon.api import models as api_models
-from datetime import datetime, timezone
+from pymon.api.deps import get_db
+from pymon.auth import User, get_current_user
 
 router = APIRouter(prefix="/services", tags=["services"])
 
@@ -35,10 +36,10 @@ async def create_service(data: api_models.ServiceCreate, current_user: User = De
 async def get_all_services_history(range: str = "1h", current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
-        if range.endswith('h'): h = int(range[:-1])
-        elif range.endswith('d'): h = int(range[:-1]) * 24
-        elif range.endswith('m'): h = int(range[:-1]) / 60
-        else: h = 1
+        h: float = 1.0
+        if range.endswith('h'): h = float(range[:-1])
+        elif range.endswith('d'): h = float(range[:-1]) * 24
+        elif range.endswith('m'): h = float(range[:-1]) / 60
         rows = conn.execute("SELECT * FROM services_history WHERE timestamp > datetime('now', ?) ORDER BY timestamp ASC", (f'-{h} hours',)).fetchall()
         return [dict(r) for r in rows]
     finally:

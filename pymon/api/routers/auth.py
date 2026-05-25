@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+
 from pymon.auth import (
     APIKeyCreate,
     PasswordChange,
@@ -10,7 +11,6 @@ from pymon.auth import (
     authenticate_user,
     change_password,
     create_api_key,
-    delete_api_key,
     get_admin_user,
     get_current_user,
     list_api_keys,
@@ -62,7 +62,8 @@ async def create_user(data: dict, current_user: User = Depends(get_admin_user)):
 
 @router.put("/users/{user_id}")
 async def update_user(user_id: int, data: dict, current_user: User = Depends(get_admin_user)):
-    from pymon.auth import update_user as _update_user, set_password as _set_password
+    from pymon.auth import set_password as _set_password
+    from pymon.auth import update_user as _update_user
     is_admin = bool(data["is_admin"]) if "is_admin" in data else None
     must_change_password = bool(data["must_change_password"]) if "must_change_password" in data else None
 
