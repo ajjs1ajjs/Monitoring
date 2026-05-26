@@ -115,14 +115,20 @@ def init_auth_tables():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )""")
 
-    c.execute("SELECT id FROM users WHERE username = ?", (auth_config.admin_username,))
-    if not c.fetchone():
+    c.execute("SELECT id, password_hash FROM users WHERE username = ?", (auth_config.admin_username,))
+    admin_row = c.fetchone()
+    if not admin_row:
         password_hash = hash_password(auth_config.admin_password)
         c.execute(
             "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) VALUES (?, ?, 1, 0, ?)",
             (auth_config.admin_username, password_hash, datetime.now(timezone.utc).isoformat()),
         )
         print(f"Created default user: {auth_config.admin_username}")
+    else:
+        if not verify_password(auth_config.admin_password, admin_row[1]):
+            new_hash = hash_password(auth_config.admin_password)
+            c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, admin_row[0]))
+            print("Updated admin password from config")
 
     conn.commit()
     conn.close()
