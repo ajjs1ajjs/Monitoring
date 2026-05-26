@@ -113,7 +113,7 @@ export PYMON_ALLOWED_ORIGINS=http://localhost:10000
 # Змінити пароль адміна (через API)
 curl -X POST http://localhost:10000/api/v1/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "chang3m3N0w!"}'
+  -d '{"username": "admin", "password": "291263"}'
 
 # Зміна пароля
 curl -X PUT http://localhost:10000/api/v1/users/admin/password \

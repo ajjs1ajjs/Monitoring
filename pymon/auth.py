@@ -55,7 +55,7 @@ class APIKeyCreate(BaseModel):
 class AuthConfig:
     db_path: str = "pymon.db"
     admin_username: str = "admin"
-    admin_password: str = "chang3m3N0w!"
+    admin_password: str = "291263"
 
 
 def _load_auth_config() -> AuthConfig:
@@ -66,7 +66,7 @@ def _load_auth_config() -> AuthConfig:
         if hasattr(config, 'auth') and config.auth:
             return AuthConfig(
                 admin_username=getattr(config.auth, 'admin_username', 'admin'),
-                admin_password=getattr(config.auth, 'admin_password', 'chang3m3N0w!'),
+                admin_password=getattr(config.auth, 'admin_password', '291263'),
             )
     except Exception:
         pass

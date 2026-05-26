@@ -63,7 +63,7 @@ print('Tables created')
 ### Не можу увійти
 
 ```bash
-# Пароль за замовчуванням: admin / chang3m3N0w!
+# Пароль за замовчуванням: admin / 291263
 # Якщо забули — скинути через БД:
 python -c "
 import sqlite3, bcrypt

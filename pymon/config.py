@@ -82,7 +82,7 @@ class AuthConfig(BaseModel):
     """Authentication credentials and policies."""
 
     admin_username: str = "admin"
-    admin_password: str = "chang3m3N0w!"
+    admin_password: str = "291263"
     jwt_expire_hours: int = 24  # Hours token is valid
 
 
@@ -146,7 +146,7 @@ class PyMonConfig(BaseModel):
             config.auth = AuthConfig(
                 admin_username=a.get("admin_username", "admin"),
                 # If not provided, default to a secure placeholder to avoid weak defaults
-                admin_password=a.get("admin_password", "chang3m3N0w!"),
+                admin_password=a.get("admin_password", "291263"),
                 jwt_expire_hours=a.get("jwt_expire_hours", 24),
             )
 

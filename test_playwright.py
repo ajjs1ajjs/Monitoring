@@ -10,7 +10,7 @@ def run():
         print("Logging in...")
         page.goto('http://127.0.0.1:10000/login')
         page.fill('input[type="text"]', 'admin')
-        page.fill('input[type="password"]', 'chang3m3N0w!')
+        page.fill('input[type="password"]', '291263')
         page.click('button[type="submit"]')
         
         page.wait_for_selector('text="Live Infrastructure Status"')

@@ -35,7 +35,7 @@ Get JWT access token.
 ```json
 {
   "username": "admin",
-  "password": "chang3m3N0w!"
+  "password": "291263"
 }
 ```
 
@@ -83,7 +83,7 @@ Authorization: Bearer <token>
 **Request:**
 ```json
 {
-  "current_password": "chang3m3N0w!",
+  "current_password": "291263",
   "new_password": "NewSecure123"
 }
 ```
@@ -743,7 +743,7 @@ import requests
 # Login
 resp = requests.post('http://localhost:10000/api/v1/auth/login', json={
     'username': 'admin',
-    'password': 'chang3m3N0w!'
+    'password': '291263'
 })
 token = resp.json()['access_token']
 
@@ -766,7 +766,7 @@ metrics = resp.json()
 # Login
 TOKEN=$(curl -s -X POST http://localhost:10000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"chang3m3N0w!"}' | jq -r '.access_token')
+  -d '{"username":"admin","password":"291263"}' | jq -r '.access_token')
 
 # Get servers
 curl -X GET http://localhost:10000/api/v1/servers \

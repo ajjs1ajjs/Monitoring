@@ -184,7 +184,7 @@ storage:
 
 auth:
   admin_username: admin
-  admin_password: chang3m3N0w!
+  admin_password: 291263
   jwt_expire_hours: 24
 
 # Scrape configuration (Prometheus-style)
@@ -294,7 +294,7 @@ if systemctl is-active --quiet $SERVICE_NAME; then
     echo ""
     echo -e "  ${YELLOW}Default Credentials:${NC}"
     echo -e "    Username: ${BLUE}admin${NC}"
-    echo -e "    Password: ${BLUE}chang3m3N0w!${NC}"
+    echo -e "    Password: ${BLUE}291263${NC}"
     echo -e "  ${RED}IMPORTANT: Change this password immediately after login!${NC}"
     echo ""
     echo "Management Commands:"
