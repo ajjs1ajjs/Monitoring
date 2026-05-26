@@ -78,6 +78,19 @@ auth_config = _load_auth_config()
 from pymon.api.deps import get_db
 
 
+def _log_audit(user_id: int, action: str, details: str = "", ip_address: str = ""):
+    try:
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO audit_logs (user_id, action, details, ip_address, timestamp) VALUES (?, ?, ?, ?, ?)",
+            (user_id, action, details, ip_address, datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
 def init_auth_tables():
     conn = get_db()
     c = conn.cursor()
@@ -224,6 +237,7 @@ def create_user(username: str, password: str, is_admin: bool = False) -> User:
         user_id = c.lastrowid
         conn.commit()
         conn.close()
+        _log_audit(user_id, "User Created", f"Created user '{username}' (admin={is_admin})")
         return User(id=user_id, username=username, is_admin=is_admin, must_change_password=True)
     except sqlite3.IntegrityError:
         conn.close()
@@ -243,11 +257,8 @@ def authenticate_user(username: str, password: str) -> Token:
         conn.close()
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Close connection immediately after auth to free it up
-    u_id = row["id"]
+    row["id"]
     conn.close()
-
-    # (Background update disabled for stability)
 
     user = User(
         id=row["id"],
@@ -257,6 +268,7 @@ def authenticate_user(username: str, password: str) -> Token:
     )
 
     token = create_token(user.id, user.username, user.is_admin, user.must_change_password)
+    _log_audit(user.id, "Login", f"User '{username}' logged in")
     return Token(access_token=token, user=user)
 
 
@@ -275,6 +287,7 @@ def set_password(user_id: int, new_password: str) -> bool:
         raise HTTPException(status_code=404, detail="User not found")
     conn.commit()
     conn.close()
+    _log_audit(user_id, "Password Changed", "Admin reset password")
     return True
 
 
@@ -300,6 +313,7 @@ def change_password(user_id: int, current_password: str, new_password: str) -> b
     c.execute("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?", (new_hash, user_id))
     conn.commit()
     conn.close()
+    _log_audit(user_id, "Password Changed", "User changed own password")
     return True
 
 
@@ -315,6 +329,7 @@ def create_api_key(user_id: int, name: str) -> str:
     )
     conn.commit()
     conn.close()
+    _log_audit(user_id, "API Key Created", f"Created key '{name}'")
 
     return api_key
 
@@ -338,6 +353,7 @@ def delete_api_key(user_id: int, key_id: int) -> bool:
     deleted = c.rowcount > 0
     conn.commit()
     conn.close()
+    _log_audit(user_id, "API Key Deleted", f"Deleted key id={key_id}")
     return deleted  # type: ignore
 
 
@@ -371,6 +387,7 @@ def update_user(user_id: int, is_admin: Optional[bool] = None, must_change_passw
     updated = c.rowcount > 0
     conn.commit()
     conn.close()
+    _log_audit(user_id, "User Updated", f"Updated user id={user_id}")
     return bool(updated)
 
 
@@ -383,4 +400,5 @@ def delete_user(user_id: int) -> bool:
     deleted = c.rowcount > 0
     conn.commit()
     conn.close()
+    _log_audit(user_id, "User Deleted", f"Deleted user id={user_id}")
     return bool(deleted)

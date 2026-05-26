@@ -123,8 +123,8 @@ class NotificationDispatcher:
 
         try:
             with smtplib.SMTP(smtp_server_str, smtp_port_int) as server:
+                server.starttls()
                 if smtp_pass_str:
-                    server.starttls()
                     server.login(smtp_user_str, smtp_pass_str)
                 server.send_message(msg)
             return True

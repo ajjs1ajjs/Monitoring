@@ -187,8 +187,9 @@ async function apiFetch(url, options = {}) {
             return null;
         }
         if (!resp.ok) {
-            console.error(`API Error ${resp.status} on ${url}`);
-            return null;
+            const errData = await resp.json().catch(() => ({}));
+            console.error(`API Error ${resp.status} on ${url}:`, errData.detail || resp.statusText);
+            return resp;
         }
         return resp;
     } catch (e) {
@@ -1231,6 +1232,7 @@ function expandChart(type) {
 }
 
 let seenAlertIds = new Set();
+let lastSeenCleanup = Date.now();
 
 async function loadRecentAlerts() {
     const feed = document.getElementById('recentAlertsFeed');
@@ -1241,6 +1243,12 @@ async function loadRecentAlerts() {
         if (!resp) return;
         const data = await resp.json();
         const logs = data.logs || [];
+
+        if (Date.now() - lastSeenCleanup > 300000) {
+            const maxSeen = Math.max(...seenAlertIds, 0);
+            seenAlertIds = new Set([maxSeen]);
+            lastSeenCleanup = Date.now();
+        }
 
         let hasNewCritical = false;
         logs.forEach(log => {

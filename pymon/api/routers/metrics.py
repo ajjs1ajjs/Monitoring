@@ -88,7 +88,7 @@ async def get_metrics_trend(
             db.row_factory = sqlite3.Row
             cursor = await db.execute(
                 """
-                SELECT timestamp, AVG(cpu_percent), AVG(memory_percent), AVG(disk_percent), 
+                SELECT timestamp, AVG(cpu_percent), AVG(memory_percent), AVG(disk_percent),
                        SUM(network_rx), SUM(network_tx)
                 FROM metrics_history
                 WHERE timestamp > datetime('now', ?)

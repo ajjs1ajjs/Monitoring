@@ -41,7 +41,7 @@ async def create_alert(data: AlertCreate, current_user: User = Depends(get_curre
     try:
         c.execute(
             """INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, service_id,
-               notify_telegram, notify_discord, notify_slack, notify_email, notify_teams, description, enabled, created_at) 
+               notify_telegram, notify_discord, notify_slack, notify_email, notify_teams, description, enabled, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 data.name, data.metric, data.condition, data.threshold, data.duration, data.severity, data.server_id, data.service_id,

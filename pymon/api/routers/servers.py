@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from pymon.api import models as api_models
 from pymon.api.deps import get_db
 from pymon.auth import User, get_current_user
+from pymon.validation import validate_port, validate_server_host, validate_server_name
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
@@ -23,6 +24,7 @@ class ServerCreate(BaseModel):
     agent_port: int = 9100
     enabled: bool = True
     server_group: str | None = None
+    scrape_interval: int = 0
 
 class ServerUpdate(BaseModel):
     name: str | None = None
@@ -30,6 +32,7 @@ class ServerUpdate(BaseModel):
     os_type: str | None = None
     agent_port: int | None = None
     enabled: bool | None = None
+    scrape_interval: int | None = None
 
 @router.get("")
 async def list_servers(current_user: User = Depends(get_current_user)):
@@ -43,16 +46,19 @@ async def list_servers(current_user: User = Depends(get_current_user)):
 
 @router.post("")
 async def create_server(data: ServerCreate, current_user: User = Depends(get_current_user)):
+    validate_server_name(data.name)
+    validate_server_host(data.host)
+    validate_port(data.agent_port)
     conn = get_db()
     try:
         cursor = conn.cursor()
         now = datetime.now().isoformat()
         cursor.execute(
             """
-            INSERT INTO servers (name, host, agent_port, os_type, enabled, server_group, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO servers (name, host, agent_port, os_type, enabled, server_group, scrape_interval, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (data.name, data.host, data.agent_port, data.os_type, int(data.enabled), data.server_group, now)
+            (data.name, data.host, data.agent_port, data.os_type, int(data.enabled), data.server_group, data.scrape_interval, now)
         )
         conn.commit()
         server_id = cursor.lastrowid
@@ -285,8 +291,7 @@ async def compare_servers(
     current_user: User = Depends(get_current_user),
 ):
     """Compare a metric across all servers."""
-    column_map = {"cpu": "cpu_percent", "memory": "memory_percent", "disk": "disk_percent"}
-    col = column_map.get(metric, "cpu_percent")
+    col_index = {"cpu": 1, "memory": 2, "disk": 3}.get(metric, 1)
     time_ranges = {
         "5m": "-5 minutes", "15m": "-15 minutes", "1h": "-1 hour",
         "6h": "-6 hours", "12h": "-12 hours", "24h": "-24 hours",
@@ -298,16 +303,18 @@ async def compare_servers(
         servers = conn.execute("SELECT id, name FROM servers ORDER BY name").fetchall()
         result = []
         for s in servers:
-            rows = conn.execute(
-                f"""
-                SELECT timestamp, {col}
+            cursor = conn.execute(
+                """
+                SELECT timestamp, cpu_percent, memory_percent, disk_percent
                 FROM metrics_history
-                WHERE server_id = ? AND timestamp > datetime('now', ?) AND {col} IS NOT NULL
+                WHERE server_id = ? AND timestamp > datetime('now', ?)
                 ORDER BY timestamp
                 """,
                 (s["id"], time_filter),
-            ).fetchall()
-            values = [r[1] for r in rows]
+            )
+            rows = cursor.fetchall()
+            col_index = {"cpu": 1, "memory": 2, "disk": 3}.get(metric, 1)
+            values = [r[col_index] for r in rows if r[col_index] is not None]
             avg = sum(values) / len(values) if values else 0
             result.append({
                 "server_id": s["id"],
@@ -336,6 +343,12 @@ async def get_server(server_id: int, current_user: User = Depends(get_current_us
 
 @router.put("/{server_id}")
 async def update_server(server_id: int, data: ServerUpdate, current_user: User = Depends(get_current_user)):
+    if data.host is not None:
+        validate_server_host(data.host)
+    if data.agent_port is not None:
+        validate_port(data.agent_port)
+    if data.name is not None:
+        validate_server_name(data.name)
     conn = get_db()
     try:
         fields = []
@@ -402,6 +415,7 @@ async def force_scrape_server(server_id: int, request: Request, current_user: Us
 async def get_server_history(
     server_id: int,
     range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
+    current_user: User = Depends(get_current_user),
 ):
     time_ranges = {
         "5m": "-5 minutes", "15m": "-15 minutes", "1h": "-1 hour",
@@ -444,7 +458,7 @@ async def get_server_history(
     return {"history": history}
 
 @router.get("/{server_id}/summary")
-async def get_server_summary(server_id: int):
+async def get_server_summary(server_id: int, current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         last_status = conn.execute("SELECT last_status FROM servers WHERE id = ?", (server_id,)).fetchone()
@@ -466,7 +480,7 @@ async def get_server_summary(server_id: int):
         conn.close()
 
 @router.get("/summary/all")
-async def get_all_servers_summary():
+async def get_all_servers_summary(current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         cursor = conn.execute(

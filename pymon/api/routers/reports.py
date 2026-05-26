@@ -17,8 +17,8 @@ async def generate_server_report(server_id: int, current_user: User = Depends(ge
         if not server: raise HTTPException(status_code=404, detail="Server not found")
 
         history = conn.execute("""
-            SELECT timestamp, cpu_percent, memory_percent 
-            FROM metrics_history 
+            SELECT timestamp, cpu_percent, memory_percent
+            FROM metrics_history
             WHERE server_id = ? AND timestamp > datetime('now', '-24 hours')
             ORDER BY timestamp ASC
         """, (server_id,)).fetchall()
@@ -56,7 +56,7 @@ async def generate_server_report(server_id: int, current_user: User = Depends(ge
                         </div>
                         <button class="btn-print" onclick="window.print()">Download PDF</button>
                     </div>
-                    
+
                     <div class="info-grid">
                         <div class="stat-box">
                             <div class="label">Server Identifier</div>
@@ -105,7 +105,7 @@ async def generate_server_report(server_id: int, current_user: User = Depends(ge
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {{ legend: {{ position: 'top' }} }},
-                            scales: {{ 
+                            scales: {{
                                 y: {{ beginAtZero: true, max: 100 }},
                                 x: {{ ticks: {{ maxRotation: 45, autoSkip: true, maxTicksLimit: 12 }} }}
                             }}

@@ -43,11 +43,16 @@ def init_database():
                   exporter_version TEXT,
                   error_message TEXT,
                   is_maintenance INTEGER DEFAULT 0,
-                  flapping_count INTEGER DEFAULT 0,
-                  volumes TEXT DEFAULT '[]',
-                  created_at TEXT)''')
+                   flapping_count INTEGER DEFAULT 0,
+                   volumes TEXT DEFAULT '[]',
+                   scrape_interval INTEGER DEFAULT 0,
+                   created_at TEXT)''')
     try:
         c.execute("ALTER TABLE servers ADD COLUMN volumes TEXT DEFAULT '[]'")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("ALTER TABLE servers ADD COLUMN scrape_interval INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
 
