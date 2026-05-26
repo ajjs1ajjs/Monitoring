@@ -22,7 +22,7 @@ storage:
 # =============================================================================
 auth:
   admin_username: admin
-  admin_password: changeme # ⚠️ CHANGE THIS AFTER FIRST LOGIN!
+  admin_password: chang3m3N0w! # ⚠️ CHANGE THIS AFTER FIRST LOGIN!
   jwt_expire_hours: 24 # Token expiration time
 
 # =============================================================================

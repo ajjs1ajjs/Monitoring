@@ -141,7 +141,7 @@ def main():
     server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite"], help="Storage backend")
     server_parser.add_argument("--db", default=None, help="Database path (defaults to config value)")
 
-    subparsers.add_parser("reset-admin", help="Reset admin password to 'changeme'")
+    subparsers.add_parser("reset-admin", help="Reset admin password to 'chang3m3N0w!'")
 
     args = parser.parse_args()
 
@@ -246,7 +246,7 @@ def main():
             print("--------------------------------------------------")
             print("SUCCESS: Admin password has been reset!")
             print("Login: admin")
-            print("Password: changeme")
+            print("Password: chang3m3N0w!")
             print("--------------------------------------------------")
         except Exception as e:
             print(f"ERROR: Failed to reset admin: {e}")
