@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 
 class StaticConfig(BaseModel):
@@ -84,6 +84,11 @@ class AuthConfig(BaseModel):
     admin_username: str = "admin"
     admin_password: str = "291263"
     jwt_expire_hours: int = 24  # Hours token is valid
+
+    @field_validator('admin_password', mode='before')
+    @classmethod
+    def coerce_password(cls, v):
+        return str(v)
 
 
 class BackupConfig(BaseModel):

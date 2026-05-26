@@ -22,7 +22,7 @@ storage:
 # =============================================================================
 auth:
   admin_username: admin
-  admin_password: 291263 # ⚠️ CHANGE THIS AFTER FIRST LOGIN!
+  admin_password: "291263" # ⚠️ CHANGE THIS AFTER FIRST LOGIN!
   jwt_expire_hours: 24 # Token expiration time
 
 # =============================================================================
