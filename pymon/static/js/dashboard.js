@@ -210,6 +210,7 @@ if (addNodeForm) addNodeForm.addEventListener('submit', async (e) => {
         submitBtn.textContent = 'Connecting...';
         
         const name = document.getElementById('nodeName').value;
+        const server_group = document.getElementById('nodeGroup').value || null;
         const host = document.getElementById('nodeHost').value;
         const os_type = document.getElementById('nodeOS').value;
         const agent_port = parseInt(document.getElementById('nodePort').value) || 9100;
@@ -219,6 +220,7 @@ if (addNodeForm) addNodeForm.addEventListener('submit', async (e) => {
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 name, host, os_type, agent_port,
+                server_group,
                 enabled: true
             })
         });
@@ -289,6 +291,7 @@ async function refreshData() {
         if (servResp && servResp.ok) {
             const data = await servResp.json();
             nodes = data.servers;
+            populateGroupFilter();
             filterNodes();
             const liveSearch = document.getElementById('liveSearch');
             if (liveSearch) filterLiveTable();
@@ -318,19 +321,50 @@ function filterLiveTable() {
     updateLiveTable(filtered);
 }
 
+function populateGroupFilter() {
+    const filterGroup = document.getElementById('filterGroup');
+    if (!filterGroup) return;
+    const currentVal = filterGroup.value;
+    
+    const groups = new Set();
+    nodes.forEach(n => {
+        if (n.server_group) {
+            groups.add(n.server_group);
+        }
+    });
+    
+    filterGroup.innerHTML = '<option value="all">Усі групи</option>';
+    Array.from(groups).sort().forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g;
+        opt.textContent = g;
+        filterGroup.appendChild(opt);
+    });
+    
+    if (groups.has(currentVal)) {
+        filterGroup.value = currentVal;
+    } else {
+        filterGroup.value = 'all';
+    }
+}
+
 function filterNodes() {
     const nodeSearch = document.getElementById('nodeSearch');
     const filterStatus = document.getElementById('filterStatus');
+    const filterGroup = document.getElementById('filterGroup');
     
     const query = (nodeSearch?.value || '').toLowerCase();
     const statusFilter = filterStatus?.value || 'all';
+    const groupFilter = filterGroup?.value || 'all';
 
     let filtered = nodes.filter(n => {
         const name = (n.name || '').toLowerCase();
         const host = (n.host || '').toLowerCase();
-        const matchesSearch = name.includes(query) || host.includes(query);
+        const group = (n.server_group || '').toLowerCase();
+        const matchesSearch = name.includes(query) || host.includes(query) || group.includes(query);
         const matchesStatus = statusFilter === 'all' || n.last_status === statusFilter;
-        return matchesSearch && matchesStatus;
+        const matchesGroup = groupFilter === 'all' || n.server_group === groupFilter;
+        return matchesSearch && matchesStatus && matchesGroup;
     });
 
     // Apply sorting
@@ -394,13 +428,17 @@ function updateLiveTable(data) {
             </td>
             <td>
                 <div style="font-weight: 700; color: #fff; font-size: 1.1rem; margin-bottom: 0.25rem;">${n.name}</div>
-                <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;">
+                <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;">
                     <i data-lucide="server" style="width: 12px; height: 12px;"></i>
                     ${n.os_type === 'windows' ? 'Windows NT' : 'Linux Kernel'}
                     <span style="display:flex; align-items:center; gap:0.25rem; background: rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border);">
                         <span style="display:inline-block; width:5px; height:5px; border-radius:50%; background: ${n.exporter_version && n.exporter_version !== 'unknown' ? 'var(--success)' : 'var(--text-muted)'};"></span>
                         <span style="font-size: 0.65rem; color: ${n.exporter_version && n.exporter_version !== 'unknown' ? '#fff' : 'var(--text-muted)'}; font-family: 'JetBrains Mono';">${n.exporter_version || 'v?'}</span>
                     </span>
+                    ${n.server_group ? `
+                    <span class="status-badge" style="background: rgba(249, 115, 22, 0.1); color: var(--accent); border: 1px solid rgba(249, 115, 22, 0.2); font-size: 0.65rem; padding: 1px 6px; line-height: 1;">
+                        ${n.server_group}
+                    </span>` : ''}
                 </div>
             </td>
             <td>
@@ -794,6 +832,7 @@ function showEditModal(id) {
     if (!s) return;
     editingServerId = id;
     document.getElementById('editNodeName').value = s.name;
+    document.getElementById('editNodeGroup').value = s.server_group || '';
     document.getElementById('editNodeHost').value = s.host;
     document.getElementById('editNodeOS').value = s.os_type || 'linux';
     document.getElementById('editNodePort').value = s.agent_port || 9100;
@@ -810,7 +849,8 @@ if (editNodeForm) editNodeForm.addEventListener('submit', async (e) => {
             name: document.getElementById('editNodeName').value,
             host: document.getElementById('editNodeHost').value,
             os_type: document.getElementById('editNodeOS').value,
-            agent_port: parseInt(document.getElementById('editNodePort').value)
+            agent_port: parseInt(document.getElementById('editNodePort').value),
+            server_group: document.getElementById('editNodeGroup').value || null
         })
     });
     if (resp && resp.ok) {
@@ -1261,7 +1301,7 @@ async function loadRecentAlerts() {
             }
         });
 
-        if (hasNewCritical && seenAlertIds.size > logs.length) {
+        if (hasNewCritical && seenAlertIds.size > logs.length && audioNotificationsEnabled) {
             const audio = document.getElementById('alertSound');
             if (audio) {
                 audio.play().catch(err => console.log('Sound play blocked by browser policy:', err));
@@ -1353,6 +1393,63 @@ function connectWebSocket() {
     };
 }
 
+// Audio Notifications
+let audioNotificationsEnabled = localStorage.getItem('audioNotifications') === 'enabled';
+
+function initAudioNotifications() {
+    const btn = document.getElementById('toggleAudioNotificationsBtn');
+    const icon = document.getElementById('audioBtnIcon');
+    const text = document.getElementById('audioBtnText');
+    const testBtn = document.getElementById('testAudioBtn');
+
+    function updateBtnUI() {
+        if (!btn || !icon || !text) return;
+        if (audioNotificationsEnabled) {
+            btn.classList.remove('btn-secondary');
+            btn.classList.add('btn-primary');
+            icon.setAttribute('data-lucide', 'volume-2');
+            text.textContent = 'Звук: Увімкнено';
+        } else {
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-secondary');
+            icon.setAttribute('data-lucide', 'volume-x');
+            text.textContent = 'Звук: Вимкнено';
+        }
+        if (window.lucide) lucide.createIcons();
+    }
+
+    if (btn) {
+        btn.addEventListener('click', () => {
+            audioNotificationsEnabled = !audioNotificationsEnabled;
+            localStorage.setItem('audioNotifications', audioNotificationsEnabled ? 'enabled' : 'disabled');
+            updateBtnUI();
+            
+            if (audioNotificationsEnabled) {
+                const audio = document.getElementById('alertSound');
+                if (audio) {
+                    audio.play()
+                        .then(() => {
+                            audio.pause();
+                            audio.currentTime = 0;
+                        })
+                        .catch(err => console.log('Audio unlock failed:', err));
+                }
+            }
+        });
+    }
+
+    if (testBtn) {
+        testBtn.addEventListener('click', () => {
+            const audio = document.getElementById('alertSound');
+            if (audio) {
+                audio.play().catch(err => alert('Браузер заблокував відтворення. Будь ласка, спочатку дозвольте звук сповіщень!'));
+            }
+        });
+    }
+
+    updateBtnUI();
+}
+
 // Theme Toggle
 function initTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -1396,6 +1493,7 @@ refreshData();
 initOverviewCharts();
 connectWebSocket();
 initTheme();
+initAudioNotifications();
 
 setInterval(refreshData, 60000);
 setInterval(() => {

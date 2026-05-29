@@ -234,6 +234,9 @@
                                 <option value="up">Тільки UP</option>
                                 <option value="down">Тільки DOWN</option>
                             </select>
+                            <select id="filterGroup" onchange="filterNodes()" class="server-select" style="min-width: 120px;">
+                                <option value="all">Усі групи</option>
+                            </select>
                             <div class="search-box">
                                 <i data-lucide="search" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
                                 <input type="search" id="nodeSearch" placeholder="Пошук за назвою або IP..." oninput="filterNodes()" autocomplete="off" spellcheck="false" class="server-select" style="min-width: 250px;">
@@ -544,6 +547,22 @@
                                     <label>Default Node Port (Windows)</label>
                                     <input type="number" id="defaultPortWindows" class="form-input" value="9182">
                                 </div>
+                                <hr style="border: 0; border-top: 1px solid var(--border); margin: 1.5rem 0;">
+                                <div class="form-group">
+                                    <label>Звукові сповіщення в браузері</label>
+                                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                                        <button type="button" id="toggleAudioNotificationsBtn" class="btn btn-secondary" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: 700;">
+                                            <i data-lucide="volume-x" id="audioBtnIcon" style="width: 16px; height: 16px;"></i>
+                                            <span id="audioBtnText">Увімкнути звук сповіщень</span>
+                                        </button>
+                                        <button type="button" id="testAudioBtn" class="btn btn-secondary" style="padding: 0.6rem 1rem;" title="Перевірити звук">
+                                            <i data-lucide="play" style="width: 16px; height: 16px;"></i>
+                                        </button>
+                                    </div>
+                                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+                                        Дозволяє браузеру відтворювати звуковий сигнал при появі нових критичних алертів.
+                                    </p>
+                                </div>
                                 <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSystemSettings()">Зберегти систему</button>
                             </div>
                         </div>
@@ -662,6 +681,10 @@
                         <input type="text" id="nodeName" required class="form-input" placeholder="Production Server 01">
                     </div>
                     <div class="form-group">
+                        <label>Група серверів / Тег</label>
+                        <input type="text" id="nodeGroup" class="form-input" placeholder="напр. database, frontend, production">
+                    </div>
+                    <div class="form-group">
                         <label>Адреса хоста</label>
                         <input type="text" id="nodeHost" required class="form-input" placeholder="192.168.1.100">
                     </div>
@@ -743,6 +766,10 @@
                     <div class="form-group">
                         <label>Display Name</label>
                         <input type="text" id="editNodeName" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label>Група серверів / Тег</label>
+                        <input type="text" id="editNodeGroup" class="form-input" placeholder="e.g. database, frontend, production">
                     </div>
                     <div class="form-group">
                         <label>Host Address</label>

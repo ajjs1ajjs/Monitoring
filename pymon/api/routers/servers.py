@@ -33,6 +33,7 @@ class ServerUpdate(BaseModel):
     agent_port: int | None = None
     enabled: bool | None = None
     scrape_interval: int | None = None
+    server_group: str | None = None
 
 @router.get("")
 async def list_servers(current_user: User = Depends(get_current_user)):
