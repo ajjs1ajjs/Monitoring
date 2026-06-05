@@ -114,6 +114,3 @@ class MemoryProcessor(MetricProcessor):
             "total_data_points_analyzed": len(values),
         }
 
-    def get_supported_metric_types(self) -> str:  # type: ignore
-        """Returns the unique type identifier for Memory metrics."""
-        return "memory"

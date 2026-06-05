@@ -397,14 +397,14 @@ async def force_scrape_server(server_id: int, request: Request, current_user: Us
 
     conn = get_db()
     try:
-        s = conn.execute("SELECT id, name, host, agent_port, os_type, enabled FROM servers WHERE id = ?", (server_id,)).fetchone()
+        s = conn.execute("SELECT id, name, host, agent_port, os_type, enabled, last_status, cpu_percent FROM servers WHERE id = ?", (server_id,)).fetchone()
         if not s:
             raise HTTPException(status_code=404, detail="Server not found")
 
-        sid, name, host, port, os_type, enabled = s
+        sid, name, host, port, os_type, enabled, last_status, last_cpu = s
         import httpx
         async with httpx.AsyncClient(timeout=10.0) as client:
-            success = await scrape_manager._scrape_one(client, sid, name, host, port)
+            success = await scrape_manager._scrape_one(client, sid, name, host, port, last_status, last_cpu)
             if success:
                 return {"status": "success"}
             else:

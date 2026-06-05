@@ -47,3 +47,21 @@ def get_db():
     except:
         pass
     return conn
+
+async def get_async_db():
+    """Get async database connection with aiosqlite"""
+    import aiosqlite
+
+    from pymon.config import load_config
+    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+    db_path = config.storage.path
+
+    conn = await aiosqlite.connect(db_path, timeout=30.0)
+    conn.row_factory = aiosqlite.Row
+    try:
+        await conn.execute("PRAGMA journal_mode=WAL")
+        await conn.execute("PRAGMA synchronous=NORMAL")
+        await conn.execute("PRAGMA busy_timeout=30000")
+    except Exception:
+        pass
+    return conn

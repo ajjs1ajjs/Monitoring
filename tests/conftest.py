@@ -50,8 +50,8 @@ def test_config(db_path):
 def init_database(db_path, test_config):
     """Initialize the test database with all required tables and test data"""
     from pymon.auth import init_auth_tables
-    from pymon.storage import init_storage
     from pymon.database import init_database
+    from pymon.storage import init_storage
 
     init_storage(backend="sqlite", db_path=db_path)
     init_auth_tables()

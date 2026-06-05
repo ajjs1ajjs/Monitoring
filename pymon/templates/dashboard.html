@@ -417,6 +417,9 @@
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
                             <input type="search" id="logSearch" class="server-select" placeholder="Пошук..." style="width: 200px;" oninput="filterLogs()" autocomplete="off" spellcheck="false">
+                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem;" onclick="loadSystemLogs()">
+                                <i data-lucide="terminal" style="width: 14px; height: 14px; margin-right: 0.4rem;"></i> Системні логи
+                            </button>
                             <button class="btn btn-secondary" style="padding: 0.6rem 1rem;" onclick="loadAuditLogs()">
                                 <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
                             </button>

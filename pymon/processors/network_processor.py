@@ -114,6 +114,3 @@ class NetworkProcessor(MetricProcessor):
             "total_data_points_analyzed": len(throughput_values),
         }
 
-    def get_supported_metric_types(self) -> str:  # type: ignore
-        """Returns the unique type identifier for Network metrics."""
-        return "network"

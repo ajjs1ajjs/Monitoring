@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, Query
+import os
+
+from fastapi import APIRouter, Depends, Query, HTTPException
 
 from pymon.api.deps import get_db
 from pymon.auth import User, get_current_user
 
 router = APIRouter(prefix="/audit-log", tags=["logs"])
+
 
 @router.get("")
 async def get_audit_logs(
@@ -32,3 +35,30 @@ async def clear_audit_logs(current_user: User = Depends(get_current_user)):
         return {"status": "ok"}
     finally:
         conn.close()
+
+# System Logs (pymon.log)
+@router.get("/system-logs")
+async def get_system_logs(lines: int = Query(200, ge=10, le=5000), current_user: User = Depends(get_current_user)):
+    log_path = os.path.join(".", "logs", "pymon.log")
+    if not os.path.exists(log_path):
+        return {"logs": ["Log file not found."]}
+    
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+            all_lines = f.readlines()
+        return {"logs": all_lines[-lines:]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/system-logs")
+async def clear_system_logs(current_user: User = Depends(get_current_user)):
+    log_path = os.path.join(".", "logs", "pymon.log")
+    try:
+        if os.path.exists(log_path):
+            # Open in write mode to truncate
+            with open(log_path, "w", encoding="utf-8") as f:
+                f.write("")
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

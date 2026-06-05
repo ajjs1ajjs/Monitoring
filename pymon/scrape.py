@@ -1,11 +1,14 @@
 import asyncio
 import json
-import sys
+import logging
 from datetime import datetime
 
 import httpx
 
-from pymon.api.deps import get_db, manager
+from pymon.api.deps import get_async_db, manager
+from pymon.notifications import dispatcher
+
+logger = logging.getLogger(__name__)
 
 
 class ScrapeManager:
@@ -34,9 +37,7 @@ class ScrapeManager:
                 await self.scrape_all()
                 await self._cleanup_old_metrics()
             except Exception as e:
-                import traceback
-                print(f"[ERROR] Scrape loop: {e}", file=sys.stderr)
-                traceback.print_exc(file=sys.stderr)
+                logger.exception(f"Scrape loop error: {e}")
             await asyncio.sleep(self.interval)
 
     async def _cleanup_old_metrics(self):
@@ -46,26 +47,37 @@ class ScrapeManager:
             return
         self._last_cleanup = now
         try:
-            conn = get_db()
-            conn.execute(
+            conn = await get_async_db()
+            await conn.execute(
                 "DELETE FROM metrics_history WHERE timestamp < datetime('now', ?)",
                 (f"-{self.retention_hours} hours",),
             )
-            conn.execute(
+            await conn.execute(
                 "DELETE FROM services_history WHERE timestamp < datetime('now', ?)",
                 (f"-{self.retention_hours} hours",),
             )
-            conn.commit()
-            conn.close()
-        except Exception:
-            pass
+            await conn.commit()
+            await conn.close()
+        except Exception as e:
+            logger.error(f"Cleanup error: {e}")
+
+        if datetime.now().hour == 3 and not getattr(self, "_vacuumed_today", False):
+            try:
+                conn = await get_async_db()
+                await conn.execute("VACUUM")
+                await conn.close()
+                self._vacuumed_today = True
+                logger.info("Database vacuumed successfully.")
+            except Exception as e:
+                logger.error(f"Vacuum error: {e}")
+        elif datetime.now().hour != 3:
+            self._vacuumed_today = False
 
     async def scrape_all(self):
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, host, agent_port, os_type, enabled, scrape_interval FROM servers WHERE enabled=1")
-        servers = cursor.fetchall()
-        conn.close()
+        conn = await get_async_db()
+        cursor = await conn.execute("SELECT id, name, host, agent_port, os_type, enabled, scrape_interval, last_status, cpu_percent FROM servers WHERE enabled=1")
+        servers = await cursor.fetchall()
+        await conn.close()
 
         if not servers:
             return
@@ -73,8 +85,8 @@ class ScrapeManager:
         async with httpx.AsyncClient(timeout=10.0) as client:
             tasks = []
             for s in servers:
-                sid, name, host, port, os_type, enabled = s[:6]
-                tasks.append(self._scrape_one(client, sid, name, host, port))
+                sid, name, host, port, os_type, enabled, s_interval, last_status, last_cpu = s
+                tasks.append(self._scrape_one(client, sid, name, host, port, last_status, last_cpu))
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
             ok = 0
@@ -82,58 +94,108 @@ class ScrapeManager:
                 if r is True:
                     ok += 1
                 elif isinstance(r, Exception):
-                    print(f"[ScrapeManager] Error: {type(r).__name__}: {r}", file=sys.stderr, flush=True)
+                    logger.error(f"[ScrapeManager] Error: {type(r).__name__}: {r}")
             if ok:
-                print(f"[ScrapeManager] Collected {ok}/{len(servers)} servers", flush=True)
+                logger.info(f"[ScrapeManager] Collected {ok}/{len(servers)} servers")
 
-    async def _scrape_one(self, client, server_id, name, host, port):
+    async def _scrape_one(self, client, server_id, name, host, port, last_status, last_cpu):
         url = f"http://{host}:{port}/metrics"
+        is_up = False
         try:
             resp = await client.get(url)
-            if resp.status_code != 200:
-                return False
-            text = resp.text
-        except httpx.ConnectError:
-            return False
-        except httpx.TimeoutException:
-            return False
+            if resp.status_code == 200:
+                is_up = True
+                text = resp.text
         except Exception:
+            pass
+
+        now = datetime.now().isoformat()
+        conn = await get_async_db()
+
+        if not is_up:
+            if last_status == 'up':
+                await self._trigger_alert(f"🔥 Server Down: {name}", f"Server {name} ({host}) is offline or exporter is unreachable.")
+            try:
+                await conn.execute("UPDATE servers SET last_status='down', last_check=? WHERE id=?", (now, server_id))
+                await conn.commit()
+            except Exception:
+                pass
+            finally:
+                await conn.close()
             return False
 
         data = self._parse_metrics(text, name)
-
-        conn = get_db()
-        cursor = conn.cursor()
-        now = datetime.now().isoformat()
 
         try:
             vols = data.get('volumes', [])
             disk_json = json.dumps(vols)
             vol_summary = json.dumps([{'volume': v['volume'], 'used_percent': v['used_percent']} for v in vols])
-            cursor.execute("""
+            
+            cpu_val = data.get('cpu', 0)
+            if cpu_val > 90 and (last_cpu is None or last_cpu <= 90):
+                await self._trigger_alert(f"⚠️ High CPU: {name}", f"Server {name} CPU usage is high: {cpu_val}%.")
+            elif cpu_val <= 90 and (last_cpu is not None and last_cpu > 90):
+                await self._trigger_alert(f"✅ CPU Normal: {name}", f"Server {name} CPU usage returned to normal: {cpu_val}%.")
+            
+            if last_status == 'down':
+                await self._trigger_alert(f"✅ Server Restored: {name}", f"Server {name} ({host}) is back online.")
+
+            await conn.execute("""
                 INSERT INTO metrics_history
                 (timestamp, server_id, cpu_percent, memory_percent,
                  disk_percent, network_rx, network_tx, disk_info)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (now, server_id,
-                  data.get('cpu', 0), data.get('memory', 0),
+                  cpu_val, data.get('memory', 0),
                   data.get('disk', 0), data.get('net_rx', 0),
                   data.get('net_tx', 0), disk_json))
 
-            cursor.execute("""
+            await conn.execute("""
                 UPDATE servers SET last_status='up', last_check=?,
                 cpu_percent=?, memory_percent=?, disk_percent=?,
                 volumes=?
                 WHERE id=?
-            """, (now, data.get('cpu', 0), data.get('memory', 0),
+            """, (now, cpu_val, data.get('memory', 0),
                   data.get('disk', 0), vol_summary, server_id))
-            conn.commit()
-            conn.close()
+            await conn.commit()
+            await conn.close()
             await manager.broadcast({"type": "metrics_updated", "server_id": server_id})
             return True
-        except Exception:
-            conn.close()
+        except Exception as e:
+            logger.error(f"Scrape insert error for {name}: {e}")
+            await conn.close()
             return False
+
+    async def _trigger_alert(self, title, message):
+        try:
+            conn = await get_async_db()
+            row = await conn.execute("SELECT config FROM notifications WHERE channel = 'all'")
+            row = await row.fetchone()
+            await conn.close()
+            if not row: return
+            
+            data = json.loads(row[0])
+            if not data.get("enabled"): return
+            
+            channels = {}
+            if data.get("telegram_bot_token") and data.get("telegram_chat_id"):
+                channels["telegram"] = {"bot_token": data["telegram_bot_token"], "chat_id": data["telegram_chat_id"]}
+            if data.get("discord_webhook_url"):
+                channels["discord"] = {"webhook_url": data["discord_webhook_url"]}
+            if data.get("teams_webhook_url"):
+                channels["teams"] = {"webhook_url": data["teams_webhook_url"]}
+            if data.get("smtp_server") and data.get("email_to"):
+                channels["email"] = {
+                    "smtp_server": data["smtp_server"],
+                    "smtp_port": data.get("smtp_port", 587),
+                    "smtp_user": data.get("smtp_user", ""),
+                    "smtp_pass": data.get("smtp_pass", ""),
+                    "email_to": data["email_to"]
+                }
+            if channels:
+                dispatcher.dispatch(title, message, channels)
+        except Exception as e:
+            logger.error(f"Error triggering alert: {e}")
 
     def _parse_metrics(self, text, name=""):
         result = {'cpu': 0, 'memory': 0, 'disk': 0, 'net_rx': 0, 'net_tx': 0, 'volumes': []}
@@ -376,19 +438,16 @@ class ServiceChecker:
             try:
                 await self.check_all(last_checked)
             except Exception as e:
-                import traceback
-                print(f"[ERROR] ServiceChecker: {e}", file=sys.stderr)
-                traceback.print_exc(file=sys.stderr)
+                logger.exception(f"ServiceChecker error: {e}")
             await asyncio.sleep(5)
 
     async def check_all(self, last_checked: dict[int, float] | None = None):
         import time
         now_ts = time.time()
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, target_url, timeout, expected_status, enabled, interval FROM services WHERE enabled=1")
-        services = cursor.fetchall()
-        conn.close()
+        conn = await get_async_db()
+        cursor = await conn.execute("SELECT id, name, target_url, timeout, expected_status, enabled, interval, check_type, status FROM services WHERE enabled=1")
+        services = await cursor.fetchall()
+        await conn.close()
 
         if not services:
             return
@@ -396,47 +455,97 @@ class ServiceChecker:
         async with httpx.AsyncClient(timeout=15.0) as client:
             tasks = []
             for s in services:
-                sid, name, url, timeout, expected, enabled = s[:6]
-                srv_interval = s[6] if len(s) > 6 and s[6] and s[6] > 0 else self.default_interval
+                sid, name, url, timeout, expected, enabled, srv_interval, check_type, last_status = s
+                if not srv_interval or srv_interval <= 0:
+                    srv_interval = self.default_interval
                 if last_checked is not None:
                     last = last_checked.get(sid, 0)
                     if now_ts - last < srv_interval:
                         continue
                     last_checked[sid] = now_ts
-                tasks.append(self._check_one(client, sid, name, url, timeout, expected))
+                tasks.append(self._check_one(client, sid, name, url, timeout, expected, check_type, last_status))
 
             if tasks:
                 await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def _check_one(self, client, service_id, name, url, timeout, expected):
+    async def _check_one(self, client, service_id, name, url, timeout, expected, check_type, last_status):
         expected_status = int(expected) if expected else 200
         start = datetime.now()
+        latency = 0
+        status = 'down'
+
         try:
-            resp = await client.get(url, timeout=timeout if timeout else 10)
-            latency = int((datetime.now() - start).total_seconds() * 1000)
-            status = 'up' if resp.status_code == expected_status else 'degraded'
+            if check_type == 'ping':
+                import sys
+                import asyncio
+                args = ["-n", "1", "-w", str((timeout if timeout else 10) * 1000)] if sys.platform == "win32" else ["-c", "1", "-W", str(timeout if timeout else 2)]
+                proc = await asyncio.create_subprocess_exec(
+                    "ping", *args, url,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                await proc.wait()
+                latency = int((datetime.now() - start).total_seconds() * 1000)
+                status = 'up' if proc.returncode == 0 else 'down'
+            elif check_type == 'ssl':
+                import ssl
+                import asyncio
+                ctx = ssl.create_default_context()
+                host = url
+                port = 443
+                if ":" in url:
+                    host, port_str = url.split(":", 1)
+                    port = int(port_str)
+                try:
+                    fut = asyncio.open_connection(host, port, ssl=ctx, server_hostname=host)
+                    reader, writer = await asyncio.wait_for(fut, timeout=(timeout if timeout else 10))
+                    cert = writer.get_extra_info('peercert')
+                    writer.close()
+                    await writer.wait_closed()
+                    if cert and 'notAfter' in cert:
+                        expire_dt = datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z')
+                        days_left = (expire_dt - datetime.now()).days
+                        status = 'degraded' if days_left < 14 else 'up'
+                    else:
+                        status = 'down'
+                except ssl.SSLCertVerificationError:
+                    status = 'degraded'
+                except Exception:
+                    status = 'down'
+                latency = int((datetime.now() - start).total_seconds() * 1000)
+            else:
+                resp = await client.get(url, timeout=timeout if timeout else 10)
+                latency = int((datetime.now() - start).total_seconds() * 1000)
+                status = 'up' if resp.status_code == expected_status else 'degraded'
         except Exception:
             latency = 0
             status = 'down'
 
+        if status == 'down' and last_status in ('up', 'degraded'):
+            await scraper._trigger_alert(f"🔥 Service Down: {name}", f"Service {name} ({url}) is down. Type: {check_type}")
+        elif status == 'degraded' and last_status == 'up' and check_type == 'ssl':
+            await scraper._trigger_alert(f"⚠️ SSL Expiring: {name}", f"SSL certificate for {name} ({url}) expires in less than 14 days.")
+        elif status == 'up' and last_status in ('down', 'degraded'):
+            await scraper._trigger_alert(f"✅ Service Restored: {name}", f"Service {name} ({url}) is back online.")
+
         now = datetime.now().isoformat()
         for attempt in range(3):
             try:
-                conn = get_db()
-                conn.execute("UPDATE services SET status=?, last_check=?, response_time_ms=? WHERE id=?",
+                conn = await get_async_db()
+                await conn.execute("UPDATE services SET status=?, last_check=?, response_time_ms=? WHERE id=?",
                              (status, now, latency, service_id))
-                conn.execute("INSERT INTO services_history (service_id, status, latency_ms, timestamp) VALUES (?, ?, ?, ?)",
+                await conn.execute("INSERT INTO services_history (service_id, status, latency_ms, timestamp) VALUES (?, ?, ?, ?)",
                              (service_id, status, latency, now))
-                conn.commit()
-                conn.close()
+                await conn.commit()
+                await conn.close()
                 return True
             except Exception as e:
                 try:
-                    conn.close()
+                    await conn.close()
                 except Exception:
                     pass
                 if attempt == 2:
-                    print(f"[ServiceChecker] DB error for {name} ({url}): {e}", file=sys.stderr, flush=True)
+                    logger.error(f"[ServiceChecker] DB error for {name} ({url}): {e}")
                     return False
                 await asyncio.sleep(0.2)
         return False

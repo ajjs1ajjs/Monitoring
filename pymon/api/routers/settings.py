@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from pymon.api.deps import get_db
 from pymon.auth import User, get_current_user
+from pymon.notifications import dispatcher
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -40,6 +41,45 @@ async def save_notification_settings(data: dict, current_user: User = Depends(ge
                     ('all', int(data.get('enabled', True)), config_json))
         conn.commit()
         return {"status": "ok"}
+    finally:
+        conn.close()
+
+@router.post("/notifications/test")
+async def test_notification_settings(current_user: User = Depends(get_current_user)):
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT config FROM notifications WHERE channel = 'all'").fetchone()
+        if not row:
+            raise HTTPException(status_code=400, detail="No notification config found")
+        data = json.loads(row[0])
+        
+        channels = {}
+        if data.get("telegram_bot_token") and data.get("telegram_chat_id"):
+            channels["telegram"] = {"bot_token": data["telegram_bot_token"], "chat_id": data["telegram_chat_id"]}
+        if data.get("discord_webhook_url"):
+            channels["discord"] = {"webhook_url": data["discord_webhook_url"]}
+        if data.get("teams_webhook_url"):
+            channels["teams"] = {"webhook_url": data["teams_webhook_url"]}
+        if data.get("smtp_server") and data.get("email_to"):
+            channels["email"] = {
+                "smtp_server": data["smtp_server"],
+                "smtp_port": data.get("smtp_port", 587),
+                "smtp_user": data.get("smtp_user", ""),
+                "smtp_pass": data.get("smtp_pass", ""),
+                "email_to": data["email_to"]
+            }
+
+        if not channels:
+            raise HTTPException(status_code=400, detail="No valid channels configured")
+
+        results = dispatcher.dispatch("Test Alert", "This is a test notification from PyMon.", channels)
+        successes = [k for k, v in results.items() if v]
+        failures = [k for k, v in results.items() if not v]
+
+        if not successes:
+            raise HTTPException(status_code=400, detail=f"All channels failed: {failures}")
+            
+        return {"status": "ok", "success": successes, "failed": failures}
     finally:
         conn.close()
 

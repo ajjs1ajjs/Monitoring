@@ -1,4 +1,6 @@
-import subprocess, re
+import re
+import subprocess
+
 out = subprocess.run([r'.\.venv\Scripts\mypy', '.'], capture_output=True, text=True).stdout
 errors_by_file = {}  # type: ignore
 for line in out.splitlines():

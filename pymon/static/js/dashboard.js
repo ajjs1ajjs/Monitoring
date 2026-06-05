@@ -672,6 +672,26 @@ async function loadAuditLogs() {
     } catch (e) { console.error(e); }
 }
 
+async function loadSystemLogs() {
+    try {
+        const resp = await apiFetch('/api/v1/audit-log/system-logs?lines=200');
+        if (!resp) return;
+        const data = await resp.json();
+        const logs = data.logs || [];
+        
+        const auditLogStream = document.getElementById('auditLogStream');
+        if (auditLogStream) {
+            if (logs.length && logs[0] !== "Log file not found.") {
+                auditLogStream.innerHTML = `<pre style="white-space: pre-wrap; font-family: monospace; color: #a3e635; margin: 0; padding: 1rem; background: rgba(0,0,0,0.5); border-radius: 8px; font-size: 0.8rem; overflow-x: auto;">${logs.join('')}</pre>`;
+            } else {
+                auditLogStream.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">Логів не знайдено або файл відсутній</div>';
+            }
+        }
+    } catch (e) {
+        console.error("System Logs fetch error:", e);
+    }
+}
+
 async function deleteNode(id) {
     if (confirm('Permanently decommission this node?')) {
         try {
