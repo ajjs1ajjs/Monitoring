@@ -129,7 +129,12 @@ class ScrapeManager:
         try:
             vols = data.get('volumes', [])
             disk_json = json.dumps(vols)
-            vol_summary = json.dumps([{'volume': v['volume'], 'used_percent': v['used_percent']} for v in vols])
+            vol_summary = json.dumps([{
+                'volume': v['volume'],
+                'size': v.get('size_bytes', 0),
+                'free': v.get('free_bytes', 0),
+                'used_percent': v['used_percent']
+            } for v in vols])
             
             cpu_val = data.get('cpu', 0)
             if cpu_val > 90 and (last_cpu is None or last_cpu <= 90):
@@ -419,6 +424,29 @@ class ScrapeManager:
             result['net_tx'] = net_tx
 
 
+def _extract_host_port(url: str, default_port: int = 443) -> tuple[str, int]:
+    """Extracts host and port from a URL or raw address string for ping/ssl checks."""
+    host = url.strip()
+    port = default_port
+    
+    if host.startswith(("http://", "https://")):
+        from urllib.parse import urlparse
+        try:
+            parsed = urlparse(host)
+            host = parsed.hostname or host
+            if parsed.port is not None:
+                port = parsed.port
+        except Exception:
+            pass
+    else:
+        if ":" in host:
+            parts = host.rsplit(":", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                host = parts[0].strip("[] ")
+                port = int(parts[1])
+    return host, port
+
+
 class ServiceChecker:
     def __init__(self):
         self.default_interval = 60
@@ -478,9 +506,10 @@ class ServiceChecker:
             if check_type == 'ping':
                 import sys
                 import asyncio
+                clean_host, _ = _extract_host_port(url)
                 args = ["-n", "1", "-w", str((timeout if timeout else 10) * 1000)] if sys.platform == "win32" else ["-c", "1", "-W", str(timeout if timeout else 2)]
                 proc = await asyncio.create_subprocess_exec(
-                    "ping", *args, url,
+                    "ping", *args, clean_host,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )
@@ -491,11 +520,7 @@ class ServiceChecker:
                 import ssl
                 import asyncio
                 ctx = ssl.create_default_context()
-                host = url
-                port = 443
-                if ":" in url:
-                    host, port_str = url.split(":", 1)
-                    port = int(port_str)
+                host, port = _extract_host_port(url, default_port=443)
                 try:
                     fut = asyncio.open_connection(host, port, ssl=ctx, server_hostname=host)
                     reader, writer = await asyncio.wait_for(fut, timeout=(timeout if timeout else 10))

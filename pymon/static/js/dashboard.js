@@ -1207,20 +1207,22 @@ function expandChart(type) {
         // Multi-line disk chart
         const volumes = new Set();
         lastFetchedHistory.forEach(h => {
-            if (h.disk_info) {
-                Object.keys(h.disk_info).forEach(v => {
-                    const vLower = v.toLowerCase();
-                    if (vLower.includes('harddiskvolume') || 
-                        vLower.includes('/snap/') || 
-                        vLower.includes('docker') || 
-                        vLower.includes('kubelet') || 
-                        vLower.includes('tmpfs') || 
-                        vLower.includes('overlay') || 
-                        vLower.includes('shm') || 
-                        vLower.includes('/run/user/')) {
-                        return;
+            if (Array.isArray(h.disk_info)) {
+                h.disk_info.forEach(v => {
+                    if (v && v.volume) {
+                        const vLower = v.volume.toLowerCase();
+                        if (vLower.includes('harddiskvolume') || 
+                            vLower.includes('/snap/') || 
+                            vLower.includes('docker') || 
+                            vLower.includes('kubelet') || 
+                            vLower.includes('tmpfs') || 
+                            vLower.includes('overlay') || 
+                            vLower.includes('shm') || 
+                            vLower.includes('/run/user/')) {
+                            return;
+                        }
+                        volumes.add(v.volume);
                     }
-                    volumes.add(v);
                 });
             }
         });
@@ -1229,7 +1231,13 @@ function expandChart(type) {
         let colorIdx = 0;
 
         Array.from(volumes).sort().forEach(vol => {
-            const data = lastFetchedHistory.map(h => (h.disk_info && h.disk_info[vol] !== undefined) ? h.disk_info[vol] : null);
+            const data = lastFetchedHistory.map(h => {
+                if (Array.isArray(h.disk_info)) {
+                    const found = h.disk_info.find(v => v && v.volume === vol);
+                    return found ? (found.used_percent !== undefined ? found.used_percent : (found.percent !== undefined ? found.percent : 0)) : null;
+                }
+                return null;
+            });
             datasets.push({
                 label: vol,
                 data: data,

@@ -114,10 +114,14 @@ async def get_metrics_trend(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/history/{server_id}")
-async def get_server_history_alias(server_id: int, range: str = "1h"):
+async def get_server_history_alias(
+    server_id: int,
+    range: str = "1h",
+    current_user: User = Depends(get_current_user),
+):
     # Alias for servers router to maintain backward compatibility if needed
     from pymon.api.routers.servers import get_server_history
-    return await get_server_history(server_id, range)
+    return await get_server_history(server_id, range, current_user)
 
 @router.delete("/history")
 async def clear_metric_history(current_user: User = Depends(get_current_user)):

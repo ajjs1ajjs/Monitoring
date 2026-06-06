@@ -210,3 +210,21 @@ class TestDataValidation:
         assert response.status_code == 200
         data = response.json()
         assert 0 <= data["uptime_percent"] <= 100
+
+    def test_metrics_history_alias_requires_auth(self, client):
+        """Test that the metrics history alias endpoint requires authentication"""
+        response = client.get("/api/v1/metrics/history/1")
+        assert response.status_code == 401
+
+    def test_get_metrics_history_cpu_only_filter(self, auth_client):
+        """Test that metrics history with metric=cpu returns only cpu information"""
+        response = auth_client.get("/api/v1/servers/history?range=1h&metric=cpu")
+        assert response.status_code == 200
+        data = response.json()
+        assert "servers" in data
+        for server in data["servers"]:
+            if server["history"]:
+                for h in server["history"]:
+                    assert "cpu" in h
+                    assert "mem" not in h
+                    assert "disk" not in h

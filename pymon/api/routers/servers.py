@@ -71,6 +71,7 @@ async def create_server(data: ServerCreate, current_user: User = Depends(get_cur
 @router.get("/history")
 async def get_aggregated_history(
     range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
+    metric: str | None = Query(None, pattern="^(cpu|memory|disk|net)$"),
     current_user: User = Depends(get_current_user),
 ):
     """Aggregated metrics history for all servers."""
@@ -106,10 +107,18 @@ async def get_aggregated_history(
                             dinfo = json.loads(r[6])
                     except Exception:
                         pass
-                    history.append({
-                        "timestamp": r[0], "cpu": r[1], "mem": r[2],
-                        "disk": r[3], "net_rx": r[4], "net_tx": r[5], "disk_info": dinfo,
-                    })
+                    item = {"timestamp": r[0]}
+                    if not metric or metric == "cpu":
+                        item["cpu"] = r[1]
+                    if not metric or metric == "memory":
+                        item["mem"] = r[2]
+                    if not metric or metric == "disk":
+                        item["disk"] = r[3]
+                        item["disk_info"] = dinfo
+                    if not metric or metric == "net":
+                        item["net_rx"] = r[4]
+                        item["net_tx"] = r[5]
+                    history.append(item)
                 servers_data.append({"id": srv["id"], "name": srv["name"], "host": srv["host"], "history": history})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
