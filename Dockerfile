@@ -9,9 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
-RUN pip install --no-cache-dir fastapi uvicorn pydantic pydantic-settings \
-    sqlalchemy aiosqlite httpx prometheus-client jinja2 python-multipart \
-    websockets apscheduler bcrypt pyjwt python-dotenv pyyaml
+RUN pip install --no-cache-dir -e .
 
 FROM python:3.12-slim
 
