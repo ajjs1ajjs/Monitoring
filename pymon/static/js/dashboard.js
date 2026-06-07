@@ -1015,9 +1015,24 @@ async function changeUserPassword() {
 
 function copyDeployCmd() {
     const el = document.getElementById('deployCmd');
-    el.select();
-    document.execCommand('copy');
-    alert('Command copied to clipboard');
+    if (el) {
+        // Modern Clipboard API approach
+        el.select();
+        try {
+            navigator.clipboard.writeText(el.value).then(() => {
+                alert('Command copied to clipboard');
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                // Fallback for older browsers
+                document.execCommand('copy');
+                alert('Command copied to clipboard');
+            });
+        } catch (err) {
+            // Fallback for very old browsers
+            document.execCommand('copy');
+            alert('Command copied to clipboard');
+        }
+    }
 }
 
 // --- OVERVIEW CHARTS LOGIC ---
