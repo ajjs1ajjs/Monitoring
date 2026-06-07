@@ -9,15 +9,18 @@ class ValidationError(Exception):
     pass
 
 
-def validate_server_host(host: str) -> bool:
-    """Validate server hostname/IP"""
+def validate_server_host(host: str) -> str:
+    """Validate and sanitize server hostname/IP. Strips protocol prefixes and URL paths."""
+    host = host.strip()
+    for prefix in ('http://', 'https://'):
+        if host.startswith(prefix):
+            host = host[len(prefix):]
+    host = host.split('/')[0].split('?')[0]
     if not host or len(host) < 3:
         raise ValidationError("Host must be at least 3 characters")
-
     if len(host) > 255:
         raise ValidationError("Host must be less than 255 characters")
-
-    return True
+    return host
 
 
 def validate_port(port: int) -> bool:

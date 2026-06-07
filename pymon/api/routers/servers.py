@@ -21,7 +21,7 @@ class ServerCreate(BaseModel):
     name: str
     host: str
     os_type: str
-    agent_port: int = 9100
+    agent_port: int | None = None
     enabled: bool = True
     server_group: str | None = None
     scrape_interval: int = 0
@@ -48,8 +48,9 @@ async def list_servers(current_user: User = Depends(get_current_user)):
 @router.post("")
 async def create_server(data: ServerCreate, current_user: User = Depends(get_current_user)):
     validate_server_name(data.name)
-    validate_server_host(data.host)
-    validate_port(data.agent_port)
+    host = validate_server_host(data.host)
+    port = data.agent_port or (9182 if data.os_type == 'windows' else 9100)
+    validate_port(port)
     conn = get_db()
     try:
         cursor = conn.cursor()
@@ -59,7 +60,7 @@ async def create_server(data: ServerCreate, current_user: User = Depends(get_cur
             INSERT INTO servers (name, host, agent_port, os_type, enabled, server_group, scrape_interval, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (data.name, data.host, data.agent_port, data.os_type, int(data.enabled), data.server_group, data.scrape_interval, now)
+            (data.name, host, port, data.os_type, int(data.enabled), data.server_group, data.scrape_interval, now)
         )
         conn.commit()
         server_id = cursor.lastrowid
@@ -353,7 +354,7 @@ async def get_server(server_id: int, current_user: User = Depends(get_current_us
 @router.put("/{server_id}")
 async def update_server(server_id: int, data: ServerUpdate, current_user: User = Depends(get_current_user)):
     if data.host is not None:
-        validate_server_host(data.host)
+        data.host = validate_server_host(data.host)
     if data.agent_port is not None:
         validate_port(data.agent_port)
     if data.name is not None:

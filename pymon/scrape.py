@@ -100,15 +100,20 @@ class ScrapeManager:
                 logger.info(f"[ScrapeManager] Collected {ok}/{len(servers)} servers")
 
     async def _scrape_one(self, client, server_id, name, host, port, last_status, last_cpu):
-        url = f"http://{host}:{port}/metrics"
+        clean_host = host.strip()
+        for prefix in ('http://', 'https://'):
+            if clean_host.startswith(prefix):
+                clean_host = clean_host[len(prefix):]
+        clean_host = clean_host.split('/')[0].split('?')[0]
+        url = f"http://{clean_host}:{port}/metrics"
         is_up = False
         try:
             resp = await client.get(url)
             if resp.status_code == 200:
                 is_up = True
                 text = resp.text
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Scrape HTTP error for {name} ({url}): {type(e).__name__}: {e}")
 
         now = datetime.now().isoformat()
         conn = await get_async_db()
@@ -168,7 +173,12 @@ class ScrapeManager:
             await manager.broadcast({"type": "metrics_updated", "server_id": server_id})
             return True
         except Exception as e:
-            logger.error(f"Scrape insert error for {name}: {e}")
+            logger.error(f"Scrape processing error for {name} ({url}): {type(e).__name__}: {e}")
+            try:
+                await conn.execute("UPDATE servers SET last_status='down', last_check=? WHERE id=?", (now, server_id))
+                await conn.commit()
+            except Exception:
+                pass
             await conn.close()
             return False
 
