@@ -14,7 +14,8 @@ async def generate_server_report(server_id: int, current_user: User = Depends(ge
     conn = get_db()
     try:
         server = conn.execute("SELECT name, host FROM servers WHERE id = ?", (server_id,)).fetchone()
-        if not server: raise HTTPException(status_code=404, detail="Server not found")
+        if not server:
+            raise HTTPException(status_code=404, detail="Server not found")
 
         history = conn.execute("""
             SELECT timestamp, cpu_percent, memory_percent

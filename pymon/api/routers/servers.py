@@ -132,7 +132,6 @@ async def get_server_history_detail(
     current_user: User = Depends(get_current_user),
 ):
     """Alias for /{server_id}/history to match test expectations."""
-    from pymon.api.routers.servers import get_server_history
     return await get_server_history(server_id, range)
 
 
@@ -452,8 +451,10 @@ async def get_server_history(
             for r in rows:
                 dinfo = None
                 try:
-                    if r[6]: dinfo = json.loads(r[6])
-                except: pass
+                    if r[6]:
+                        dinfo = json.loads(r[6])
+                except Exception:
+                    pass
                 history.append({
                     "timestamp": r[0],
                     "cpu": r[1],

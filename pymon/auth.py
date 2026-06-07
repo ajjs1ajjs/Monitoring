@@ -13,6 +13,8 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
+from pymon.api.deps import get_db
+
 JWT_SECRET = os.getenv("JWT_SECRET", secrets.token_urlsafe(32))
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24
@@ -74,8 +76,6 @@ def _load_auth_config() -> AuthConfig:
 
 
 auth_config = _load_auth_config()
-
-from pymon.api.deps import get_db
 
 
 def _log_audit(user_id: int, action: str, details: str = "", ip_address: str = ""):
@@ -263,7 +263,6 @@ def authenticate_user(username: str, password: str) -> Token:
         conn.close()
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    row["id"]
     conn.close()
 
     user = User(

@@ -68,9 +68,7 @@ class MemoryStorage(StorageBackend):
                 if not key.startswith(key_prefix):
                     continue
 
-                if labels:
-                    continue
-
+                # TODO: implement label filtering
                 for point in points:
                     if start <= point.timestamp <= end:
                         result.append(point)

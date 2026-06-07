@@ -37,9 +37,12 @@ async def get_all_services_history(range: str = "1h", current_user: User = Depen
     conn = get_db()
     try:
         h: float = 1.0
-        if range.endswith('h'): h = float(range[:-1])
-        elif range.endswith('d'): h = float(range[:-1]) * 24
-        elif range.endswith('m'): h = float(range[:-1]) / 60
+        if range.endswith('h'):
+            h = float(range[:-1])
+        elif range.endswith('d'):
+            h = float(range[:-1]) * 24
+        elif range.endswith('m'):
+            h = float(range[:-1]) / 60
         rows = conn.execute("SELECT * FROM services_history WHERE timestamp > datetime('now', ?) ORDER BY timestamp ASC", (f'-{h} hours',)).fetchall()
         return [dict(r) for r in rows]
     finally:

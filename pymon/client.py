@@ -51,7 +51,7 @@ class PyMonClient:
     async def query(
         self, query: str, start: str | None = None, end: str | None = None, step: int = 60, hours: int | None = None
     ) -> list[dict]:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         params = {"query": query, "step": step}
         if start:
@@ -59,7 +59,7 @@ class PyMonClient:
         if end:
             params["end"] = end
         if hours and not start:
-            end_dt = datetime.now(timezone.utc)  # type: ignore
+            end_dt = datetime.now(timezone.utc)
             start_dt = end_dt - timedelta(hours=hours)
             params["start"] = start_dt.isoformat()
             params["end"] = end_dt.isoformat()

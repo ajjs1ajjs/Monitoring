@@ -52,7 +52,7 @@ async def test_notification_settings(current_user: User = Depends(get_current_us
         if not row:
             raise HTTPException(status_code=400, detail="No notification config found")
         data = json.loads(row[0])
-        
+
         channels = {}
         if data.get("telegram_bot_token") and data.get("telegram_chat_id"):
             channels["telegram"] = {"bot_token": data["telegram_bot_token"], "chat_id": data["telegram_chat_id"]}
@@ -78,7 +78,7 @@ async def test_notification_settings(current_user: User = Depends(get_current_us
 
         if not successes:
             raise HTTPException(status_code=400, detail=f"All channels failed: {failures}")
-            
+
         return {"status": "ok", "success": successes, "failed": failures}
     finally:
         conn.close()
@@ -114,16 +114,19 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
         for sc in scrape_configs:
             job_name = sc.get("job_name", "imported_job")
             static_configs = sc.get("static_configs", [])
-            if not isinstance(static_configs, list): continue
+            if not isinstance(static_configs, list):
+                continue
 
             for static_cfg in static_configs:
                 targets = static_cfg.get("targets", [])
-                if not isinstance(targets, list): continue
+                if not isinstance(targets, list):
+                    continue
 
                 for target in targets:
                     try:
                         t_str = str(target).strip()
-                        if not t_str: continue
+                        if not t_str:
+                            continue
 
                         # Check if it's a URL (for Services)
                         if t_str.startswith(('http://', 'https://')):
@@ -151,7 +154,8 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
                         else:
                             host = t_str.strip('[] ')
 
-                        if not host: continue
+                        if not host:
+                            continue
 
                         # Auto-detect OS based on port
                         os_type = 'linux'

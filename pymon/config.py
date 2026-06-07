@@ -160,7 +160,7 @@ class PyMonConfig(BaseModel):
             config.backup = BackupConfig(
                 enabled=b.get("enabled", True),
                 max_backups=b.get("max_backups", 10),
-                backup_dir=b.get("backup_dir", "/etc/pymon/backups"),
+                backup_dir=b.get("backup_dir", "./backups"),
                 schedule=b.get("schedule", "0 2 * * *"),
             )
 

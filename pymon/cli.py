@@ -32,7 +32,7 @@ async def lifespan(app):
         config = load_config(config_path)
 
         scrape_manager = ScrapeManager(config)
-        service_checker = ServiceChecker()
+        service_checker = ServiceChecker(scraper=scrape_manager)
         app.state.scrape_manager = scrape_manager
         app.state.service_checker = service_checker
 
@@ -77,6 +77,9 @@ def create_app():
         logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     app = FastAPI(title="PyMon", version=__version__, lifespan=lifespan)
+
+    from pymon.middleware import setup_middleware
+    setup_middleware(app)
 
     templates_dir = os.path.join(os.path.dirname(__file__), "templates")
     templates = Jinja2Templates(directory=templates_dir)

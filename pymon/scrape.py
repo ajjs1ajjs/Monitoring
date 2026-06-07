@@ -22,6 +22,7 @@ class ScrapeManager:
                 self.retention_hours = config.storage.retention_hours
         self.running = False
         self._last_cleanup = 0
+        self._vacuumed_today = False
 
     async def start(self):
         self.running = True
@@ -135,13 +136,13 @@ class ScrapeManager:
                 'free': v.get('free_bytes', 0),
                 'used_percent': v['used_percent']
             } for v in vols])
-            
+
             cpu_val = data.get('cpu', 0)
             if cpu_val > 90 and (last_cpu is None or last_cpu <= 90):
                 await self._trigger_alert(f"⚠️ High CPU: {name}", f"Server {name} CPU usage is high: {cpu_val}%.")
             elif cpu_val <= 90 and (last_cpu is not None and last_cpu > 90):
                 await self._trigger_alert(f"✅ CPU Normal: {name}", f"Server {name} CPU usage returned to normal: {cpu_val}%.")
-            
+
             if last_status == 'down':
                 await self._trigger_alert(f"✅ Server Restored: {name}", f"Server {name} ({host}) is back online.")
 
@@ -177,11 +178,13 @@ class ScrapeManager:
             row = await conn.execute("SELECT config FROM notifications WHERE channel = 'all'")
             row = await row.fetchone()
             await conn.close()
-            if not row: return
-            
+            if not row:
+                return
+
             data = json.loads(row[0])
-            if not data.get("enabled"): return
-            
+            if not data.get("enabled"):
+                return
+
             channels = {}
             if data.get("telegram_bot_token") and data.get("telegram_chat_id"):
                 channels["telegram"] = {"bot_token": data["telegram_bot_token"], "chat_id": data["telegram_chat_id"]}
@@ -428,7 +431,7 @@ def _extract_host_port(url: str, default_port: int = 443) -> tuple[str, int]:
     """Extracts host and port from a URL or raw address string for ping/ssl checks."""
     host = url.strip()
     port = default_port
-    
+
     if host.startswith(("http://", "https://")):
         from urllib.parse import urlparse
         try:
@@ -448,9 +451,10 @@ def _extract_host_port(url: str, default_port: int = 443) -> tuple[str, int]:
 
 
 class ServiceChecker:
-    def __init__(self):
+    def __init__(self, scraper: 'ScrapeManager | None' = None):
         self.default_interval = 60
         self.running = False
+        self.scraper = scraper
 
     async def start(self):
         self.running = True
@@ -504,8 +508,8 @@ class ServiceChecker:
 
         try:
             if check_type == 'ping':
-                import sys
                 import asyncio
+                import sys
                 clean_host, _ = _extract_host_port(url)
                 args = ["-n", "1", "-w", str((timeout if timeout else 10) * 1000)] if sys.platform == "win32" else ["-c", "1", "-W", str(timeout if timeout else 2)]
                 proc = await asyncio.create_subprocess_exec(
@@ -517,8 +521,8 @@ class ServiceChecker:
                 latency = int((datetime.now() - start).total_seconds() * 1000)
                 status = 'up' if proc.returncode == 0 else 'down'
             elif check_type == 'ssl':
-                import ssl
                 import asyncio
+                import ssl
                 ctx = ssl.create_default_context()
                 host, port = _extract_host_port(url, default_port=443)
                 try:
@@ -546,12 +550,13 @@ class ServiceChecker:
             latency = 0
             status = 'down'
 
-        if status == 'down' and last_status in ('up', 'degraded'):
-            await scraper._trigger_alert(f"🔥 Service Down: {name}", f"Service {name} ({url}) is down. Type: {check_type}")
-        elif status == 'degraded' and last_status == 'up' and check_type == 'ssl':
-            await scraper._trigger_alert(f"⚠️ SSL Expiring: {name}", f"SSL certificate for {name} ({url}) expires in less than 14 days.")
-        elif status == 'up' and last_status in ('down', 'degraded'):
-            await scraper._trigger_alert(f"✅ Service Restored: {name}", f"Service {name} ({url}) is back online.")
+        if self.scraper:
+            if status == 'down' and last_status in ('up', 'degraded'):
+                await self.scraper._trigger_alert(f"🔥 Service Down: {name}", f"Service {name} ({url}) is down. Type: {check_type}")
+            elif status == 'degraded' and last_status == 'up' and check_type == 'ssl':
+                await self.scraper._trigger_alert(f"⚠️ SSL Expiring: {name}", f"SSL certificate for {name} ({url}) expires in less than 14 days.")
+            elif status == 'up' and last_status in ('down', 'degraded'):
+                await self.scraper._trigger_alert(f"✅ Service Restored: {name}", f"Service {name} ({url}) is back online.")
 
         now = datetime.now().isoformat()
         for attempt in range(3):
@@ -574,35 +579,6 @@ class ServiceChecker:
                     return False
                 await asyncio.sleep(0.2)
         return False
-
-
-scraper = ScrapeManager()
-service_checker = ServiceChecker()
-
-
-def get_scraper():
-    return scraper
-
-
-async def start_scraper():
-    await scraper.start()
-    await service_checker.start()
-    asyncio.create_task(_backup_scheduler())
-
-
-async def _backup_scheduler():
-    await asyncio.sleep(60)
-    while True:
-        try:
-            import os
-
-            from pymon.config import load_config
-            config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
-            if hasattr(config, 'backup') and config.backup and config.backup.enabled:
-                await _run_backup_if_due(config)
-        except Exception:
-            pass
-        await asyncio.sleep(3600)
 
 
 _last_backup_run = 0
