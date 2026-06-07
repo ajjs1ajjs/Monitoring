@@ -27,7 +27,7 @@ COPY README.md CHANGELOG.md ./
 
 RUN groupadd -r pymon && useradd -r -g pymon pymon \
     && mkdir -p /data /config /logs \
-    && chown -R pymon:pymon /app /data /config /logs
+    && chown -R pymon:pymon /app /data /config /logs /root/.local
 
 ENV PATH=/root/.local/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
