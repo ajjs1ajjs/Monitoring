@@ -26,10 +26,18 @@ async def lifespan(app):
 
     try:
         from pymon.config import load_config
-        from pymon.scrape import ScrapeManager, ServiceChecker
 
         config_path = os.getenv("CONFIG_PATH", "config.yml")
         config = load_config(config_path)
+
+        os.environ.setdefault("DB_PATH", config.storage.path)
+        os.environ.setdefault("CONFIG_PATH", config_path)
+
+        from pymon.database import init_database
+
+        init_database()
+
+        from pymon.scrape import ScrapeManager, ServiceChecker
 
         scrape_manager = ScrapeManager(config)
         service_checker = ServiceChecker(scraper=scrape_manager)
