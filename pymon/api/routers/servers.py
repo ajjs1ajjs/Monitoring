@@ -1,11 +1,8 @@
 import csv
 import io
 import json
-import os
-import sqlite3
 from datetime import datetime
 
-import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
@@ -82,45 +79,42 @@ async def get_aggregated_history(
         "3d": "-3 days", "7d": "-7 days", "15d": "-15 days", "30d": "-30 days",
     }
     time_filter = time_ranges.get(range, "-1 hour")
-    db_path = os.getenv("DB_PATH", "pymon.db")
     servers_data = []
     try:
-        async with aiosqlite.connect(db_path) as db:
-            db.row_factory = sqlite3.Row
-            cursor = await db.execute("SELECT id, name, host FROM servers ORDER BY name")
-            servers = await cursor.fetchall()
-            for srv in servers:
-                c2 = await db.execute(
-                    """
-                    SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info
-                    FROM metrics_history
-                    WHERE server_id = ? AND timestamp > datetime('now', ?)
-                    ORDER BY timestamp
-                    """,
-                    (srv["id"], time_filter),
-                )
-                rows = await c2.fetchall()
-                history = []
-                for r in rows:
-                    dinfo = None
-                    try:
-                        if r[6]:
-                            dinfo = json.loads(r[6])
-                    except Exception:
-                        pass
-                    item = {"timestamp": r[0]}
-                    if not metric or metric == "cpu":
-                        item["cpu"] = r[1]
-                    if not metric or metric == "memory":
-                        item["mem"] = r[2]
-                    if not metric or metric == "disk":
-                        item["disk"] = r[3]
-                        item["disk_info"] = dinfo
-                    if not metric or metric == "net":
-                        item["net_rx"] = r[4]
-                        item["net_tx"] = r[5]
-                    history.append(item)
-                servers_data.append({"id": srv["id"], "name": srv["name"], "host": srv["host"], "history": history})
+        conn = get_db()
+        servers = conn.execute("SELECT id, name, host FROM servers ORDER BY name").fetchall()
+        for srv in servers:
+            rows = conn.execute(
+                """
+                SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info
+                FROM metrics_history
+                WHERE server_id = ? AND timestamp > datetime('now', ?)
+                ORDER BY timestamp
+                """,
+                (srv["id"], time_filter),
+            ).fetchall()
+            history = []
+            for r in rows:
+                dinfo = None
+                try:
+                    if r[6]:
+                        dinfo = json.loads(r[6])
+                except Exception:
+                    pass
+                item = {"timestamp": r[0]}
+                if not metric or metric == "cpu":
+                    item["cpu"] = r[1]
+                if not metric or metric == "memory":
+                    item["mem"] = r[2]
+                if not metric or metric == "disk":
+                    item["disk"] = r[3]
+                    item["disk_info"] = dinfo
+                if not metric or metric == "net":
+                    item["net_rx"] = r[4]
+                    item["net_tx"] = r[5]
+                history.append(item)
+            servers_data.append({"id": srv["id"], "name": srv["name"], "host": srv["host"], "history": history})
+        conn.close()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"range": range, "servers": servers_data}
@@ -433,38 +427,36 @@ async def get_server_history(
         "3d": "-3 days", "7d": "-7 days", "15d": "-15 days", "30d": "-30 days"
     }
     time_filter = time_ranges.get(range, "-1 hour")
-    db_path = os.getenv("DB_PATH", "pymon.db")
     history = []
     try:
-        async with aiosqlite.connect(db_path) as db:
-            db.row_factory = sqlite3.Row
-            cursor = await db.execute(
-                """
-                SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info
-                FROM metrics_history
-                WHERE server_id = ?
-                AND timestamp > datetime('now', ?)
-                ORDER BY timestamp
-                """,
-                (server_id, time_filter),
-            )
-            rows = await cursor.fetchall()
-            for r in rows:
-                dinfo = None
-                try:
-                    if r[6]:
-                        dinfo = json.loads(r[6])
-                except Exception:
-                    pass
-                history.append({
-                    "timestamp": r[0],
-                    "cpu": r[1],
-                    "mem": r[2],
-                    "disk": r[3],
-                    "net_rx": r[4],
-                    "net_tx": r[5],
-                    "disk_info": dinfo
-                })
+        conn = get_db()
+        rows = conn.execute(
+            """
+            SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info
+            FROM metrics_history
+            WHERE server_id = ?
+            AND timestamp > datetime('now', ?)
+            ORDER BY timestamp
+            """,
+            (server_id, time_filter),
+        ).fetchall()
+        conn.close()
+        for r in rows:
+            dinfo = None
+            try:
+                if r[6]:
+                    dinfo = json.loads(r[6])
+            except Exception:
+                pass
+            history.append({
+                "timestamp": r[0],
+                "cpu": r[1],
+                "mem": r[2],
+                "disk": r[3],
+                "net_rx": r[4],
+                "net_tx": r[5],
+                "disk_info": dinfo
+            })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"history": history}

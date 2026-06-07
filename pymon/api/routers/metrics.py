@@ -1,7 +1,4 @@
-import os
-import sqlite3
 
-import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
@@ -81,35 +78,34 @@ async def get_metrics_trend(
         "3d": "-3 days", "7d": "-7 days", "15d": "-15 days", "30d": "-30 days"
     }
     time_filter = time_ranges.get(range, "-1 hour")
-    db_path = os.getenv("DB_PATH", "pymon.db")
 
     try:
-        async with aiosqlite.connect(db_path) as db:
-            db.row_factory = sqlite3.Row
-            cursor = await db.execute(
-                """
-                SELECT timestamp, AVG(cpu_percent), AVG(memory_percent), AVG(disk_percent),
-                       SUM(network_rx), SUM(network_tx)
-                FROM metrics_history
-                WHERE timestamp > datetime('now', ?)
-                GROUP BY timestamp
-                ORDER BY timestamp
-                """,
-                (time_filter,),
-            )
-            rows = await cursor.fetchall()
-            history = [
-                {
-                    "timestamp": r[0],
-                    "cpu_avg": r[1],
-                    "mem_avg": r[2],
-                    "disk_avg": r[3],
-                    "net_rx_avg": r[4],
-                    "net_tx_avg": r[5]
-                }
-                for r in rows
-            ]
-            return {"history": history}
+        conn = get_db()
+        cursor = conn.execute(
+            """
+            SELECT timestamp, AVG(cpu_percent), AVG(memory_percent), AVG(disk_percent),
+                   SUM(network_rx), SUM(network_tx)
+            FROM metrics_history
+            WHERE timestamp > datetime('now', ?)
+            GROUP BY timestamp
+            ORDER BY timestamp
+            """,
+            (time_filter,),
+        )
+        rows = cursor.fetchall()
+        conn.close()
+        history = [
+            {
+                "timestamp": r[0],
+                "cpu_avg": r[1],
+                "mem_avg": r[2],
+                "disk_avg": r[3],
+                "net_rx_avg": r[4],
+                "net_tx_avg": r[5]
+            }
+            for r in rows
+        ]
+        return {"history": history}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
