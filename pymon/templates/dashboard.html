@@ -694,7 +694,7 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
                             <label>ОС системи</label>
-                            <select id="nodeOS" class="form-input">
+                            <select id="nodeOS" class="form-input" onchange="document.getElementById('nodePort').value = this.value === 'windows' ? 9182 : 9100">
                                 <option value="linux">Linux / POSIX</option>
                                 <option value="windows">Windows / NT</option>
                             </select>
@@ -781,7 +781,7 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
                             <label>System OS</label>
-                            <select id="editNodeOS" class="form-input">
+                            <select id="editNodeOS" class="form-input" onchange="document.getElementById('editNodePort').value = this.value === 'windows' ? 9182 : 9100">
                                 <option value="linux">Linux / POSIX</option>
                                 <option value="windows">Windows / NT</option>
                             </select>
