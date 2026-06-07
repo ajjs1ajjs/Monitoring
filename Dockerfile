@@ -9,8 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
-RUN pip install --user --no-cache-dir pip --upgrade && \
-    pip install --user --no-cache-dir fastapi uvicorn pydantic pydantic-settings \
+RUN pip install --no-cache-dir fastapi uvicorn pydantic pydantic-settings \
     sqlalchemy aiosqlite httpx prometheus-client jinja2 python-multipart \
     websockets apscheduler bcrypt pyjwt python-dotenv pyyaml
 
@@ -18,7 +17,7 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY --from=builder /root/.local /root/.local
+COPY --from=builder /usr/local /usr/local
 
 COPY pymon/ ./pymon/
 COPY pyproject.toml .
@@ -27,9 +26,9 @@ COPY README.md CHANGELOG.md ./
 
 RUN groupadd -r pymon && useradd -r -g pymon pymon \
     && mkdir -p /data /config /logs \
-    && chown -R pymon:pymon /app /data /config /logs /root/.local
+    && chown -R pymon:pymon /app /data /config /logs /usr/local
 
-ENV PATH=/root/.local/bin:$PATH \
+ENV PATH=/usr/local/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
