@@ -23,7 +23,6 @@ COPY --from=builder /root/.local /root/.local
 COPY pymon/ ./pymon/
 COPY pyproject.toml .
 COPY docs/ ./docs/
-COPY examples/ ./examples/
 COPY README.md CHANGELOG.md ./
 
 RUN groupadd -r pymon && useradd -r -g pymon pymon \
