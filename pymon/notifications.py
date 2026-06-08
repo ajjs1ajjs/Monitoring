@@ -106,7 +106,7 @@ class NotificationDispatcher:
         smtp_pass = config.get("smtp_pass")
         email_to = config.get("email_to")
 
-        if not smtp_server or not smtp_user or not email_to:
+        if not smtp_server or not email_to:
             return False
 
         smtp_server_str = str(smtp_server)

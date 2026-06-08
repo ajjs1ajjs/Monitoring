@@ -542,7 +542,7 @@ class ServiceChecker:
                     writer.close()
                     await writer.wait_closed()
                     if cert and 'notAfter' in cert:
-                        expire_dt = datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z')
+                        expire_dt = datetime.strptime(str(cert['notAfter']), '%b %d %H:%M:%S %Y %Z')
                         days_left = (expire_dt - datetime.now()).days
                         status = 'degraded' if days_left < 14 else 'up'
                     else:
@@ -608,7 +608,10 @@ async def _run_backup_if_due(config):
         if len(parts) != 5:
             return
         minute, hour, day, month, weekday = parts
-        if hour != '*' and int(hour) != datetime.now().hour:
+        now = datetime.now()
+        if hour != '*' and int(hour) != now.hour:
+            return
+        if minute != '*' and int(minute) != now.minute:
             return
         _last_backup_run = now
         backup_dir = config.backup.backup_dir

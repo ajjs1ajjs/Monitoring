@@ -14,13 +14,13 @@ import json
 from functools import wraps
 from typing import Any, Callable, Dict, Optional
 
-# Використовуємо aioredis для повної асинхронності
-
 try:
-    import aioredis as redis_client  # type: ignore[import-not-found]
-
+    from redis.asyncio import Redis as AsyncRedis
+    from redis.asyncio.connection import ConnectionPool as AsyncConnectionPool
 except ImportError:
-    print("⚠️ aioredis не встановлено. Кешування буде недоступне.")
+    print("⚠️ redis (async) не встановлено. Кешування буде недоступне.")
+    AsyncRedis = None  # type: ignore
+    AsyncConnectionPool = None  # type: ignore
 
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -65,7 +65,7 @@ class CacheManager:
 
     def __init__(self, config: Optional[CacheConfig] = None):
         self.config = config or CacheConfig()
-        self._redis_pool: Optional[redis_client.Redis] = None
+        self._redis_pool: Optional[AsyncRedis] = None
         self._initialized = False
         self._stats: Dict[str, int] = {
             "hits": 0,
@@ -77,18 +77,12 @@ class CacheManager:
         """Ініціалізує підключення до Redis."""
         if self._initialized:
             return True
+        if AsyncRedis is None:
+            return False
 
         try:
-            # Створюємо пул з'єднань
-            pool = redis_client.ConnectionPool.from_url(
-                self.config.redis_url,
-                encoding="utf-8",
-                decode_responses=False,  # Будемо парсити вручну для гнучкості
-            )
-
-            self._redis_pool = redis_client.Redis(connection_pool=pool)
-
-            # Перевіряємо підключення
+            pool = AsyncConnectionPool.from_url(self.config.redis_url, decode_responses=False)
+            self._redis_pool = AsyncRedis(connection_pool=pool)
             await self._redis_pool.ping()
             print(f"✅ Підключено до Redis: {self.config.redis_url}")
             return True
@@ -139,7 +133,7 @@ class CacheManager:
             ttl = ttl or self.config.default_ttl
             result = await self._redis_pool.setex(key, ttl, json_value)  # type: ignore
 
-            if result:
+            if not result:
                 self._stats["errors"] += 1
 
         except Exception as e:

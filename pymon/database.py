@@ -6,9 +6,13 @@ from pymon.config import load_config
 
 logger = logging.getLogger(__name__)
 
+_config_cache = None
+
 def get_db_connection():
-    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
-    db_path = config.storage.path
+    global _config_cache
+    if _config_cache is None:
+        _config_cache = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+    db_path = _config_cache.storage.path
 
     conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row

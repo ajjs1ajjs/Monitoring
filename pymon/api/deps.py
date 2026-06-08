@@ -32,12 +32,19 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+_db_path_cache = None
+
+def _resolve_db_path() -> str:
+    global _db_path_cache
+    if _db_path_cache is None:
+        from pymon.config import load_config
+        cfg = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+        _db_path_cache = cfg.storage.path
+    return _db_path_cache
+
 def get_db():
     """Get database connection with WAL mode enabled for concurrency"""
-    from pymon.config import load_config
-    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
-    db_path = config.storage.path
-
+    db_path = _resolve_db_path()
     conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row
     try:
@@ -51,11 +58,7 @@ def get_db():
 async def get_async_db():
     """Get async database connection with aiosqlite"""
     import aiosqlite
-
-    from pymon.config import load_config
-    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
-    db_path = config.storage.path
-
+    db_path = _resolve_db_path()
     conn = await aiosqlite.connect(db_path, timeout=30.0)
     conn.row_factory = aiosqlite.Row
     try:

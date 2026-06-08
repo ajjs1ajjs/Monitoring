@@ -13,11 +13,12 @@ import uvicorn
 from pymon import __version__
 
 scrape_manager = None
+service_checker = None
 
 
 @asynccontextmanager
 async def lifespan(app):
-    global scrape_manager
+    global scrape_manager, service_checker
     import asyncio
 
     from pymon.api.deps import manager
@@ -60,7 +61,7 @@ async def lifespan(app):
 
     if scrape_manager:
         await scrape_manager.stop()
-    if 'service_checker' in dir() and service_checker:
+    if service_checker is not None:
         await service_checker.stop()
     print("Background tasks stopped", file=sys.stderr)
 
