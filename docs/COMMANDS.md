@@ -110,14 +110,15 @@ export PYMON_ALLOWED_ORIGINS=http://localhost:10000
 ## 🔐 Authentication
 
 ```bash
-# Змінити пароль адміна (через API)
-curl -X POST http://localhost:10000/api/v1/login \
+# Отримати токен (через API)
+curl -X POST http://localhost:10000/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "291263"}'
 
 # Зміна пароля
-curl -X PUT http://localhost:10000/api/v1/users/admin/password \
+curl -X POST http://localhost:10000/api/v1/auth/change-password \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <TOKEN>" \
   -d '{"current_password": "oldpass", "new_password": "NewSecurePass789"}'
 ```
 

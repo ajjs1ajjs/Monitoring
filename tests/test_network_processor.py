@@ -34,11 +34,11 @@ def test_process_batch_success(network_processor):
     processed = network_processor.process_batch(raw_metrics)
 
     assert len(processed) == 2
-    assert processed[0]["ingress_rate_bps"] == 50.0
-    assert processed[0]["egress_rate_bps"] == 30.0
+    assert processed[0]["ingress_rate_bps"] == 5000.0
+    assert processed[0]["egress_rate_bps"] == 3000.0
     assert processed[0]["source"] == "server-web-01"
-    assert processed[1]["ingress_rate_bps"] == 100.0
-    assert processed[1]["egress_rate_bps"] == 60.0
+    assert processed[1]["ingress_rate_bps"] == 10000.0
+    assert processed[1]["egress_rate_bps"] == 6000.0
     assert processed[1]["source"] == "server-db-02"
 
 

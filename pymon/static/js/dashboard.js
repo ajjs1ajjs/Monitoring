@@ -2,7 +2,12 @@
 if (window.lucide) lucide.createIcons();
 
 // State Management
-const token = localStorage.getItem('token');
+let token = '';
+try {
+    token = localStorage.getItem('token') || '';
+} catch (e) {
+    console.warn('localStorage недоступний:', e);
+}
 if (!token) window.location.href = '/login';
 
 let currentRange = '1h';
@@ -194,7 +199,7 @@ async function apiFetch(url, options = {}) {
         return resp;
     } catch (e) {
         console.error(`Fetch error on ${url}:`, e);
-        return null;
+        return { ok: false, status: 0, json: async () => ({ detail: e.message || 'Network error' }), statusText: 'Network Error' };
     }
 }
 

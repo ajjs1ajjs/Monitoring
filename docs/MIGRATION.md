@@ -12,7 +12,7 @@
      ```
    - **Linux**: Виконайте команду оновлення:
      ```bash
-     curl -fsSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/update.sh | sudo bash
+      git pull origin main && sudo systemctl restart pymon
      ```
 Скрипт автоматично оновить програмний код, збереже ваші дані та переведе систему на роботу у фоновому режимі (як службу).
 

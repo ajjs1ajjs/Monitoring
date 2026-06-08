@@ -785,7 +785,7 @@ const axios = require('axios');
 // Login
 const { data } = await axios.post('http://localhost:10000/api/v1/auth/login', {
   username: 'admin',
-  password: 'admin'
+  password: '291263'
 });
 const token = data.access_token;
 
@@ -813,22 +813,22 @@ For issues or questions:
 ## Additional Endpoints (Phase 2.8+)
 
 - Export All Servers
-  - Endpoint: GET /servers/export
+  - Endpoint: GET /api/v1/servers/export
   - Query params: format=json|csv, range=5m|15m|1h|6h|24h|7d
   - Description: Exports metrics for all servers aggregated into a list per server. Returns JSON or CSV attachment.
 
 - Aggregate Metrics History (All Servers)
-  - Endpoint: GET /servers/metrics/history
+  - Endpoint: GET /api/v1/servers/history
   - Query params: range=5m|15m|1h|6h|24h|7d, metric (cpu|memory|disk|network) optional
   - Description: Returns aggregated history data across all servers. If metric is provided, returns series per metric; else returns per-server histories for CPU/Memory/Disk/Network.
 
 - Server Summary (All Servers)
-  - Endpoint: GET /servers/summary
+  - Endpoint: GET /api/v1/servers/summary/all
   - Description: Returns a high-level summary across all monitored servers: total, online, offline, avg_cpu, avg_memory, avg_disk.
 
 - Micro Endpoints for Admin/Backups
-  - GET /backup/list: List available backups
-  - POST /backup/create: Create a new backup (zip)
+  - GET /api/v1/backup/list: List available backups
+  - POST /api/v1/backup/create: Create a new backup
 
 - Admin Events
-  - GET /servers/{server_id}/events: Recent audit events for a server
+  - GET /api/v1/audit-log: Recent audit events

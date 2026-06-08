@@ -45,7 +45,7 @@ class MemoryProcessor(MetricProcessor):
 
             usage_percent: Optional[float] = None
 
-            if raw_total and raw_used and raw_total > 0:
+            if raw_total is not None and raw_used is not None and raw_total > 0:
                 # Calculate percentage from absolute bytes (most reliable method)
                 usage_percent = (raw_used / raw_total) * 100.0
             elif isinstance(point.get("value"), (int, float)) and 0 <= point["value"] <= 100:

@@ -67,6 +67,15 @@ cd "$APP_DIR"
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt --quiet
 
+info "Generating persistent JWT secret..."
+if [ ! -f "$APP_DIR/.env" ]; then
+    JWT_SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+    cat > "$APP_DIR/.env" <<EOF
+JWT_SECRET=$JWT_SECRET
+EOF
+    chmod 600 "$APP_DIR/.env"
+fi
+
 info "Creating systemd service..."
 cat > /etc/systemd/system/pymon.service <<EOF
 [Unit]
@@ -80,7 +89,7 @@ WorkingDirectory=$APP_DIR
 ExecStart=$APP_DIR/venv/bin/python -m pymon.cli server --config $CONFIG_PATH
 Restart=always
 RestartSec=10
-Environment=JWT_SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+EnvironmentFile=$APP_DIR/.env
 Environment=PYMON_ALLOWED_ORIGINS=http://localhost:$PORT
 
 [Install]

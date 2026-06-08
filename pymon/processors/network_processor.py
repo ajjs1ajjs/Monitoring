@@ -50,10 +50,8 @@ class NetworkProcessor(MetricProcessor):
             egress_rate: Optional[float] = None
 
             if raw_bytes_in is not None and raw_bytes_out is not None:
-                # Assuming the exporter provides calculated rates or delta values are handled upstream
-                # For demonstration, we just normalize the bytes as a representative value.
-                ingress_rate = float(raw_bytes_in) / 100.0  # Simulating rate calculation
-                egress_rate = float(raw_bytes_out) / 100.0  # Simulating rate calculation
+                ingress_rate = float(raw_bytes_in)
+                egress_rate = float(raw_bytes_out)
 
             if ingress_rate is not None and egress_rate is not None:
                 processed_results.append(
