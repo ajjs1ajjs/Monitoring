@@ -106,8 +106,18 @@ class PyMonClient:
 def push_metric(
     url: str, name: str, value: float, labels: dict[str, str] | None = None, metric_type: str = "gauge"
 ) -> None:
-    async def _push():
-        async with PyMonClient(url) as client:
-            await client.push(name, value, metric_type, labels)
+    try:
+        loop = asyncio.get_running_loop()
+        if loop.is_running():
+            loop.create_task(_push_async(url, name, value, labels, metric_type))
+            return
+    except RuntimeError:
+        pass
+    asyncio.run(_push_async(url, name, value, labels, metric_type))
 
-    asyncio.run(_push())
+
+async def _push_async(
+    url: str, name: str, value: float, labels: dict[str, str] | None = None, metric_type: str = "gauge"
+) -> None:
+    async with PyMonClient(url) as client:
+        await client.push(name, value, metric_type, labels)

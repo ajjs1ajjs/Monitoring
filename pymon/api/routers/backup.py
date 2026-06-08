@@ -9,11 +9,17 @@ from pymon.auth import User, get_current_user
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
+_config_cache = None
+
+def _get_config():
+    global _config_cache
+    if _config_cache is None:
+        from pymon.config import load_config
+        _config_cache = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+    return _config_cache
 
 def _get_backup_dir():
-    from pymon.config import load_config
-    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
-    return config.backup.backup_dir
+    return _get_config().backup.backup_dir
 
 
 @router.get("/list")
@@ -35,8 +41,7 @@ async def list_backups(current_user: User = Depends(get_current_user)):
 
 @router.post("/create")
 async def create_backup(current_user: User = Depends(get_current_user)):
-    from pymon.config import load_config
-    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+    config = _get_config()
     backup_dir = _get_backup_dir()
     os.makedirs(backup_dir, exist_ok=True)
     db_path = config.storage.path
@@ -66,8 +71,7 @@ async def create_backup(current_user: User = Depends(get_current_user)):
 
 @router.post("/restore")
 async def restore_backup(data: dict, current_user: User = Depends(get_current_user)):
-    from pymon.config import load_config
-    config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+    config = _get_config()
     backup_dir = _get_backup_dir()
     filename = data.get("filename", "")
     if not filename:

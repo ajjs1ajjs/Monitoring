@@ -24,9 +24,17 @@ async def generate_server_report(server_id: int, current_user: User = Depends(ge
             ORDER BY timestamp ASC
         """, (server_id,)).fetchall()
 
-        labels = [row[0] for row in history]
-        cpu_data = [row[1] for row in history]
-        mem_data = [row[2] for row in history]
+        labels = []
+        cpu_data = []
+        mem_data = []
+        for row in history:
+            try:
+                ts = datetime.fromisoformat(str(row[0]))
+                labels.append(ts.strftime("%H:%M"))
+            except Exception:
+                labels.append(str(row[0])[:16])
+            cpu_data.append(row[1])
+            mem_data.append(row[2])
 
         html = f"""
         <!DOCTYPE html>

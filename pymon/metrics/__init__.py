@@ -1,14 +1,11 @@
 """
-Monitoring/pymon/metrics/__init__.py
-
-This module serves as the central registry and entry point for all metric processing logic.
-It manages different concrete MetricProcessors, ensuring that raw scraped data
-is processed through standardized pipelines before storage or visualization.
+NOTE: This module is DEPRECATED. The actual metric processing pipeline
+uses pymon/metrics/collector.py (MetricsRegistry + prometheus_client format).
+METRIC_REGISTRY here is not integrated into the scrape/API flow.
 """
 
 from typing import Any, Dict, List
 
-# Assume this import works because I created the Abstract Base Class in pymon/services/metric_processor.py
 from ..services.metric_processor import MetricProcessor
 
 

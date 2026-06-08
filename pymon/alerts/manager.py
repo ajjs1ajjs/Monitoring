@@ -1,4 +1,8 @@
-"""Alerting system"""
+"""
+NOTE: This module is DEPRECATED. Actual alerting logic is implemented
+directly in pymon/scrape.py (ScrapeManager._trigger_alert).
+AlertManager here is not wired into the application.
+"""
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone

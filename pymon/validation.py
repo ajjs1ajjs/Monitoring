@@ -45,7 +45,7 @@ def validate_server_name(name: str) -> bool:
     if len(name) > 100:
         raise ValidationError("Name must be less than 100 characters")
 
-    if not re.match(r"^[a-zA-Z0-9_\-\ \.]+$", name):
+    if not re.match(r"^[a-zA-Z0-9_\-\ \.а-яА-ЯіїєґІЇЄҐ]+$", name):
         raise ValidationError("Name can only contain letters, numbers, hyphens, underscores, and dots")
 
     return True
