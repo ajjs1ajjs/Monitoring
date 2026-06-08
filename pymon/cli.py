@@ -74,6 +74,7 @@ def create_app():
     from fastapi.templating import Jinja2Templates
 
     from pymon.api.endpoints import api
+    from pymon.metrics.prometheus import router as prometheus_router
 
     # Setup basic rotating logger for prod-like environments
     log_dir = os.path.join(".", "logs")
@@ -109,6 +110,7 @@ def create_app():
     )
 
     app.include_router(api, prefix="/api/v1")
+    app.include_router(prometheus_router)
 
     static_dir = os.path.join(os.path.dirname(__file__), "static")
     if os.path.exists(static_dir):

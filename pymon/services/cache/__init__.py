@@ -18,7 +18,7 @@ try:
     from redis.asyncio import Redis as AsyncRedis
     from redis.asyncio.connection import ConnectionPool as AsyncConnectionPool
 except ImportError:
-    print("⚠️ redis (async) не встановлено. Кешування буде недоступне.")
+    print("[WARN] redis (async) не встановлено. Кешування буде недоступне.")
     AsyncRedis = None  # type: ignore
     AsyncConnectionPool = None  # type: ignore
 
@@ -84,10 +84,10 @@ class CacheManager:
             pool = AsyncConnectionPool.from_url(self.config.redis_url, decode_responses=False)
             self._redis_pool = AsyncRedis(connection_pool=pool)
             await self._redis_pool.ping()
-            print(f"✅ Підключено до Redis: {self.config.redis_url}")
+            print(f"[OK] Підключено до Redis: {self.config.redis_url}")
             return True
         except Exception as e:
-            print(f"❌ Помилка ініціалізації Redis: {e}")
+            print(f"[ERR] Помилка ініціалізації Redis: {e}")
             self._stats["errors"] += 1
             return False
 
@@ -97,7 +97,7 @@ class CacheManager:
             try:
                 await self._redis_pool.close()
             except Exception as e:
-                print(f"⚠️ Помилка закриття Redis: {e}")
+                print(f"[WARN] Помилка закриття Redis: {e}")
 
     # ==================== Базові операції ====================
 
@@ -116,7 +116,7 @@ class CacheManager:
                 return data
 
         except (json.JSONDecodeError, Exception) as e:  # type: ignore
-            print(f"⚠️ Помилка читання кешу для ключа {key}: {e}")
+            print(f"[WARN] Помилка читання кешу для ключа {key}: {e}")
 
         self._stats["misses"] += 1
         return None
@@ -137,7 +137,7 @@ class CacheManager:
                 self._stats["errors"] += 1
 
         except Exception as e:
-            print(f"⚠️ Помилка запису в Redis для ключа {key}: {e}")
+            print(f"[WARN] Помилка запису в Redis для ключа {key}: {e}")
             self._stats["errors"] += 1
 
         return True
@@ -152,7 +152,7 @@ class CacheManager:
             return bool(result)  # Redis повертає кількість видалених ключів
 
         except Exception as e:
-            print(f"⚠️ Помилка видалення ключа {key}: {e}")
+            print(f"[WARN] Помилка видалення ключа {key}: {e}")
             return False
 
     async def exists(self, key: str) -> bool:
@@ -165,7 +165,7 @@ class CacheManager:
             return bool(result)
 
         except Exception as e:
-            print(f"⚠️ Помилка перевірки існування ключа {key}: {e}")
+            print(f"[WARN] Помилка перевірки існування ключа {key}: {e}")
             return False
 
     async def increment(self, key: str, amount: int = 1, ttl: int = None) -> Optional[int]:  # type: ignore
@@ -186,7 +186,7 @@ class CacheManager:
                 return int(amount)
 
         except Exception as e:
-            print(f"⚠️ Помилка інкременту для ключа {key}: {e}")
+            print(f"[WARN] Помилка інкременту для ключа {key}: {e}")
             return None
 
     async def expire(self, key: str, ttl: int = None) -> bool:  # type: ignore
@@ -200,7 +200,7 @@ class CacheManager:
             return bool(result)  # True якщо розширення вдалося
 
         except Exception as e:
-            print(f"⚠️ Помилка розширення TTL для ключа {key}: {e}")
+            print(f"[WARN] Помилка розширення TTL для ключа {key}: {e}")
             return False
 
     async def clear(self, prefix: str = "") -> int:
@@ -224,7 +224,7 @@ class CacheManager:
             return deleted_count
 
         except Exception as e:
-            print(f"⚠️ Помилка очищення кешу: {e}")
+            print(f"[WARN] Помилка очищення кешу: {e}")
             return 0
 
     # ==================== Декоратори для кешування ====================

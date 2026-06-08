@@ -2,7 +2,6 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from pymon.api.deps import manager
 from pymon.api.routers import alerts, auth, backup, logs, metrics, reports, servers, services, settings
-from pymon.metrics.prometheus import router as prometheus_router
 
 api = APIRouter()
 
@@ -15,7 +14,6 @@ api.include_router(logs.router)
 api.include_router(services.router)
 api.include_router(reports.router)
 api.include_router(backup.router)
-api.include_router(prometheus_router)
 
 @api.websocket("/ws/metrics")
 async def websocket_endpoint(websocket: WebSocket):
