@@ -41,13 +41,16 @@ async def create_alert(data: AlertCreate, current_user: User = Depends(get_curre
     try:
         c.execute(
             """INSERT INTO alerts (name, metric, condition, threshold, duration, severity, server_id, service_id,
-               notify_telegram, notify_discord, notify_slack, notify_email, notify_teams, description, enabled, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               notify_telegram, notify_discord, notify_slack, notify_email, notify_teams, description, enabled, created_at,
+               message, alert_type)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
-                data.name, data.metric, data.condition, data.threshold, data.duration, data.severity, data.server_id, data.service_id,
+                data.name, data.metric, data.condition, data.threshold, data.duration, data.severity,
+                data.server_id, data.service_id,
                 int(data.notify_telegram), int(data.notify_discord), int(data.notify_slack),
                 int(data.notify_email), int(data.notify_teams), data.description, int(data.enabled),
-                datetime.now(timezone.utc).isoformat()
+                datetime.now(timezone.utc).isoformat(),
+                data.description, data.condition
             )
         )
         conn.commit()

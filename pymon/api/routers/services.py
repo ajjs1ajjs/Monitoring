@@ -12,7 +12,7 @@ async def list_services(current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         rows = conn.execute("SELECT * FROM services ORDER BY name").fetchall()
-        return [dict(r) for r in rows]
+        return {"services": [dict(r) for r in rows]}
     finally:
         conn.close()
 

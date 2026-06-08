@@ -47,10 +47,9 @@ class Logger:
     @staticmethod
     def get_module_name() -> str:
         """Helper to retrieve the name of the calling module for better context."""
-        # This attempts to capture the caller's file/module name.
-        # In a complex multi-threaded environment, this might need refinement.
         try:
-            return logging.currentframe().f_back.f_globals["__name__"]  # type: ignore
+            import sys
+            return sys._getframe(1).f_globals["__name__"]
         except Exception:
             return "unknown_module"
 
@@ -73,11 +72,10 @@ class Logger:
             logging.getLogger("pymon_monitoring").warning(message)
 
     def error(self, message: str, exc_info: bool = True):
-        """
-        Logs a critical ERROR message with optional stack trace.
-        If exc_info is True (default), full traceback is captured and logged.
-        """
         logging.getLogger("pymon_monitoring").error(message, exc_info=exc_info)
+
+    def exception(self, message: str):
+        logging.getLogger("pymon_monitoring").exception(message)
 
 
 # --- Usage Example ---
@@ -90,8 +88,7 @@ if __name__ == "__main__":
 
     try:
         x = 1 / 0
-    except ZeroDivisionError as e:
-        # Demonstrating how to log an error with a stack trace (exc_info=True)
-        logger.error("Caught critical division by zero error.", exc_info=e)  # type: ignore
+    except ZeroDivisionError:
+        logger.exception("Caught critical division by zero error.")
 
     logger.warning("Configuration file check passed, but some parameters are deprecated.")

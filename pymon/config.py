@@ -203,7 +203,7 @@ class PyMonConfig(BaseModel):
         if "notifications" in data:
             n = data["notifications"]
             config.notifications = NotificationConfig(
-                enabled=n.get("email", {}).get("enabled", False),
+                enabled=n.get("enabled", False),
                 smtp_server=n.get("email", {}).get("smtp_server", ""),
                 smtp_port=n.get("email", {}).get("smtp_port", 587),
                 smtp_user=n.get("email", {}).get("smtp_user", ""),

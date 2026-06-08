@@ -99,11 +99,49 @@ def init_database():
                   server_id INTEGER,
                   service_id INTEGER,
                   alert_type TEXT,
-                  severity TEXT,
+                  severity TEXT DEFAULT 'warning',
                   message TEXT,
                   timestamp TEXT,
                   resolved INTEGER DEFAULT 0,
-                  resolved_at TEXT)''')
+                  resolved_at TEXT,
+                  name TEXT DEFAULT '',
+                  metric TEXT DEFAULT '',
+                  condition TEXT DEFAULT '',
+                  threshold REAL DEFAULT 0,
+                  duration INTEGER DEFAULT 0,
+                  notify_telegram INTEGER DEFAULT 0,
+                  notify_discord INTEGER DEFAULT 0,
+                  notify_slack INTEGER DEFAULT 0,
+                  notify_email INTEGER DEFAULT 0,
+                  notify_teams INTEGER DEFAULT 0,
+                  description TEXT DEFAULT '',
+                  enabled INTEGER DEFAULT 1,
+                  created_at TEXT)''')
+    for col in ['name', 'metric', 'condition', 'description', 'created_at']:
+        try:
+            c.execute(f"ALTER TABLE alerts ADD COLUMN {col} TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+    for col in ['threshold']:
+        try:
+            c.execute(f"ALTER TABLE alerts ADD COLUMN {col} REAL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+    for col in ['duration']:
+        try:
+            c.execute(f"ALTER TABLE alerts ADD COLUMN {col} INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+    for col in ['enabled']:
+        try:
+            c.execute(f"ALTER TABLE alerts ADD COLUMN {col} INTEGER DEFAULT 1")
+        except sqlite3.OperationalError:
+            pass
+    for col in ['notify_telegram', 'notify_discord', 'notify_slack', 'notify_email', 'notify_teams']:
+        try:
+            c.execute(f"ALTER TABLE alerts ADD COLUMN {col} INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
 
     # Services history
     c.execute('''CREATE TABLE IF NOT EXISTS services_history

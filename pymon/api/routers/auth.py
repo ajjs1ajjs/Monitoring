@@ -50,10 +50,13 @@ async def list_users(current_user: User = Depends(get_admin_user)):
 @router.post("/users")
 async def create_user(data: dict, current_user: User = Depends(get_admin_user)):
     from pymon.auth import create_user as _create_user
+    password = str(data.get("password", ""))
+    if not password or len(password) < 12:
+        raise HTTPException(status_code=400, detail="Password must be at least 12 characters with uppercase, lowercase, and digit")
     try:
         user = _create_user(
             username=str(data.get("username", "")),
-            password=str(data.get("password", "291263")),
+            password=password,
             is_admin=bool(data.get("is_admin", False)),
         )
         return {"status": "ok", "user_id": user.id}
