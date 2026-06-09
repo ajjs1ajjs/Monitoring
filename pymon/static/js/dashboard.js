@@ -400,21 +400,37 @@ function sortNodes(key) {
 }
 
 function updateStats() {
-    const online = nodes.filter(n => n.last_status === 'up').length;
-    const offline = nodes.length - online;
+    const select = document.getElementById('overviewNodeSelect');
+    const serverId = select ? select.value : 'agg';
+
+    let online, offline, cpuStat, memStat, diskStat;
+
+    if (serverId === 'agg') {
+        online = nodes.filter(n => n.last_status === 'up').length;
+        offline = nodes.length - online;
+        const count = nodes.length || 1;
+        cpuStat = nodes.reduce((a, b) => a + (b.cpu_percent || 0), 0) / count;
+        memStat = nodes.reduce((a, b) => a + (b.memory_percent || 0), 0) / count;
+        diskStat = nodes.reduce((a, b) => a + (b.disk_percent || 0), 0) / count;
+    } else {
+        const node = nodes.find(n => n.id == serverId);
+        if (node) {
+            online = node.last_status === 'up' ? 1 : 0;
+            offline = node.last_status === 'down' ? 1 : 0;
+            cpuStat = node.cpu_percent || 0;
+            memStat = node.memory_percent || 0;
+            diskStat = node.disk_percent || 0;
+        }
+    }
+
     const elOnline = document.getElementById('stat-online');
     const elOffline = document.getElementById('stat-offline');
-    if (elOnline) elOnline.textContent = online;
-    if (elOffline) elOffline.textContent = offline;
+    if (elOnline) elOnline.textContent = online ?? '';
+    if (elOffline) elOffline.textContent = offline ?? '';
 
-    const count = nodes.length || 1;
-    const avgCpu = nodes.reduce((a, b) => a + (b.cpu_percent || 0), 0) / count;
-    const avgMem = nodes.reduce((a, b) => a + (b.memory_percent || 0), 0) / count;
-    const avgDisk = nodes.reduce((a, b) => a + (b.disk_percent || 0), 0) / count;
-
-    if (document.getElementById('stat-cpu')) document.getElementById('stat-cpu').innerHTML = `${avgCpu.toFixed(1)}<span>%</span>`;
-    if (document.getElementById('stat-mem')) document.getElementById('stat-mem').innerHTML = `${avgMem.toFixed(1)}<span>%</span>`;
-    if (document.getElementById('stat-disk')) document.getElementById('stat-disk').innerHTML = `${avgDisk.toFixed(1)}<span>%</span>`;
+    if (document.getElementById('stat-cpu')) document.getElementById('stat-cpu').innerHTML = `${(cpuStat || 0).toFixed(1)}<span>%</span>`;
+    if (document.getElementById('stat-mem')) document.getElementById('stat-mem').innerHTML = `${(memStat || 0).toFixed(1)}<span>%</span>`;
+    if (document.getElementById('stat-disk')) document.getElementById('stat-disk').innerHTML = `${(diskStat || 0).toFixed(1)}<span>%</span>`;
 }
 
 function updateLiveTable(data) {
@@ -1115,6 +1131,7 @@ function initOverviewCharts() {
 }
 
 async function updateOverviewCharts() {
+    updateStats();
     const select = document.getElementById('overviewNodeSelect');
     if (!select) return;
     const serverId = select.value;

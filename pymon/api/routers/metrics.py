@@ -83,12 +83,12 @@ async def get_metrics_trend(
         conn = get_db()
         cursor = conn.execute(
             """
-            SELECT timestamp, AVG(cpu_percent), AVG(memory_percent), AVG(disk_percent),
+            SELECT MAX(timestamp), AVG(cpu_percent), AVG(memory_percent), AVG(disk_percent),
                    SUM(network_rx), SUM(network_tx)
             FROM metrics_history
             WHERE timestamp > datetime('now', ?)
-            GROUP BY timestamp
-            ORDER BY timestamp
+            GROUP BY strftime('%Y-%m-%d %H:%M', timestamp)
+            ORDER BY 1
             """,
             (time_filter,),
         )
@@ -97,11 +97,11 @@ async def get_metrics_trend(
         history = [
             {
                 "timestamp": r[0],
-                "cpu_avg": r[1],
-                "mem_avg": r[2],
-                "disk_avg": r[3],
-                "net_rx_avg": r[4],
-                "net_tx_avg": r[5]
+                "cpu_avg": round(r[1], 1) if r[1] is not None else None,
+                "mem_avg": round(r[2], 1) if r[2] is not None else None,
+                "disk_avg": round(r[3], 1) if r[3] is not None else None,
+                "net_rx_avg": round(r[4], 1) if r[4] is not None else None,
+                "net_tx_avg": round(r[5], 1) if r[5] is not None else None
             }
             for r in rows
         ]
