@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime
 
 import httpx
@@ -132,6 +133,9 @@ class ScrapeManager:
 
         data = self._parse_metrics(text, name)
 
+        m = re.search(r'_build_info\{[^}]*version="([^"]+)"', text)
+        exporter_version = m.group(1) if m else (data.get('exporter_version') or '')
+
         try:
             vols = data.get('volumes', [])
             disk_json = json.dumps(vols)
@@ -164,10 +168,10 @@ class ScrapeManager:
             await conn.execute("""
                 UPDATE servers SET last_status='up', last_check=?,
                 cpu_percent=?, memory_percent=?, disk_percent=?,
-                volumes=?
+                volumes=?, exporter_version=?
                 WHERE id=?
             """, (now, cpu_val, data.get('memory', 0),
-                  data.get('disk', 0), vol_summary, server_id))
+                  data.get('disk', 0), vol_summary, exporter_version, server_id))
             await conn.commit()
             await conn.close()
             await manager.broadcast({"type": "metrics_updated", "server_id": server_id})

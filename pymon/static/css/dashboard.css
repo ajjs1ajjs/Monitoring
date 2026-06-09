@@ -81,6 +81,16 @@ header { height: 72px; border-bottom: 1px solid var(--border); display: flex; al
 .node-info-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em; }
 .node-info-value { font-size: 1rem; font-weight: 700; color: #fff; }
 
+.stats-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+.stats-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1.25rem; padding: 1.25rem; display: flex; align-items: center; gap: 1rem; transition: transform 0.2s, border-color 0.2s; }
+.stats-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.15); }
+.stats-icon { width: 42px; height: 42px; border-radius: 0.75rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.stats-icon svg { width: 20px; height: 20px; }
+.stats-info { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.stats-value { font-size: 1.5rem; font-weight: 800; color: #fff; line-height: 1.2; letter-spacing: -0.02em; }
+.stats-value span { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-left: 0.1rem; }
+.stats-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 .overview-grid { display: grid; grid-template-columns: 1fr 350px; gap: 1.5rem; }
 .charts-main { display: flex; flex-direction: column; gap: 1.5rem; }
 .charts-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
