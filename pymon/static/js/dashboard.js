@@ -303,7 +303,8 @@ async function refreshData() {
         }
 
         if (servicesResp && servicesResp.ok) {
-            services = await servicesResp.json();
+            const data = await servicesResp.json();
+            services = data.services || [];
             updateServicesTable(services);
         }
 
