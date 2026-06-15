@@ -88,7 +88,11 @@ class AuthConfig(BaseModel):
     @field_validator('admin_password', mode='before')
     @classmethod
     def coerce_password(cls, v):
-        return str(v)
+        pwd = str(v)
+        if pwd == "291263":
+            import sys as _sys
+            print("[WARN] Using default admin password '291263'. Change it immediately in config.yml!", file=_sys.stderr)
+        return pwd
 
 
 class BackupConfig(BaseModel):
