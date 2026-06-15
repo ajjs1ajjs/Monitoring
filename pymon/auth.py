@@ -1,0 +1,428 @@
+"""JWT Authentication module for PyMon"""
+
+import os
+import secrets
+import sqlite3
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+import bcrypt
+import jwt
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
+
+from pymon.api.deps import get_db
+
+_JWT_SECRET_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".jwt_secret")
+
+
+def _load_jwt_secret() -> str:
+    env_secret = os.getenv("JWT_SECRET")
+    if env_secret:
+        return env_secret
+    if os.path.exists(_JWT_SECRET_FILE):
+        with open(_JWT_SECRET_FILE) as f:
+            return f.read().strip()
+    secret = secrets.token_urlsafe(32)
+    try:
+        with open(_JWT_SECRET_FILE, "w") as f:
+            f.write(secret)
+    except OSError:
+        pass
+    return secret
+
+
+JWT_SECRET = _load_jwt_secret()
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
+
+
+class User(BaseModel):
+    id: int
+    username: str
+    is_admin: bool = False
+    must_change_password: bool = False
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    is_admin: bool = False
+
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: User
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class APIKeyCreate(BaseModel):
+    name: str
+
+
+@dataclass
+class AuthConfig:
+    db_path: str = "pymon.db"
+    admin_username: str = "admin"
+    admin_password: str = "291263"
+
+
+def _load_auth_config() -> AuthConfig:
+    """Load auth config from YAML config file, falling back to defaults."""
+    from pymon.config import load_config
+    try:
+        config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+        if hasattr(config, 'auth') and config.auth:
+            return AuthConfig(
+                admin_username=getattr(config.auth, 'admin_username', 'admin'),
+                admin_password=getattr(config.auth, 'admin_password', '291263'),
+            )
+    except Exception:
+        pass
+    return AuthConfig()
+
+
+auth_config = _load_auth_config()
+
+
+def _log_audit(user_id: int, action: str, details: str = "", ip_address: str = ""):
+    try:
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO audit_logs (user_id, action, details, ip_address, timestamp) VALUES (?, ?, ?, ?, ?)",
+            (user_id, action, details, ip_address, datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def init_auth_tables():
+    conn = get_db()
+    c = conn.cursor()
+
+    c.execute("""CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        is_admin BOOLEAN DEFAULT 0,
+        must_change_password BOOLEAN DEFAULT 1,
+        created_at TEXT,
+        last_login TEXT
+    )""")
+
+    c.execute("""CREATE TABLE IF NOT EXISTS api_keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        key_hash TEXT NOT NULL,
+        name TEXT,
+        created_at TEXT,
+        last_used TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )""")
+
+    c.execute("SELECT id, password_hash FROM users WHERE username = ?", (auth_config.admin_username,))
+    admin_row = c.fetchone()
+    if not admin_row:
+        password_hash = hash_password(auth_config.admin_password)
+        c.execute(
+            "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) VALUES (?, ?, 1, 0, ?)",
+            (auth_config.admin_username, password_hash, datetime.now(timezone.utc).isoformat()),
+        )
+        print(f"Created default user: {auth_config.admin_username}")
+    else:
+        if not verify_password(auth_config.admin_password, admin_row[1]):
+            new_hash = hash_password(auth_config.admin_password)
+            c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, admin_row[0]))
+            print("Updated admin password from config")
+
+    conn.commit()
+    conn.close()
+
+
+def hash_password(password: str) -> str:
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+    except (ValueError, TypeError):
+        return False
+
+
+def create_token(user_id: int, username: str, is_admin: bool, must_change: bool) -> str:
+    payload = {
+        "sub": username,
+        "user_id": user_id,
+        "is_admin": is_admin,
+        "must_change_password": must_change,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_HOURS),
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def decode_token(token: str) -> Optional[dict]:
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+security = HTTPBearer(auto_error=False)
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security), request: Request = None  # type: ignore
+) -> User:
+    if not credentials:
+        api_key = request.headers.get("X-API-Key") if request else None
+        if api_key:
+            return await validate_api_key(api_key)
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    payload = decode_token(credentials.credentials)
+
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT id, username, is_admin, must_change_password FROM users WHERE username = ?", (payload["sub"],))  # type: ignore
+    row = c.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return User(
+        id=row["id"],
+        username=row["username"],
+        is_admin=bool(row["is_admin"]),
+        must_change_password=bool(row["must_change_password"]),
+    )
+
+
+async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+
+async def validate_api_key(api_key: str) -> User:
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+
+    for row in c.execute("SELECT user_id, key_hash FROM api_keys"):
+        if verify_password(api_key, row["key_hash"]):
+            c.execute(
+                "UPDATE api_keys SET last_used = ? WHERE user_id = ?",
+                (datetime.now(timezone.utc).isoformat(), row["user_id"]),
+            )
+            conn.commit()
+
+            c.execute("SELECT id, username, is_admin, must_change_password FROM users WHERE id = ?", (row["user_id"],))
+            user = c.fetchone()
+            conn.close()
+
+            if user:
+                return User(id=user["id"], username=user["username"], is_admin=user["is_admin"])
+
+    conn.close()
+    raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+def create_user(username: str, password: str, is_admin: bool = False) -> User:
+    conn = get_db()
+    c = conn.cursor()
+
+    try:
+        password_hash = hash_password(password)
+        c.execute(
+            "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) VALUES (?, ?, ?, 1, ?)",
+            (username, password_hash, int(is_admin), datetime.now(timezone.utc).isoformat()),
+        )
+        user_id = c.lastrowid
+        conn.commit()
+        conn.close()
+        _log_audit(user_id, "User Created", f"Created user '{username}' (admin={is_admin})")
+        return User(id=user_id, username=username, is_admin=is_admin, must_change_password=True)
+    except sqlite3.IntegrityError:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+
+def authenticate_user(username: str, password: str) -> Token:
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, username, password_hash, is_admin, must_change_password FROM users WHERE username = ?", (username,)
+    )
+    row = c.fetchone()
+
+    if not row or not verify_password(password, row["password_hash"]):
+        conn.close()
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    conn.close()
+
+    user = User(
+        id=row["id"],
+        username=row["username"],
+        is_admin=bool(row["is_admin"]),
+        must_change_password=bool(row["must_change_password"]),
+    )
+
+    token = create_token(user.id, user.username, user.is_admin, user.must_change_password)
+    _log_audit(user.id, "Login", f"User '{username}' logged in")
+    return Token(access_token=token, user=user)
+
+
+def set_password(user_id: int, new_password: str) -> bool:
+    """Admin-only: set a user's password without requiring current password."""
+    if len(new_password) < 12:
+        raise HTTPException(status_code=400, detail="Password must be at least 12 characters")
+    if not any(c.isupper() for c in new_password) or not any(c.islower() for c in new_password) or not any(c.isdigit() for c in new_password):
+        raise HTTPException(status_code=400, detail="Password must contain uppercase, lowercase, and digit")
+    conn = get_db()
+    c = conn.cursor()
+    new_hash = hash_password(new_password)
+    c.execute("UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?", (new_hash, user_id))
+    if c.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User not found")
+    conn.commit()
+    conn.close()
+    _log_audit(user_id, "Password Changed", "Admin reset password")
+    return True
+
+
+def change_password(user_id: int, current_password: str, new_password: str) -> bool:
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,))
+    row = c.fetchone()
+
+    if not row or not verify_password(current_password, row["password_hash"]):
+        conn.close()
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if len(new_password) < 12:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Password must be at least 12 characters with uppercase, lowercase, and digit")
+    if not any(c.isupper() for c in new_password) or not any(c.islower() for c in new_password) or not any(c.isdigit() for c in new_password):
+        conn.close()
+        raise HTTPException(status_code=400, detail="Password must contain uppercase, lowercase, and digit")
+
+    new_hash = hash_password(new_password)
+    c.execute("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?", (new_hash, user_id))
+    conn.commit()
+    conn.close()
+    _log_audit(user_id, "Password Changed", "User changed own password")
+    return True
+
+
+def create_api_key(user_id: int, name: str) -> str:
+    api_key = f"pymon_{secrets.token_urlsafe(32)}"
+    key_hash = hash_password(api_key)
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO api_keys (user_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)",
+        (user_id, key_hash, name, datetime.now(timezone.utc).isoformat()),
+    )
+    conn.commit()
+    conn.close()
+    _log_audit(user_id, "API Key Created", f"Created key '{name}'")
+
+    return api_key
+
+
+def list_api_keys(user_id: int) -> list[dict]:
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT id, name, created_at, last_used FROM api_keys WHERE user_id = ?", (user_id,))
+    rows = c.fetchall()
+    conn.close()
+    return [
+        {"id": r["id"], "name": r["name"], "created_at": r["created_at"], "last_used": r["last_used"]} for r in rows
+    ]
+
+
+def delete_api_key(user_id: int, key_id: int) -> bool:
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM api_keys WHERE id = ? AND user_id = ?", (key_id, user_id))
+    deleted = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    _log_audit(user_id, "API Key Deleted", f"Deleted key id={key_id}")
+    return deleted  # type: ignore
+
+
+def list_users() -> list[dict]:
+    conn = get_db()
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT id, username, is_admin, must_change_password, created_at, last_login FROM users ORDER BY id")
+    rows = c.fetchall()
+    conn.close()
+    return [
+        {
+            "id": r["id"],
+            "username": r["username"],
+            "is_admin": bool(r["is_admin"]),
+            "must_change_password": bool(r["must_change_password"]),
+            "created_at": r["created_at"],
+            "last_login": r["last_login"],
+        }
+        for r in rows
+    ]
+
+
+def update_user(user_id: int, is_admin: Optional[bool] = None, must_change_password: Optional[bool] = None) -> bool:
+    conn = get_db()
+    c = conn.cursor()
+    if is_admin is not None:
+        c.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(is_admin), user_id))
+    if must_change_password is not None:
+        c.execute("UPDATE users SET must_change_password = ? WHERE id = ?", (int(must_change_password), user_id))
+    updated = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    _log_audit(user_id, "User Updated", f"Updated user id={user_id}")
+    return bool(updated)
+
+
+def delete_user(user_id: int) -> bool:
+    if user_id == 1:
+        raise HTTPException(status_code=400, detail="Cannot delete admin user")
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    deleted = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    _log_audit(user_id, "User Deleted", f"Deleted user id={user_id}")
+    return bool(deleted)
