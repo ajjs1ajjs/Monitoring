@@ -19,6 +19,36 @@ if ($InstallDir -eq "") {
 
 $ErrorActionPreference = "Stop"
 
+# Detect if this is an update
+$IS_UPDATE = $false
+if (Test-Path "$InstallDir\venv") {
+    $IS_UPDATE = $true
+    Write-Host ""
+    Write-Host "==========================================" -ForegroundColor Yellow
+    Write-Host "   PyMon - Update Mode Detected" -ForegroundColor Yellow
+    Write-Host "==========================================" -ForegroundColor Yellow
+    Write-Host ""
+}
+
+# Backup if updating
+if ($IS_UPDATE) {
+    $backupTs = Get-Date -Format "yyyyMMdd-HHmmss"
+    Write-Host "Backing up current data..." -ForegroundColor Yellow
+    if (Test-Path "$InstallDir\config.yml") {
+        Copy-Item "$InstallDir\config.yml" "$env:TEMP\pymon.config.backup.$backupTs" -Force
+        Write-Host "  [v] Config backed up" -ForegroundColor Green
+    }
+    if (Test-Path "$InstallDir\pymon.db") {
+        Copy-Item "$InstallDir\pymon.db" "$env:TEMP\pymon.db.backup.$backupTs" -Force
+        Write-Host "  [v] Database backed up" -ForegroundColor Green
+    }
+    if (Test-Path "$InstallDir\.env") {
+        Copy-Item "$InstallDir\.env" "$env:TEMP\pymon.env.backup.$backupTs" -Force
+        Write-Host "  [v] .env backed up" -ForegroundColor Green
+    }
+    Write-Host ""
+}
+
 if ($Help) {
     Write-Host @"
 PyMon Installation Script
@@ -207,6 +237,25 @@ if (-not (Test-Path $configPath)) {
     Set-Content -Path $configPath -Value $configContent
 }
 
+# Restore config and DB if updating
+if ($IS_UPDATE) {
+    $backupConfig = Get-ChildItem "$env:TEMP\pymon.config.backup.*" | Select-Object -First 1
+    if ($backupConfig -and (Test-Path $backupConfig.FullName)) {
+        Copy-Item $backupConfig.FullName "$InstallDir\config.yml" -Force
+        Write-Host "  [v] Config restored" -ForegroundColor Green
+    }
+    $backupDb = Get-ChildItem "$env:TEMP\pymon.db.backup.*" | Select-Object -First 1
+    if ($backupDb -and (Test-Path $backupDb.FullName)) {
+        Copy-Item $backupDb.FullName "$InstallDir\pymon.db" -Force
+        Write-Host "  [v] Database restored" -ForegroundColor Green
+    }
+    $backupEnv = Get-ChildItem "$env:TEMP\pymon.env.backup.*" | Select-Object -First 1
+    if ($backupEnv -and (Test-Path $backupEnv.FullName)) {
+        Copy-Item $backupEnv.FullName "$InstallDir\.env" -Force
+        Write-Host "  [v] .env restored" -ForegroundColor Green
+    }
+}
+
 Write-Success "Installed to: $InstallDir"
 
 # Run as service if requested
@@ -233,26 +282,40 @@ if ($Service) {
 }
 
 # Final output
-Write-Host ""
-Write-Host "==========================================" -ForegroundColor Green
-Write-Host "   Installation Complete!" -ForegroundColor Green
-Write-Host "==========================================" -ForegroundColor Green
-Write-Host ""
-Write-Host "  Version:   $VERSION" -ForegroundColor White
-Write-Host "  Port:     $Port" -ForegroundColor White
-Write-Host "  URL:      http://$serverIP`:$Port/dashboard/" -ForegroundColor White
-Write-Host ""
-Write-Host "  Username: admin" -ForegroundColor Yellow
-Write-Host "  Password: 291263" -ForegroundColor Yellow
-Write-Host "  IMPORTANT: Change this password immediately after login!" -ForegroundColor Red
-Write-Host ""
-Write-Host "  To start:" -ForegroundColor Cyan
-Write-Host "    Set-Location $InstallDir" -ForegroundColor White
-Write-Host "    .\venv\Scripts\Activate" -ForegroundColor White  
-Write-Host "    python -m pymon server" -ForegroundColor White
-Write-Host ""
+if ($IS_UPDATE) {
+    Write-Host ""
+    Write-Host "==========================================" -ForegroundColor Green
+    Write-Host "   PyMon - Update Complete!" -ForegroundColor Green
+    Write-Host "==========================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Version:   $VERSION" -ForegroundColor White
+    Write-Host "  Port:     $Port" -ForegroundColor White
+    Write-Host "  URL:      http://$serverIP`:$Port/dashboard/" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  To restart, run: net start/stop PyMonServer" -ForegroundColor Cyan
+    Write-Host ""
+} else {
+    Write-Host ""
+    Write-Host "==========================================" -ForegroundColor Green
+    Write-Host "   Installation Complete!" -ForegroundColor Green
+    Write-Host "==========================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Version:   $VERSION" -ForegroundColor White
+    Write-Host "  Port:     $Port" -ForegroundColor White
+    Write-Host "  URL:      http://$serverIP`:$Port/dashboard/" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Username: admin" -ForegroundColor Yellow
+    Write-Host "  Password: 291263" -ForegroundColor Yellow
+    Write-Host "  IMPORTANT: Change this password immediately after login!" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  To start:" -ForegroundColor Cyan
+    Write-Host "    Set-Location $InstallDir" -ForegroundColor White
+    Write-Host "    .\venv\Scripts\Activate" -ForegroundColor White  
+    Write-Host "    python -m pymon server" -ForegroundColor White
+    Write-Host ""
 
-if ($Service) {
-    Write-Host "  Service:   $serviceName (started)" -ForegroundColor Green
+    if ($Service) {
+        Write-Host "  Service:   $serviceName (started)" -ForegroundColor Green
+    }
+    Write-Host ""
 }
-Write-Host ""

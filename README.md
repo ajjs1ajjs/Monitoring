@@ -30,6 +30,7 @@
 **Для Windows Server (PowerShell від Адміністратора):**
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1' -OutFile 'install.ps1'; .\install.ps1 -Service
+# 💡 The same command works for both fresh install and updates. Run it again to update.
 ```
 
 **Для Linux:**

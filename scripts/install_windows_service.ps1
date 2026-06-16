@@ -13,6 +13,11 @@ if (-not (Test-Path $pythonExe)) {
     exit 1
 }
 
+Write-Host "NOTE: install.ps1 now handles both install and update." -ForegroundColor Yellow
+Write-Host "Run the following command again to update:" -ForegroundColor Cyan
+Write-Host "  powershell -ExecutionPolicy Bypass -File install.ps1 -Service" -ForegroundColor White
+Write-Host ""
+
 Write-Host "Registering PyMon as a background service..." -ForegroundColor Cyan
 
 # Create the action
