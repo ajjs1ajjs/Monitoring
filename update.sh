@@ -8,6 +8,14 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+echo -e "${YELLOW}=========================================="
+echo "  NOTE: install.sh now handles both install"
+echo "  and update. Use this instead:"
+echo ""
+echo "  curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash"
+echo "==========================================${NC}"
+echo ""
+
 GITHUB_REPO="ajjs1ajjs/Monitoring"
 INSTALL_DIR="/opt/pymon"
 CONFIG_DIR="/etc/pymon"

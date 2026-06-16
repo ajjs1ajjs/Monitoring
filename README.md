@@ -35,6 +35,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManage
 **Для Linux:**
 ```bash
 curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
+# 💡 The same command works for both installation and updates
 ```
 
 > **Security (v2.1.0+):** Пароль треба змінити після першого входу. Мінімум 12 символів з upper+lower+digit. `config.yml` тепер в `.gitignore` — не комітьте секрети в git!
@@ -78,8 +79,8 @@ sudo journalctl -u pymon -f
 sudo ./deploy.sh
 sudo ./deploy.sh --remove
 
-# Update
-sudo ./update.sh
+# Update (one-command, same as install)
+curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
 
 # Direct
 python -m pymon.cli server --config config.yml

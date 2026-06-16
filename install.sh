@@ -29,6 +29,16 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Detect if this is an update
+IS_UPDATE=false
+if [ -d "$INSTALL_DIR/pymon" ] && [ -f "$INSTALL_DIR/.version" ]; then
+    IS_UPDATE=true
+    echo -e "${YELLOW}=========================================="
+    echo "   PyMon - Update Mode Detected"
+    echo "==========================================${NC}"
+    echo ""
+fi
+
 PORT=10000
 PYMON_VERSION="main"
 STORAGE="sqlite"
@@ -128,6 +138,27 @@ fi
 echo -e "${BLUE}Creating directories...${NC}"
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
 
+# Backup existing data if updating
+if [ "$IS_UPDATE" = true ]; then
+    UPDATE_BACKUP_TS=$(date +%Y%m%d-%H%M%S)
+    echo -e "${YELLOW}Backing up current data...${NC}"
+    if [ -d "$INSTALL_DIR/pymon" ]; then
+        cp -r "$INSTALL_DIR/pymon" "/tmp/pymon.backup.$UPDATE_BACKUP_TS"
+        echo -e "${GREEN}  ✓ Code backed up: /tmp/pymon.backup.$UPDATE_BACKUP_TS${NC}"
+    fi
+    if [ -f "$DATA_DIR/pymon.db" ]; then
+        cp "$DATA_DIR/pymon.db" "/tmp/pymon.db.backup.$UPDATE_BACKUP_TS"
+        echo -e "${GREEN}  ✓ Database backed up: /tmp/pymon.db.backup.$UPDATE_BACKUP_TS${NC}"
+    fi
+    if [ -f "$CONFIG_DIR/config.yml" ]; then
+        cp "$CONFIG_DIR/config.yml" "/tmp/pymon.config.backup.$UPDATE_BACKUP_TS"
+        echo -e "${GREEN}  ✓ Config backed up: /tmp/pymon.config.backup.$UPDATE_BACKUP_TS${NC}"
+    fi
+    echo -e "${YELLOW}Stopping service...${NC}"
+    systemctl stop $SERVICE_NAME 2>/dev/null || true
+    sleep 2
+fi
+
 echo -e "${BLUE}Downloading PyMon $APP_VERSION from GitHub...${NC}"
 echo -e "${YELLOW}URL: $DOWNLOAD_URL${NC}"
 cd /tmp
@@ -165,6 +196,8 @@ echo -e "${BLUE}Installing application...${NC}"
 cp -r "$EXTRACT_DIR/pymon" "$INSTALL_DIR/"
 cp "$EXTRACT_DIR/pyproject.toml" "$INSTALL_DIR/" 2>/dev/null || true
 cp "$EXTRACT_DIR/README.md" "$INSTALL_DIR/" 2>/dev/null || true
+
+echo "$PYMON_VERSION" > "$INSTALL_DIR/.version"
 
 SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "0.0.0.0")
 
@@ -213,6 +246,18 @@ EOF
 fi
 
 mkdir -p "$CONFIG_DIR/backups"
+
+# Restore config and database if updating
+if [ "$IS_UPDATE" = true ]; then
+    if [ -f "/tmp/pymon.config.backup.$UPDATE_BACKUP_TS" ]; then
+        cp "/tmp/pymon.config.backup.$UPDATE_BACKUP_TS" "$CONFIG_DIR/config.yml"
+        echo -e "${GREEN}  ✓ Config restored${NC}"
+    fi
+    if [ -f "/tmp/pymon.db.backup.$UPDATE_BACKUP_TS" ]; then
+        cp "/tmp/pymon.db.backup.$UPDATE_BACKUP_TS" "$DATA_DIR/pymon.db"
+        echo -e "${GREEN}  ✓ Database restored${NC}"
+    fi
+fi
 
 echo -e "${BLUE}Creating virtual environment...${NC}"
 cd "$INSTALL_DIR"
@@ -280,44 +325,77 @@ sleep 3
 if systemctl is-active --quiet $SERVICE_NAME; then
     IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
     
-    echo ""
-    echo -e "${GREEN}=========================================="
-    echo "   PyMon - Installation Successful!"
-    echo "==========================================${NC}"
-    echo ""
-    echo -e "  ${GREEN}Version:${NC}     $APP_VERSION"
-    echo -e "  ${GREEN}Port:${NC}        $PORT"
-    echo -e "  ${GREEN}Storage:${NC}     $STORAGE"
-    echo -e "  ${GREEN}URL:${NC}         http://$IP:$PORT"
-    echo -e "  ${GREEN}API:${NC}         http://$IP:$PORT/api/v1/"
-    echo -e "  ${GREEN}Dashboard:${NC}   http://$IP:$PORT/dashboard/"
-    echo ""
-    echo -e "  ${YELLOW}Default Credentials:${NC}"
-    echo -e "    Username: ${BLUE}admin${NC}"
-    echo -e "    Password: ${BLUE}291263${NC}"
-    echo -e "  ${RED}IMPORTANT: Change this password immediately after login!${NC}"
-    echo ""
-    echo "Management Commands:"
-    echo "  sudo systemctl status $SERVICE_NAME"
-    echo "  sudo systemctl restart $SERVICE_NAME"
-    echo "  sudo systemctl stop $SERVICE_NAME"
-    echo "  sudo journalctl -u $SERVICE_NAME -f"
-    echo ""
-    echo "Update Command:"
-    echo "  curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPO/main/update.sh | sudo bash"
-    echo ""
-    echo "Configuration:"
-    echo "  Config: $CONFIG_DIR/config.yml"
-    echo "  Logs:   $LOG_DIR/"
-    echo "  Data:   $DATA_DIR/"
-    echo ""
+    if [ "$IS_UPDATE" = true ]; then
+        echo ""
+        echo -e "${GREEN}=========================================="
+        echo "   PyMon - Update Successful!"
+        echo "==========================================${NC}"
+        echo ""
+        echo -e "  ${GREEN}URL:${NC}  http://$IP:$PORT"
+        echo ""
+        if [ -n "$UPDATE_BACKUP_TS" ]; then
+            echo -e "  Backup: /tmp/pymon.backup.$UPDATE_BACKUP_TS"
+            echo ""
+            echo -e "  ${YELLOW}Rollback if needed:${NC}"
+            echo "    sudo systemctl stop $SERVICE_NAME"
+            echo "    sudo rm -rf $INSTALL_DIR/pymon"
+            echo "    sudo cp -r /tmp/pymon.backup.$UPDATE_BACKUP_TS/pymon $INSTALL_DIR/"
+            echo "    sudo systemctl start $SERVICE_NAME"
+            echo ""
+        fi
+        echo -e "${GREEN}Update completed!${NC}"
+    else
+        echo -e "${GREEN}=========================================="
+        echo "   PyMon - Installation Successful!"
+        echo "==========================================${NC}"
+        echo ""
+        echo -e "  ${GREEN}Version:${NC}     $APP_VERSION"
+        echo -e "  ${GREEN}Port:${NC}        $PORT"
+        echo -e "  ${GREEN}Storage:${NC}     $STORAGE"
+        echo -e "  ${GREEN}URL:${NC}         http://$IP:$PORT"
+        echo -e "  ${GREEN}API:${NC}         http://$IP:$PORT/api/v1/"
+        echo -e "  ${GREEN}Dashboard:${NC}   http://$IP:$PORT/dashboard/"
+        echo ""
+        echo -e "  ${YELLOW}Default Credentials:${NC}"
+        echo -e "    Username: ${BLUE}admin${NC}"
+        echo -e "    Password: ${BLUE}291263${NC}"
+        echo -e "  ${RED}IMPORTANT: Change this password immediately after login!${NC}"
+        echo ""
+        echo "Management Commands:"
+        echo "  sudo systemctl status $SERVICE_NAME"
+        echo "  sudo systemctl restart $SERVICE_NAME"
+        echo "  sudo systemctl stop $SERVICE_NAME"
+        echo "  sudo journalctl -u $SERVICE_NAME -f"
+        echo ""
+        echo -e "${GREEN}To update in the future, simply run the same command again:${NC}"
+        echo -e "  ${BLUE}curl -sSL https://raw.githubusercontent.com/$GITHUB_REPO/main/install.sh | sudo bash${NC}"
+        echo ""
+        echo "Configuration:"
+        echo "  Config: $CONFIG_DIR/config.yml"
+        echo "  Logs:   $LOG_DIR/"
+        echo "  Data:   $DATA_DIR/"
+        echo ""
+    fi
 else
     echo -e "${RED}=========================================="
-    echo "   Installation Failed"
+    if [ "$IS_UPDATE" = true ]; then
+        echo "   Update Failed"
+    else
+        echo "   Installation Failed"
+    fi
     echo "==========================================${NC}"
     echo ""
     echo "Service failed to start. Check logs:"
     echo "  sudo journalctl -u $SERVICE_NAME -n 50"
+    if [ "$IS_UPDATE" = true ] && [ -n "$UPDATE_BACKUP_TS" ]; then
+        echo ""
+        echo -e "${YELLOW}Rollback:${NC}"
+        echo "  sudo systemctl stop $SERVICE_NAME"
+        echo "  sudo rm -rf $INSTALL_DIR/pymon"
+        echo "  sudo cp -r /tmp/pymon.backup.$UPDATE_BACKUP_TS/pymon $INSTALL_DIR/"
+        echo "  sudo systemctl start $SERVICE_NAME"
+        echo ""
+    fi
     echo ""
     exit 1
 fi
