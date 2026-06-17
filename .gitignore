@@ -68,3 +68,5 @@ htmlcov/
 # Test databases
 test_*.db
 test*.db
+
+credentials.txt
