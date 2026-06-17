@@ -1,4 +1,4 @@
-# PyMon - Windows Installation Script
+﻿# PyMon - Windows Installation Script
 # Run as Administrator
 
 param(
@@ -305,7 +305,7 @@ if ($IS_UPDATE) {
     Write-Host "  URL:      http://$serverIP`:$Port/dashboard/" -ForegroundColor White
     Write-Host ""
     Write-Host "  Username: admin" -ForegroundColor Yellow
-    Write-Host "  Password: 291263" -ForegroundColor Yellow
+    Write-Host "  Password: (auto-generated)" -ForegroundColor Yellow
     Write-Host "  IMPORTANT: Change this password immediately after login!" -ForegroundColor Red
     Write-Host ""
     Write-Host "  To start:" -ForegroundColor Cyan

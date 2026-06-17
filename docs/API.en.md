@@ -1,4 +1,4 @@
-# PyMon API Documentation
+﻿# PyMon API Documentation
 
 Complete API reference for PyMon Enterprise Server Monitoring.
 
@@ -35,7 +35,7 @@ Get JWT access token.
 ```json
 {
   "username": "admin",
-  "password": "291263"
+  "password auto-generated"
 }
 ```
 
@@ -83,7 +83,7 @@ Authorization: Bearer <token>
 **Request:**
 ```json
 {
-  "current_password": "291263",
+  "current_password auto-generated",
   "new_password": "NewSecure123"
 }
 ```
@@ -743,7 +743,7 @@ import requests
 # Login
 resp = requests.post('http://localhost:10000/api/v1/auth/login', json={
     'username': 'admin',
-    'password': '291263'
+    'password': 'auto-generated'
 })
 token = resp.json()['access_token']
 
@@ -766,7 +766,7 @@ metrics = resp.json()
 # Login
 TOKEN=$(curl -s -X POST http://localhost:10000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"291263"}' | jq -r '.access_token')
+  -d '{"username":"admin","password auto-generated"}' | jq -r '.access_token')
 
 # Get servers
 curl -X GET http://localhost:10000/api/v1/servers \
@@ -785,7 +785,7 @@ const axios = require('axios');
 // Login
 const { data } = await axios.post('http://localhost:10000/api/v1/auth/login', {
   username: 'admin',
-  password: '291263'
+  password: 'auto-generated'
 });
 const token = data.access_token;
 

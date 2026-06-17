@@ -1,4 +1,4 @@
-# Документація API PyMon
+﻿# Документація API PyMon
 
 Повна довідка REST API для PyMon Enterprise Server Monitoring.
 
@@ -35,7 +35,7 @@ Authorization: Bearer <your_token>
 ```json
 {
     "username": "admin",
-    "password": "291263"
+    "password auto-generated"
 }
 ```
 
@@ -407,7 +407,7 @@ import httpx
 async with httpx.AsyncClient() as client:
     # Логін
     resp = await client.post("http://localhost:10000/api/v1/auth/login",
-        json={"username": "admin", "password": "291263"})
+        json={"username": "admin", "password auto-generated"})
     token = resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -422,7 +422,7 @@ async with httpx.AsyncClient() as client:
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:10000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"291263"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+  -d '{"username":"admin","password auto-generated"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
 
 curl -s http://localhost:10000/api/v1/servers \
   -H "Authorization: Bearer $TOKEN"

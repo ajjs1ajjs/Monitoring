@@ -1,4 +1,4 @@
-# 🛠️ Усунення несправностей PyMon NOC
+﻿# 🛠️ Усунення несправностей PyMon NOC
 
 ---
 
@@ -63,7 +63,7 @@ print('Tables created')
 ### Не можу увійти
 
 ```bash
-# Пароль за замовчуванням: admin / 291263
+# Пароль за замовчуванням: admin / auto-generated
 # Якщо забули — скинути через БД:
 python -c "
 import sqlite3, bcrypt

@@ -136,7 +136,7 @@ class APIKeyCreate(BaseModel):
 class AuthConfig:
     db_path: str = "pymon.db"
     admin_username: str = "admin"
-    admin_password: str = "291263"
+    admin_password: str = "change-me-on-first-login"
 
 
 def _load_auth_config() -> AuthConfig:
@@ -147,7 +147,7 @@ def _load_auth_config() -> AuthConfig:
         if hasattr(config, 'auth') and config.auth:
             admin_password = getattr(config.auth, 'admin_password', 'change-me-on-first-login')
             # If admin_password is the default, generate random one
-            if admin_password in ('291263', 'change-me-on-first-login'):
+            if admin_password in ('change-me-on-first-login', '291263'):
                 admin_password = os.environ.get("PYMON_ADMIN_PASSWORD") or secrets.token_urlsafe(12)
             return AuthConfig(
                 admin_username=getattr(config.auth, 'admin_username', 'admin'),

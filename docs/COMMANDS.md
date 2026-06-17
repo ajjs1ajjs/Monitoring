@@ -1,4 +1,4 @@
-# 📋 Довідник команд PyMon NOC
+﻿# 📋 Довідник команд PyMon NOC
 
 Повний список команд для керування PyMon NOC.
 
@@ -113,7 +113,7 @@ export PYMON_ALLOWED_ORIGINS=http://localhost:10000
 # Отримати токен (через API)
 curl -X POST http://localhost:10000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "291263"}'
+  -d '{"username": "admin", "password auto-generated"}'
 
 # Зміна пароля
 curl -X POST http://localhost:10000/api/v1/auth/change-password \

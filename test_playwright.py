@@ -1,4 +1,4 @@
-import time
+﻿import time
 
 from playwright.sync_api import sync_playwright
 
@@ -12,7 +12,7 @@ def run():
         print("Logging in...")
         page.goto('http://127.0.0.1:10000/login')
         page.fill('input[type="text"]', 'admin')
-        page.fill('input[type="password"]', '291263')
+        page.fill('input[type="password"]', 'auto-generated')
         page.click('button[type="submit"]')
 
         page.wait_for_selector('text="Live Infrastructure Status"')

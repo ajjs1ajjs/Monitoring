@@ -1,4 +1,4 @@
-<div align="center">
+﻿<div align="center">
   <h1>PyMon NOC</h1>
   <p><b>Enterprise Infrastructure Monitoring & NOC Dashboard</b></p>
   
@@ -111,7 +111,7 @@ curl http://localhost:10000/api/v1/health
 ## 🛠️ Додаткова інформація
 
 - **Доступ до панелі**: `http://<IP-адреса>:10000/dashboard/`
-- **Логін за замовчуванням**: `admin` / `291263` (ЗМІНИТИ ПІСЛЯ ВХОДУ!)
+- **Логін за замовчуванням**: `admin` / `auto-generated` (ЗМІНИТИ ПІСЛЯ ВХОДУ!)
 - **Конфігурація**: `config.yml` (в `.gitignore` — не комітити!)
 - **База даних**: `pymon.db` (SQLite)
 - **Пароль**: мін. 12 символів, upper+lower+digit
