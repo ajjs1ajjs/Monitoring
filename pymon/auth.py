@@ -15,7 +15,30 @@ from pydantic import BaseModel
 
 from pymon.api.deps import get_db
 
-JWT_SECRET = os.getenv("JWT_SECRET", secrets.token_urlsafe(32))
+def _load_jwt_secret() -> str:
+    env_secret = os.getenv("JWT_SECRET")
+    if env_secret:
+        return env_secret
+    secret_file = os.path.join(os.path.dirname(__file__), "..", ".pymon_jwt_secret")
+    secret_file = os.path.normpath(secret_file)
+    try:
+        with open(secret_file) as f:
+            stored = f.read().strip()
+            if stored:
+                return stored
+    except (FileNotFoundError, OSError):
+        pass
+    new_secret = secrets.token_urlsafe(32)
+    try:
+        with open(secret_file, "w") as f:
+            f.write(new_secret)
+        os.chmod(secret_file, 0o600)
+    except OSError:
+        pass
+    return new_secret
+
+
+JWT_SECRET = _load_jwt_secret()
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24
 
@@ -120,7 +143,7 @@ def init_auth_tables():
     if not admin_row:
         password_hash = hash_password(auth_config.admin_password)
         c.execute(
-            "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) VALUES (?, ?, 1, 0, ?)",
+            "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) VALUES (?, ?, 1, 1, ?)",
             (auth_config.admin_username, password_hash, datetime.now(timezone.utc).isoformat()),
         )
         print(f"Created default user: {auth_config.admin_username}")
@@ -172,7 +195,7 @@ security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security), request: Request = None  # type: ignore
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security), request: Optional[Request] = None
 ) -> User:
     if not credentials:
         api_key = request.headers.get("X-API-Key") if request else None
@@ -181,11 +204,13 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     payload = decode_token(credentials.credentials)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
     conn = get_db()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("SELECT id, username, is_admin, must_change_password FROM users WHERE username = ?", (payload["sub"],))  # type: ignore
+    c.execute("SELECT id, username, is_admin, must_change_password FROM users WHERE username = ?", (payload["sub"],))
     row = c.fetchone()
     conn.close()
 
@@ -355,11 +380,11 @@ def delete_api_key(user_id: int, key_id: int) -> bool:
     conn = get_db()
     c = conn.cursor()
     c.execute("DELETE FROM api_keys WHERE id = ? AND user_id = ?", (key_id, user_id))
-    deleted = c.rowcount > 0
+    deleted: bool = bool(c.rowcount)
     conn.commit()
     conn.close()
     _log_audit(user_id, "API Key Deleted", f"Deleted key id={key_id}")
-    return deleted  # type: ignore
+    return deleted
 
 
 def list_users() -> list[dict]:

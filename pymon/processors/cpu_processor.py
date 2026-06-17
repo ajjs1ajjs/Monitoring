@@ -53,7 +53,7 @@ class CpuProcessor(MetricProcessor):
 
         return processed_results
 
-    def calculate_derived_metrics(self, historical_data: List[RawMetricPoint]) -> Optional[Dict]:  # type: ignore
+    def calculate_derived_metrics(self, historical_data: List[RawMetricPoint]) -> Optional[Dict]:
         """
         Calculates derived metrics (e.g., Moving Average and Standard Deviation).
 

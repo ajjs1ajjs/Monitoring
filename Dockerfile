@@ -8,11 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     passwd \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml .
-# Install dependencies directly from pyproject.toml
-RUN pip install --no-cache-dir fastapi uvicorn pydantic pydantic-settings \
-    sqlalchemy aiosqlite httpx prometheus-client jinja2 python-multipart \
-    websockets apscheduler bcrypt pyjwt python-dotenv pyyaml slowapi
+COPY pyproject.toml requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 FROM python:3.12-slim
 
@@ -48,7 +45,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 VOLUME ["/data", "/config", "/logs"]
 
 LABEL maintainer="PyMon Team"
-LABEL version="2.0.0"
+LABEL version="2.1.0"
 LABEL description="Enterprise Server Monitoring with Grafana-style Dashboard"
 
-CMD ["python", "-m", "pymon.cli", "server", "--config", "/config/config.yml"]
+CMD ["python", "-m", "pymon", "server", "--config", "/config/config.yml"]

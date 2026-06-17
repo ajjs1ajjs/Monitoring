@@ -46,18 +46,17 @@ class MetricProcessor(ABC):
         raise NotImplementedError("Subclasses must implement process_batch method.")
 
     @abstractmethod
-    def calculate_derived_metrics(self, historical_data: Dict[str, Any]) -> Optional[Dict]:
+    def calculate_derived_metrics(self, historical_data: List[RawMetricPoint]) -> Optional[Dict]:
         """
         Calculates advanced or derived metrics based on historical data.
 
         This is used for calculations that require looking at trends over time,
         such as standard deviation, moving averages, rate-of-change (RoC),
-        or complex threshold analysis. The 'historical_data' dictionary should
+        or complex threshold analysis. The 'historical_data' list should
         contain enough context for the calculation to proceed.
 
         Args:
-            historical_data: A dictionary containing pre-loaded historical time series data
-                              relevant to this metric type (e.g., list of past values).
+            historical_data: A list of raw metric points representing historical time series data.
 
         Returns:
             A dictionary containing derived metrics, or None if calculation is not possible/applicable.

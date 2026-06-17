@@ -1,7 +1,7 @@
 """Prometheus-compatible /metrics endpoint implementation."""
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -12,15 +12,15 @@ class PrometheusMetricsExporter:
     """Exposes metrics in Prometheus exposition format."""
 
     def __init__(self):
-        self._metrics_registry: Dict[str, Dict[str, Any]] = {}
-        self._gauge_samples: Dict[str, Dict[str, float]] = {}
-        self._histogram_buckets: Dict[str, List[float]] = {"default": [0.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0]}
+        self._metrics_registry: dict[str, dict[str, Any]] = {}
+        self._gauge_samples: dict[str, dict[str, Any]] = {}
+        self._histogram_buckets: dict[str, list[float]] = {"default": [0.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0]}
 
     def register_metric(self, name: str, help_text: str, metric_type: str = "gauge"):
         """Register a new metric for exposure."""
         self._metrics_registry[name] = {"__name__": name, "_type": metric_type, "help": help_text}
 
-    def record_gauge(self, name: str, value: float, labels: Optional[Dict[str, str]] = None):
+    def record_gauge(self, name: str, value: float, labels: dict[str, str] | None = None):
         """Record a gauge value (e.g., CPU usage, memory percentage)."""
         key = f"{name}{labels_key(labels)}" if labels else name
 
@@ -31,7 +31,7 @@ class PrometheusMetricsExporter:
             for label_name, label_value in labels.items():
                 if label_value is None:
                     continue  # Skip empty label values
-                self._gauge_samples[key][label_name] = str(label_value)  # type: ignore
+                self._gauge_samples[key][label_name] = str(label_value)
 
         self._gauge_samples[key]["value"] = value
 
@@ -92,12 +92,12 @@ class PrometheusMetricsExporter:
 
         return "\n".join(lines)
 
-    def _parse_metric_key(self, key: str) -> Dict[str, Any]:
+    def _parse_metric_key(self, key: str) -> dict[str, Any]:
         """Parse metric key to extract name and labels."""
         # This is a simplified parser - in production you'd use prometheus_client library
         parts = key.split("{", 1)
         if len(parts) == 2:
-            name = self._parse_metric_name(parts[0])  # type: ignore
+            name = _parse_metric_name(parts[0])
             return {"__name__": name, "help": f"Sample value of {name}"}
 
         # No labels - just metric name
@@ -109,10 +109,12 @@ class PrometheusMetricsExporter:
         return f"# {now}"
 
 
-def labels_key(labels: Optional[Dict[str, str]]) -> str:
+def labels_key(labels: dict[str, str] | None) -> str:
     """Generate a label key string from dictionary of labels."""
     parts = []
-    for name, value in sorted(labels.items()):  # type: ignore
+    if labels is None:
+        return "{}"
+    for name, value in sorted(labels.items()):
         if value is None:
             continue
         # Escape double quotes and backslashes
@@ -122,7 +124,7 @@ def labels_key(labels: Optional[Dict[str, str]]) -> str:
     return "{" + ",".join(parts) + "}"
 
 
-def _parse_metric_name(name: str) -> Dict[str, Any]:
+def _parse_metric_name(name: str) -> dict[str, Any]:
     """Parse a metric name that may include type suffix."""
     # Remove type suffix if present (e.g., "_total", "_sum")
     base_name = name.rstrip("_total").rstrip("_sum")
@@ -135,6 +137,17 @@ def _parse_metric_name(name: str) -> Dict[str, Any]:
 # ============================================================================
 
 
+_exporter_instance: PrometheusMetricsExporter | None = None
+
+
+def get_metrics_exporter() -> PrometheusMetricsExporter:
+    global _exporter_instance
+    if _exporter_instance is None:
+        _exporter_instance = PrometheusMetricsExporter()
+        _exporter_instance.register_metric("pymon_uptime_seconds", "Uptime of PyMon server in seconds", metric_type="gauge")
+    return _exporter_instance
+
+
 @router.get(
     "/metrics",
     summary="Prometheus-compatible metrics exposition endpoint",
@@ -145,11 +158,7 @@ def _parse_metric_name(name: str) -> Dict[str, Any]:
 )
 async def prometheus_metrics_endpoint() -> str:
     """Return metrics in Prometheus exposition format."""
-    exporter = PrometheusMetricsExporter()
-
-    # Register some default metrics that PyMon exposes
-    exporter.register_metric("pymon_uptime_seconds", "Uptime of PyMon server in seconds", metric_type="gauge")
-
+    exporter = get_metrics_exporter()
     return exporter.generate_exposition()
 
 

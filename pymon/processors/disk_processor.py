@@ -63,7 +63,7 @@ class DiskProcessor(MetricProcessor):
 
         return processed_results
 
-    def calculate_derived_metrics(self, historical_data: List[RawMetricPoint]) -> Optional[Dict]:  # type: ignore
+    def calculate_derived_metrics(self, historical_data: List[RawMetricPoint]) -> Optional[Dict]:
         """
         Calculates derived metrics (Moving Average and Standard Deviation) based on disk utilization history.
 

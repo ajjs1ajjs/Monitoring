@@ -2,16 +2,18 @@
 # This script registers PyMon as a background task that starts automatically on boot.
 
 $projectName = "PyMonServer"
-$workDir = "D:\CODE\Monitoring"
-$pythonExe = Join-Path $workDir ".venv\Scripts\python.exe"
-$arguments = "-m pymon server"
-
-# Check if .venv exists
-if (-not (Test-Path $pythonExe)) {
-    Write-Host "Error: Virtual environment not found at $pythonExe" -ForegroundColor Red
-    Write-Host "Please run run.bat first to initialize the environment." -ForegroundColor Yellow
+$workDir = (Get-Location).Path
+$hasDotVenv = Test-Path (Join-Path $workDir ".venv\Scripts\python.exe")
+$hasVenv = Test-Path (Join-Path $workDir "venv\Scripts\python.exe")
+if ($hasDotVenv) {
+    $pythonExe = Join-Path $workDir ".venv\Scripts\python.exe"
+} elseif ($hasVenv) {
+    $pythonExe = Join-Path $workDir "venv\Scripts\python.exe"
+} else {
+    Write-Host "Error: Virtual environment not found. Please run install.ps1 first." -ForegroundColor Red
     exit 1
 }
+$arguments = "-m pymon server"
 
 Write-Host "NOTE: install.ps1 now handles both install and update." -ForegroundColor Yellow
 Write-Host "Run the following command again to update:" -ForegroundColor Cyan

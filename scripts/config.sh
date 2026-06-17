@@ -9,7 +9,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 CONFIG_DIR="/etc/pymon"
-CONFIG_FILE="$CONFIG_DIR/config.json"
+CONFIG_FILE="$CONFIG_DIR/config.yml"
 SERVICE_NAME="pymon"
 
 echo -e "${GREEN}"
@@ -51,9 +51,9 @@ show_help() {
 get_value() {
     local key="$1"
     python3 -c "
-import json
+import yaml
 with open('$CONFIG_FILE') as f:
-    config = json.load(f)
+    config = yaml.safe_load(f) or {}
 keys = '$key'.split('.')
 value = config
 for k in keys:
@@ -62,7 +62,7 @@ if value == {}:
     print('Key not found')
 else:
     if isinstance(value, dict):
-        print(json.dumps(value, indent=2))
+        print(yaml.dump(value, default_flow_style=False).strip())
     else:
         print(value)
 "
@@ -72,30 +72,31 @@ set_value() {
     local key="$1"
     local value="$2"
     python3 -c "
-import json
+import yaml
 with open('$CONFIG_FILE') as f:
-    config = json.load(f)
+    config = yaml.safe_load(f) or {}
 keys = '$key'.split('.')
 obj = config
 for k in keys[:-1]:
     obj = obj.setdefault(k, {})
-try:
-    obj[keys[-1]] = json.loads('''$value''')
-except:
-    obj[keys[-1]] = '''$value'''
+obj[keys[-1]] = '''$value'''
 with open('$CONFIG_FILE', 'w') as f:
-    json.dump(config, f, indent=4)
+    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 print('Updated $key = $value')
 "
 }
 
 list_config() {
     echo -e "${BLUE}Current configuration:${NC}"
-    cat "$CONFIG_FILE" | python3 -m json.tool
+    python3 -c "
+import yaml
+with open('$CONFIG_FILE') as f:
+    print(yaml.safe_dump(yaml.safe_load(f), default_flow_style=False, sort_keys=False))
+"
 }
 
 backup_config() {
-    local backup_file="$CONFIG_DIR/config.backups/config_$(date +%Y%m%d_%H%M%S).json"
+    local backup_file="$CONFIG_DIR/config.backups/config_$(date +%Y%m%d_%H%M%S).yml"
     mkdir -p "$CONFIG_DIR/config.backups"
     cp "$CONFIG_FILE" "$backup_file"
     echo -e "${GREEN}Configuration backed up to: $backup_file${NC}"

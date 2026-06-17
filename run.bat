@@ -24,20 +24,23 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-REM Create virtual environment
-if not exist ".venv" (
+REM Create virtual environment (check both venv names)
+set VENV_DIR=.venv
+if exist "venv" set VENV_DIR=venv
+if not exist "!VENV_DIR!" (
     echo [1/3] Creating virtual environment...
     python -m venv .venv
+    set VENV_DIR=.venv
 )
 
 REM Install dependencies
 echo [2/3] Installing dependencies...
-call .venv\Scripts\pip.exe install --upgrade pip -q
-call .venv\Scripts\pip.exe install -r requirements.txt -q
+call !VENV_DIR!\Scripts\pip.exe install --upgrade pip -q
+call !VENV_DIR!\Scripts\pip.exe install -r requirements.txt -q
 
 REM Run
 echo [3/3] Starting server on port %PORT%...
 echo Dashboard: http://localhost:%PORT%/dashboard/
 echo.
 
-call .venv\Scripts\python.exe -m pymon server --port %PORT%
+call !VENV_DIR!\Scripts\python.exe -m pymon server --port %PORT%

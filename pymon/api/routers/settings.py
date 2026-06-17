@@ -99,7 +99,7 @@ async def import_prometheus_config(data: dict, current_user: User = Depends(get_
 
     from datetime import datetime, timezone
 
-    import yaml  # type: ignore
+    import yaml
 
 
     try:

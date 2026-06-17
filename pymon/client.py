@@ -1,7 +1,7 @@
 """HTTP client for pushing metrics to PyMon server"""
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -20,7 +20,7 @@ class PyMonClient:
         resp.raise_for_status()
         data = resp.json()
         self._token = data["access_token"]
-        return data  # type: ignore
+        return cast(dict[str, Any], data)
 
     async def _headers(self) -> dict[str, str]:
         headers = {"Content-Type": "application/json"}
@@ -46,12 +46,12 @@ class PyMonClient:
 
         resp = await self._client.post(f"{self.base_url}/api/v1/metrics", json=payload, headers=await self._headers())
         resp.raise_for_status()
-        return resp.json()  # type: ignore
+        return cast(dict[str, Any], resp.json())
 
     async def get_metrics(self) -> list[dict]:
         resp = await self._client.get(f"{self.base_url}/api/v1/metrics", headers=await self._headers())
         resp.raise_for_status()
-        return resp.json().get("metrics", [])  # type: ignore
+        return cast(list[dict], resp.json().get("metrics", []))
 
     async def get_server_history(self, server_id: int, range: str = "1h") -> dict:
         resp = await self._client.get(
@@ -60,7 +60,7 @@ class PyMonClient:
             headers=await self._headers(),
         )
         resp.raise_for_status()
-        return resp.json()  # type: ignore
+        return cast(dict, resp.json())
 
     async def create_api_key(self, name: str) -> str:
         resp = await self._client.post(
@@ -69,12 +69,12 @@ class PyMonClient:
             headers=await self._headers(),
         )
         resp.raise_for_status()
-        return resp.json()["api_key"]  # type: ignore
+        return cast(str, resp.json()["api_key"])
 
     async def list_api_keys(self) -> list[dict]:
         resp = await self._client.get(f"{self.base_url}/api/v1/auth/api-keys", headers=await self._headers())
         resp.raise_for_status()
-        return resp.json().get("api_keys", [])  # type: ignore
+        return cast(list[dict], resp.json().get("api_keys", []))
 
     async def delete_api_key(self, key_id: int) -> bool:
         resp = await self._client.delete(
@@ -86,7 +86,7 @@ class PyMonClient:
     async def health(self) -> dict:
         resp = await self._client.get(f"{self.base_url}/api/v1/health")
         resp.raise_for_status()
-        return resp.json()  # type: ignore
+        return cast(dict, resp.json())
 
     async def prometheus_export(self) -> str:
         resp = await self._client.get(f"{self.base_url}/metrics")

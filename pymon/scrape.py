@@ -38,6 +38,7 @@ class ScrapeManager:
             try:
                 await self.scrape_all()
                 await self._cleanup_old_metrics()
+                await _run_backup_if_due(self.config)
             except Exception as e:
                 logger.exception(f"Scrape loop error: {e}")
             await asyncio.sleep(self.interval)
@@ -56,6 +57,10 @@ class ScrapeManager:
             )
             await conn.execute(
                 "DELETE FROM services_history WHERE timestamp < datetime('now', ?)",
+                (f"-{self.retention_hours} hours",),
+            )
+            await conn.execute(
+                "DELETE FROM alerts WHERE timestamp < datetime('now', ?)",
                 (f"-{self.retention_hours} hours",),
             )
             await conn.commit()
@@ -152,6 +157,8 @@ class ScrapeManager:
             elif cpu_val <= 90 and (last_cpu is not None and last_cpu > 90):
                 await self._trigger_alert(f"✅ CPU Normal: {name}", f"Server {name} CPU usage returned to normal: {cpu_val}%.")
 
+            await self._evaluate_alerting_rules(name, cpu_val, data.get('memory', 0), data.get('disk', 0))
+
             if last_status == 'down':
                 await self._trigger_alert(f"✅ Server Restored: {name}", f"Server {name} ({host}) is back online.")
 
@@ -185,6 +192,22 @@ class ScrapeManager:
                 pass
             await conn.close()
             return False
+
+    async def _evaluate_alerting_rules(self, server_name: str, cpu: float, memory: float, disk: float):
+        if not self.config or not self.config.alerting_rules:
+            return
+        for rule in self.config.alerting_rules:
+            val = None
+            expr_lower = rule.expr.lower()
+            if 'cpu' in expr_lower:
+                val = cpu
+            elif 'memory' in expr_lower or 'mem' in expr_lower:
+                val = memory
+            elif 'disk' in expr_lower:
+                val = disk
+            if val is not None and val > rule.threshold:
+                message = rule.message or f"{rule.name}: {val:.1f}% (threshold: {rule.threshold}%)"
+                await self._trigger_alert(f"{rule.severity.upper()}: {rule.name} on {server_name}", message)
 
     async def _trigger_alert(self, title, message):
         try:
@@ -595,7 +618,7 @@ class ServiceChecker:
         return False
 
 
-_last_backup_run = 0
+_last_backup_run = 0.0
 
 
 async def _run_backup_if_due(config):
@@ -603,33 +626,36 @@ async def _run_backup_if_due(config):
     import os
     import shutil
     import time
-    now = time.time()
-    if now - _last_backup_run < 3600:
+    now_ts = time.time()
+    if now_ts - _last_backup_run < 3600:
+        return
+    if not config or not config.backup.enabled:
         return
     try:
         schedule = config.backup.schedule
         parts = schedule.strip().split()
         if len(parts) != 5:
             return
-        minute, hour, day, month, weekday = parts
-        now = datetime.now()
-        if hour != '*' and int(hour) != now.hour:
+        minute, hour, *_ = parts
+        now_dt = datetime.now()
+        if hour != '*' and int(hour) != now_dt.hour:
             return
-        if minute != '*' and int(minute) != now.minute:
+        if minute != '*' and int(minute) != now_dt.minute:
             return
-        _last_backup_run = now
+        _last_backup_run = now_ts
         backup_dir = config.backup.backup_dir
         os.makedirs(backup_dir, exist_ok=True)
         db_path = config.storage.path
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = now_dt.strftime("%Y%m%d_%H%M%S")
         backup_path = os.path.join(backup_dir, f"pymon_backup_{timestamp}.db")
         if os.path.exists(db_path):
             shutil.copy2(db_path, backup_path)
+            logger.info(f"Database backed up to {backup_path}")
         backups = sorted(
             [f for f in os.listdir(backup_dir) if f.endswith('.db')],
             key=lambda x: os.path.getmtime(os.path.join(backup_dir, x)),
         )
         while len(backups) > config.backup.max_backups:
             os.remove(os.path.join(backup_dir, backups.pop(0)))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Backup error: {e}")

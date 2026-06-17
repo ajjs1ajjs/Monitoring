@@ -150,7 +150,7 @@ def main():
 
     server_parser = subparsers.add_parser("server", help="Start the monitoring server")
     server_parser.add_argument("--host", default="0.0.0.0", help="Host to bind")
-    server_parser.add_argument("--port", type=int, default=10000, help="Port to bind")
+    server_parser.add_argument("--port", type=int, default=None, help="Port to bind (overrides config)")
     server_parser.add_argument("--config", "-c", default=None, help="Path to config file")
     server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite"], help="Storage backend")
     server_parser.add_argument("--db", default=None, help="Database path (defaults to config value)")

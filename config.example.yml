@@ -196,10 +196,6 @@ backup:
   max_backups: 10 # Maximum number of backups to keep
   compress: true # Compress backups (ZIP)
 
-# PostgreSQL (Phase 4, optional)
-postgres:
-  dsn: postgres://user:password@localhost:5432/pymon
-
 # TLS/SSL (optional for Phase 4)
 tls:
   enabled: false

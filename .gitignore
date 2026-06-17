@@ -56,6 +56,10 @@ backups/
 config.yml
 settings.json
 
+# Secrets
+.jwt_secret
+.pymon_jwt_secret
+
 # Testing
 .pytest_cache/
 .coverage

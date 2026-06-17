@@ -17,12 +17,12 @@ def get_db_connection():
     conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row
 
-    # Enable WAL mode for better concurrency
     try:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA busy_timeout=30000")
     except Exception as e:
-        logger.warning(f"Could not set WAL mode: {e}")
+        logger.warning(f"Could not set PRAGMAs: {e}")
 
     return conn
 
@@ -166,6 +166,32 @@ def init_database():
                   enabled INTEGER DEFAULT 1,
                   config TEXT)''')
 
+    # Indexes for performance
+    try:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_metrics_history_server_id ON metrics_history(server_id)")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_metrics_history_timestamp ON metrics_history(timestamp)")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_metrics_history_server_timestamp ON metrics_history(server_id, timestamp)")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_services_history_service_id ON services_history(service_id)")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_alerts_server_id ON alerts(server_id)")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp)")
+    except sqlite3.OperationalError:
+        pass
+
     conn.commit()
     conn.close()
-    logger.info("Database initialized with WAL mode")
+    logger.info("Database initialized with WAL mode and performance indexes")

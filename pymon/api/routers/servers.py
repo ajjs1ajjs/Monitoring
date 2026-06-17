@@ -283,6 +283,14 @@ async def export_all_servers(
                     for r in rows
                 ],
             })
+        if format == "csv":
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["server_id", "server_name", "host", "timestamp", "cpu", "memory", "disk", "network_rx", "network_tx"])
+            for srv in result:
+                for d in srv["data"]:
+                    writer.writerow([srv["id"], srv["name"], srv["host"], d["timestamp"], d["cpu"], d["memory"], d["disk"], d["network_rx"], d["network_tx"]])
+            return PlainTextResponse(output.getvalue(), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=all_servers_{range}.csv"})
         return {"range": range, "servers": result}
     finally:
         conn.close()
@@ -317,7 +325,6 @@ async def compare_servers(
                 (s["id"], time_filter),
             )
             rows = cursor.fetchall()
-            col_index = {"cpu": 1, "memory": 2, "disk": 3}.get(metric, 1)
             values = [r[col_index] for r in rows if r[col_index] is not None]
             avg = sum(values) / len(values) if values else 0
             result.append({
