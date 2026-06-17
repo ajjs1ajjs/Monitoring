@@ -216,7 +216,7 @@ storage:
 
 auth:
   admin_username: admin
-  admin_password: 291263
+  admin_password: change-me-on-first-login
   jwt_expire_hours: 24
 
 scrape_configs:

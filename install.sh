@@ -217,7 +217,7 @@ storage:
 
 auth:
   admin_username: admin
-  admin_password: "291263"
+  admin_password: "change-me-on-first-login"
   jwt_expire_hours: 24
 
 # Scrape configuration (Prometheus-style)
@@ -356,10 +356,20 @@ if systemctl is-active --quiet $SERVICE_NAME; then
         echo -e "  ${GREEN}API:${NC}         http://$IP:$PORT/api/v1/"
         echo -e "  ${GREEN}Dashboard:${NC}   http://$IP:$PORT/dashboard/"
         echo ""
-        echo -e "  ${YELLOW}Default Credentials:${NC}"
+        echo -e "  ${YELLOW}Admin Credentials:${NC}"
         echo -e "    Username: ${BLUE}admin${NC}"
-        echo -e "    Password: ${BLUE}291263${NC}"
+        ADMIN_PW=$(journalctl -u $SERVICE_NAME -n 200 --no-pager 2>/dev/null | grep 'Password:' | tail -1 | sed 's/.*Password: //' | tr -d '\r\n ' || true)
+        if [ -n "$ADMIN_PW" ]; then
+            echo -e "    Password: ${GREEN}$ADMIN_PW${NC}"
+        else
+            echo -e "    Password: ${YELLOW}(see: journalctl -u $SERVICE_NAME | grep Password)${NC}"
+        fi
         echo -e "  ${RED}IMPORTANT: Change this password immediately after login!${NC}"
+        echo ""
+        echo "  Password Commands:"
+        echo "    pymon show-password        # Show current password"
+        echo "    pymon reset-admin          # Reset to random password"
+        echo "    pymon restore-password     # Restore from encrypted backup"
         echo ""
         echo "Management Commands:"
         echo "  sudo systemctl status $SERVICE_NAME"

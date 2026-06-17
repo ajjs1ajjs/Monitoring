@@ -155,7 +155,11 @@ def main():
     server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite"], help="Storage backend")
     server_parser.add_argument("--db", default=None, help="Database path (defaults to config value)")
 
-    subparsers.add_parser("reset-admin", help="Reset admin password to '291263'")
+    subparsers.add_parser("reset-admin", help="Reset admin password to random")
+
+    subparsers.add_parser("show-password", help="Show current admin password")
+
+    subparsers.add_parser("restore-password", help="Restore admin password from encrypted backup")
 
     args = parser.parse_args()
 
@@ -246,24 +250,109 @@ def main():
         try:
             import sqlite3
 
-            from pymon.auth import init_auth_tables
+            from pymon.auth import init_auth_tables, _encrypt_password, hash_password, JWT_SECRET, _save_credentials_file
+
+            new_password = secrets.token_urlsafe(12)
+            password_hash = hash_password(new_password)
+            encrypted = _encrypt_password(new_password, JWT_SECRET)
 
             db_path = os.getenv("DB_PATH", "pymon.db")
-            if os.path.exists(db_path):
-                conn = sqlite3.connect(db_path)
-                conn.execute("DELETE FROM users WHERE username='admin'")
-                conn.commit()
-                conn.close()
-                print(f"Deleted existing admin from {db_path}")
-
-            init_auth_tables()
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute("PRAGMA table_info(users)")
+            cols = {row[1] for row in c.fetchall()}
+            if "password_encrypted" not in cols:
+                c.execute("ALTER TABLE users ADD COLUMN password_encrypted TEXT")
+            c.execute("DELETE FROM users WHERE username='admin'")
+            c.execute(
+                "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at, password_encrypted) VALUES (?, ?, 1, 1, ?, ?)",
+                ("admin", password_hash, datetime.now(timezone.utc).isoformat(), encrypted or None),
+            )
+            conn.commit()
+            conn.close()
+            _save_credentials_file(new_password)
             print("--------------------------------------------------")
             print("SUCCESS: Admin password has been reset!")
             print("Login: admin")
-            print("Password: 291263")
+            print(f"Password: {new_password}")
             print("--------------------------------------------------")
         except Exception as e:
             print(f"ERROR: Failed to reset admin: {e}")
+            sys.exit(1)
+    elif args.command == "show-password":
+        try:
+            import sqlite3
+            from pymon.auth import JWT_SECRET, _decrypt_password
+
+            db_path = os.getenv("DB_PATH", "pymon.db")
+            if not os.path.exists(db_path):
+                print(f"ERROR: Database not found at {db_path}")
+                sys.exit(1)
+
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute("SELECT password_encrypted FROM users WHERE username = 'admin'")
+            row = c.fetchone()
+            conn.close()
+
+            if not row or not row[0]:
+                print("ERROR: No password backup found for admin")
+                print("HINT: Use 'reset-admin' to set a new password")
+                sys.exit(1)
+
+            password = _decrypt_password(row[0], JWT_SECRET)
+            if not password:
+                print("ERROR: Cannot decrypt password backup")
+                print("HINT: Use 'reset-admin' to set a new password")
+                sys.exit(1)
+
+            print("--------------------------------------------------")
+            print("Username: admin")
+            print(f"Password: {password}")
+            print("--------------------------------------------------")
+        except Exception as e:
+            print(f"ERROR: {e}")
+            sys.exit(1)
+    elif args.command == "restore-password":
+        try:
+            import sqlite3
+            from pymon.auth import JWT_SECRET, _decrypt_password, hash_password, _save_credentials_file
+
+            db_path = os.getenv("DB_PATH", "pymon.db")
+            if not os.path.exists(db_path):
+                print(f"ERROR: Database not found at {db_path}")
+                sys.exit(1)
+
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute("SELECT password_encrypted FROM users WHERE username = 'admin'")
+            row = c.fetchone()
+
+            if not row or not row[0]:
+                conn.close()
+                print("ERROR: No password backup found for admin")
+                print("HINT: Use 'reset-admin' to set a new password")
+                sys.exit(1)
+
+            password = _decrypt_password(row[0], JWT_SECRET)
+            if not password:
+                conn.close()
+                print("ERROR: Cannot decrypt password backup")
+                print("HINT: Use 'reset-admin' to set a new password")
+                sys.exit(1)
+
+            password_hash = hash_password(password)
+            c.execute("UPDATE users SET password_hash = ?, password_encrypted = ?, must_change_password = 0 WHERE username = 'admin'", (password_hash, row[0]))
+            conn.commit()
+            conn.close()
+            _save_credentials_file(password)
+            print("--------------------------------------------------")
+            print("SUCCESS: Admin password restored!")
+            print("Username: admin")
+            print(f"Password: {password}")
+            print("--------------------------------------------------")
+        except Exception as e:
+            print(f"ERROR: {e}")
             sys.exit(1)
     else:
         parser.print_help()
