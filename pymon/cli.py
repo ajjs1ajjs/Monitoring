@@ -112,6 +112,9 @@ def create_app():
     else:
         origins = ["http://localhost:10000", "http://127.0.0.1:10000"]
 
+    # NOTE: allow_credentials=True with wildcard methods/headers is only safe while
+    # `origins` is an explicit list (never "*"). Lock down PYMON_ALLOWED_ORIGINS in
+    # production; do NOT set it to "*" or credentialed cross-site requests open up.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
@@ -271,7 +274,18 @@ def main():
             new_password = os.getenv("PYMON_ADMIN_PASSWORD") or secrets.token_urlsafe(18)
             password_hash = hash_password(new_password)
 
-            db_path = os.getenv("DB_PATH", "pymon.db")
+            # Resolve the DB the same way the server does: DB_PATH env wins, else the
+            # path from config.yml (CONFIG_PATH). Avoids editing the wrong database.
+            from pymon.config import resolve_db_path
+            try:
+                db_path = resolve_db_path()
+            except Exception:
+                db_path = os.getenv("DB_PATH", "pymon.db")
+            if not os.path.exists(db_path):
+                print(f"ERROR: Database not found at {db_path}")
+                print("HINT: set DB_PATH or CONFIG_PATH to point at the live database.")
+                sys.exit(1)
+            print(f"Using database: {db_path}", file=sys.stderr)
             conn = sqlite3.connect(db_path)
             c = conn.cursor()
             c.execute("DELETE FROM users WHERE username='admin'")

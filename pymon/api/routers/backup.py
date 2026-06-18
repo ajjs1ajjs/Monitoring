@@ -81,8 +81,19 @@ def restore_backup(data: dict, current_user: User = Depends(get_admin_user)):
         raise HTTPException(status_code=404, detail="Backup file not found")
     from pymon.config import resolve_db_path
     db_path = resolve_db_path()
+    # Use SQLite's online backup API to copy the snapshot INTO the live database
+    # instead of overwriting the file. This is safe with WAL mode and concurrent
+    # readers (no risk of a half-written DB file corrupting a running server).
+    import sqlite3
     try:
-        shutil.copy2(src, db_path)
+        src_conn = sqlite3.connect(src)
+        dst_conn = sqlite3.connect(db_path, timeout=30)
+        try:
+            with dst_conn:
+                src_conn.backup(dst_conn)
+        finally:
+            src_conn.close()
+            dst_conn.close()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Restore failed: {e}")
     return {"status": "ok", "restored_from": filename}

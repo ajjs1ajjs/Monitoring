@@ -8,6 +8,7 @@ import httpx
 
 from pymon.api.deps import get_async_db, manager
 from pymon.notifications import build_channels, dispatcher
+from pymon.validation import is_blocked_outbound_host
 
 logger = logging.getLogger(__name__)
 
@@ -113,13 +114,16 @@ class ScrapeManager:
         clean_host = clean_host.split('/')[0].split('?')[0]
         url = f"http://{clean_host}:{port}/metrics"
         is_up = False
-        try:
-            resp = await client.get(url)
-            if resp.status_code == 200:
-                is_up = True
-                text = resp.text
-        except Exception as e:
-            logger.warning(f"Scrape HTTP error for {name} ({url}): {type(e).__name__}: {e}")
+        if is_blocked_outbound_host(clean_host):
+            logger.warning(f"[ScrapeManager] Refusing blocked metadata target {clean_host} for {name}")
+        else:
+            try:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    is_up = True
+                    text = resp.text
+            except Exception as e:
+                logger.warning(f"Scrape HTTP error for {name} ({url}): {type(e).__name__}: {e}")
 
         now = datetime.now().isoformat()
         conn = await get_async_db()
@@ -532,6 +536,9 @@ class ServiceChecker:
         status = 'down'
 
         try:
+            _chk_host, _ = _extract_host_port(url)
+            if is_blocked_outbound_host(_chk_host):
+                raise ValueError(f"blocked metadata target: {_chk_host}")
             if check_type == 'ping':
                 import asyncio
                 import sys
@@ -609,6 +616,37 @@ class ServiceChecker:
 _last_backup_run = 0.0
 
 
+def _parse_cron_field(field: str, max_val: int) -> set[int] | None:
+    """Parse a single cron field into a set of ints. Returns None for '*' (any).
+
+    Supports '*', '*/n' steps, 'a-b' ranges and 'a,b,c' lists. Unparseable
+    fragments are ignored rather than raising.
+    """
+    field = field.strip()
+    if field == '*':
+        return None
+    values: set[int] = set()
+    for part in field.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            if part.startswith('*/'):
+                step = int(part[2:])
+                if step > 0:
+                    values.update(range(0, max_val + 1, step))
+            elif '-' in part:
+                lo, hi = (int(x) for x in part.split('-', 1))
+                values.update(v for v in range(lo, hi + 1) if 0 <= v <= max_val)
+            else:
+                v = int(part)
+                if 0 <= v <= max_val:
+                    values.add(v)
+        except ValueError:
+            continue
+    return values
+
+
 async def _run_backup_if_due(config):
     global _last_backup_run
     import os
@@ -626,12 +664,16 @@ async def _run_backup_if_due(config):
             return
         minute, hour, *_ = parts
         now_dt = datetime.now()
-        if hour != '*' and int(hour) != now_dt.hour:
+        hours = _parse_cron_field(hour, 23)
+        if hours is not None and now_dt.hour not in hours:
             return
-        # Fire on the first scrape at or after the target minute (the 1h throttle above
-        # prevents repeats), so a scrape interval > 60s can't skip the exact minute.
-        if minute != '*' and now_dt.minute < int(minute):
-            return
+        # Fire on the first scrape at or after the earliest target minute (the 1h
+        # throttle above prevents repeats), so a scrape interval > 60s can't skip
+        # the exact minute. An unparseable minute field is skipped safely.
+        minutes = _parse_cron_field(minute, 59)
+        if minutes is not None:
+            if not minutes or now_dt.minute < min(minutes):
+                return
         _last_backup_run = now_ts
         backup_dir = config.backup.backup_dir
         os.makedirs(backup_dir, exist_ok=True)

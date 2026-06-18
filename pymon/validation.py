@@ -98,6 +98,27 @@ def sanitize_input(value: str, max_length: int = 255) -> str:
     return value
 
 
+# Cloud instance-metadata endpoints are the classic SSRF target. We block them for
+# outbound scrape/service checks by default. Private LAN ranges are intentionally
+# NOT blocked — monitoring internal hosts is the whole point of this app.
+_BLOCKED_OUTBOUND_HOSTS = {
+    "169.254.169.254",            # AWS/GCP/Azure IMDS
+    "metadata.google.internal",   # GCP
+    "fd00:ec2::254",              # AWS IMDS over IPv6
+}
+
+
+def is_blocked_outbound_host(host: str) -> bool:
+    """True if a scrape/check target must be refused (cloud-metadata SSRF guard).
+
+    Set PYMON_ALLOW_METADATA=true to opt out (e.g. if you really do monitor IMDS).
+    """
+    if os.getenv("PYMON_ALLOW_METADATA", "").strip().lower() in ("1", "true", "yes", "on"):
+        return False
+    h = (host or "").strip().strip("[]").lower()
+    return h in _BLOCKED_OUTBOUND_HOSTS
+
+
 def validate_db_path(path: str) -> bool:
     """Validate database path"""
     if not path:

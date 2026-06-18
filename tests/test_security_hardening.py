@@ -56,3 +56,31 @@ def test_admin_can_delete_server(auth_client):
     # Admin (auth_client) is allowed through the same gate.
     resp = auth_client.delete("/api/v1/servers/999")
     assert resp.status_code == 200
+
+
+def test_api_key_cannot_perform_admin_actions(client, db_path):
+    import os
+    os.environ["DB_PATH"] = db_path
+    key = auth.create_api_key(user_id=1, name="ci-key")  # user 1 is the admin
+    # API key is rejected for admin actions even though the owner is an admin...
+    assert client.delete("/api/v1/servers/999", headers={"X-API-Key": key}).status_code == 403
+    # ...but read access still works.
+    assert client.get("/api/v1/servers", headers={"X-API-Key": key}).status_code == 200
+
+
+def test_parse_cron_field_handles_steps_lists_ranges():
+    from pymon.scrape import _parse_cron_field
+    assert _parse_cron_field("*", 59) is None
+    assert _parse_cron_field("*/15", 59) == {0, 15, 30, 45}
+    assert _parse_cron_field("2,14", 23) == {2, 14}
+    assert _parse_cron_field("1-3", 23) == {1, 2, 3}
+    assert _parse_cron_field("bogus", 23) == set()  # no crash
+
+
+def test_metadata_host_blocked_by_default(monkeypatch):
+    from pymon.validation import is_blocked_outbound_host
+    monkeypatch.delenv("PYMON_ALLOW_METADATA", raising=False)
+    assert is_blocked_outbound_host("169.254.169.254") is True
+    assert is_blocked_outbound_host("192.168.1.10") is False  # LAN target allowed
+    monkeypatch.setenv("PYMON_ALLOW_METADATA", "true")
+    assert is_blocked_outbound_host("169.254.169.254") is False

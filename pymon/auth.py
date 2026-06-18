@@ -58,6 +58,9 @@ class User(BaseModel):
     username: str
     is_admin: bool = False
     must_change_password: bool = False
+    # How the principal authenticated: "jwt" (interactive login) or "api_key".
+    # API-key principals are never allowed to perform admin actions.
+    auth_method: str = "jwt"
 
 
 class UserCreate(BaseModel):
@@ -267,6 +270,10 @@ def get_current_user(
 
 
 async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
+    # API keys are for ingestion/read only — they can never perform admin actions,
+    # regardless of the owning user's role.
+    if current_user.auth_method == "api_key":
+        raise HTTPException(status_code=403, detail="API keys cannot perform admin actions")
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
@@ -296,6 +303,7 @@ def validate_api_key(api_key: str) -> User:
             username=user["username"],
             is_admin=bool(user["is_admin"]),
             must_change_password=bool(user["must_change_password"]),
+            auth_method="api_key",
         )
 
     try:
