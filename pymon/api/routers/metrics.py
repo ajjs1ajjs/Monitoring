@@ -10,11 +10,15 @@ from pymon.storage import get_storage
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])
 
+class LabelPayload(BaseModel):
+    name: str
+    value: str
+
 class MetricPayload(BaseModel):
     name: str
     value: float
     type: str = "gauge"
-    labels: list[dict[str, str]] = []
+    labels: list[LabelPayload] = []
     help_text: str = ""
 
 @router.post("")
@@ -25,7 +29,7 @@ async def ingest_metric(payload: MetricPayload, current_user: User = Depends(get
     except ValueError:
         metric_type = MetricType.GAUGE
 
-    labels = [Label(name=lbl["name"], value=lbl["value"]) for lbl in payload.labels]
+    labels = [Label(name=lbl.name, value=lbl.value) for lbl in payload.labels]
     registry.register(payload.name, metric_type, payload.help_text, labels)
     registry.set(payload.name, payload.value, labels)
 

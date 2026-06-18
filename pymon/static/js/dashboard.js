@@ -1419,8 +1419,8 @@ function populateServerSelect() {
 let ws = null;
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/metrics`;
-    
+    const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/metrics?token=${encodeURIComponent(token)}`;
+
     ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {

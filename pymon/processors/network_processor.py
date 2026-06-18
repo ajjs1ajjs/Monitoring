@@ -39,26 +39,17 @@ class NetworkProcessor(MetricProcessor):
         for point in raw_metrics:
             raw_bytes_in: Optional[float] = point.get("bytes_in")
             raw_bytes_out: Optional[float] = point.get("bytes_out")
-            timestamp: float = point["timestamp"]
+            timestamp = point["timestamp"]
 
-            # In a real scenario, we would need the previous reading's timestamp/count
-            # to calculate the delta rate over time (rate = (new - old) / delta_time).
-            # For this standardized processor structure, we will simulate calculating
-            # instantaneous rates based on assumed available fields.
-
-            ingress_rate: Optional[float] = None
-            egress_rate: Optional[float] = None
-
+            # NOTE: bytes_in/bytes_out are cumulative counters; a true bytes/sec rate would
+            # need the previous reading's count and timestamp. This simplified processor
+            # echoes the supplied values (see tests for the established contract).
             if raw_bytes_in is not None and raw_bytes_out is not None:
-                ingress_rate = float(raw_bytes_in)
-                egress_rate = float(raw_bytes_out)
-
-            if ingress_rate is not None and egress_rate is not None:
                 processed_results.append(
                     {
                         "timestamp": timestamp,
-                        "ingress_rate_bps": round(ingress_rate, 2),  # Standardize output
-                        "egress_rate_bps": round(egress_rate, 2),
+                        "ingress_rate_bps": round(float(raw_bytes_in), 2),
+                        "egress_rate_bps": round(float(raw_bytes_out), 2),
                         "source": point.get("target"),
                     }
                 )
@@ -102,7 +93,7 @@ class NetworkProcessor(MetricProcessor):
 
         try:
             # Calculate standard deviation on the sample size used for MA
-            stdev_throughput = statistics.stdev(throughput_values[:num_points_for_stats])
+            stdev_throughput = statistics.stdev(throughput_values[-num_points_for_stats:])
         except statistics.StatisticsError:
             stdev_throughput = 0.0
 

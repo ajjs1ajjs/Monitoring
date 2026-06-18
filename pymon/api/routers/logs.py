@@ -44,9 +44,13 @@ async def get_system_logs(lines: int = Query(200, ge=10, le=5000), current_user:
         return {"logs": ["Log file not found."]}
 
     try:
+        # Tail efficiently: keep only the last `lines` in memory instead of loading
+        # the whole (potentially tens-of-MB) rotating log file.
+        from collections import deque
+
         with open(log_path, "r", encoding="utf-8", errors="replace") as f:
-            all_lines = f.readlines()
-        return {"logs": all_lines[-lines:]}
+            tail = deque(f, maxlen=lines)
+        return {"logs": list(tail)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

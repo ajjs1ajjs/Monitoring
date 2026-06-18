@@ -144,9 +144,11 @@ async def get_disk_breakdown(
         volumes = json.loads(row[0])
         disks = []
         for v in volumes:
-            size_gb = round(v["size"] / (1024**3), 2) if v.get("size") else 0
-            free_gb = round(v["free"] / (1024**3), 2) if v.get("free") else 0
-            used_gb = round(size_gb - free_gb, 2)
+            size = v.get("size")
+            free = v.get("free")
+            size_gb = round(size / (1024**3), 2) if isinstance(size, (int, float)) else 0
+            free_gb = round(free / (1024**3), 2) if isinstance(free, (int, float)) else 0
+            used_gb = round(max(0.0, size_gb - free_gb), 2)
             percent = round((used_gb / size_gb) * 100, 1) if size_gb > 0 else 0
             disks.append({
                 "volume": v.get("volume", ""),
@@ -364,7 +366,11 @@ async def update_server(server_id: int, data: ServerUpdate, current_user: User =
     try:
         fields = []
         params = []
+        # Defense-in-depth: only allow known model columns to be built into SQL.
+        allowed_columns = set(ServerUpdate.model_fields)
         for field, value in data.model_dump(exclude_unset=True).items():
+            if field not in allowed_columns:
+                continue
             fields.append(f"{field} = ?")
             params.append(value)
 

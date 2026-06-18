@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from pymon.api import models as api_models
 from pymon.api.deps import get_db
@@ -33,7 +33,10 @@ async def create_service(data: api_models.ServiceCreate, current_user: User = De
         conn.close()
 
 @router.get("/history")
-async def get_all_services_history(range: str = "1h", current_user: User = Depends(get_current_user)):
+async def get_all_services_history(
+    range: str = Query("1h", pattern=r"^\d+[mhd]$"),
+    current_user: User = Depends(get_current_user),
+):
     conn = get_db()
     try:
         h: float = 1.0

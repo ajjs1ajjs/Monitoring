@@ -37,9 +37,14 @@ _db_path_cache = None
 def _resolve_db_path() -> str:
     global _db_path_cache
     if _db_path_cache is None:
-        from pymon.config import load_config
-        cfg = load_config(os.getenv("CONFIG_PATH", "config.yml"))
-        _db_path_cache = cfg.storage.path
+        # An explicit DB_PATH env var always wins so the whole process (app + CLI) agrees.
+        env_path = os.getenv("DB_PATH")
+        if env_path:
+            _db_path_cache = env_path
+        else:
+            from pymon.config import load_config
+            cfg = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+            _db_path_cache = cfg.storage.path
     return _db_path_cache
 
 def get_db():

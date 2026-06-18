@@ -3,6 +3,7 @@
 import os
 import secrets
 import sqlite3
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -89,8 +90,15 @@ def _load_jwt_secret() -> str:
         with open(secret_file, "w") as f:
             f.write(new_secret)
         os.chmod(secret_file, 0o600)
-    except OSError:
-        pass
+    except OSError as e:
+        # Could not persist the secret: every restart will now invalidate all tokens.
+        # Surface this loudly instead of failing silently; set JWT_SECRET env to fix.
+        print(
+            f"WARNING: could not persist JWT secret to {secret_file} ({e}). "
+            "Tokens will be invalidated on restart. Set the JWT_SECRET environment variable "
+            "to a fixed value to avoid this.",
+            file=sys.stderr,
+        )
     return new_secret
 
 
@@ -344,11 +352,11 @@ async def validate_api_key(api_key: str) -> User:
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
 
-    for row in c.execute("SELECT user_id, key_hash FROM api_keys"):
+    for row in c.execute("SELECT id, user_id, key_hash FROM api_keys").fetchall():
         if verify_password(api_key, row["key_hash"]):
             c.execute(
-                "UPDATE api_keys SET last_used = ? WHERE user_id = ?",
-                (datetime.now(timezone.utc).isoformat(), row["user_id"]),
+                "UPDATE api_keys SET last_used = ? WHERE id = ?",
+                (datetime.now(timezone.utc).isoformat(), row["id"]),
             )
             conn.commit()
 
@@ -524,9 +532,19 @@ def list_users() -> list[dict]:
     ]
 
 
+def _count_admins(c) -> int:
+    return c.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
+
+
 def update_user(user_id: int, is_admin: Optional[bool] = None, must_change_password: Optional[bool] = None) -> bool:
     conn = get_db()
     c = conn.cursor()
+    if is_admin is False:
+        # Block demoting the last remaining admin (would lock everyone out).
+        row = c.execute("SELECT is_admin FROM users WHERE id = ?", (user_id,)).fetchone()
+        if row and row["is_admin"] and _count_admins(c) <= 1:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Cannot demote the last admin user")
     if is_admin is not None:
         c.execute("UPDATE users SET is_admin = ? WHERE id = ?", (int(is_admin), user_id))
     if must_change_password is not None:
@@ -539,10 +557,16 @@ def update_user(user_id: int, is_admin: Optional[bool] = None, must_change_passw
 
 
 def delete_user(user_id: int) -> bool:
-    if user_id == 1:
-        raise HTTPException(status_code=400, detail="Cannot delete admin user")
     conn = get_db()
     c = conn.cursor()
+    row = c.execute("SELECT is_admin FROM users WHERE id = ?", (user_id,)).fetchone()
+    if row is None:
+        conn.close()
+        return False
+    # Block deleting the last remaining admin (would lock everyone out).
+    if row["is_admin"] and _count_admins(c) <= 1:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Cannot delete the last admin user")
     c.execute("DELETE FROM users WHERE id = ?", (user_id,))
     deleted = c.rowcount > 0
     conn.commit()

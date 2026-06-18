@@ -1,9 +1,12 @@
 """HTTP client for pushing metrics to PyMon server"""
 
 import asyncio
+import logging
 from typing import Any, cast
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class PyMonClient:
@@ -109,11 +112,21 @@ def push_metric(
     try:
         loop = asyncio.get_running_loop()
         if loop.is_running():
-            loop.create_task(_push_async(url, name, value, labels, metric_type))
+            task = loop.create_task(_push_async(url, name, value, labels, metric_type))
+            task.add_done_callback(_log_push_result)
             return
     except RuntimeError:
         pass
     asyncio.run(_push_async(url, name, value, labels, metric_type))
+
+
+def _log_push_result(task: "asyncio.Task") -> None:
+    """Surface fire-and-forget push failures instead of swallowing them."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc is not None:
+        logger.error("push_metric task failed: %s", exc)
 
 
 async def _push_async(

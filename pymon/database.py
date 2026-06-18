@@ -10,9 +10,12 @@ _config_cache = None
 
 def get_db_connection():
     global _config_cache
-    if _config_cache is None:
-        _config_cache = load_config(os.getenv("CONFIG_PATH", "config.yml"))
-    db_path = _config_cache.storage.path
+    # An explicit DB_PATH env var always wins so init and runtime agree on one file.
+    db_path = os.getenv("DB_PATH")
+    if not db_path:
+        if _config_cache is None:
+            _config_cache = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+        db_path = _config_cache.storage.path
 
     conn = sqlite3.connect(db_path, timeout=30)
     conn.row_factory = sqlite3.Row

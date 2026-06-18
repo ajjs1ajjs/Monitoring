@@ -640,7 +640,9 @@ async def _run_backup_if_due(config):
         now_dt = datetime.now()
         if hour != '*' and int(hour) != now_dt.hour:
             return
-        if minute != '*' and int(minute) != now_dt.minute:
+        # Fire on the first scrape at or after the target minute (the 1h throttle above
+        # prevents repeats), so a scrape interval > 60s can't skip the exact minute.
+        if minute != '*' and now_dt.minute < int(minute):
             return
         _last_backup_run = now_ts
         backup_dir = config.backup.backup_dir

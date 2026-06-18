@@ -4,13 +4,13 @@ import os
 from fastapi import APIRouter, Depends, HTTPException
 
 from pymon.api.deps import get_db
-from pymon.auth import User, get_current_user
+from pymon.auth import User, get_admin_user
 from pymon.notifications import dispatcher
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 @router.get("/notifications")
-async def get_notification_settings(current_user: User = Depends(get_current_user)):
+async def get_notification_settings(current_user: User = Depends(get_admin_user)):
     conn = get_db()
     try:
         # Check if notifications table has a unified config or per-channel
@@ -32,7 +32,7 @@ async def get_notification_settings(current_user: User = Depends(get_current_use
         conn.close()
 
 @router.post("/notifications")
-async def save_notification_settings(data: dict, current_user: User = Depends(get_current_user)):
+async def save_notification_settings(data: dict, current_user: User = Depends(get_admin_user)):
     conn = get_db()
     try:
         # Save as a single 'all' record for simplicity as expected by dashboard
@@ -45,7 +45,7 @@ async def save_notification_settings(data: dict, current_user: User = Depends(ge
         conn.close()
 
 @router.post("/notifications/test")
-async def test_notification_settings(current_user: User = Depends(get_current_user)):
+async def test_notification_settings(current_user: User = Depends(get_admin_user)):
     conn = get_db()
     try:
         row = conn.execute("SELECT config FROM notifications WHERE channel = 'all'").fetchone()
@@ -84,7 +84,7 @@ async def test_notification_settings(current_user: User = Depends(get_current_us
         conn.close()
 
 @router.get("/config/export")
-async def export_config(current_user: User = Depends(get_current_user)):
+async def export_config(current_user: User = Depends(get_admin_user)):
     config_path = os.getenv("CONFIG_PATH", "config.yml")
     if not os.path.exists(config_path):
         raise HTTPException(status_code=404, detail="Config file not found")
@@ -92,7 +92,7 @@ async def export_config(current_user: User = Depends(get_current_user)):
         return {"content": f.read()}
 
 @router.post("/config/import-prometheus")
-async def import_prometheus_config(data: dict, current_user: User = Depends(get_current_user)):
+async def import_prometheus_config(data: dict, current_user: User = Depends(get_admin_user)):
     yaml_content = data.get("yaml_content")
     if not yaml_content:
         raise HTTPException(status_code=400, detail="No YAML content provided")
