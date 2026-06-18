@@ -178,21 +178,39 @@ fi
 echo -e "${GREEN}Downloaded: $(du -h pymon.tar.gz | cut -f1)${NC}"
 
 echo -e "${BLUE}Extracting...${NC}"
-tar -xzf pymon.tar.gz
+# Extract into a dedicated, clean directory so the code backup in /tmp
+# (pymon.backup.*) can never be mistaken for the extracted source tree.
+EXTRACT_ROOT="/tmp/pymon_extract.$$"
+rm -rf "$EXTRACT_ROOT"
+mkdir -p "$EXTRACT_ROOT"
+tar -xzf pymon.tar.gz -C "$EXTRACT_ROOT"
 
-# Find extracted directory (could be Monitoring-main, Project2-main, etc.)
-EXTRACT_DIR=$(find . -maxdepth 1 -type d \( -name "Monitoring*" -o -name "Project2*" -o -name "pymon*" \) | head -1)
-
+# The GitHub tarball unpacks to a single <repo>-<ref> directory. Pick the one
+# that actually contains the application package (pymon/ + pyproject.toml).
+EXTRACT_DIR=""
+for d in "$EXTRACT_ROOT"/*/; do
+    if [ -d "$d/pymon" ] && [ -f "$d/pyproject.toml" ]; then
+        EXTRACT_DIR="${d%/}"
+        break
+    fi
+done
+# Fallback: first sub-directory in the clean extract root.
 if [ -z "$EXTRACT_DIR" ]; then
-    echo -e "${RED}Error: Could not find extracted files${NC}"
-    echo "Looking for extracted directories:"
-    ls -la
+    EXTRACT_DIR=$(find "$EXTRACT_ROOT" -maxdepth 1 -mindepth 1 -type d | head -1)
+fi
+
+if [ -z "$EXTRACT_DIR" ] || [ ! -d "$EXTRACT_DIR/pymon" ]; then
+    echo -e "${RED}Error: Could not find extracted application files${NC}"
+    echo "Contents of $EXTRACT_ROOT:"
+    ls -la "$EXTRACT_ROOT"
     exit 1
 fi
 
 echo -e "${BLUE}Found: $EXTRACT_DIR${NC}"
 
 echo -e "${BLUE}Installing application...${NC}"
+# Remove the old package first so deleted files don't linger between versions.
+rm -rf "$INSTALL_DIR/pymon"
 cp -r "$EXTRACT_DIR/pymon" "$INSTALL_DIR/"
 cp "$EXTRACT_DIR/pyproject.toml" "$INSTALL_DIR/" 2>/dev/null || true
 cp "$EXTRACT_DIR/README.md" "$INSTALL_DIR/" 2>/dev/null || true
@@ -412,6 +430,6 @@ else
     exit 1
 fi
 
-rm -rf /tmp/pymon.tar.gz "$EXTRACT_DIR"
+rm -rf /tmp/pymon.tar.gz "$EXTRACT_ROOT"
 
 echo -e "${GREEN}Done!${NC}"
