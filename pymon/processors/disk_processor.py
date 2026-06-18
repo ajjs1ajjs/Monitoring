@@ -99,7 +99,7 @@ class DiskProcessor(MetricProcessor):
             moving_average = None
 
         try:
-            stdev = statistics.stdev(values[:num_points_for_stats])
+            stdev = statistics.stdev(values[-num_points_for_stats:])
         except statistics.StatisticsError:
             stdev = 0.0  # Happens if all values are the same or list is too short
 

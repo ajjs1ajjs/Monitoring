@@ -109,10 +109,8 @@ class Gauge:
         registry.set(self.name, value, _merge_labels(self._base_labels, labels))
 
     def inc(self, value: float = 1.0, labels: list[Label] | None = None) -> None:
-        merged_labels = _merge_labels(self._base_labels, labels)
-        metric = registry.get_metric(self.name, merged_labels)
-        current = metric.value if metric else 0
-        registry.set(self.name, current + value, merged_labels)
+        # Delegate to registry.inc which performs the read-modify-write under lock.
+        registry.inc(self.name, value, _merge_labels(self._base_labels, labels))
 
     def dec(self, value: float = 1.0, labels: list[Label] | None = None) -> None:
         self.inc(-value, labels)

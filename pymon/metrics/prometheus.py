@@ -15,6 +15,7 @@ class PrometheusMetricsExporter:
         self._metrics_registry: dict[str, dict[str, Any]] = {}
         self._gauge_samples: dict[str, dict[str, Any]] = {}
         self._histogram_buckets: dict[str, list[float]] = {"default": [0.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0]}
+        self._start_time = datetime.now(timezone.utc).timestamp()
 
     def register_metric(self, name: str, help_text: str, metric_type: str = "gauge"):
         """Register a new metric for exposure."""
@@ -59,54 +60,48 @@ class PrometheusMetricsExporter:
         lines = ["# HELP pymon_uptime_seconds Uptime of PyMon server in seconds", "# TYPE pymon_uptime_seconds gauge"]
 
         now = datetime.now(timezone.utc).timestamp()
-        uptime = (now - self._start_time) if hasattr(self, "_start_time") else 0
+        uptime = now - self._start_time
 
-        lines.append(f"# {self._get_timestamp()}")
         lines.append(f"pymon_uptime_seconds {uptime}")
 
         # Output registered gauge metrics with samples
         for key, sample_data in sorted(self._gauge_samples.items()):
             metric_name = self._parse_metric_key(key)
-
-            if "__name__" not in metric_name:
-                continue  # Skip non-standard metrics
-
             metric_title = metric_name.get("__name__", key)
             metric_help = metric_name.get("help", f"Sample value of {metric_title}")
 
-            labels_str = ""
-            for label, value in sorted(sample_data.items()):
-                if label.startswith("__"):
-                    continue
-                labels_str += f'{label}="{value}",'
-
-            if labels_str:
-                lines.append(f"# HELP {metric_title} {metric_help}")
-                lines.append(f"# TYPE {metric_title} gauge")
-
-            for label, value in sorted(sample_data.items()):
+            label_parts = []
+            value = None
+            for label, lvalue in sorted(sample_data.items()):
                 if label.startswith("__"):
                     continue  # Skip meta labels
                 if label == "value":
-                    lines.append(f"{labels_str.rstrip(',')} {sample_data[label]}")
+                    value = lvalue
+                    continue
+                label_parts.append(f'{label}="{lvalue}"')
+
+            if value is None:
+                continue
+
+            labels_str = "{" + ",".join(label_parts) + "}" if label_parts else ""
+            lines.append(f"# HELP {metric_title} {metric_help}")
+            lines.append(f"# TYPE {metric_title} gauge")
+            lines.append(f"{metric_title}{labels_str} {value}")
+
+        # Include the live in-process metrics registry (system_* gauges, counters, etc.)
+        from pymon.metrics.collector import registry
+
+        registry_output = registry.export_prometheus()
+        if registry_output:
+            lines.append(registry_output)
 
         return "\n".join(lines)
 
     def _parse_metric_key(self, key: str) -> dict[str, Any]:
         """Parse metric key to extract name and labels."""
         # This is a simplified parser - in production you'd use prometheus_client library
-        parts = key.split("{", 1)
-        if len(parts) == 2:
-            name = _parse_metric_name(parts[0])
-            return {"__name__": name, "help": f"Sample value of {name}"}
-
-        # No labels - just metric name
-        return {"__name__": key}
-
-    def _get_timestamp(self) -> str:
-        """Get Prometheus timestamp format."""
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        return f"# {now}"
+        name = _parse_metric_name(key.split("{", 1)[0])
+        return {"__name__": name, "help": f"Sample value of {name}"}
 
 
 def labels_key(labels: dict[str, str] | None) -> str:
@@ -124,12 +119,12 @@ def labels_key(labels: dict[str, str] | None) -> str:
     return "{" + ",".join(parts) + "}"
 
 
-def _parse_metric_name(name: str) -> dict[str, Any]:
-    """Parse a metric name that may include type suffix."""
-    # Remove type suffix if present (e.g., "_total", "_sum")
-    base_name = name.rstrip("_total").rstrip("_sum")
-
-    return {"__name__": base_name, "help": f"Sample value of {base_name}"}
+def _parse_metric_name(name: str) -> str:
+    """Parse a metric name, stripping a known type suffix if present."""
+    for suffix in ("_total", "_sum"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return name
 
 
 # ============================================================================

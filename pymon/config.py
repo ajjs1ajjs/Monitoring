@@ -289,13 +289,20 @@ class PyMonConfig(BaseModel):
                 "teams": {
                     "webhook_url": self.notifications.teams_webhook_url,
                 },
-                "smtp": {
-                    "server": self.notifications.smtp_server,
-                    "port": self.notifications.smtp_port,
-                    "user": self.notifications.smtp_user,
-                    "pass": self.notifications.smtp_pass,
-                    "email_to": self.notifications.email_to,
-                }
+                "slack": {
+                    "webhook_url": self.notifications.slack_webhook_url,
+                },
+                "email": {
+                    "smtp_server": self.notifications.smtp_server,
+                    "smtp_port": self.notifications.smtp_port,
+                    "smtp_user": self.notifications.smtp_user,
+                    "smtp_pass": self.notifications.smtp_pass,
+                    "to": self.notifications.email_to,
+                },
+                "webhook": {
+                    "url": self.notifications.webhook_url,
+                    "headers": self.notifications.webhook_headers,
+                },
             }
         }
 
@@ -311,21 +318,15 @@ def _parse_duration(value: Any) -> int:
         raise TypeError("Duration must be a string or integer.")
 
     # Handle common suffixes for robustness
-    if value.endswith("s"):
-        seconds = int(value[:-1])
-        if seconds < 0:
+    _multipliers = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+    if value and value[-1] in _multipliers:
+        try:
+            amount = int(value[:-1])
+        except ValueError:
+            raise ValueError(f"Invalid duration format: {value}. Must end with s, m, h, d, or be a number.")
+        if amount < 0:
             raise ValueError("Duration cannot be negative.")
-        return seconds
-    elif value.endswith("m"):
-        minutes = int(value[:-1])
-        return minutes * 60
-    elif value.endswith("h"):
-        hours = int(value[:-1])
-        return hours * 3600
-    # Assuming 'd' for days is rare, but included for completeness
-    elif value.endswith("d"):
-        days = int(value[:-1])
-        return days * 86400
+        return amount * _multipliers[value[-1]]
     else:
         try:
             # Assume plain integer seconds if no suffix is provided

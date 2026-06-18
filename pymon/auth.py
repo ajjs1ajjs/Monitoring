@@ -303,10 +303,10 @@ security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security), request: Optional[Request] = None
+    request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> User:
     if not credentials:
-        api_key = request.headers.get("X-API-Key") if request else None
+        api_key = request.headers.get("X-API-Key")
         if api_key:
             return await validate_api_key(api_key)
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -357,7 +357,12 @@ async def validate_api_key(api_key: str) -> User:
             conn.close()
 
             if user:
-                return User(id=user["id"], username=user["username"], is_admin=user["is_admin"])
+                return User(
+                    id=user["id"],
+                    username=user["username"],
+                    is_admin=bool(user["is_admin"]),
+                    must_change_password=bool(user["must_change_password"]),
+                )
 
     conn.close()
     raise HTTPException(status_code=401, detail="Invalid API key")

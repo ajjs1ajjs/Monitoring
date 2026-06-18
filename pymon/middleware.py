@@ -32,7 +32,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             status_code=500,
             content={
                 "error": "Internal server error",
-                "detail": str(exc) if logger.level == logging.DEBUG else "An error occurred",
+                "detail": str(exc) if logger.isEnabledFor(logging.DEBUG) else "An error occurred",
                 "request_id": request_id,
             },
         )

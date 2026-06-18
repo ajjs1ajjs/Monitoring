@@ -104,7 +104,7 @@ class MemoryProcessor(MetricProcessor):
             moving_average = None
 
         try:
-            stdev = statistics.stdev(values[:num_points_for_stats])  # Calculate STDEV on the sample size used for MA
+            stdev = statistics.stdev(values[-num_points_for_stats:])  # Calculate STDEV on the sample size used for MA
         except statistics.StatisticsError:
             stdev = 0.0
 

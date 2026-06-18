@@ -3,9 +3,11 @@
 import argparse
 import logging
 import os
+import secrets
 import sys
 import traceback
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 
 import uvicorn
@@ -87,6 +89,15 @@ def create_app():
         logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     app = FastAPI(title="PyMon", version=__version__, lifespan=lifespan)
+
+    # Register the slowapi rate limiter so the @limiter.limit decorators (e.g. on /auth/login) work.
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+
+    from pymon.api.routers.auth import _limiter
+
+    app.state.limiter = _limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     from pymon.middleware import setup_middleware
     setup_middleware(app)

@@ -76,8 +76,13 @@ async def restore_backup(data: dict, current_user: User = Depends(get_current_us
     filename = data.get("filename", "")
     if not filename:
         raise HTTPException(status_code=400, detail="filename is required")
+    # Reject path traversal: only allow a bare filename inside backup_dir.
+    if os.path.basename(filename) != filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
     src = os.path.join(backup_dir, filename)
-    if not os.path.exists(src):
+    if os.path.realpath(src) != os.path.join(os.path.realpath(backup_dir), filename):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    if not os.path.isfile(src):
         raise HTTPException(status_code=404, detail="Backup file not found")
     db_path = config.storage.path
     try:

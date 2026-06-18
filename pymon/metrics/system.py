@@ -13,6 +13,7 @@ class SystemCollector:
         self.interval = interval
         self.labels = labels or []
         self._running = False
+        self._task = None
 
         self.cpu_gauge = Gauge("system_cpu_usage_percent", "CPU usage percentage", self.labels)
         self.memory_gauge = Gauge("system_memory_usage_percent", "Memory usage percentage", self.labels)
@@ -24,30 +25,27 @@ class SystemCollector:
         self._start_time = time.time()
 
     async def collect(self) -> None:
-        if not self._running:
-            return
+        while self._running:
+            try:
+                await self._collect_cpu()
+                await self._collect_memory()
+                await self._collect_disk()
+                await self._collect_uptime()
 
-        try:
-            await self._collect_cpu()
-            await self._collect_memory()
-            await self._collect_disk()
-            await self._collect_uptime()
+                for metric in registry.get_all_metrics():
+                    if metric.name.startswith("system_"):
+                        await get_storage().write(metric)
 
-            for metric in registry.get_all_metrics():
-                if metric.name.startswith("system_"):
-                    await get_storage().write(metric)
+            except Exception as e:
+                print(f"Collection error: {e}")
 
-        except Exception as e:
-            print(f"Collection error: {e}")
-
-        await asyncio.sleep(self.interval)
-        asyncio.create_task(self.collect())
+            await asyncio.sleep(self.interval)
 
     async def _collect_cpu(self) -> None:
         try:
             import psutil
 
-            cpu = psutil.cpu_percent(interval=1)
+            cpu = await asyncio.to_thread(psutil.cpu_percent, 1)
             self.cpu_gauge.set(cpu, self.labels)
         except ImportError:
             self.cpu_gauge.set(0, self.labels)
@@ -98,7 +96,7 @@ class SystemCollector:
 
     def start(self) -> None:
         self._running = True
-        asyncio.create_task(self.collect())
+        self._task = asyncio.create_task(self.collect())
 
     def stop(self) -> None:
         self._running = False

@@ -1,3 +1,4 @@
+import html
 import json
 from datetime import datetime
 
@@ -36,11 +37,14 @@ async def generate_server_report(server_id: int, current_user: User = Depends(ge
             cpu_data.append(row[1])
             mem_data.append(row[2])
 
-        html = f"""
+        server_name = html.escape(str(server['name']))
+        server_host = html.escape(str(server['host']))
+
+        report_html = f"""
         <!DOCTYPE html>
         <html>
             <head>
-                <title>Infrastructure Report - {server['name']}</title>
+                <title>Infrastructure Report - {server_name}</title>
                 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
                 <style>
                     body {{ font-family: 'Outfit', sans-serif; padding: 40px; background: #fff; color: #1e293b; max-width: 1000px; margin: 0 auto; }}
@@ -69,11 +73,11 @@ async def generate_server_report(server_id: int, current_user: User = Depends(ge
                     <div class="info-grid">
                         <div class="stat-box">
                             <div class="label">Server Identifier</div>
-                            <div class="value">{server['name']}</div>
+                            <div class="value">{server_name}</div>
                         </div>
                         <div class="stat-box">
                             <div class="label">Network Address</div>
-                            <div class="value">{server['host']}</div>
+                            <div class="value">{server_host}</div>
                         </div>
                     </div>
 
@@ -124,6 +128,6 @@ async def generate_server_report(server_id: int, current_user: User = Depends(ge
             </body>
         </html>
         """
-        return HTMLResponse(content=html)
+        return HTMLResponse(content=report_html)
     finally:
         conn.close()
