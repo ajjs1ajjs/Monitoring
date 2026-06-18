@@ -9,14 +9,9 @@ from pymon.auth import User, get_current_user
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
-_config_cache = None
-
 def _get_config():
-    global _config_cache
-    if _config_cache is None:
-        from pymon.config import load_config
-        _config_cache = load_config(os.getenv("CONFIG_PATH", "config.yml"))
-    return _config_cache
+    from pymon.config import get_cached_config
+    return get_cached_config()
 
 def _get_backup_dir():
     return _get_config().backup.backup_dir
@@ -41,10 +36,11 @@ def list_backups(current_user: User = Depends(get_current_user)):
 
 @router.post("/create")
 def create_backup(current_user: User = Depends(get_current_user)):
+    from pymon.config import resolve_db_path
     config = _get_config()
     backup_dir = _get_backup_dir()
     os.makedirs(backup_dir, exist_ok=True)
-    db_path = config.storage.path
+    db_path = resolve_db_path()
     if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database file not found")
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -71,7 +67,6 @@ def create_backup(current_user: User = Depends(get_current_user)):
 
 @router.post("/restore")
 def restore_backup(data: dict, current_user: User = Depends(get_current_user)):
-    config = _get_config()
     backup_dir = _get_backup_dir()
     filename = data.get("filename", "")
     if not filename:
@@ -84,7 +79,8 @@ def restore_backup(data: dict, current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Invalid filename")
     if not os.path.isfile(src):
         raise HTTPException(status_code=404, detail="Backup file not found")
-    db_path = config.storage.path
+    from pymon.config import resolve_db_path
+    db_path = resolve_db_path()
     try:
         shutil.copy2(src, db_path)
     except Exception as e:

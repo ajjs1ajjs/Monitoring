@@ -73,17 +73,18 @@ class CpuProcessor(MetricProcessor):
             if isinstance(raw_value, (int, float)):
                 values.append(float(raw_value))
 
-        # 2. Calculate Moving Average (Simple implementation for demonstration)
-        # In a real system, this would use the 'ma_window' from config and specialized time series libraries.
-        if len(values) >= 5:  # Require at least 5 points for meaningful average calculation
-            avg = sum(values[-5:]) / min(len(values), 5)
+        # 2. Calculate Moving Average and Standard Deviation over the same recent window
+        # (consistent with the disk/memory/network processors).
+        num_points_for_stats = min(len(values), 5)
+
+        if num_points_for_stats >= 2:
+            avg = sum(values[-num_points_for_stats:]) / num_points_for_stats
             moving_average = round(avg, 2)
         else:
             moving_average = None
 
-        # 3. Calculate Standard Deviation
         try:
-            stdev = statistics.stdev(values)
+            stdev = statistics.stdev(values[-num_points_for_stats:])
         except statistics.StatisticsError:
             stdev = 0.0  # Happens if all values are the same or list is too short
 

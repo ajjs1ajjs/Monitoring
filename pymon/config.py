@@ -372,3 +372,31 @@ def load_config(path: str | None = None) -> PyMonConfig:
 
     # If no config was loaded successfully
     raise FileNotFoundError("Could not find or validate a valid configuration file (.yml, .yaml, or .json).")
+
+
+# --- Shared, invalidatable config cache -------------------------------------
+# Single source of truth for the parsed config so callers don't each keep their
+# own stale module-level copy. Call reset_config_cache() to force a reload.
+_cached_config: PyMonConfig | None = None
+
+
+def get_cached_config() -> PyMonConfig:
+    """Return the process-wide cached config, loading it on first use."""
+    global _cached_config
+    if _cached_config is None:
+        _cached_config = load_config(os.getenv("CONFIG_PATH", "config.yml"))
+    return _cached_config
+
+
+def reset_config_cache() -> None:
+    """Drop the cached config so the next access reloads it from disk."""
+    global _cached_config
+    _cached_config = None
+
+
+def resolve_db_path() -> str:
+    """Resolve the database path: explicit DB_PATH env always wins, else config."""
+    env_path = os.getenv("DB_PATH")
+    if env_path:
+        return env_path
+    return get_cached_config().storage.path
