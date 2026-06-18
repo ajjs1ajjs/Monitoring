@@ -1,5 +1,6 @@
 """JWT Authentication module for PyMon"""
 
+import hashlib
 import os
 import secrets
 import sqlite3
@@ -215,6 +216,17 @@ def init_auth_tables():
         FOREIGN KEY (user_id) REFERENCES users(id)
     )""")
 
+    # Migration: add indexed sha256 lookup so validate_api_key does an O(1) exact
+    # match instead of a bcrypt scan over every row (DoS + timing-leak vector).
+    try:
+        c.execute("PRAGMA table_info(api_keys)")
+        key_cols = {row[1] for row in c.fetchall()}
+        if "key_sha256" not in key_cols:
+            c.execute("ALTER TABLE api_keys ADD COLUMN key_sha256 TEXT")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_api_keys_sha256 ON api_keys(key_sha256)")
+    except Exception:
+        pass
+
     jwt_key = JWT_SECRET
     c.execute("SELECT id, password_hash, password_encrypted FROM users WHERE username = ?", (auth_config.admin_username,))
     admin_row = c.fetchone()
@@ -310,13 +322,15 @@ def decode_token(token: str) -> Optional[dict]:
 security = HTTPBearer(auto_error=False)
 
 
-async def get_current_user(
+def get_current_user(
     request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> User:
+    # Sync dependency: FastAPI runs it in a threadpool, keeping the blocking
+    # sqlite/bcrypt work off the event loop.
     if not credentials:
         api_key = request.headers.get("X-API-Key")
         if api_key:
-            return await validate_api_key(api_key)
+            return validate_api_key(api_key)
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     payload = decode_token(credentials.credentials)
@@ -347,32 +361,52 @@ async def get_admin_user(current_user: User = Depends(get_current_user)) -> User
     return current_user
 
 
-async def validate_api_key(api_key: str) -> User:
+def validate_api_key(api_key: str) -> User:
     conn = get_db()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
 
-    for row in c.execute("SELECT id, user_id, key_hash FROM api_keys").fetchall():
-        if verify_password(api_key, row["key_hash"]):
-            c.execute(
-                "UPDATE api_keys SET last_used = ? WHERE id = ?",
-                (datetime.now(timezone.utc).isoformat(), row["id"]),
-            )
-            conn.commit()
+    def _resolve(row, backfill_sha: str | None = None) -> Optional[User]:
+        """Confirm the bcrypt hash, touch last_used, and return the owning user."""
+        if not verify_password(api_key, row["key_hash"]):
+            return None
+        if backfill_sha is not None:
+            c.execute("UPDATE api_keys SET last_used = ?, key_sha256 = ? WHERE id = ?", (now, backfill_sha, row["id"]))
+        else:
+            c.execute("UPDATE api_keys SET last_used = ? WHERE id = ?", (now, row["id"]))
+        conn.commit()
+        c.execute("SELECT id, username, is_admin, must_change_password FROM users WHERE id = ?", (row["user_id"],))
+        user = c.fetchone()
+        if not user:
+            return None
+        return User(
+            id=user["id"],
+            username=user["username"],
+            is_admin=bool(user["is_admin"]),
+            must_change_password=bool(user["must_change_password"]),
+        )
 
-            c.execute("SELECT id, username, is_admin, must_change_password FROM users WHERE id = ?", (row["user_id"],))
-            user = c.fetchone()
-            conn.close()
+    try:
+        # Fast path: indexed exact match on the sha256 lookup (no per-row bcrypt scan).
+        sha = _api_key_sha256(api_key)
+        row = c.execute("SELECT id, user_id, key_hash FROM api_keys WHERE key_sha256 = ?", (sha,)).fetchone()
+        if row is not None:
+            user = _resolve(row)
+            if user is not None:
+                return user
 
-            if user:
-                return User(
-                    id=user["id"],
-                    username=user["username"],
-                    is_admin=bool(user["is_admin"]),
-                    must_change_password=bool(user["must_change_password"]),
-                )
+        # Legacy fallback: keys created before the migration have no sha256 yet.
+        # Scan only those, and backfill the sha256 on the matched row so it migrates.
+        for legacy in c.execute(
+            "SELECT id, user_id, key_hash FROM api_keys WHERE key_sha256 IS NULL"
+        ).fetchall():
+            user = _resolve(legacy, backfill_sha=sha)
+            if user is not None:
+                return user
+    finally:
+        conn.close()
 
-    conn.close()
     raise HTTPException(status_code=401, detail="Invalid API key")
 
 
@@ -472,6 +506,10 @@ def change_password(user_id: int, current_password: str, new_password: str) -> b
     return True
 
 
+def _api_key_sha256(api_key: str) -> str:
+    return hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+
+
 def create_api_key(user_id: int, name: str) -> str:
     api_key = f"pymon_{secrets.token_urlsafe(32)}"
     key_hash = hash_password(api_key)
@@ -479,8 +517,8 @@ def create_api_key(user_id: int, name: str) -> str:
     conn = get_db()
     c = conn.cursor()
     c.execute(
-        "INSERT INTO api_keys (user_id, key_hash, name, created_at) VALUES (?, ?, ?, ?)",
-        (user_id, key_hash, name, datetime.now(timezone.utc).isoformat()),
+        "INSERT INTO api_keys (user_id, key_hash, key_sha256, name, created_at) VALUES (?, ?, ?, ?, ?)",
+        (user_id, key_hash, _api_key_sha256(api_key), name, datetime.now(timezone.utc).isoformat()),
     )
     conn.commit()
     conn.close()
