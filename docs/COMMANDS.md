@@ -45,7 +45,7 @@ python -m pymon.cli server
 # Через Task Scheduler або Ctrl+C в консолі
 
 # Видалення
-# Через Task Scheduler: видалити задачу "PyMon"
+# Через Task Scheduler: видалити задачу "PyMonServer"
 ```
 
 ---
@@ -101,8 +101,10 @@ python -m pymon.cli server --config /шлях/до/config.yml
 
 # Змінні середовища:
 export CONFIG_PATH=/etc/pymon/config.yml
-export JWT_SECRET=ваш-секретний-ключ
+export JWT_SECRET=ваш-секретний-ключ-мін-32-символи
 export PYMON_ALLOWED_ORIGINS=http://localhost:10000
+export PYMON_ADMIN_PASSWORD=ВашСильнийПароль123   # необов'язково
+export PYMON_ALLOW_METADATA=false                 # SSRF-захист (cloud metadata)
 ```
 
 ---
@@ -113,14 +115,40 @@ export PYMON_ALLOWED_ORIGINS=http://localhost:10000
 # Отримати токен (через API)
 curl -X POST http://localhost:10000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password auto-generated"}'
+  -d '{"username": "admin", "password": "<ваш-пароль>"}'
 
-# Зміна пароля
+# Зміна пароля (мін. 12 символів, upper+lower+digit)
 curl -X POST http://localhost:10000/api/v1/auth/change-password \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer <TOKEN>" \
   -d '{"current_password": "oldpass", "new_password": "NewSecurePass789"}'
 ```
+
+---
+
+## 🔑 Скидання пароля адміна
+
+Пароль показується **лише один раз** при створенні і ніколи не зберігається у
+відкритому вигляді. Якщо його втрачено — згенеруйте новий:
+
+```bash
+# Локально (БД у поточній директорії або через DB_PATH)
+python -m pymon.cli reset-admin
+
+# Задати конкретний пароль
+PYMON_ADMIN_PASSWORD='NewStrongPass123' python -m pymon.cli reset-admin
+
+# На проді (systemd) — вказати конфіг, щоб знайти живу БД
+sudo -u <user> CONFIG_PATH=/etc/pymon/config.yml /opt/pymon/venv/bin/pymon reset-admin
+```
+
+> Перезапуск служби не потрібен — користувачі читаються з БД на кожен запит.
+
+### API-ключі
+
+API-ключі (заголовок `X-API-Key`) призначені **лише для інжесту метрик та
+читання** — адмін-дії через них заборонені (повертають `403`). Створення/перегляд
+ключів — через `POST/GET /api/v1/auth/api-keys` (потрібен JWT-логін).
 
 ---
 
@@ -146,8 +174,26 @@ curl http://localhost:10000/metrics
 
 ## 🔄 Backup
 
+Автоматичні бекапи виконуються за розкладом `backup.schedule` (cron) з `config.yml`.
+Керувати можна і з дашборду (**Settings → Backup**) або через API:
+
 ```bash
-# Ручне копіювання БД
+# Створити бекап (адмін)
+curl -X POST http://localhost:10000/api/v1/backup/create \
+  -H "Authorization: Bearer <ADMIN_TOKEN>"
+
+# Список бекапів
+curl http://localhost:10000/api/v1/backup/list -H "Authorization: Bearer <ADMIN_TOKEN>"
+
+# Відновлення (безпечно: онлайн-backup API SQLite, без зупинки служби)
+curl -X POST http://localhost:10000/api/v1/backup/restore \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"filename": "pymon_backup_20260101_020000.db"}'
+```
+
+```bash
+# Ручне копіювання БД (служба може бути запущена — SQLite у WAL-режимі)
 cp /var/lib/pymon/pymon.db /backup/pymon-$(date +%Y%m%d).db
 
 # Через скрипт

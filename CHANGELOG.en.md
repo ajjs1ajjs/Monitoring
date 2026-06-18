@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.0] - 2026-06-19
+
+### 🔒 Security hardening & code audit
+
+#### Security (critical)
+- **Removed reversible admin-password storage** — dropped Fernet encryption, the
+  per-startup cleartext print, and `credentials.txt`. The DB now holds only the
+  bcrypt hash; the password is shown **once** on creation or `reset-admin`.
+- **Removed the hardcoded weak default `291263`** — a strong random password is
+  generated on first run when the config value is empty/weak (override with
+  `PYMON_ADMIN_PASSWORD`).
+- **Fixed broken access control** — server CRUD/maintenance, `/backup/*`, and
+  audit/system-log/metric-history clears now require admin.
+- **API keys can no longer perform admin actions** (ingest/read only; `403` otherwise).
+- **Fixed stored XSS** — all server/service/user/log data is escaped in the
+  dashboard; server host is validated against a strict character whitelist.
+- **SSRF guard** — scrape/service checks refuse cloud-metadata addresses by
+  default (`PYMON_ALLOW_METADATA` to opt out); private LAN ranges stay allowed.
+- **Safe restore** — `/backup/restore` uses SQLite's online-backup API instead of
+  overwriting the live DB file (WAL-safe).
+
+#### Fixed
+- SQLite connection leak in `_log_audit`; robust Prometheus label parsing;
+  `_parse_duration` accepts floats; `delete_server` removes orphan alerts;
+  `last_login` is updated on login; backup cron parser handles `*/n`, `a,b`,
+  `a-b`; `reset-admin` resolves the DB path like the server.
+
+#### Changed / Performance
+- Removed N+1 queries in aggregated history, export-all, and compare.
+- Extracted shared `TIME_RANGES` (`constants.py`) and `build_channels`
+  (`notifications.py`); `uuid4` request ids.
+- Replaced `show-password`/`restore-password` CLI commands with `reset-admin`.
+- Reworked README and command/API docs; added `LICENSE`; bumped to 2.2.0.
+
+---
+
 ## [2.1.0] - 2026-05-10
 
 ### 🏗️ Major Refactoring - Modular Architecture & Async Engine

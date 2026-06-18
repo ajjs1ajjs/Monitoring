@@ -35,7 +35,7 @@ Get JWT access token.
 ```json
 {
   "username": "admin",
-  "password auto-generated"
+  "password": "<your-password>"
 }
 ```
 
@@ -83,7 +83,7 @@ Authorization: Bearer <token>
 **Request:**
 ```json
 {
-  "current_password auto-generated",
+  "current_password": "<old-password>",
   "new_password": "NewSecure123"
 }
 ```
@@ -743,7 +743,7 @@ import requests
 # Login
 resp = requests.post('http://localhost:10000/api/v1/auth/login', json={
     'username': 'admin',
-    'password': 'auto-generated'
+    'password': '<your-password>'
 })
 token = resp.json()['access_token']
 
@@ -766,7 +766,7 @@ metrics = resp.json()
 # Login
 TOKEN=$(curl -s -X POST http://localhost:10000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password auto-generated"}' | jq -r '.access_token')
+  -d '{"username":"admin","password": "<your-password>"}' | jq -r '.access_token')
 
 # Get servers
 curl -X GET http://localhost:10000/api/v1/servers \
@@ -785,7 +785,7 @@ const axios = require('axios');
 // Login
 const { data } = await axios.post('http://localhost:10000/api/v1/auth/login', {
   username: 'admin',
-  password: 'auto-generated'
+  password: '<your-password>'
 });
 const token = data.access_token;
 
