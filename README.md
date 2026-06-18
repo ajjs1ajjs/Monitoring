@@ -30,13 +30,11 @@
 **Для Windows Server (PowerShell від Адміністратора):**
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1' -OutFile 'install.ps1'; .\install.ps1 -Service
-# 💡 The same command works for both fresh install and updates. Run it again to update.
 ```
 
 **Для Linux:**
 ```bash
 curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
-# 💡 The same command works for both installation and updates
 ```
 
 > **Security (v2.1.0+):** Пароль треба змінити після першого входу. Мінімум 12 символів з upper+lower+digit. `config.yml` тепер в `.gitignore` — не комітьте секрети в git!
