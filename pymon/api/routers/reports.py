@@ -11,7 +11,7 @@ from pymon.auth import User, get_current_user
 router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/server/{server_id}")
-async def generate_server_report(server_id: int, current_user: User = Depends(get_current_user)):
+def generate_server_report(server_id: int, current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         server = conn.execute("SELECT name, host FROM servers WHERE id = ?", (server_id,)).fetchone()

@@ -40,7 +40,7 @@ async def ingest_metric(payload: MetricPayload, current_user: User = Depends(get
     return {"status": "ok"}
 
 @router.get("")
-async def list_metrics(current_user: User = Depends(get_current_user)):
+def list_metrics(current_user: User = Depends(get_current_user)):
     registry_metrics = [m.to_dict() for m in registry.get_all_metrics()]
 
     if registry_metrics:
@@ -71,7 +71,7 @@ async def list_metrics(current_user: User = Depends(get_current_user)):
         return {"metrics": registry_metrics}
 
 @router.get("/trend")
-async def get_metrics_trend(
+def get_metrics_trend(
     range: str = Query("1h", pattern="^(5m|15m|30m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
     current_user: User = Depends(get_current_user)
 ):
@@ -114,17 +114,17 @@ async def get_metrics_trend(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/history/{server_id}")
-async def get_server_history_alias(
+def get_server_history_alias(
     server_id: int,
     range: str = "1h",
     current_user: User = Depends(get_current_user),
 ):
     # Alias for servers router to maintain backward compatibility if needed
     from pymon.api.routers.servers import get_server_history
-    return await get_server_history(server_id, range, current_user)
+    return get_server_history(server_id, range, current_user)
 
 @router.delete("/history")
-async def clear_metric_history(current_user: User = Depends(get_current_user)):
+def clear_metric_history(current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         conn.execute("DELETE FROM metrics_history")

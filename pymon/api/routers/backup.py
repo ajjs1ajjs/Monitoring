@@ -23,7 +23,7 @@ def _get_backup_dir():
 
 
 @router.get("/list")
-async def list_backups(current_user: User = Depends(get_current_user)):
+def list_backups(current_user: User = Depends(get_current_user)):
     backup_dir = _get_backup_dir()
     os.makedirs(backup_dir, exist_ok=True)
     backups = []
@@ -40,7 +40,7 @@ async def list_backups(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/create")
-async def create_backup(current_user: User = Depends(get_current_user)):
+def create_backup(current_user: User = Depends(get_current_user)):
     config = _get_config()
     backup_dir = _get_backup_dir()
     os.makedirs(backup_dir, exist_ok=True)
@@ -70,7 +70,7 @@ async def create_backup(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/restore")
-async def restore_backup(data: dict, current_user: User = Depends(get_current_user)):
+def restore_backup(data: dict, current_user: User = Depends(get_current_user)):
     config = _get_config()
     backup_dir = _get_backup_dir()
     filename = data.get("filename", "")

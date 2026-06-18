@@ -33,7 +33,7 @@ class ServerUpdate(BaseModel):
     server_group: str | None = None
 
 @router.get("")
-async def list_servers(current_user: User = Depends(get_current_user)):
+def list_servers(current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         rows = conn.execute("SELECT * FROM servers ORDER BY name").fetchall()
@@ -43,7 +43,7 @@ async def list_servers(current_user: User = Depends(get_current_user)):
 
 
 @router.post("")
-async def create_server(data: ServerCreate, current_user: User = Depends(get_current_user)):
+def create_server(data: ServerCreate, current_user: User = Depends(get_current_user)):
     validate_server_name(data.name)
     host = validate_server_host(data.host)
     port = data.agent_port or (9182 if data.os_type == 'windows' else 9100)
@@ -67,7 +67,7 @@ async def create_server(data: ServerCreate, current_user: User = Depends(get_cur
 
 
 @router.get("/history")
-async def get_aggregated_history(
+def get_aggregated_history(
     range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
     metric: str | None = Query(None, pattern="^(cpu|memory|disk|net)$"),
     current_user: User = Depends(get_current_user),
@@ -121,17 +121,17 @@ async def get_aggregated_history(
 
 
 @router.get("/{server_id}/history-detail")
-async def get_server_history_detail(
+def get_server_history_detail(
     server_id: int,
     range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
     current_user: User = Depends(get_current_user),
 ):
     """Alias for /{server_id}/history to match test expectations."""
-    return await get_server_history(server_id, range)
+    return get_server_history(server_id, range)
 
 
 @router.get("/{server_id}/disk-breakdown")
-async def get_disk_breakdown(
+def get_disk_breakdown(
     server_id: int,
     current_user: User = Depends(get_current_user),
 ):
@@ -163,7 +163,7 @@ async def get_disk_breakdown(
 
 
 @router.get("/{server_id}/uptime-timeline")
-async def get_uptime_timeline(
+def get_uptime_timeline(
     server_id: int,
     days: int = Query(7, ge=1, le=90),
     current_user: User = Depends(get_current_user),
@@ -199,7 +199,7 @@ async def get_uptime_timeline(
 
 
 @router.get("/{server_id}/export")
-async def export_server(
+def export_server(
     server_id: int,
     range: str = Query("24h", pattern="^(1h|6h|12h|24h|3d|7d)$"),
     format: str = Query("json", pattern="^(json|csv)$"),
@@ -249,7 +249,7 @@ async def export_server(
 
 
 @router.get("/export")
-async def export_all_servers(
+def export_all_servers(
     range: str = Query("24h", pattern="^(1h|6h|12h|24h|3d|7d)$"),
     format: str = Query("json", pattern="^(json|csv)$"),
     current_user: User = Depends(get_current_user),
@@ -299,7 +299,7 @@ async def export_all_servers(
 
 
 @router.get("/compare")
-async def compare_servers(
+def compare_servers(
     metric: str = Query("cpu", pattern="^(cpu|memory|disk)$"),
     range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d)$"),
     current_user: User = Depends(get_current_user),
@@ -344,7 +344,7 @@ async def compare_servers(
 
 
 @router.get("/{server_id}")
-async def get_server(server_id: int, current_user: User = Depends(get_current_user)):
+def get_server(server_id: int, current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         row = conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
@@ -355,7 +355,7 @@ async def get_server(server_id: int, current_user: User = Depends(get_current_us
         conn.close()
 
 @router.put("/{server_id}")
-async def update_server(server_id: int, data: ServerUpdate, current_user: User = Depends(get_current_user)):
+def update_server(server_id: int, data: ServerUpdate, current_user: User = Depends(get_current_user)):
     if data.host is not None:
         data.host = validate_server_host(data.host)
     if data.agent_port is not None:
@@ -385,7 +385,7 @@ async def update_server(server_id: int, data: ServerUpdate, current_user: User =
         conn.close()
 
 @router.delete("/{server_id}")
-async def delete_server(server_id: int, current_user: User = Depends(get_current_user)):
+def delete_server(server_id: int, current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         conn.execute("DELETE FROM servers WHERE id = ?", (server_id,))
@@ -396,7 +396,7 @@ async def delete_server(server_id: int, current_user: User = Depends(get_current
         conn.close()
 
 @router.post("/{server_id}/maintenance")
-async def toggle_maintenance(server_id: int, data: api_models.MaintenanceToggle, current_user: User = Depends(get_current_user)):
+def toggle_maintenance(server_id: int, data: api_models.MaintenanceToggle, current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         conn.execute("UPDATE servers SET is_maintenance = ? WHERE id = ?", (int(data.is_maintenance), server_id))
@@ -429,7 +429,7 @@ async def force_scrape_server(server_id: int, request: Request, current_user: Us
         conn.close()
 
 @router.get("/{server_id}/history", response_model=api_models.HistoryResponse)
-async def get_server_history(
+def get_server_history(
     server_id: int,
     range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
     current_user: User = Depends(get_current_user),
@@ -475,7 +475,7 @@ async def get_server_history(
     return {"history": history}
 
 @router.get("/{server_id}/summary")
-async def get_server_summary(server_id: int, current_user: User = Depends(get_current_user)):
+def get_server_summary(server_id: int, current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         last_status = conn.execute("SELECT last_status FROM servers WHERE id = ?", (server_id,)).fetchone()
@@ -497,7 +497,7 @@ async def get_server_summary(server_id: int, current_user: User = Depends(get_cu
         conn.close()
 
 @router.get("/summary/all")
-async def get_all_servers_summary(current_user: User = Depends(get_current_user)):
+def get_all_servers_summary(current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         cursor = conn.execute(

@@ -9,7 +9,7 @@ router = APIRouter(prefix="/audit-log", tags=["logs"])
 
 
 @router.get("")
-async def get_audit_logs(
+def get_audit_logs(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
@@ -27,7 +27,7 @@ async def get_audit_logs(
         conn.close()
 
 @router.delete("")
-async def clear_audit_logs(current_user: User = Depends(get_current_user)):
+def clear_audit_logs(current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         conn.execute("DELETE FROM audit_logs")
@@ -38,7 +38,7 @@ async def clear_audit_logs(current_user: User = Depends(get_current_user)):
 
 # System Logs (pymon.log)
 @router.get("/system-logs")
-async def get_system_logs(lines: int = Query(200, ge=10, le=5000), current_user: User = Depends(get_current_user)):
+def get_system_logs(lines: int = Query(200, ge=10, le=5000), current_user: User = Depends(get_current_user)):
     log_path = os.path.join(".", "logs", "pymon.log")
     if not os.path.exists(log_path):
         return {"logs": ["Log file not found."]}
@@ -55,7 +55,7 @@ async def get_system_logs(lines: int = Query(200, ge=10, le=5000), current_user:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/system-logs")
-async def clear_system_logs(current_user: User = Depends(get_current_user)):
+def clear_system_logs(current_user: User = Depends(get_current_user)):
     log_path = os.path.join(".", "logs", "pymon.log")
     try:
         if os.path.exists(log_path):

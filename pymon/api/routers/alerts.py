@@ -26,7 +26,7 @@ class AlertCreate(BaseModel):
     enabled: bool = True
 
 @router.get("")
-async def list_alerts(current_user: User = Depends(get_current_user)):
+def list_alerts(current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         rows = conn.execute("SELECT * FROM alerts ORDER BY id DESC").fetchall()
@@ -35,7 +35,7 @@ async def list_alerts(current_user: User = Depends(get_current_user)):
         conn.close()
 
 @router.post("")
-async def create_alert(data: AlertCreate, current_user: User = Depends(get_current_user)):
+def create_alert(data: AlertCreate, current_user: User = Depends(get_current_user)):
     conn = get_db()
     c = conn.cursor()
     try:
@@ -62,7 +62,7 @@ async def create_alert(data: AlertCreate, current_user: User = Depends(get_curre
         conn.close()
 
 @router.delete("/{alert_id}")
-async def delete_alert(alert_id: int, current_user: User = Depends(get_current_user)):
+def delete_alert(alert_id: int, current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         conn.execute("DELETE FROM alerts WHERE id = ?", (alert_id,))

@@ -8,7 +8,7 @@ from pymon.auth import User, get_current_user
 router = APIRouter(prefix="/services", tags=["services"])
 
 @router.get("")
-async def list_services(current_user: User = Depends(get_current_user)):
+def list_services(current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         rows = conn.execute("SELECT * FROM services ORDER BY name").fetchall()
@@ -17,7 +17,7 @@ async def list_services(current_user: User = Depends(get_current_user)):
         conn.close()
 
 @router.post("")
-async def create_service(data: api_models.ServiceCreate, current_user: User = Depends(get_current_user)):
+def create_service(data: api_models.ServiceCreate, current_user: User = Depends(get_current_user)):
     conn = get_db()
     c = conn.cursor()
     try:
@@ -33,7 +33,7 @@ async def create_service(data: api_models.ServiceCreate, current_user: User = De
         conn.close()
 
 @router.get("/history")
-async def get_all_services_history(
+def get_all_services_history(
     range: str = Query("1h", pattern=r"^\d+[mhd]$"),
     current_user: User = Depends(get_current_user),
 ):
@@ -52,7 +52,7 @@ async def get_all_services_history(
         conn.close()
 
 @router.delete("/{service_id}")
-async def delete_service(service_id: int, current_user: User = Depends(get_current_user)):
+def delete_service(service_id: int, current_user: User = Depends(get_current_user)):
     conn = get_db()
     try:
         conn.execute("DELETE FROM services WHERE id = ?", (service_id,))
