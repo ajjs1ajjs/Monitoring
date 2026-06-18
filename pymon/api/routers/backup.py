@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 
 from pymon.api.deps import get_db
-from pymon.auth import User, get_current_user
+from pymon.auth import User, get_admin_user
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
@@ -18,7 +18,7 @@ def _get_backup_dir():
 
 
 @router.get("/list")
-def list_backups(current_user: User = Depends(get_current_user)):
+def list_backups(current_user: User = Depends(get_admin_user)):
     backup_dir = _get_backup_dir()
     os.makedirs(backup_dir, exist_ok=True)
     backups = []
@@ -35,7 +35,7 @@ def list_backups(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/create")
-def create_backup(current_user: User = Depends(get_current_user)):
+def create_backup(current_user: User = Depends(get_admin_user)):
     from pymon.config import resolve_db_path
     config = _get_config()
     backup_dir = _get_backup_dir()
@@ -66,7 +66,7 @@ def create_backup(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/restore")
-def restore_backup(data: dict, current_user: User = Depends(get_current_user)):
+def restore_backup(data: dict, current_user: User = Depends(get_admin_user)):
     backup_dir = _get_backup_dir()
     filename = data.get("filename", "")
     if not filename:

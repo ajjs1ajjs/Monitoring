@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from pymon.api.deps import get_db
-from pymon.auth import User, get_current_user
+from pymon.auth import User, get_admin_user, get_current_user
 from pymon.metrics.collector import registry
 from pymon.metrics.models import Label, Metric, MetricType
 from pymon.storage import get_storage
@@ -76,12 +76,8 @@ def get_metrics_trend(
     current_user: User = Depends(get_current_user)
 ):
     """Aggregate trend for all servers"""
-    time_ranges = {
-        "5m": "-5 minutes", "15m": "-15 minutes", "30m": "-30 minutes", "1h": "-1 hour",
-        "6h": "-6 hours", "12h": "-12 hours", "24h": "-24 hours",
-        "3d": "-3 days", "7d": "-7 days", "15d": "-15 days", "30d": "-30 days"
-    }
-    time_filter = time_ranges.get(range, "-1 hour")
+    from pymon.constants import time_filter as _time_filter
+    time_filter = _time_filter(range)
 
     try:
         conn = get_db()
@@ -120,11 +116,11 @@ def get_server_history_alias(
     current_user: User = Depends(get_current_user),
 ):
     # Alias for servers router to maintain backward compatibility if needed
-    from pymon.api.routers.servers import get_server_history
-    return get_server_history(server_id, range, current_user)
+    from pymon.api.routers.servers import _server_history
+    return _server_history(server_id, range)
 
 @router.delete("/history")
-def clear_metric_history(current_user: User = Depends(get_current_user)):
+def clear_metric_history(current_user: User = Depends(get_admin_user)):
     conn = get_db()
     try:
         conn.execute("DELETE FROM metrics_history")

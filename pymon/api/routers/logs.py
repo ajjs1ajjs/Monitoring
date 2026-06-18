@@ -3,7 +3,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from pymon.api.deps import get_db
-from pymon.auth import User, get_current_user
+from pymon.auth import User, get_admin_user, get_current_user
 
 router = APIRouter(prefix="/audit-log", tags=["logs"])
 
@@ -27,7 +27,7 @@ def get_audit_logs(
         conn.close()
 
 @router.delete("")
-def clear_audit_logs(current_user: User = Depends(get_current_user)):
+def clear_audit_logs(current_user: User = Depends(get_admin_user)):
     conn = get_db()
     try:
         conn.execute("DELETE FROM audit_logs")
@@ -38,7 +38,7 @@ def clear_audit_logs(current_user: User = Depends(get_current_user)):
 
 # System Logs (pymon.log)
 @router.get("/system-logs")
-def get_system_logs(lines: int = Query(200, ge=10, le=5000), current_user: User = Depends(get_current_user)):
+def get_system_logs(lines: int = Query(200, ge=10, le=5000), current_user: User = Depends(get_admin_user)):
     log_path = os.path.join(".", "logs", "pymon.log")
     if not os.path.exists(log_path):
         return {"logs": ["Log file not found."]}
@@ -55,7 +55,7 @@ def get_system_logs(lines: int = Query(200, ge=10, le=5000), current_user: User 
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/system-logs")
-def clear_system_logs(current_user: User = Depends(get_current_user)):
+def clear_system_logs(current_user: User = Depends(get_admin_user)):
     log_path = os.path.join(".", "logs", "pymon.log")
     try:
         if os.path.exists(log_path):

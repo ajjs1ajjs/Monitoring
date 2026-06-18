@@ -7,7 +7,7 @@ from datetime import datetime
 import httpx
 
 from pymon.api.deps import get_async_db, manager
-from pymon.notifications import dispatcher
+from pymon.notifications import build_channels, dispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -222,21 +222,7 @@ class ScrapeManager:
             if not data.get("enabled"):
                 return
 
-            channels = {}
-            if data.get("telegram_bot_token") and data.get("telegram_chat_id"):
-                channels["telegram"] = {"bot_token": data["telegram_bot_token"], "chat_id": data["telegram_chat_id"]}
-            if data.get("discord_webhook_url"):
-                channels["discord"] = {"webhook_url": data["discord_webhook_url"]}
-            if data.get("teams_webhook_url"):
-                channels["teams"] = {"webhook_url": data["teams_webhook_url"]}
-            if data.get("smtp_server") and data.get("email_to"):
-                channels["email"] = {
-                    "smtp_server": data["smtp_server"],
-                    "smtp_port": data.get("smtp_port", 587),
-                    "smtp_user": data.get("smtp_user", ""),
-                    "smtp_pass": data.get("smtp_pass", ""),
-                    "email_to": data["email_to"]
-                }
+            channels = build_channels(data)
             if channels:
                 dispatcher.dispatch(title, message, channels)
         except Exception as e:
@@ -261,8 +247,10 @@ class ScrapeManager:
 
             name_m = metric.split('{')[0] if '{' in metric else metric
             labels = {}
-            if '{' in metric:
-                lbl_str = metric[metric.index('{')+1:metric.index('}')]
+            if '{' in metric and '}' in metric:
+                # Use the last '}' so label values that themselves contain '}' don't
+                # truncate the label block.
+                lbl_str = metric[metric.index('{') + 1:metric.rindex('}')]
                 for pair in lbl_str.split(','):
                     if '=' in pair:
                         k, v = pair.split('=', 1)

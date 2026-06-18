@@ -63,16 +63,12 @@ print('Tables created')
 ### Не можу увійти
 
 ```bash
-# Пароль за замовчуванням: admin / auto-generated
-# Якщо забули — скинути через БД:
-python -c "
-import sqlite3, bcrypt
-conn = sqlite3.connect('pymon.db')
-hash = bcrypt.hashpw(b'NewPass123', bcrypt.gensalt()).decode()
-conn.execute('UPDATE users SET password_hash=? WHERE username=?', (hash, 'admin'))
-conn.commit()
-print('Password reset to: NewPass123')
-"
+# Пароль показується лише раз при першому запуску і НЕ зберігається у відкритому
+# вигляді. Якщо забули — згенерувати новий випадковий (буде показано один раз):
+python -m pymon.cli reset-admin
+
+# ...або задати конкретний пароль:
+PYMON_ADMIN_PASSWORD='NewStrongPass123' python -m pymon.cli reset-admin
 ```
 
 ### JWT помилка: `Invalid signature`

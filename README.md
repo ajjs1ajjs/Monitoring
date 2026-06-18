@@ -83,6 +83,11 @@ curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh
 
 # Direct
 python -m pymon.cli server --config config.yml
+
+# Reset the admin password (prints a new random password ONCE)
+python -m pymon.cli reset-admin
+# ...or choose the password explicitly:
+PYMON_ADMIN_PASSWORD='YourStrongPass123' python -m pymon.cli reset-admin
 ```
 
 ### Windows
@@ -113,3 +118,14 @@ curl http://localhost:10000/api/v1/health
 - **Конфігурація**: `config.yml` (в `.gitignore` — не комітити!)
 - **База даних**: `pymon.db` (SQLite)
 - **Пароль**: мін. 12 символів, upper+lower+digit
+
+---
+
+## 🔒 Безпека
+
+- **Пароль адміна показується лише один раз** — при першому створенні або після `reset-admin`. Він **ніколи не зберігається у відкритому вигляді** (ні у файлі, ні в БД) — у базі лежить тільки bcrypt-хеш. Якщо пароль втрачено, виконайте `python -m pymon.cli reset-admin`.
+- **Дефолтного пароля в коді немає.** Якщо `auth.admin_password` у `config.yml` порожній або слабкий, на першому запуску генерується сильний випадковий пароль (його можна задати через змінну `PYMON_ADMIN_PASSWORD`).
+- **Керування інфраструктурою — лише для адмінів.** Створення/зміна/видалення серверів, бекапи (`/backup/*`), очищення журналів і метрик вимагають адмін-прав.
+- **JWT-секрет** береться зі змінної `JWT_SECRET`; інакше зберігається у `.pymon_jwt_secret` (в `.gitignore`). Для продакшну задавайте `JWT_SECRET` явно, щоб токени переживали рестарт.
+- **CORS** обмежується змінною `PYMON_ALLOWED_ORIGINS` (через кому). За замовчуванням — лише `localhost`.
+- **Хост сервера** валідовується суворим whitelist-ом символів — жодних HTML/скрипт-навантажень; усі дані серверів/сервісів/журналів екрануються перед виводом у дашборді (захист від збереженого XSS).

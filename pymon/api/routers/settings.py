@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from pymon.api.deps import get_db
 from pymon.auth import User, get_admin_user
-from pymon.notifications import dispatcher
+from pymon.notifications import build_channels, dispatcher
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -53,21 +53,7 @@ def test_notification_settings(current_user: User = Depends(get_admin_user)):
             raise HTTPException(status_code=400, detail="No notification config found")
         data = json.loads(row[0])
 
-        channels = {}
-        if data.get("telegram_bot_token") and data.get("telegram_chat_id"):
-            channels["telegram"] = {"bot_token": data["telegram_bot_token"], "chat_id": data["telegram_chat_id"]}
-        if data.get("discord_webhook_url"):
-            channels["discord"] = {"webhook_url": data["discord_webhook_url"]}
-        if data.get("teams_webhook_url"):
-            channels["teams"] = {"webhook_url": data["teams_webhook_url"]}
-        if data.get("smtp_server") and data.get("email_to"):
-            channels["email"] = {
-                "smtp_server": data["smtp_server"],
-                "smtp_port": data.get("smtp_port", 587),
-                "smtp_user": data.get("smtp_user", ""),
-                "smtp_pass": data.get("smtp_pass", ""),
-                "email_to": data["email_to"]
-            }
+        channels = build_channels(data)
 
         if not channels:
             raise HTTPException(status_code=400, detail="No valid channels configured")

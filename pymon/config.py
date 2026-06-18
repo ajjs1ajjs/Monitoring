@@ -82,16 +82,23 @@ class AuthConfig(BaseModel):
     """Authentication credentials and policies."""
 
     admin_username: str = "admin"
-    admin_password: str = "291263"
+    # Empty by default: an empty/weak value makes auth generate a strong random
+    # password on first run (see pymon.auth._load_auth_config). Never ship a real
+    # default credential in code.
+    admin_password: str = ""
     jwt_expire_hours: int = 24  # Hours token is valid
 
     @field_validator('admin_password', mode='before')
     @classmethod
     def coerce_password(cls, v):
-        pwd = str(v)
-        if pwd == "291263":
+        pwd = "" if v is None else str(v)
+        if pwd in ("291263", "change-me-on-first-login"):
             import sys as _sys
-            print("[WARN] Using default admin password '291263'. Change it immediately in config.yml!", file=_sys.stderr)
+            print(
+                "[WARN] Weak/default admin password in config. A strong random one "
+                "will be generated on first run; set a real value or PYMON_ADMIN_PASSWORD.",
+                file=_sys.stderr,
+            )
         return pwd
 
 
@@ -154,8 +161,8 @@ class PyMonConfig(BaseModel):
             a = data["auth"]
             config.auth = AuthConfig(
                 admin_username=a.get("admin_username", "admin"),
-                # If not provided, default to a secure placeholder to avoid weak defaults
-                admin_password=a.get("admin_password", "291263"),
+                # If not provided, leave empty so auth generates a strong random password.
+                admin_password=a.get("admin_password", ""),
                 jwt_expire_hours=a.get("jwt_expire_hours", 24),
             )
 
@@ -321,18 +328,18 @@ def _parse_duration(value: Any) -> int:
     _multipliers = {"s": 1, "m": 60, "h": 3600, "d": 86400}
     if value and value[-1] in _multipliers:
         try:
-            amount = int(value[:-1])
+            amount = float(value[:-1])
         except ValueError:
             raise ValueError(f"Invalid duration format: {value}. Must end with s, m, h, d, or be a number.")
         if amount < 0:
             raise ValueError("Duration cannot be negative.")
-        return amount * _multipliers[value[-1]]
+        return int(amount * _multipliers[value[-1]])
     else:
         try:
-            # Assume plain integer seconds if no suffix is provided
-            return int(value)
+            # Assume plain seconds if no suffix is provided (accept floats too).
+            return int(float(value))
         except ValueError:
-            raise ValueError(f"Invalid duration format: {value}. Must end with s, m, h, or be a number.")
+            raise ValueError(f"Invalid duration format: {value}. Must end with s, m, h, d, or be a number.")
 
 
 def load_config(path: str | None = None) -> PyMonConfig:

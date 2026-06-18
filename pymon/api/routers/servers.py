@@ -9,7 +9,8 @@ from pydantic import BaseModel
 
 from pymon.api import models as api_models
 from pymon.api.deps import get_db
-from pymon.auth import User, get_current_user
+from pymon.auth import User, get_admin_user, get_current_user
+from pymon.constants import time_filter as _time_filter
 from pymon.validation import validate_port, validate_server_host, validate_server_name
 
 router = APIRouter(prefix="/servers", tags=["servers"])
@@ -43,7 +44,7 @@ def list_servers(current_user: User = Depends(get_current_user)):
 
 
 @router.post("")
-def create_server(data: ServerCreate, current_user: User = Depends(get_current_user)):
+def create_server(data: ServerCreate, current_user: User = Depends(get_admin_user)):
     validate_server_name(data.name)
     host = validate_server_host(data.host)
     port = data.agent_port or (9182 if data.os_type == 'windows' else 9100)
@@ -73,48 +74,51 @@ def get_aggregated_history(
     current_user: User = Depends(get_current_user),
 ):
     """Aggregated metrics history for all servers."""
-    time_ranges = {
-        "5m": "-5 minutes", "15m": "-15 minutes", "1h": "-1 hour",
-        "6h": "-6 hours", "12h": "-12 hours", "24h": "-24 hours",
-        "3d": "-3 days", "7d": "-7 days", "15d": "-15 days", "30d": "-30 days",
-    }
-    time_filter = time_ranges.get(range, "-1 hour")
-    servers_data = []
+    time_filter = _time_filter(range)
     try:
         conn = get_db()
-        servers = conn.execute("SELECT id, name, host FROM servers ORDER BY name").fetchall()
-        for srv in servers:
+        try:
+            servers = conn.execute("SELECT id, name, host FROM servers ORDER BY name").fetchall()
+            # Single query for all servers (avoids an N+1 query-per-server fan-out).
             rows = conn.execute(
                 """
-                SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info
+                SELECT server_id, timestamp, cpu_percent, memory_percent, disk_percent,
+                       network_rx, network_tx, disk_info
                 FROM metrics_history
-                WHERE server_id = ? AND timestamp > datetime('now', ?)
-                ORDER BY timestamp
+                WHERE timestamp > datetime('now', ?)
+                ORDER BY server_id, timestamp
                 """,
-                (srv["id"], time_filter),
+                (time_filter,),
             ).fetchall()
-            history = []
-            for r in rows:
-                dinfo = None
-                try:
-                    if r[6]:
-                        dinfo = json.loads(r[6])
-                except Exception:
-                    pass
-                item = {"timestamp": r[0]}
-                if not metric or metric == "cpu":
-                    item["cpu"] = r[1]
-                if not metric or metric == "memory":
-                    item["mem"] = r[2]
-                if not metric or metric == "disk":
-                    item["disk"] = r[3]
-                    item["disk_info"] = dinfo
-                if not metric or metric == "net":
-                    item["net_rx"] = r[4]
-                    item["net_tx"] = r[5]
-                history.append(item)
-            servers_data.append({"id": srv["id"], "name": srv["name"], "host": srv["host"], "history": history})
-        conn.close()
+        finally:
+            conn.close()
+
+        history_by_server: dict[int, list] = {}
+        for r in rows:
+            dinfo = None
+            try:
+                if r[7]:
+                    dinfo = json.loads(r[7])
+            except Exception:
+                pass
+            item = {"timestamp": r[1]}
+            if not metric or metric == "cpu":
+                item["cpu"] = r[2]
+            if not metric or metric == "memory":
+                item["mem"] = r[3]
+            if not metric or metric == "disk":
+                item["disk"] = r[4]
+                item["disk_info"] = dinfo
+            if not metric or metric == "net":
+                item["net_rx"] = r[5]
+                item["net_tx"] = r[6]
+            history_by_server.setdefault(r[0], []).append(item)
+
+        servers_data = [
+            {"id": srv["id"], "name": srv["name"], "host": srv["host"],
+             "history": history_by_server.get(srv["id"], [])}
+            for srv in servers
+        ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"range": range, "servers": servers_data}
@@ -127,7 +131,7 @@ def get_server_history_detail(
     current_user: User = Depends(get_current_user),
 ):
     """Alias for /{server_id}/history to match test expectations."""
-    return get_server_history(server_id, range)
+    return _server_history(server_id, range)
 
 
 @router.get("/{server_id}/disk-breakdown")
@@ -206,11 +210,7 @@ def export_server(
     current_user: User = Depends(get_current_user),
 ):
     """Export server metrics as JSON or CSV."""
-    time_ranges = {
-        "1h": "-1 hour", "6h": "-6 hours", "12h": "-12 hours",
-        "24h": "-24 hours", "3d": "-3 days", "7d": "-7 days",
-    }
-    time_filter = time_ranges.get(range, "-24 hours")
+    time_filter = _time_filter(range, default="-24 hours")
     conn = get_db()
     try:
         server = conn.execute("SELECT name, host FROM servers WHERE id = ?", (server_id,)).fetchone()
@@ -255,36 +255,32 @@ def export_all_servers(
     current_user: User = Depends(get_current_user),
 ):
     """Export all servers' metrics."""
-    time_ranges = {
-        "1h": "-1 hour", "6h": "-6 hours", "12h": "-12 hours",
-        "24h": "-24 hours", "3d": "-3 days", "7d": "-7 days",
-    }
-    time_filter = time_ranges.get(range, "-24 hours")
+    time_filter = _time_filter(range, default="-24 hours")
     conn = get_db()
     try:
         servers = conn.execute("SELECT id, name, host FROM servers ORDER BY name").fetchall()
-        result = []
-        for s in servers:
-            rows = conn.execute(
-                """
-                SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx
-                FROM metrics_history
-                WHERE server_id = ? AND timestamp > datetime('now', ?)
-                ORDER BY timestamp
-                """,
-                (s["id"], time_filter),
-            ).fetchall()
-            result.append({
-                "id": s["id"], "name": s["name"], "host": s["host"],
-                "data": [
-                    {
-                        "timestamp": r["timestamp"], "cpu": r["cpu_percent"],
-                        "memory": r["memory_percent"], "disk": r["disk_percent"],
-                        "network_rx": r["network_rx"], "network_tx": r["network_tx"],
-                    }
-                    for r in rows
-                ],
+        # Single query for all servers instead of one query per server (N+1).
+        all_rows = conn.execute(
+            """
+            SELECT server_id, timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx
+            FROM metrics_history
+            WHERE timestamp > datetime('now', ?)
+            ORDER BY server_id, timestamp
+            """,
+            (time_filter,),
+        ).fetchall()
+        data_by_server: dict[int, list] = {}
+        for r in all_rows:
+            data_by_server.setdefault(r["server_id"], []).append({
+                "timestamp": r["timestamp"], "cpu": r["cpu_percent"],
+                "memory": r["memory_percent"], "disk": r["disk_percent"],
+                "network_rx": r["network_rx"], "network_tx": r["network_tx"],
             })
+        result = [
+            {"id": s["id"], "name": s["name"], "host": s["host"],
+             "data": data_by_server.get(s["id"], [])}
+            for s in servers
+        ]
         if format == "csv":
             output = io.StringIO()
             writer = csv.writer(output)
@@ -305,38 +301,35 @@ def compare_servers(
     current_user: User = Depends(get_current_user),
 ):
     """Compare a metric across all servers."""
-    col_index = {"cpu": 1, "memory": 2, "disk": 3}.get(metric, 1)
-    time_ranges = {
-        "5m": "-5 minutes", "15m": "-15 minutes", "1h": "-1 hour",
-        "6h": "-6 hours", "12h": "-12 hours", "24h": "-24 hours",
-        "3d": "-3 days", "7d": "-7 days",
-    }
-    time_filter = time_ranges.get(range, "-1 hour")
+    # Column name comes from a fixed whitelist, so it's safe to interpolate.
+    col = {"cpu": "cpu_percent", "memory": "memory_percent", "disk": "disk_percent"}.get(metric, "cpu_percent")
+    time_filter = _time_filter(range)
     conn = get_db()
     try:
         servers = conn.execute("SELECT id, name FROM servers ORDER BY name").fetchall()
+        # Aggregate in SQL with a single grouped query instead of per-server loops.
+        agg_rows = conn.execute(
+            f"""
+            SELECT server_id, AVG({col}), MIN({col}), MAX({col}), COUNT({col})
+            FROM metrics_history
+            WHERE timestamp > datetime('now', ?) AND {col} IS NOT NULL
+            GROUP BY server_id
+            """,
+            (time_filter,),
+        ).fetchall()
+        agg = {r[0]: r for r in agg_rows}
         result = []
         for s in servers:
-            cursor = conn.execute(
-                """
-                SELECT timestamp, cpu_percent, memory_percent, disk_percent
-                FROM metrics_history
-                WHERE server_id = ? AND timestamp > datetime('now', ?)
-                ORDER BY timestamp
-                """,
-                (s["id"], time_filter),
-            )
-            rows = cursor.fetchall()
-            values = [r[col_index] for r in rows if r[col_index] is not None]
-            avg = sum(values) / len(values) if values else 0
+            a = agg.get(s["id"])
+            count = a[4] if a else 0
             result.append({
                 "server_id": s["id"],
                 "server_name": s["name"],
                 "metric": metric,
-                "average": round(avg, 2),
-                "min": round(min(values), 2) if values else 0,
-                "max": round(max(values), 2) if values else 0,
-                "data_points": len(values),
+                "average": round(a[1], 2) if count else 0,
+                "min": round(a[2], 2) if count else 0,
+                "max": round(a[3], 2) if count else 0,
+                "data_points": count,
             })
         return {"metric": metric, "range": range, "servers": result}
     finally:
@@ -355,7 +348,7 @@ def get_server(server_id: int, current_user: User = Depends(get_current_user)):
         conn.close()
 
 @router.put("/{server_id}")
-def update_server(server_id: int, data: ServerUpdate, current_user: User = Depends(get_current_user)):
+def update_server(server_id: int, data: ServerUpdate, current_user: User = Depends(get_admin_user)):
     if data.host is not None:
         data.host = validate_server_host(data.host)
     if data.agent_port is not None:
@@ -385,18 +378,20 @@ def update_server(server_id: int, data: ServerUpdate, current_user: User = Depen
         conn.close()
 
 @router.delete("/{server_id}")
-def delete_server(server_id: int, current_user: User = Depends(get_current_user)):
+def delete_server(server_id: int, current_user: User = Depends(get_admin_user)):
     conn = get_db()
     try:
+        # Clean up dependent rows too, so deleting a server leaves no orphans.
         conn.execute("DELETE FROM servers WHERE id = ?", (server_id,))
         conn.execute("DELETE FROM metrics_history WHERE server_id = ?", (server_id,))
+        conn.execute("DELETE FROM alerts WHERE server_id = ?", (server_id,))
         conn.commit()
         return {"status": "ok"}
     finally:
         conn.close()
 
 @router.post("/{server_id}/maintenance")
-def toggle_maintenance(server_id: int, data: api_models.MaintenanceToggle, current_user: User = Depends(get_current_user)):
+def toggle_maintenance(server_id: int, data: api_models.MaintenanceToggle, current_user: User = Depends(get_admin_user)):
     conn = get_db()
     try:
         conn.execute("UPDATE servers SET is_maintenance = ? WHERE id = ?", (int(data.is_maintenance), server_id))
@@ -428,32 +423,25 @@ async def force_scrape_server(server_id: int, request: Request, current_user: Us
     finally:
         conn.close()
 
-@router.get("/{server_id}/history", response_model=api_models.HistoryResponse)
-def get_server_history(
-    server_id: int,
-    range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
-    current_user: User = Depends(get_current_user),
-):
-    time_ranges = {
-        "5m": "-5 minutes", "15m": "-15 minutes", "1h": "-1 hour",
-        "6h": "-6 hours", "12h": "-12 hours", "24h": "-24 hours",
-        "3d": "-3 days", "7d": "-7 days", "15d": "-15 days", "30d": "-30 days"
-    }
-    time_filter = time_ranges.get(range, "-1 hour")
+def _server_history(server_id: int, range: str) -> dict:
+    """Core history query, callable directly (no DI) so route aliases can reuse it."""
+    time_filter = _time_filter(range)
     history = []
     try:
         conn = get_db()
-        rows = conn.execute(
-            """
-            SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info
-            FROM metrics_history
-            WHERE server_id = ?
-            AND timestamp > datetime('now', ?)
-            ORDER BY timestamp
-            """,
-            (server_id, time_filter),
-        ).fetchall()
-        conn.close()
+        try:
+            rows = conn.execute(
+                """
+                SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info
+                FROM metrics_history
+                WHERE server_id = ?
+                AND timestamp > datetime('now', ?)
+                ORDER BY timestamp
+                """,
+                (server_id, time_filter),
+            ).fetchall()
+        finally:
+            conn.close()
         for r in rows:
             dinfo = None
             try:
@@ -473,6 +461,15 @@ def get_server_history(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"history": history}
+
+
+@router.get("/{server_id}/history", response_model=api_models.HistoryResponse)
+def get_server_history(
+    server_id: int,
+    range: str = Query("1h", pattern="^(5m|15m|1h|6h|12h|24h|3d|7d|15d|30d)$"),
+    current_user: User = Depends(get_current_user),
+):
+    return _server_history(server_id, range)
 
 @router.get("/{server_id}/summary")
 def get_server_summary(server_id: int, current_user: User = Depends(get_current_user)):

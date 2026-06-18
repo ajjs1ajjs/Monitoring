@@ -2,6 +2,7 @@
 
 import logging
 import traceback
+import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -21,7 +22,8 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
             return self._handle_exception(request, e)
 
     def _handle_exception(self, request: Request, exc: Exception) -> JSONResponse:
-        request_id = id(request)
+        # Time-unique id (id(request) reuses memory addresses across requests).
+        request_id = uuid.uuid4().hex
 
         logger.error(
             f"Request {request.url} failed: {exc}",

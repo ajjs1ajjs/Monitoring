@@ -15,6 +15,16 @@ let nodes = [];
 let currentView = 'list';
 let lastFetchedHistory = []; // Store history for detailed expansion
 
+// HTML-escape any server-supplied string before injecting it via innerHTML.
+// Server/service names, hosts, volume labels and audit details are user- or
+// remote-exporter-controlled, so they MUST be escaped to prevent stored XSS.
+function esc(value) {
+    if (value === null || value === undefined) return '';
+    return String(value).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
 function switchView(view) {
     currentView = view;
     document.getElementById('btnViewList').classList.toggle('active', view === 'list');
@@ -50,7 +60,7 @@ function openDrawer(nodeId) {
                 return `
                 <div style="margin-bottom: 1rem;">
                     <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:0.4rem;">
-                        <span style="font-weight:700; color:#fff;">${d.volume || '?'}</span>
+                        <span style="font-weight:700; color:#fff;">${esc(d.volume || '?')}</span>
                         <span style="color:var(--text-muted);">${pct.toFixed(0)}%</span>
                     </div>
                     <div class="progress-container" style="height:8px; background:rgba(0,0,0,0.2);">
@@ -65,9 +75,9 @@ function openDrawer(nodeId) {
         <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">System Info</h4>
         <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem; margin-bottom: 2rem;">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.85rem;">
-                <div><span style="color: var(--text-muted);">OS:</span> <br><strong style="color: #fff;">${n.os_type || 'Unknown'}</strong></div>
-                <div><span style="color: var(--text-muted);">IP:</span> <br><strong style="color: #fff; font-family: monospace;">${n.host}</strong></div>
-                <div><span style="color: var(--text-muted);">Version:</span> <br><strong style="color: #fff;">${n.exporter_version || 'N/A'}</strong></div>
+                <div><span style="color: var(--text-muted);">OS:</span> <br><strong style="color: #fff;">${esc(n.os_type || 'Unknown')}</strong></div>
+                <div><span style="color: var(--text-muted);">IP:</span> <br><strong style="color: #fff; font-family: monospace;">${esc(n.host)}</strong></div>
+                <div><span style="color: var(--text-muted);">Version:</span> <br><strong style="color: #fff;">${esc(n.exporter_version || 'N/A')}</strong></div>
                 <div><span style="color: var(--text-muted);">Maintenance:</span> <br><strong style="color: ${n.is_maintenance ? 'var(--warning)' : 'var(--success)'};">${n.is_maintenance ? 'ON' : 'OFF'}</strong></div>
                 <div><span style="color: var(--text-muted);">Added:</span> <br><strong style="color: #fff;">${new Date(n.created_at).toLocaleDateString()}</strong></div>
             </div>
@@ -449,22 +459,22 @@ function updateLiveTable(data) {
                 </div>
             </td>
             <td>
-                <div style="font-weight: 700; color: #fff; font-size: 1.1rem; margin-bottom: 0.25rem;">${n.name}</div>
+                <div style="font-weight: 700; color: #fff; font-size: 1.1rem; margin-bottom: 0.25rem;">${esc(n.name)}</div>
                 <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem;">
                     <i data-lucide="server" style="width: 12px; height: 12px;"></i>
                     ${n.os_type === 'windows' ? 'Windows NT' : 'Linux Kernel'}
                     <span style="display:flex; align-items:center; gap:0.25rem; background: rgba(255,255,255,0.05); padding: 1px 4px; border-radius: 4px; border: 1px solid var(--border);">
                         <span style="display:inline-block; width:5px; height:5px; border-radius:50%; background: ${n.exporter_version && n.exporter_version !== 'unknown' ? 'var(--success)' : 'var(--text-muted)'};"></span>
-                        <span style="font-size: 0.65rem; color: ${n.exporter_version && n.exporter_version !== 'unknown' ? '#fff' : 'var(--text-muted)'}; font-family: 'JetBrains Mono';">${n.exporter_version || 'v?'}</span>
+                        <span style="font-size: 0.65rem; color: ${n.exporter_version && n.exporter_version !== 'unknown' ? '#fff' : 'var(--text-muted)'}; font-family: 'JetBrains Mono';">${esc(n.exporter_version || 'v?')}</span>
                     </span>
                     ${n.server_group ? `
                     <span class="status-badge" style="background: rgba(249, 115, 22, 0.1); color: var(--accent); border: 1px solid rgba(249, 115, 22, 0.2); font-size: 0.65rem; padding: 1px 6px; line-height: 1;">
-                        ${n.server_group}
+                        ${esc(n.server_group)}
                     </span>` : ''}
                 </div>
             </td>
             <td>
-                <div class="text-mono" style="font-size: 0.85rem; color: #94a3b8; background: rgba(0,0,0,0.2); padding: 0.25rem 0.6rem; border-radius: 6px; display: inline-block;">${n.host}</div>
+                <div class="text-mono" style="font-size: 0.85rem; color: #94a3b8; background: rgba(0,0,0,0.2); padding: 0.25rem 0.6rem; border-radius: 6px; display: inline-block;">${esc(n.host)}</div>
             </td>
             <td>
                 <div class="metric-cell">
@@ -539,9 +549,9 @@ function updateLiveTable(data) {
             <div class="grid-node-card" onclick="openDrawer(${n.id})">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
                     <div>
-                        <h3 style="font-size: 1.2rem; font-weight: 700; color: #fff;">${n.name}</h3>
+                        <h3 style="font-size: 1.2rem; font-weight: 700; color: #fff;">${esc(n.name)}</h3>
                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
-                            <i data-lucide="server" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> ${n.host}
+                            <i data-lucide="server" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> ${esc(n.host)}
                         </div>
                     </div>
                     <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">
@@ -582,12 +592,12 @@ function updateNodeGrid(data) {
         <div class="card" style="padding: 1.5rem; transition: transform 0.2s;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                 <div>
-                    <div style="font-weight: 700; color: white; font-size: 1.1rem;">${n.name}</div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono';">${n.host}</div>
+                    <div style="font-weight: 700; color: white; font-size: 1.1rem;">${esc(n.name)}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); font-family: 'JetBrains Mono';">${esc(n.host)}</div>
                 </div>
                 <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}">
                     <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
-                    ${n.last_status}
+                    ${esc(n.last_status)}
                 </div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
@@ -631,7 +641,7 @@ async function loadAlertRules() {
         <div class="card" style="border-left: 4px solid ${a.metric === 'cpu' ? 'var(--accent)' : (a.metric === 'memory' ? '#3b82f6' : 'var(--success)')}; padding: 1.5rem;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                 <div>
-                    <h4 style="font-weight: 700; color: white; font-size: 1rem;">${a.name}</h4>
+                    <h4 style="font-weight: 700; color: white; font-size: 1rem;">${esc(a.name)}</h4>
                     <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Logic Rule Active</div>
                 </div>
                 <div style="padding: 0.4rem; background: rgba(255,255,255,0.05); border-radius: 0.5rem;">
@@ -641,7 +651,7 @@ async function loadAlertRules() {
             <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--border);">
                 <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Trigger Condition</div>
                 <div style="font-family: 'JetBrains Mono'; font-size: 0.9rem; color: #fff;">
-                    <span style="color: var(--accent);">${a.metric.toUpperCase()}</span> ${a.condition} <span style="color: var(--success);">${a.threshold}${a.metric.includes('latency') ? 'ms' : (a.metric.includes('status') ? '' : '%')}</span>
+                    <span style="color: var(--accent);">${esc((a.metric || '').toUpperCase())}</span> ${esc(a.condition)} <span style="color: var(--success);">${esc(a.threshold)}${a.metric && a.metric.includes('latency') ? 'ms' : (a.metric && a.metric.includes('status') ? '' : '%')}</span>
                 </div>
             </div>
             <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
@@ -680,11 +690,11 @@ async function loadAuditLogs() {
                     </div>
                     <div style="flex: 1;">
                         <div style="display: flex; justify-content: space-between;">
-                            <span style="font-weight: 600; color: #fff;">${l.action}</span>
+                            <span style="font-weight: 600; color: #fff;">${esc(l.action)}</span>
                             <span style="font-size: 0.7rem; color: var(--text-muted);">${l.timestamp ? l.timestamp.slice(0, 19).replace('T', ' ') : '-'}</span>
                         </div>
                         <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem;">
-                            Target: <span style="color: #94a3b8;">${l.target || 'System'}</span> • Details: <span style="color: #94a3b8;">${l.details || 'No additional info'}</span>
+                            Target: <span style="color: #94a3b8;">${esc(l.target || 'System')}</span> • Details: <span style="color: #94a3b8;">${esc(l.details || 'No additional info')}</span>
                         </div>
                     </div>
                 </div>
@@ -704,7 +714,7 @@ async function loadSystemLogs() {
         const auditLogStream = document.getElementById('auditLogStream');
         if (auditLogStream) {
             if (logs.length && logs[0] !== "Log file not found.") {
-                auditLogStream.innerHTML = `<pre style="white-space: pre-wrap; font-family: monospace; color: #a3e635; margin: 0; padding: 1rem; background: rgba(0,0,0,0.5); border-radius: 8px; font-size: 0.8rem; overflow-x: auto;">${logs.join('')}</pre>`;
+                auditLogStream.innerHTML = `<pre style="white-space: pre-wrap; font-family: monospace; color: #a3e635; margin: 0; padding: 1rem; background: rgba(0,0,0,0.5); border-radius: 8px; font-size: 0.8rem; overflow-x: auto;">${esc(logs.join(''))}</pre>`;
             } else {
                 auditLogStream.innerHTML = '<div style="padding: 2rem; text-align: center; color: var(--text-muted);">Логів не знайдено або файл відсутній</div>';
             }
@@ -955,9 +965,9 @@ async function loadUsers() {
                         <td>
                             <div style="display: flex; align-items: center; gap: 0.75rem;">
                                 <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #ea580c); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; color: white;">
-                                    ${u.username.charAt(0).toUpperCase()}
+                                    ${esc((u.username || '').charAt(0).toUpperCase())}
                                 </div>
-                                <span style="font-weight: 700; color: #fff;">${u.username}</span>
+                                <span style="font-weight: 700; color: #fff;">${esc(u.username)}</span>
                             </div>
                         </td>
                         <td>
@@ -1387,12 +1397,12 @@ async function loadRecentAlerts() {
         feed.innerHTML = logs.map(log => `
             <div class="alert-item-v2 ${log.action.toLowerCase().includes('critical') ? 'critical' : log.action.toLowerCase().includes('warning') ? 'warning' : ''}">
                 <div class="alert-header">
-                    <span class="alert-title">${log.action}</span>
+                    <span class="alert-title">${esc(log.action)}</span>
                     <span class="alert-time">${new Date(log.timestamp).toLocaleTimeString()}</span>
                 </div>
-                <p class="alert-desc" style="font-weight: 700; color: #fff; margin-bottom: 2px;">${log.target}</p>
-                <p class="alert-desc" style="font-size: 0.75rem; opacity: 0.8;">${log.details || ''}</p>
-                <p style="font-size: 0.65rem; color: var(--text-muted); margin-top: 0.5rem;">By: ${log.username}</p>
+                <p class="alert-desc" style="font-weight: 700; color: #fff; margin-bottom: 2px;">${esc(log.target)}</p>
+                <p class="alert-desc" style="font-size: 0.75rem; opacity: 0.8;">${esc(log.details || '')}</p>
+                <p style="font-size: 0.65rem; color: var(--text-muted); margin-top: 0.5rem;">By: ${esc(log.username)}</p>
             </div>
         `).join('');
         lucide.createIcons();
@@ -1610,10 +1620,10 @@ function updateServicesTable(services) {
     tbody.innerHTML = services.map(s => `
         <tr>
             <td>
-                <div style="font-weight: 600;">${s.name}</div>
-                <div style="font-size: 0.7rem; color: var(--text-muted);">${s.target_url}</div>
+                <div style="font-weight: 600;">${esc(s.name)}</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">${esc(s.target_url)}</div>
             </td>
-            <td><span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">${s.check_type.toUpperCase()}</span></td>
+            <td><span class="badge" style="background: rgba(255,255,255,0.05); color: var(--text-muted);">${esc((s.check_type || '').toUpperCase())}</span></td>
             <td>
                 <span class="status-badge status-${(s.status || s.last_status || 'unknown')}">
                     <span class="status-dot status-${(s.status || s.last_status || 'unknown')}"></span>

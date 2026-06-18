@@ -6,6 +6,34 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+
+def build_channels(data: dict) -> dict:
+    """Build a dispatcher ``channels`` dict from a flat notification-config dict.
+
+    Single source of truth shared by the settings test endpoint and the scrape
+    worker's alert trigger, so the two can't drift apart.
+    """
+    channels: dict = {}
+    if data.get("telegram_bot_token") and data.get("telegram_chat_id"):
+        channels["telegram"] = {
+            "bot_token": data["telegram_bot_token"],
+            "chat_id": data["telegram_chat_id"],
+        }
+    if data.get("discord_webhook_url"):
+        channels["discord"] = {"webhook_url": data["discord_webhook_url"]}
+    if data.get("teams_webhook_url"):
+        channels["teams"] = {"webhook_url": data["teams_webhook_url"]}
+    if data.get("smtp_server") and data.get("email_to"):
+        channels["email"] = {
+            "smtp_server": data["smtp_server"],
+            "smtp_port": data.get("smtp_port", 587),
+            "smtp_user": data.get("smtp_user", ""),
+            "smtp_pass": data.get("smtp_pass", ""),
+            "email_to": data["email_to"],
+        }
+    return channels
+
+
 class NotificationDispatcher:
     def __init__(self, config=None):
         self.config = config

@@ -9,6 +9,11 @@ class ValidationError(Exception):
     pass
 
 
+# Hostnames, IPv4, and bracketed IPv6 (with optional :port). Deliberately a strict
+# whitelist so a host value can never carry HTML/script payloads into the dashboard.
+_HOST_RE = re.compile(r"^[A-Za-z0-9._\-:\[\]]+$")
+
+
 def validate_server_host(host: str) -> str:
     """Validate and sanitize server hostname/IP. Strips protocol prefixes and URL paths."""
     host = host.strip()
@@ -20,6 +25,8 @@ def validate_server_host(host: str) -> str:
         raise ValidationError("Host must be at least 3 characters")
     if len(host) > 255:
         raise ValidationError("Host must be less than 255 characters")
+    if not _HOST_RE.match(host):
+        raise ValidationError("Host may only contain letters, digits, dots, hyphens, colons and brackets")
     return host
 
 
