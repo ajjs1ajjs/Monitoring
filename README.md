@@ -176,11 +176,11 @@ curl http://localhost:10000/api/v1/health
 | Документ | Опис |
 |----------|------|
 | [docs/COMMANDS.md](docs/COMMANDS.md) | Повний довідник команд (Linux + Windows) |
-| [docs/API.md](docs/API.md) | REST API довідка (укр) · [English](docs/API.en.md) |
+| [docs/API.md](docs/API.md) | REST API довідка |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Архітектура проекту |
 | [docs/MIGRATION.md](docs/MIGRATION.md) | Міграція з інших систем |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Усунення несправностей |
-| [CHANGELOG.md](CHANGELOG.md) | Журнал змін (укр) · [English](CHANGELOG.en.md) |
+| [CHANGELOG.md](CHANGELOG.md) | Журнал змін |
 
 ---
 

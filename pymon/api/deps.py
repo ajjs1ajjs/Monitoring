@@ -21,7 +21,10 @@ class ConnectionManager:
 
     async def broadcast(self, message: dict):
         disconnected = []
-        for connection in self.active_connections:
+        # Iterate over a snapshot: broadcast is awaited concurrently from many
+        # scrape tasks, and mutating the live list during iteration (on a failed
+        # send or a concurrent connect/disconnect) would corrupt the loop.
+        for connection in list(self.active_connections):
             try:
                 await connection.send_json(message)
             except Exception:

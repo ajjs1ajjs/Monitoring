@@ -113,11 +113,22 @@ def push_metric(
         loop = asyncio.get_running_loop()
         if loop.is_running():
             task = loop.create_task(_push_async(url, name, value, labels, metric_type))
-            task.add_done_callback(_log_push_result)
+            # Keep a strong reference until completion — the loop only holds a
+            # weak ref, so without this the task can be GC'd mid-flight.
+            _pending_pushes.add(task)
+            task.add_done_callback(_on_push_done)
             return
     except RuntimeError:
         pass
     asyncio.run(_push_async(url, name, value, labels, metric_type))
+
+
+_pending_pushes: set = set()
+
+
+def _on_push_done(task: "asyncio.Task") -> None:
+    _pending_pushes.discard(task)
+    _log_push_result(task)
 
 
 def _log_push_result(task: "asyncio.Task") -> None:

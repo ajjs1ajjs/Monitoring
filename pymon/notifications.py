@@ -150,7 +150,8 @@ class NotificationDispatcher:
         msg.attach(MIMEText(message, 'html'))
 
         try:
-            with smtplib.SMTP(smtp_server_str, smtp_port_int) as server:
+            # timeout so a dead/blackholed SMTP host can't hang the dispatch
+            with smtplib.SMTP(smtp_server_str, smtp_port_int, timeout=15) as server:
                 server.starttls()
                 if smtp_pass_str:
                     server.login(smtp_user_str, smtp_pass_str)

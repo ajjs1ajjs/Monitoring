@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 
@@ -52,28 +52,32 @@ class ScrapeManager:
         self._last_cleanup = now
         try:
             conn = await get_async_db()
-            await conn.execute(
-                "DELETE FROM metrics_history WHERE timestamp < datetime('now', ?)",
-                (f"-{self.retention_hours} hours",),
-            )
-            await conn.execute(
-                "DELETE FROM services_history WHERE timestamp < datetime('now', ?)",
-                (f"-{self.retention_hours} hours",),
-            )
-            await conn.execute(
-                "DELETE FROM alerts WHERE timestamp < datetime('now', ?)",
-                (f"-{self.retention_hours} hours",),
-            )
-            await conn.commit()
-            await conn.close()
+            try:
+                await conn.execute(
+                    "DELETE FROM metrics_history WHERE timestamp < datetime('now', ?)",
+                    (f"-{self.retention_hours} hours",),
+                )
+                await conn.execute(
+                    "DELETE FROM services_history WHERE timestamp < datetime('now', ?)",
+                    (f"-{self.retention_hours} hours",),
+                )
+                await conn.execute(
+                    "DELETE FROM alerts WHERE timestamp < datetime('now', ?)",
+                    (f"-{self.retention_hours} hours",),
+                )
+                await conn.commit()
+            finally:
+                await conn.close()
         except Exception as e:
             logger.error(f"Cleanup error: {e}")
 
         if datetime.now().hour == 3 and not getattr(self, "_vacuumed_today", False):
             try:
                 conn = await get_async_db()
-                await conn.execute("VACUUM")
-                await conn.close()
+                try:
+                    await conn.execute("VACUUM")
+                finally:
+                    await conn.close()
                 self._vacuumed_today = True
                 logger.info("Database vacuumed successfully.")
             except Exception as e:
@@ -132,6 +136,15 @@ class ScrapeManager:
             if last_status == 'up':
                 await self._trigger_alert(f"🔥 Server Down: {name}", f"Server {name} ({host}) is offline or exporter is unreachable.")
             try:
+                # Record a downtime row (NULL cpu_percent) so the uptime timeline
+                # reflects real downtime instead of always reading ~100% (a row
+                # with non-null cpu was previously only written on success).
+                await conn.execute(
+                    """INSERT INTO metrics_history
+                       (timestamp, server_id, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info)
+                       VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, NULL)""",
+                    (now, server_id),
+                )
                 await conn.execute("UPDATE servers SET last_status='down', last_check=? WHERE id=?", (now, server_id))
                 await conn.commit()
             except Exception:
@@ -228,7 +241,9 @@ class ScrapeManager:
 
             channels = build_channels(data)
             if channels:
-                dispatcher.dispatch(title, message, channels)
+                # dispatch() does blocking httpx/SMTP I/O; run it off the event
+                # loop so a slow/dead notification channel can't stall scraping.
+                await asyncio.to_thread(dispatcher.dispatch, title, message, channels)
         except Exception as e:
             logger.error(f"Error triggering alert: {e}")
 
@@ -564,8 +579,13 @@ class ServiceChecker:
                     writer.close()
                     await writer.wait_closed()
                     if cert and 'notAfter' in cert:
-                        expire_dt = datetime.strptime(str(cert['notAfter']), '%b %d %H:%M:%S %Y %Z')
-                        days_left = (expire_dt - datetime.now()).days
+                        # cert notAfter is GMT/UTC; %Z is discarded leaving a naive
+                        # UTC value, so compare against UTC now (not local) to keep
+                        # days_left correct regardless of server timezone.
+                        expire_dt = datetime.strptime(
+                            str(cert['notAfter']), '%b %d %H:%M:%S %Y %Z'
+                        ).replace(tzinfo=timezone.utc)
+                        days_left = (expire_dt - datetime.now(timezone.utc)).days
                         status = 'degraded' if days_left < 14 else 'up'
                     else:
                         status = 'down'

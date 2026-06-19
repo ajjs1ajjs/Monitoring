@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from pymon.api import models as api_models
 from pymon.api.deps import get_db
-from pymon.auth import User, get_current_user
+from pymon.auth import User, get_admin_user, get_current_user
 
 router = APIRouter(prefix="/services", tags=["services"])
 
@@ -17,7 +17,7 @@ def list_services(current_user: User = Depends(get_current_user)):
         conn.close()
 
 @router.post("")
-def create_service(data: api_models.ServiceCreate, current_user: User = Depends(get_current_user)):
+def create_service(data: api_models.ServiceCreate, current_user: User = Depends(get_admin_user)):
     conn = get_db()
     c = conn.cursor()
     try:
@@ -28,6 +28,7 @@ def create_service(data: api_models.ServiceCreate, current_user: User = Depends(
         conn.commit()
         return {"status": "ok", "id": c.lastrowid}
     except Exception as e:
+        conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         conn.close()
@@ -52,7 +53,7 @@ def get_all_services_history(
         conn.close()
 
 @router.delete("/{service_id}")
-def delete_service(service_id: int, current_user: User = Depends(get_current_user)):
+def delete_service(service_id: int, current_user: User = Depends(get_admin_user)):
     conn = get_db()
     try:
         conn.execute("DELETE FROM services WHERE id = ?", (service_id,))

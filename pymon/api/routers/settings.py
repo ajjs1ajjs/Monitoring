@@ -9,6 +9,29 @@ from pymon.notifications import build_channels, dispatcher
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
+# Key-name hints whose values are credential-bearing and must be redacted before
+# the config is ever serialized into an API response.
+_SECRET_KEY_HINTS = ("password", "pass", "token", "secret", "api_key", "webhook_url")
+_REDACTED = "***REDACTED***"
+
+
+def _redact_config(obj):
+    """Recursively mask secret values in a parsed config structure (in place)."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            kl = str(k).lower()
+            if kl == "headers":
+                # Auth headers (e.g. Authorization: Bearer ...) are entirely secret.
+                obj[k] = _REDACTED
+            elif any(h in kl for h in _SECRET_KEY_HINTS) and isinstance(v, str) and v:
+                obj[k] = _REDACTED
+            else:
+                _redact_config(v)
+    elif isinstance(obj, list):
+        for item in obj:
+            _redact_config(item)
+    return obj
+
 @router.get("/notifications")
 def get_notification_settings(current_user: User = Depends(get_admin_user)):
     conn = get_db()
@@ -74,8 +97,16 @@ def export_config(current_user: User = Depends(get_admin_user)):
     config_path = os.getenv("CONFIG_PATH", "config.yml")
     if not os.path.exists(config_path):
         raise HTTPException(status_code=404, detail="Config file not found")
-    with open(config_path, 'r') as f:
-        return {"content": f.read()}
+    import yaml
+
+    # Never echo raw credentials (admin_password, smtp_pass, bot_token, webhook
+    # URLs, auth headers) into an API response — redact before returning.
+    try:
+        with open(config_path) as f:
+            data = yaml.safe_load(f) or {}
+    except yaml.YAMLError as e:
+        raise HTTPException(status_code=500, detail=f"Could not parse config: {e}")
+    return {"content": yaml.safe_dump(_redact_config(data), sort_keys=False, allow_unicode=True)}
 
 @router.post("/config/import-prometheus")
 def import_prometheus_config(data: dict, current_user: User = Depends(get_admin_user)):
@@ -90,11 +121,18 @@ def import_prometheus_config(data: dict, current_user: User = Depends(get_admin_
 
     try:
         prom_data = yaml.safe_load(yaml_content)
-        scrape_configs = prom_data.get("scrape_configs", [])
+    except yaml.YAMLError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid YAML: {e}")
+    # safe_load returns None for empty input and a scalar/list for non-mapping
+    # YAML; guard before calling .get() so it's a clean 400, not a 500.
+    if not isinstance(prom_data, dict):
+        raise HTTPException(status_code=400, detail="Invalid Prometheus config: expected a YAML mapping")
+    scrape_configs = prom_data.get("scrape_configs", [])
 
-        # Save to DB as servers or update config.yml?
-        # Better: Add to 'servers' table so they appear in UI
-        conn = get_db()
+    # Save to DB as servers or update config.yml?
+    # Better: Add to 'servers' table so they appear in UI
+    conn = get_db()
+    try:
         c = conn.cursor()
         count = 0
         for sc in scrape_configs:
@@ -163,9 +201,11 @@ def import_prometheus_config(data: dict, current_user: User = Depends(get_admin_
                         print(f"Import error for target {target}: {e}")
                         continue
         conn.commit()
-        conn.close()
         return {"status": "ok", "imported": count}
     except Exception as e:
+        conn.rollback()
         import traceback
-        traceback.print_exc() # Print full error to server console
+        traceback.print_exc()  # Print full error to server console
         raise HTTPException(status_code=500, detail=f"Помилка парсингу або імпорту: {str(e)}")
+    finally:
+        conn.close()

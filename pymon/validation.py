@@ -1,7 +1,9 @@
 """Input validation utilities"""
 
+import ipaddress
 import os
 import re
+import socket
 
 
 class ValidationError(Exception):
@@ -102,21 +104,79 @@ def sanitize_input(value: str, max_length: int = 255) -> str:
 # outbound scrape/service checks by default. Private LAN ranges are intentionally
 # NOT blocked — monitoring internal hosts is the whole point of this app.
 _BLOCKED_OUTBOUND_HOSTS = {
-    "169.254.169.254",            # AWS/GCP/Azure IMDS
     "metadata.google.internal",   # GCP
-    "fd00:ec2::254",              # AWS IMDS over IPv6
 }
+# Explicit cloud-metadata IPs (in addition to the link-local/loopback ranges below).
+_BLOCKED_METADATA_IPS = {
+    "169.254.169.254",   # AWS/GCP/Azure/DO/OpenStack IMDS
+    "fd00:ec2::254",     # AWS IMDS over IPv6
+    "100.100.100.200",   # Alibaba Cloud metadata
+}
+
+
+def _candidate_ips(host: str) -> list:
+    """Best-effort enumeration of every IP a host string could connect to.
+
+    Covers literal IPs, integer/hex/octal IPv4 encodings (e.g. 2852039166,
+    0xa9fea9fe) and DNS resolution — so an alternate encoding or a name that
+    resolves to a metadata/link-local address can't slip past the check.
+    """
+    ips: list = []
+    h = (host or "").strip().strip("[]")
+    if not h:
+        return ips
+    # Literal IP (also accepts compressed IPv6).
+    try:
+        ips.append(ipaddress.ip_address(h))
+    except ValueError:
+        pass
+    # Single-integer IPv4 encodings: decimal / 0x-hex / 0o-octal.
+    try:
+        val = int(h, 0) if h.lower().startswith(("0x", "0o")) else int(h)
+        if 0 <= val <= 0xFFFFFFFF:
+            ips.append(ipaddress.IPv4Address(val))
+    except (ValueError, ipaddress.AddressValueError):
+        pass
+    # DNS / OS resolution (also normalises dotted-hex/octal forms the resolver accepts).
+    try:
+        for *_, sockaddr in socket.getaddrinfo(h, None):
+            try:
+                ips.append(ipaddress.ip_address(sockaddr[0]))
+            except ValueError:
+                pass
+    except (OSError, UnicodeError):
+        pass
+    return ips
+
+
+def _ip_is_blocked(ip) -> bool:
+    # Block metadata + loopback + link-local + multicast + unspecified, but NOT
+    # general private ranges (monitoring internal LAN hosts is intended).
+    return (
+        str(ip) in _BLOCKED_METADATA_IPS
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_unspecified
+    )
 
 
 def is_blocked_outbound_host(host: str) -> bool:
     """True if a scrape/check target must be refused (cloud-metadata SSRF guard).
+
+    Resolves the host (and normalises alternate IP encodings) and refuses it if
+    ANY resulting address is a cloud-metadata IP, loopback, link-local
+    (incl. 169.254.0.0/16 / fe80::/10), multicast or unspecified address.
+    Private LAN ranges remain allowed by design.
 
     Set PYMON_ALLOW_METADATA=true to opt out (e.g. if you really do monitor IMDS).
     """
     if os.getenv("PYMON_ALLOW_METADATA", "").strip().lower() in ("1", "true", "yes", "on"):
         return False
     h = (host or "").strip().strip("[]").lower()
-    return h in _BLOCKED_OUTBOUND_HOSTS
+    if h in _BLOCKED_OUTBOUND_HOSTS:
+        return True
+    return any(_ip_is_blocked(ip) for ip in _candidate_ips(host))
 
 
 def validate_db_path(path: str) -> bool:

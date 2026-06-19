@@ -84,3 +84,63 @@ def test_metadata_host_blocked_by_default(monkeypatch):
     assert is_blocked_outbound_host("192.168.1.10") is False  # LAN target allowed
     monkeypatch.setenv("PYMON_ALLOW_METADATA", "true")
     assert is_blocked_outbound_host("169.254.169.254") is False
+
+
+def test_alert_service_mutations_require_admin(client, db_path):
+    """Audit fix: alert/service config mutations must be admin-only (API keys & non-admins rejected)."""
+    import os
+    os.environ["DB_PATH"] = db_path
+    # Unique username — db_path is session-scoped and shared across tests.
+    user = auth.create_user(username="viewer_alerts", password="ViewerPass123", is_admin=False)
+    token = auth.create_token(user.id, user.username, is_admin=False, must_change=False)
+    h = {"Authorization": f"Bearer {token}"}
+    assert client.delete("/api/v1/alerts/1", headers=h).status_code == 403
+    assert client.delete("/api/v1/services/1", headers=h).status_code == 403
+    key = auth.create_api_key(user_id=1, name="k2")  # owner is admin
+    assert client.delete("/api/v1/alerts/1", headers={"X-API-Key": key}).status_code == 403
+    assert client.delete("/api/v1/services/1", headers={"X-API-Key": key}).status_code == 403
+
+
+def test_ssrf_blocks_encoded_metadata(monkeypatch):
+    """Audit fix: SSRF guard resolves/normalises hosts (not a literal-string blocklist)."""
+    from pymon.validation import is_blocked_outbound_host
+    monkeypatch.delenv("PYMON_ALLOW_METADATA", raising=False)
+    assert is_blocked_outbound_host("2852039166") is True   # decimal-int form of 169.254.169.254
+    assert is_blocked_outbound_host("0xA9FEA9FE") is True    # hex form
+    assert is_blocked_outbound_host("127.0.0.1") is True     # loopback
+    assert is_blocked_outbound_host("[::1]") is True          # ipv6 loopback
+    assert is_blocked_outbound_host("10.1.2.3") is False     # private LAN remains allowed
+
+
+def test_redact_config_masks_secrets():
+    """Audit fix: export_config must not echo plaintext secrets."""
+    from pymon.api.routers.settings import _redact_config
+    cfg = {
+        "auth": {"admin_password": "secret123"},
+        "notifications": {
+            "telegram": {"bot_token": "abc"},
+            "webhook": {"headers": {"Authorization": "Bearer x"}},
+        },
+        "port": 8000,
+    }
+    r = _redact_config(cfg)
+    assert r["auth"]["admin_password"] == "***REDACTED***"
+    assert r["notifications"]["telegram"]["bot_token"] == "***REDACTED***"
+    assert r["notifications"]["webhook"]["headers"] == "***REDACTED***"
+    assert r["port"] == 8000  # non-secret untouched
+
+
+def test_import_prometheus_invalid_yaml_returns_400(auth_client):
+    """Audit fix: non-mapping YAML is a clean 400, not a 500 AttributeError."""
+    resp = auth_client.post(
+        "/api/v1/settings/config/import-prometheus", json={"yaml_content": "just-a-scalar-string"}
+    )
+    assert resp.status_code == 400
+
+
+def test_security_headers_present(client):
+    """Audit fix: baseline security headers on every response."""
+    resp = client.get("/api/v1/servers")
+    assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+    assert resp.headers.get("X-Frame-Options") == "DENY"
+    assert "Content-Security-Policy" in resp.headers

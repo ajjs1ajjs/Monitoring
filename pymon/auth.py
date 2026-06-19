@@ -211,13 +211,23 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
+def _token_expire_hours() -> int:
+    """Configured JWT lifetime (config.auth.jwt_expire_hours), default 24."""
+    try:
+        from pymon.config import get_cached_config
+
+        return int(get_cached_config().auth.jwt_expire_hours)
+    except Exception:
+        return JWT_EXPIRE_HOURS
+
+
 def create_token(user_id: int, username: str, is_admin: bool, must_change: bool) -> str:
     payload = {
         "sub": username,
         "user_id": user_id,
         "is_admin": is_admin,
         "must_change_password": must_change,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_HOURS),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=_token_expire_hours()),
         "iat": datetime.now(timezone.utc),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -385,12 +395,21 @@ def authenticate_user(username: str, password: str) -> Token:
     return Token(access_token=token, user=user)
 
 
+def validate_password_complexity(password: str) -> None:
+    """Shared password policy: >=12 chars with upper, lower and digit.
+
+    Raises HTTPException(400) on failure. Used by every password-setting path so
+    the policy can't drift between endpoints.
+    """
+    if len(password) < 12:
+        raise HTTPException(status_code=400, detail="Password must be at least 12 characters")
+    if not any(c.isupper() for c in password) or not any(c.islower() for c in password) or not any(c.isdigit() for c in password):
+        raise HTTPException(status_code=400, detail="Password must contain uppercase, lowercase, and digit")
+
+
 def set_password(user_id: int, new_password: str) -> bool:
     """Admin-only: set a user's password without requiring current password."""
-    if len(new_password) < 12:
-        raise HTTPException(status_code=400, detail="Password must be at least 12 characters")
-    if not any(c.isupper() for c in new_password) or not any(c.islower() for c in new_password) or not any(c.isdigit() for c in new_password):
-        raise HTTPException(status_code=400, detail="Password must contain uppercase, lowercase, and digit")
+    validate_password_complexity(new_password)
     conn = get_db()
     c = conn.cursor()
     new_hash = hash_password(new_password)
@@ -405,6 +424,10 @@ def set_password(user_id: int, new_password: str) -> bool:
 
 
 def change_password(user_id: int, current_password: str, new_password: str) -> bool:
+    # Validate the new password BEFORE opening a connection so a policy failure
+    # can't leak the DB handle.
+    validate_password_complexity(new_password)
+
     conn = get_db()
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
@@ -414,13 +437,6 @@ def change_password(user_id: int, current_password: str, new_password: str) -> b
     if not row or not verify_password(current_password, row["password_hash"]):
         conn.close()
         raise HTTPException(status_code=400, detail="Current password is incorrect")
-
-    if len(new_password) < 12:
-        conn.close()
-        raise HTTPException(status_code=400, detail="Password must be at least 12 characters with uppercase, lowercase, and digit")
-    if not any(c.isupper() for c in new_password) or not any(c.islower() for c in new_password) or not any(c.isdigit() for c in new_password):
-        conn.close()
-        raise HTTPException(status_code=400, detail="Password must contain uppercase, lowercase, and digit")
 
     new_hash = hash_password(new_password)
     c.execute("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?", (new_hash, user_id))

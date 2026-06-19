@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from pymon.api.deps import get_db
-from pymon.auth import User, get_current_user
+from pymon.auth import User, get_admin_user, get_current_user
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -35,7 +35,7 @@ def list_alerts(current_user: User = Depends(get_current_user)):
         conn.close()
 
 @router.post("")
-def create_alert(data: AlertCreate, current_user: User = Depends(get_current_user)):
+def create_alert(data: AlertCreate, current_user: User = Depends(get_admin_user)):
     conn = get_db()
     c = conn.cursor()
     try:
@@ -62,7 +62,7 @@ def create_alert(data: AlertCreate, current_user: User = Depends(get_current_use
         conn.close()
 
 @router.delete("/{alert_id}")
-def delete_alert(alert_id: int, current_user: User = Depends(get_current_user)):
+def delete_alert(alert_id: int, current_user: User = Depends(get_admin_user)):
     conn = get_db()
     try:
         conn.execute("DELETE FROM alerts WHERE id = ?", (alert_id,))

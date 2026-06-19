@@ -40,6 +40,31 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
         )
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Attach baseline security response headers to every response."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; img-src 'self' data: https:; "
+            "style-src 'self' 'unsafe-inline' https:; "
+            "script-src 'self' 'unsafe-inline' https:; "
+            "connect-src 'self' ws: wss:; frame-ancestors 'none'",
+        )
+        # HSTS only over HTTPS (harmless/ignored over plain HTTP, but avoid
+        # pinning HSTS for users who legitimately serve over http on a LAN).
+        if request.url.scheme == "https":
+            response.headers.setdefault(
+                "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+            )
+        return response
+
+
 def setup_middleware(app: FastAPI):
     """Add all middleware to the app"""
     app.add_middleware(ErrorHandlingMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
