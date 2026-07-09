@@ -71,8 +71,26 @@ class MetricProcessor(ABC):
         """
         raise NotImplementedError("Subclasses must implement get_supported_metric_types method.")
 
-    # --- Utility Methods (Optional, but good practice) ---
+    # --- Utility Methods ---
 
     def is_configured(self) -> bool:
         """Checks if the processor has necessary configuration to run."""
         return bool(self.config)
+
+    @staticmethod
+    def _compute_stats(values: list, num_points: int = 5) -> dict:
+        """Compute moving average and standard deviation from a list of values.
+
+        Shared by all concrete processors to avoid duplicated implementation.
+        """
+        import statistics
+        if len(values) < 2:
+            return {"moving_average": None, "standard_deviation": 0.0, "total_data_points_analyzed": len(values)}
+        n = min(len(values), num_points)
+        recent = values[-n:]
+        moving_average = round(sum(recent) / n, 2)
+        try:
+            stdev = statistics.stdev(recent)
+        except statistics.StatisticsError:
+            stdev = 0.0
+        return {"moving_average": moving_average, "standard_deviation": round(stdev, 2), "total_data_points_analyzed": len(values)}

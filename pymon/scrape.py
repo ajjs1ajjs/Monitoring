@@ -111,13 +111,18 @@ class ScrapeManager:
                 logger.info(f"[ScrapeManager] Collected {ok}/{len(servers)} servers")
 
     async def _scrape_one(self, client, server_id, name, host, port, last_status, last_cpu):
-        clean_host = host.strip()
+        raw_host = host.strip()
+        scheme = "http"
+        if raw_host.startswith("https://"):
+            scheme = "https"
+        clean_host = raw_host
         for prefix in ('http://', 'https://'):
             if clean_host.startswith(prefix):
                 clean_host = clean_host[len(prefix):]
         clean_host = clean_host.split('/')[0].split('?')[0]
-        url = f"http://{clean_host}:{port}/metrics"
+        url = f"{scheme}://{clean_host}:{port}/metrics"
         is_up = False
+        text = ""
         if is_blocked_outbound_host(clean_host):
             logger.warning(f"[ScrapeManager] Refusing blocked metadata target {clean_host} for {name}")
         else:
@@ -130,35 +135,38 @@ class ScrapeManager:
                 logger.warning(f"Scrape HTTP error for {name} ({url}): {type(e).__name__}: {e}")
 
         now = datetime.now().isoformat()
-        conn = await get_async_db()
 
         if not is_up:
-            if last_status == 'up':
-                await self._trigger_alert(f"🔥 Server Down: {name}", f"Server {name} ({host}) is offline or exporter is unreachable.")
-            try:
-                # Record a downtime row (NULL cpu_percent) so the uptime timeline
-                # reflects real downtime instead of always reading ~100% (a row
-                # with non-null cpu was previously only written on success).
-                await conn.execute(
-                    """INSERT INTO metrics_history
-                       (timestamp, server_id, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info)
-                       VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, NULL)""",
-                    (now, server_id),
-                )
-                await conn.execute("UPDATE servers SET last_status='down', last_check=? WHERE id=?", (now, server_id))
-                await conn.commit()
-            except Exception:
-                pass
-            finally:
-                await conn.close()
-            return False
+            return await self._record_downtime(server_id, name, host, last_status, now)
 
         data = self._parse_metrics(text, name)
+        return await self._persist_metrics(server_id, name, host, data, text, last_status, last_cpu, now)
 
-        m = re.search(r'_build_info\{[^}]*version="([^"]+)"', text)
-        exporter_version = m.group(1) if m else (data.get('exporter_version') or '')
-
+    async def _record_downtime(self, server_id, name, host, last_status, now):
+        conn = await get_async_db()
+        if last_status == 'up':
+            await self._trigger_alert(f"🔥 Server Down: {name}", f"Server {name} ({host}) is offline or exporter is unreachable.")
         try:
+            await conn.execute(
+                """INSERT INTO metrics_history
+                   (timestamp, server_id, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info)
+                   VALUES (?, ?, NULL, NULL, NULL, NULL, NULL, NULL)""",
+                (now, server_id),
+            )
+            await conn.execute("UPDATE servers SET last_status='down', last_check=? WHERE id=?", (now, server_id))
+            await conn.commit()
+        except Exception:
+            pass
+        finally:
+            await conn.close()
+        return False
+
+    async def _persist_metrics(self, server_id, name, host, data, text, last_status, last_cpu, now):
+        conn = await get_async_db()
+        try:
+            m = re.search(r'_build_info\{[^}]*version="([^"]+)"', text)
+            exporter_version = m.group(1) if m else (data.get('exporter_version') or '')
+
             vols = data.get('volumes', [])
             disk_json = json.dumps(vols)
             vol_summary = json.dumps([{
@@ -169,15 +177,12 @@ class ScrapeManager:
             } for v in vols])
 
             cpu_val = data.get('cpu', 0)
-            if cpu_val > 90 and (last_cpu is None or last_cpu <= 90):
-                await self._trigger_alert(f"⚠️ High CPU: {name}", f"Server {name} CPU usage is high: {cpu_val}%.")
-            elif cpu_val <= 90 and (last_cpu is not None and last_cpu > 90):
-                await self._trigger_alert(f"✅ CPU Normal: {name}", f"Server {name} CPU usage returned to normal: {cpu_val}%.")
-
-            await self._evaluate_alerting_rules(name, cpu_val, data.get('memory', 0), data.get('disk', 0))
 
             if last_status == 'down':
                 await self._trigger_alert(f"✅ Server Restored: {name}", f"Server {name} ({host}) is back online.")
+
+            await self._evaluate_cpu_alert(name, cpu_val, last_cpu)
+            await self._evaluate_alerting_rules(name, cpu_val, data.get('memory', 0), data.get('disk', 0))
 
             await conn.execute("""
                 INSERT INTO metrics_history
@@ -197,18 +202,24 @@ class ScrapeManager:
             """, (now, cpu_val, data.get('memory', 0),
                   data.get('disk', 0), vol_summary, exporter_version, server_id))
             await conn.commit()
-            await conn.close()
             await manager.broadcast({"type": "metrics_updated", "server_id": server_id})
             return True
         except Exception as e:
-            logger.error(f"Scrape processing error for {name} ({url}): {type(e).__name__}: {e}")
+            logger.error(f"Scrape processing error for {name}: {type(e).__name__}: {e}")
             try:
                 await conn.execute("UPDATE servers SET last_status='down', last_check=? WHERE id=?", (now, server_id))
                 await conn.commit()
             except Exception:
                 pass
-            await conn.close()
             return False
+        finally:
+            await conn.close()
+
+    async def _evaluate_cpu_alert(self, name, cpu_val, last_cpu):
+        if cpu_val > 90 and (last_cpu is None or last_cpu <= 90):
+            await self._trigger_alert(f"⚠️ High CPU: {name}", f"Server {name} CPU usage is high: {cpu_val}%.")
+        elif cpu_val <= 90 and (last_cpu is not None and last_cpu > 90):
+            await self._trigger_alert(f"✅ CPU Normal: {name}", f"Server {name} CPU usage returned to normal: {cpu_val}%.")
 
     async def _evaluate_alerting_rules(self, server_name: str, cpu: float, memory: float, disk: float):
         if not self.config or not self.config.alerting_rules:
@@ -555,12 +566,14 @@ class ServiceChecker:
             if is_blocked_outbound_host(_chk_host):
                 raise ValueError(f"blocked metadata target: {_chk_host}")
             if check_type == 'ping':
-                import asyncio
+                import re as _re
                 import sys
                 clean_host, _ = _extract_host_port(url)
+                if not _re.match(r'^[A-Za-z0-9._:\-\[\]]+$', clean_host) or clean_host.startswith('-'):
+                    raise ValueError(f"Invalid ping target: {clean_host}")
                 args = ["-n", "1", "-w", str((timeout if timeout else 10) * 1000)] if sys.platform == "win32" else ["-c", "1", "-W", str(timeout if timeout else 2)]
                 proc = await asyncio.create_subprocess_exec(
-                    "ping", *args, clean_host,
+                    "ping", *args, "--", clean_host,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE
                 )

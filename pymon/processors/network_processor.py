@@ -1,7 +1,5 @@
-import statistics
 from typing import Dict, List, Optional
 
-# Assuming this relative import path is correct based on previous actions
 from ..services.metric_processor import MetricProcessor, RawMetricPoint
 
 
@@ -73,33 +71,16 @@ class NetworkProcessor(MetricProcessor):
         if len(historical_data) < 2:
             return {"message": "Insufficient historical data to calculate derived metrics."}
 
-        # We will analyze the average of the total throughput (ingress + egress)
         throughput_values = []
         for point in historical_data:
             ingress = point.get("ingress_rate_bps", 0.0)
             egress = point.get("egress_rate_bps", 0.0)
-            total_throughput = ingress + egress
-            throughput_values.append(total_throughput)
+            throughput_values.append(ingress + egress)
 
-        # Use the last N points for stable statistics calculation
-        num_points_for_stats = min(len(throughput_values), 5)
-
-        if num_points_for_stats >= 2:
-            # Calculate average total throughput over the most recent period
-            avg_throughput = sum(throughput_values[-num_points_for_stats:]) / num_points_for_stats
-            moving_average_throughput = round(avg_throughput, 2)
-        else:
-            moving_average_throughput = None
-
-        try:
-            # Calculate standard deviation on the sample size used for MA
-            stdev_throughput = statistics.stdev(throughput_values[-num_points_for_stats:])
-        except statistics.StatisticsError:
-            stdev_throughput = 0.0
-
+        stats = self._compute_stats(throughput_values)
         return {
-            "moving_average_bps": moving_average_throughput,
-            "standard_deviation_bps": round(stdev_throughput, 2),
-            "total_data_points_analyzed": len(throughput_values),
+            "moving_average_bps": stats["moving_average"],
+            "standard_deviation_bps": stats["standard_deviation"],
+            "total_data_points_analyzed": stats["total_data_points_analyzed"],
         }
 

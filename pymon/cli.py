@@ -246,16 +246,8 @@ def main():
             app = create_app()
             # Prefer TLS settings from env, but also allow TLS config from config.yml via TLS envs
             tls_enabled = os.getenv("TLS_ENABLED", "false").lower() in ("1", "true", "yes", "on")
-            tls_cert = (
-                os.getenv("TLS_CERT")
-                or os.getenv("TLS_CERT_PATH")
-                or (os.getenv("TLS_CERT_PATH") if tls_enabled else None)
-            )
-            tls_key = (
-                os.getenv("TLS_KEY")
-                or os.getenv("TLS_KEY_PATH")
-                or (os.getenv("TLS_KEY_PATH") if tls_enabled else None)
-            )
+            tls_cert = os.getenv("TLS_CERT") or os.getenv("TLS_CERT_PATH")
+            tls_key = os.getenv("TLS_KEY") or os.getenv("TLS_KEY_PATH")
             if tls_enabled and tls_cert and tls_key:
                 uvicorn.run(app, host=host, port=port, ssl_certfile=tls_cert, ssl_keyfile=tls_key)
             else:

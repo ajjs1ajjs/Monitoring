@@ -71,8 +71,6 @@ async def update_user(user_id: int, data: dict, current_user: User = Depends(get
     must_change_password = bool(data["must_change_password"]) if "must_change_password" in data else None
 
     if "password" in data and data["password"]:
-        if len(data["password"]) < 12:
-            raise HTTPException(status_code=400, detail="Password must be at least 12 characters")
         _set_password(user_id, data["password"])
         return {"status": "ok", "password_changed": True}
 

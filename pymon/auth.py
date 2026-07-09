@@ -93,7 +93,7 @@ class APIKeyCreate(BaseModel):
 class AuthConfig:
     db_path: str = "pymon.db"
     admin_username: str = "admin"
-    admin_password: str = "change-me-on-first-login"
+    admin_password: str = ""
 
 
 def _load_auth_config() -> AuthConfig:
@@ -113,7 +113,10 @@ def _load_auth_config() -> AuthConfig:
             )
     except Exception:
         pass
-    return AuthConfig()
+    # Never fall back to a hardcoded password — always generate a strong random one
+    return AuthConfig(
+        admin_password=os.environ.get("PYMON_ADMIN_PASSWORD") or secrets.token_urlsafe(18)
+    )
 
 
 auth_config = _load_auth_config()
@@ -516,6 +519,7 @@ def _count_admins(c) -> int:
 
 def update_user(user_id: int, is_admin: Optional[bool] = None, must_change_password: Optional[bool] = None) -> bool:
     conn = get_db()
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     if is_admin is False:
         # Block demoting the last remaining admin (would lock everyone out).
@@ -536,6 +540,7 @@ def update_user(user_id: int, is_admin: Optional[bool] = None, must_change_passw
 
 def delete_user(user_id: int) -> bool:
     conn = get_db()
+    conn.row_factory = sqlite3.Row
     c = conn.cursor()
     row = c.execute("SELECT is_admin FROM users WHERE id = ?", (user_id,)).fetchone()
     if row is None:

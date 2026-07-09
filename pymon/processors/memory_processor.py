@@ -1,7 +1,5 @@
-import statistics
 from typing import Dict, List, Optional
 
-# Assuming this relative import path is correct based on previous actions
 from ..services.metric_processor import MetricProcessor, RawMetricPoint
 
 
@@ -80,37 +78,20 @@ class MemoryProcessor(MetricProcessor):
         if len(historical_data) < 2:
             return {"message": "Insufficient historical data to calculate derived metrics."}
 
-        # 1. Extract all valid percentage readings from the history
         values = []
         for point in historical_data:
             raw_value = None
-            # Attempt to extract percentage regardless of the raw data structure used during scraping
             if "usage_percent" in point and isinstance(point["usage_percent"], (float, int)):
                 raw_value = float(point["usage_percent"])
-            elif "value" in point and isinstance(point["value"], (float, int)):  # Fallback for generic points
+            elif "value" in point and isinstance(point["value"], (float, int)):
                 raw_value = float(point["value"])
-
             if raw_value is not None:
                 values.append(raw_value)
 
-        # 2. Calculate Moving Average and Standard Deviation
-        num_points_for_stats = min(len(values), 5)  # Use the last 5 points for stability
-
-        if num_points_for_stats >= 2:
-            # Calculate average over the most recent N points
-            avg = sum(values[-num_points_for_stats:]) / num_points_for_stats
-            moving_average = round(avg, 2)
-        else:
-            moving_average = None
-
-        try:
-            stdev = statistics.stdev(values[-num_points_for_stats:])  # Calculate STDEV on the sample size used for MA
-        except statistics.StatisticsError:
-            stdev = 0.0
-
+        stats = self._compute_stats(values)
         return {
-            "moving_average_5min": moving_average,
-            "standard_deviation": round(stdev, 2),
-            "total_data_points_analyzed": len(values),
+            "moving_average_5min": stats["moving_average"],
+            "standard_deviation": stats["standard_deviation"],
+            "total_data_points_analyzed": stats["total_data_points_analyzed"],
         }
 

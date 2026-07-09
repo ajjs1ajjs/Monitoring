@@ -27,7 +27,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
 
         logger.error(
             f"Request {request.url} failed: {exc}",
-            extra={"request_id": request_id, "traceback": traceback.format_exc()},
+            extra={"request_id": request_id, "traceback": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))},
         )
 
         return JSONResponse(

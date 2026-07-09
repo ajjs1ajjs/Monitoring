@@ -10,7 +10,7 @@ services:
       - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
 
   pymon:
-    image: ghcr.io/ajjs1ajjs/Monitoring:latest
+    image: ghcr.io/ajjs1ajjs/Monitoring:2.2.0
     build: .
     ports:
       - "10000:10000"

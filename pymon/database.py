@@ -179,6 +179,10 @@ def init_database():
     except sqlite3.OperationalError:
         pass
     try:
+        c.execute("CREATE INDEX IF NOT EXISTS idx_services_history_timestamp ON services_history(timestamp)")
+    except sqlite3.OperationalError:
+        pass
+    try:
         c.execute("CREATE INDEX IF NOT EXISTS idx_alerts_server_id ON alerts(server_id)")
     except sqlite3.OperationalError:
         pass
