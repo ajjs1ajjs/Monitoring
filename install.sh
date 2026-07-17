@@ -311,8 +311,6 @@ Environment="APP_VERSION=$APP_VERSION"
 ExecStart=$INSTALL_DIR/venv/bin/pymon server --config $CONFIG_DIR/config.yml
 Restart=always
 RestartSec=10
-StandardOutput=append:$LOG_DIR/pymon.log
-StandardError=append:$LOG_DIR/pymon.error.log
 
 NoNewPrivileges=true
 PrivateTmp=true
@@ -381,17 +379,20 @@ if systemctl is-active --quiet $SERVICE_NAME; then
         echo ""
         echo -e "  ${YELLOW}Admin Credentials:${NC}"
         echo -e "    Username: ${BLUE}admin${NC}"
-        ADMIN_PW=$(journalctl -u $SERVICE_NAME -n 200 --no-pager 2>/dev/null | grep 'Password:' | tail -1 | sed 's/.*Password: //' | tr -d '\r\n ' || true)
+        ADMIN_PW=$(journalctl -u $SERVICE_NAME -n 200 --no-pager 2>/dev/null | grep 'Password:' | tail -1 | sed 's/.*Password: //' | tr -d '
+
+         ' || true)
         if [ -n "$ADMIN_PW" ]; then
             echo -e "    Password: ${GREEN}$ADMIN_PW${NC}"
         else
             echo -e "    Password: ${YELLOW}(see: journalctl -u $SERVICE_NAME | grep Password)${NC}"
+            echo -e "    ${YELLOW}Альтернатива: sudo $INSTALL_DIR/venv/bin/pymon reset-admin${NC}"
         fi
         echo -e "  ${RED}IMPORTANT: Change this password immediately after login!${NC}"
         echo ""
         echo "  Password Commands:"
-        echo "    pymon reset-admin          # Reset to a new random password (shown once)"
-        echo "    PYMON_ADMIN_PASSWORD=... pymon reset-admin  # Reset to a chosen password"
+        echo "  sudo $INSTALL_DIR/venv/bin/pymon reset-admin          # Reset to a new random password (shown once)"
+        echo "  sudo PYMON_ADMIN_PASSWORD=... $INSTALL_DIR/venv/bin/pymon reset-admin  # Reset to a chosen password"
         echo ""
         echo "  Note: the password is shown ONLY once at creation/reset and is never"
         echo "        stored in cleartext. If lost, run 'pymon reset-admin'."
