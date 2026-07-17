@@ -666,8 +666,9 @@ def _parse_cron_field(field: str, max_val: int) -> set[int] | None:
         try:
             if part.startswith('*/'):
                 step = int(part[2:])
-                if step > 0:
-                    values.update(range(0, max_val + 1, step))
+                if step <= 0:
+                    continue
+                values.update(range(0, max_val + 1, step))
             elif '-' in part:
                 lo, hi = (int(x) for x in part.split('-', 1))
                 values.update(v for v in range(lo, hi + 1) if 0 <= v <= max_val)

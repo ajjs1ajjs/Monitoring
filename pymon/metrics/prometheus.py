@@ -5,6 +5,8 @@ from typing import Any
 
 from fastapi import APIRouter
 
+from pymon.metrics.collector import registry
+
 router = APIRouter()
 
 
@@ -89,7 +91,6 @@ class PrometheusMetricsExporter:
             lines.append(f"{metric_title}{labels_str} {value}")
 
         # Include the live in-process metrics registry (system_* gauges, counters, etc.)
-        from pymon.metrics.collector import registry
 
         registry_output = registry.export_prometheus()
         if registry_output:

@@ -118,7 +118,6 @@ def import_prometheus_config(data: dict, current_user: User = Depends(get_admin_
 
     import yaml
 
-
     try:
         prom_data = yaml.safe_load(yaml_content)
     except yaml.YAMLError as e:
@@ -129,20 +128,27 @@ def import_prometheus_config(data: dict, current_user: User = Depends(get_admin_
         raise HTTPException(status_code=400, detail="Invalid Prometheus config: expected a YAML mapping")
     scrape_configs = prom_data.get("scrape_configs", [])
 
-    # Save to DB as servers or update config.yml?
-    # Better: Add to 'servers' table so they appear in UI
     conn = get_db()
     try:
         c = conn.cursor()
         count = 0
         for sc in scrape_configs:
             job_name = sc.get("job_name", "imported_job")
+            # Extract all optional scrape_config fields
+            scrape_interval = sc.get("scrape_interval")
+            scrape_timeout = sc.get("scrape_timeout")
+            metrics_path = sc.get("metrics_path")
+            honor_labels = sc.get("honor_labels")
             static_configs = sc.get("static_configs", [])
             if not isinstance(static_configs, list):
                 continue
 
             for static_cfg in static_configs:
                 targets = static_cfg.get("targets", [])
+                # Extract labels from this static_config entry
+                static_labels = static_cfg.get("labels", {})
+                if not isinstance(static_labels, dict):
+                    static_labels = {}
                 if not isinstance(targets, list):
                     continue
 
@@ -165,7 +171,7 @@ def import_prometheus_config(data: dict, current_user: User = Depends(get_admin_
 
                         # Handle Servers (host:port)
                         host = t_str
-                        port = 9182 # Default
+                        port = 9182  # Default
 
                         if ':' in t_str:
                             parts = t_str.rsplit(':', 1)
@@ -188,15 +194,62 @@ def import_prometheus_config(data: dict, current_user: User = Depends(get_admin_
                         elif port == 9100:
                             os_type = 'linux'
 
-                        # Check if exists (Servers)
-                        existing = c.execute("SELECT id FROM servers WHERE host = ? AND agent_port = ?", (host, port)).fetchone()
+                        # Serialize labels from static_configs, enriched with
+                        # extra scrape_config metadata (scrape_timeout, metrics_path, honor_labels)
+                        labels_data = dict(static_labels) if isinstance(static_labels, dict) else {}
+                        if scrape_timeout is not None:
+                            labels_data["__scrape_timeout__"] = scrape_timeout
+                        if metrics_path is not None:
+                            labels_data["__metrics_path__"] = metrics_path
+                        if honor_labels is not None:
+                            labels_data["__honor_labels__"] = honor_labels
+                        labels_str = json.dumps(labels_data) if labels_data else "{}"
+
+                        # Determine scrape_interval value (honor per-job setting, fall back to global)
+                        interval_val = scrape_interval
+                        if interval_val is None:
+                            interval_val = prom_data.get("global", {}).get("scrape_interval", 0)
+                        if not isinstance(interval_val, int):
+                            try:
+                                # Parse Prometheus duration strings like "15s", "1m" into seconds
+                                iv = str(interval_val)
+                                if iv.endswith("s"):
+                                    interval_val = int(iv[:-1])
+                                elif iv.endswith("m"):
+                                    interval_val = int(iv[:-1]) * 60
+                                elif iv.endswith("h"):
+                                    interval_val = int(iv[:-1]) * 3600
+                                else:
+                                    interval_val = int(iv)
+                            except (ValueError, TypeError):
+                                interval_val = 0
+
+                        # Check if exists (Servers) — match on host + port
+                        existing = c.execute(
+                            "SELECT id FROM servers WHERE host = ? AND agent_port = ?",
+                            (host, port),
+                        ).fetchone()
                         if not existing:
-                            c.execute("INSERT INTO servers (name, host, agent_port, os_type, enabled, server_group, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                                     (job_name, host, port, os_type, 1, "Imported", datetime.now(timezone.utc).isoformat()))
+                            c.execute(
+                                """INSERT INTO servers
+                                   (name, host, agent_port, os_type, enabled,
+                                    server_group, scrape_interval, labels, created_at)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                (job_name, host, port, os_type, 1,
+                                 job_name, interval_val, labels_str,
+                                 datetime.now(timezone.utc).isoformat()),
+                            )
                             count += 1
                         else:
-                            # Update existing server group and OS type
-                            c.execute("UPDATE servers SET os_type = ?, server_group = ? WHERE id = ?", (os_type, job_name, existing['id']))
+                            # Update existing server with all available fields
+                            c.execute(
+                                """UPDATE servers
+                                   SET os_type = ?, server_group = ?,
+                                       scrape_interval = ?, labels = ?
+                                   WHERE id = ?""",
+                                (os_type, job_name, interval_val, labels_str,
+                                 existing["id"]),
+                            )
                     except Exception as e:
                         print(f"Import error for target {target}: {e}")
                         continue
@@ -205,6 +258,7 @@ def import_prometheus_config(data: dict, current_user: User = Depends(get_admin_
     except Exception as e:
         conn.rollback()
         import traceback
+
         traceback.print_exc()  # Print full error to server console
         raise HTTPException(status_code=500, detail=f"Помилка парсингу або імпорту: {str(e)}")
     finally:

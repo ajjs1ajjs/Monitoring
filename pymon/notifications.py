@@ -1,6 +1,9 @@
 """Notification dispatching for PyMon"""
 
 import logging
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 import httpx
 
@@ -124,9 +127,6 @@ class NotificationDispatcher:
 
     def send_email(self, message: str, subject: str, config: dict):
         """Send a message via SMTP"""
-        import smtplib
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
 
         smtp_server = config.get("smtp_server")
         smtp_port = config.get("smtp_port", 587)

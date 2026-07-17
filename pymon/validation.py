@@ -71,9 +71,9 @@ def validate_os_type(os_type: str) -> bool:
 
 def validate_time_range(range_str: str) -> bool:
     """Validate time range string"""
-    valid_ranges = ["5m", "15m", "1h", "6h", "24h", "7d"]
-    if range_str not in valid_ranges:
-        raise ValidationError(f"Range must be one of: {', '.join(valid_ranges)}")
+    from pymon.constants import TIME_RANGES
+    if range_str not in TIME_RANGES:
+        raise ValidationError(f"Range must be one of: {', '.join(TIME_RANGES)}")
 
     return True
 

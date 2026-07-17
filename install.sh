@@ -287,6 +287,11 @@ echo -e "${BLUE}Installing Python packages...${NC}"
 
 JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p)
 
+echo -e "${BLUE}Storing JWT secret in secure env file...${NC}"
+echo "JWT_SECRET=$JWT_SECRET" > "$CONFIG_DIR/.env"
+chmod 600 "$CONFIG_DIR/.env"
+chown "$USER:$USER" "$CONFIG_DIR/.env"
+
 echo -e "${BLUE}Creating systemd service...${NC}"
 cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
 [Unit]
@@ -301,7 +306,7 @@ Group=$USER
 WorkingDirectory=$INSTALL_DIR
 Environment="PATH=$INSTALL_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="CONFIG_PATH=$CONFIG_DIR/config.yml"
-Environment="JWT_SECRET=$JWT_SECRET"
+EnvironmentFile=$CONFIG_DIR/.env
 Environment="APP_VERSION=$APP_VERSION"
 ExecStart=$INSTALL_DIR/venv/bin/pymon server --config $CONFIG_DIR/config.yml
 Restart=always

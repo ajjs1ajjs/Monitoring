@@ -307,14 +307,29 @@ def compare_servers(
     conn = get_db()
     try:
         servers = conn.execute("SELECT id, name FROM servers ORDER BY name").fetchall()
-        # Aggregate in SQL with a single grouped query instead of per-server loops.
-        agg_rows = conn.execute(
-            f"""
-            SELECT server_id, AVG({col}), MIN({col}), MAX({col}), COUNT({col})
-            FROM metrics_history
-            WHERE timestamp > datetime('now', ?) AND {col} IS NOT NULL
-            GROUP BY server_id
+        # Full SQL templates keyed by column name — no interpolation needed.
+        _QUERIES = {
+            "cpu_percent": """
+                SELECT server_id, AVG(cpu_percent), MIN(cpu_percent), MAX(cpu_percent), COUNT(cpu_percent)
+                FROM metrics_history
+                WHERE timestamp > datetime('now', ?) AND cpu_percent IS NOT NULL
+                GROUP BY server_id
             """,
+            "memory_percent": """
+                SELECT server_id, AVG(memory_percent), MIN(memory_percent), MAX(memory_percent), COUNT(memory_percent)
+                FROM metrics_history
+                WHERE timestamp > datetime('now', ?) AND memory_percent IS NOT NULL
+                GROUP BY server_id
+            """,
+            "disk_percent": """
+                SELECT server_id, AVG(disk_percent), MIN(disk_percent), MAX(disk_percent), COUNT(disk_percent)
+                FROM metrics_history
+                WHERE timestamp > datetime('now', ?) AND disk_percent IS NOT NULL
+                GROUP BY server_id
+            """,
+        }
+        agg_rows = conn.execute(
+            _QUERIES[col],
             (time_filter,),
         ).fetchall()
         agg = {r[0]: r for r in agg_rows}

@@ -71,7 +71,7 @@ async def lifespan(app):
 def create_app():
     from fastapi import FastAPI, Request
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import FileResponse, RedirectResponse
+    from fastapi.responses import FileResponse, RedirectResponse, Response
     from fastapi.staticfiles import StaticFiles
     from fastapi.templating import Jinja2Templates
 
@@ -138,7 +138,7 @@ def create_app():
             return FileResponse(ico_path)
         elif os.path.exists(svg_path):
             return FileResponse(svg_path)
-        return None
+        return Response(status_code=404)
 
     @app.get("/dashboard")
     @app.get("/dashboard/")

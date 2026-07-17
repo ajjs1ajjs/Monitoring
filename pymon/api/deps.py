@@ -1,6 +1,6 @@
-import sqlite3
-
 from fastapi import WebSocket
+
+from pymon.database import get_db_connection
 
 
 class ConnectionManager:
@@ -34,28 +34,15 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-def _resolve_db_path() -> str:
-    # Delegate to the shared, invalidatable resolver (DB_PATH env wins, else config).
-    from pymon.config import resolve_db_path
-    return resolve_db_path()
-
 def get_db():
     """Get database connection with WAL mode enabled for concurrency"""
-    db_path = _resolve_db_path()
-    conn = sqlite3.connect(db_path, timeout=30)
-    conn.row_factory = sqlite3.Row
-    try:
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA busy_timeout = 30000")
-    except Exception:
-        pass
-    return conn
+    return get_db_connection()
 
 async def get_async_db():
     """Get async database connection with aiosqlite"""
     import aiosqlite
-    db_path = _resolve_db_path()
+    from pymon.config import resolve_db_path
+    db_path = resolve_db_path()
     conn = await aiosqlite.connect(db_path, timeout=30.0)
     conn.row_factory = aiosqlite.Row
     try:
