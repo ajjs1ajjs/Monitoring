@@ -169,10 +169,12 @@ def main():
     server_parser.add_argument("--storage", default="sqlite", choices=["memory", "sqlite"], help="Storage backend")
     server_parser.add_argument("--db", default=None, help="Database path (defaults to config value)")
 
-    subparsers.add_parser(
+    reset_parser = subparsers.add_parser(
         "reset-admin",
         help="Reset the admin password (random, or PYMON_ADMIN_PASSWORD if set)",
     )
+    reset_parser.add_argument("--config", "-c", default=None, help="Path to config.yml (auto-detected if not set)")
+    reset_parser.add_argument("--db", default=None, help="Path to the database file (overrides config)")
 
     args = parser.parse_args()
 
@@ -266,16 +268,39 @@ def main():
             new_password = os.getenv("PYMON_ADMIN_PASSWORD") or secrets.token_urlsafe(18)
             password_hash = hash_password(new_password)
 
-            # Resolve the DB the same way the server does: DB_PATH env wins, else the
-            # path from config.yml (CONFIG_PATH). Avoids editing the wrong database.
-            from pymon.config import resolve_db_path
-            try:
-                db_path = resolve_db_path()
-            except Exception:
-                db_path = os.getenv("DB_PATH", "pymon.db")
-            if not os.path.exists(db_path):
-                print(f"ERROR: Database not found at {db_path}")
-                print("HINT: set DB_PATH or CONFIG_PATH to point at the live database.")
+            # Resolve the DB path: explicit --db wins, then DB_PATH env,
+            # then config.yml, then common default paths.
+            db_path = args.db or os.getenv("DB_PATH")
+            if not db_path:
+                config_path = args.config or os.getenv("CONFIG_PATH")
+                if config_path:
+                    os.environ["CONFIG_PATH"] = config_path
+                try:
+                    from pymon.config import resolve_db_path
+                    db_path = resolve_db_path()
+                except Exception:
+                    db_path = None
+
+            # Try common production paths if still not found
+            if not db_path or not os.path.exists(db_path):
+                for candidate in [
+                    db_path,
+                    "/var/lib/pymon/pymon.db",
+                    "/data/pymon.db",
+                    "pymon.db",
+                ]:
+                    if candidate and os.path.exists(candidate):
+                        db_path = candidate
+                        break
+
+            if not db_path or not os.path.exists(db_path):
+                print(f"ERROR: Database not found at {db_path or '?'}")
+                print()
+                print("HINT: Use one of these:")
+                print(f"  sudo CONFIG_PATH=/etc/pymon/config.yml {sys.argv[0]} reset-admin")
+                print(f"  sudo DB_PATH=/var/lib/pymon/pymon.db {sys.argv[0]} reset-admin")
+                print(f"  sudo {sys.argv[0]} reset-admin --db /var/lib/pymon/pymon.db")
+                print(f"  sudo {sys.argv[0]} reset-admin --config /etc/pymon/config.yml")
                 sys.exit(1)
             print(f"Using database: {db_path}", file=sys.stderr)
             conn = sqlite3.connect(db_path)
