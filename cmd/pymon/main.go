@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -91,7 +92,10 @@ func runServer(args []string) {
 	store := storage.NewStore(db, abs)
 	store.SetMaxBackups(cfg.Backup.MaxBackups)
 
-	jwtSecretFile := ".pymon_jwt_secret"
+	// Keep the JWT secret next to the database. systemd services run with CWD="/"
+	// which the pymon user cannot write to, so a relative ".pymon_jwt_secret"
+	// would crash startup on install (Permission denied).
+	jwtSecretFile := filepath.Join(filepath.Dir(abs), ".pymon_jwt_secret")
 	authn, err := auth.New(jwtSecretFile, cfg.Auth.JWTExpireHours)
 	if err != nil {
 		log.Fatalf("auth init: %v", err)
