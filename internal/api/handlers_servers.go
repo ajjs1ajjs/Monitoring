@@ -209,8 +209,12 @@ func (a *App) handleServersHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(servers))
 	for _, s := range servers {
+		h := history[s.ID]
+		if h == nil {
+			h = []storage.MetricPoint{}
+		}
 		out = append(out, map[string]any{
-			"id": s.ID, "name": s.Name, "host": s.Host, "history": history[s.ID],
+			"id": s.ID, "name": s.Name, "host": s.Host, "history": h,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"range": token, "servers": out})

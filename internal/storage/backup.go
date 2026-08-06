@@ -53,7 +53,7 @@ func (st *Store) ListBackups(dir string) ([]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	var out []map[string]any
+	out := []map[string]any{}
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasPrefix(e.Name(), "pymon_backup_") {
 			continue

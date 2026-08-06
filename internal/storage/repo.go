@@ -60,7 +60,7 @@ func (st *Store) ListServers() ([]Server, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Server
+	out := []Server{}
 	for rows.Next() {
 		s, err := scanServer(rows)
 		if err != nil {
@@ -130,7 +130,7 @@ func (st *Store) EnabledServers() ([]Server, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Server
+	out := []Server{}
 	for rows.Next() {
 		s, err := scanServer(rows)
 		if err != nil {
@@ -199,7 +199,7 @@ func (st *Store) ServerHistory(serverID int64, token string) ([]MetricPoint, err
 		return nil, err
 	}
 	defer rows.Close()
-	var out []MetricPoint
+	out := []MetricPoint{}
 	for rows.Next() {
 		var m MetricPoint
 		var cpu, mem, disk, rx, tx sql.NullFloat64
@@ -374,7 +374,7 @@ func (st *Store) ListServices() ([]Service, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Service
+	out := []Service{}
 	for rows.Next() {
 		s, err := scanService(rows)
 		if err != nil {
@@ -444,7 +444,7 @@ func (st *Store) EnabledServices() ([]Service, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Service
+	out := []Service{}
 	for rows.Next() {
 		s, err := scanService(rows)
 		if err != nil {
@@ -469,7 +469,7 @@ func (st *Store) ServiceHistory(token string) ([]ServiceHistory, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []ServiceHistory
+	out := []ServiceHistory{}
 	for rows.Next() {
 		var h ServiceHistory
 		var ts sql.NullString
@@ -493,7 +493,7 @@ func (st *Store) ListAlerts() ([]Alert, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Alert
+	out := []Alert{}
 	for rows.Next() {
 		var a Alert
 		var serverID, serviceID sql.NullInt64
@@ -567,7 +567,7 @@ func (st *Store) ListAudit(limit, offset int) ([]AuditLog, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []AuditLog
+	out := []AuditLog{}
 	for rows.Next() {
 		var a AuditLog
 		var uid sql.NullInt64
@@ -635,7 +635,7 @@ func (st *Store) ListUsers() ([]User, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []User
+	out := []User{}
 	for rows.Next() {
 		u, err := scanUser(rows)
 		if err != nil {
@@ -721,7 +721,7 @@ func (st *Store) ListAPIKeys(userID int64) ([]APIKey, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []APIKey
+	out := []APIKey{}
 	for rows.Next() {
 		k, err := scanAPIKey(rows)
 		if err != nil {
@@ -784,7 +784,7 @@ func (st *Store) RecentMetrics(limit int) ([]Metric, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Metric
+	out := []Metric{}
 	for rows.Next() {
 		var m Metric
 		var labels, ts sql.NullString

@@ -234,3 +234,40 @@ func jsonNumber(i int64) string {
 	b, _ := json.Marshal(i)
 	return string(b)
 }
+
+// TestEmptyListsAreArrays guards against nil slices being marshaled as JSON
+// null (Go marshals nil slices to null, which the frontend's .forEach/.map
+// calls cannot handle).
+func TestEmptyListsAreArrays(t *testing.T) {
+	app, _ := newTestApp(t)
+	h := app.Handler()
+	token := loginToken(t, h)
+
+	for _, tc := range []struct{ path, key string }{
+		{"/api/v1/servers", `"servers"`},
+		{"/api/v1/services", `"services"`},
+		{"/api/v1/alerts", `"alerts"`},
+		{"/api/v1/audit-log", `"logs"`},
+		{"/api/v1/auth/api-keys", `"api_keys"`},
+		{"/api/v1/metrics", `"metrics"`},
+	} {
+		rec := doAuth(t, h, http.MethodGet, tc.path, token, nil)
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s = %d", tc.path, rec.Code)
+			continue
+		}
+		body := rec.Body.String()
+		if strings.Contains(body, tc.key+":null") {
+			t.Errorf("%s returned null for %s (want [])", tc.path, tc.key)
+		}
+	}
+
+	// /api/v1/auth/users (admin only)
+	rec := doAuth(t, h, http.MethodGet, "/api/v1/auth/users", token, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("users = %d", rec.Code)
+	}
+	if strings.Contains(rec.Body.String(), `"users":null`) {
+		t.Errorf("users returned null (want [])")
+	}
+}
