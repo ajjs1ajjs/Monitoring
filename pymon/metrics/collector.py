@@ -56,7 +56,8 @@ class MetricsRegistry:
 
     def get_metric(self, name: str, labels: list[Label] | None = None) -> Metric | None:
         key = Metric(name=name, value=0, metric_type=MetricType.GAUGE, labels=labels or []).labels_key
-        return self._metrics.get(name, {}).get(key)
+        with self._lock:
+            return self._metrics.get(name, {}).get(key)
 
     def get_all_metrics(self) -> Iterator[Metric]:
         with self._lock:
