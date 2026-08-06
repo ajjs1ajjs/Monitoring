@@ -7,6 +7,27 @@
 
 ---
 
+## [3.0.0] - 2026-08-06
+
+### Змінено (повне переписування Python → Go)
+
+- **Бекенд переписано з Python (FastAPI) на Go 1.25** — один статичний бінар, нижче споживання RAM/CPU, миттєвий старт.
+- **SQLite через `modernc.org/sqlite`** (pure-Go, без CGO) — той самий WAL-режим, схема БД ідентична (можна підключити існуючу базу v2.x).
+- **Той самий REST API + WebSocket контракт** — фронтенд перевикористовується як embedded assets через `go:embed`.
+- **Моніторинг**: ScrapeManager (node_exporter/windows_exporter) та ServiceChecker (http/ping/ssl) як горутини; офіційний Prometheus-парсер `prometheus/common`.
+- **Виправлено відомі баги**: додано реальний Slack-канал сповіщень; додано видалення API-ключа (`DELETE /api/v1/auth/api-keys/{id}`).
+- **CLI**: `pymon server`, `pymon reset-admin`, `pymon --version`.
+- **Docker**: multi-stage Go → scratch/alpine, healthcheck через wget.
+- **CI**: Go vet + `go test -race` + Docker smoke-тест.
+- **Тести**: config, моніторинговий парсер (Linux/Windows), storage (CRUD, backup/restore, uptime), API smoke-тести (auth, RBAC, сервери, prometheus-export).
+
+### Сумісність
+
+- Схема БД і ключі даних не змінюються — дані v2.x переносяться без міграції.
+- Клієнтський API і формати відповідей збережені.
+
+---
+
 ## [2.3.3] - 2026-08-06
 
 ### 🧹 Best-practice hardening (закриття решти пунктів аудиту)

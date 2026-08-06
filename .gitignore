@@ -1,27 +1,10 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
+# Go
+/bin/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+pymon
+pymon.exe
+*.test
+*.out
 
 # IDE
 .vscode/
@@ -59,14 +42,3 @@ settings.json
 # Secrets
 .jwt_secret
 .pymon_jwt_secret
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Test databases
-test_*.db
-test*.db
-
-credentials.txt

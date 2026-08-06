@@ -1,36 +1,25 @@
-# Multi-stage build for production
-FROM python:3.12-slim AS builder
+# Multi-stage build for production (Go)
+FROM golang:1.25-alpine AS builder
 
-WORKDIR /app
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/pymon ./cmd/pymon
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    passwd \
-    && rm -rf /var/lib/apt/lists/*
+FROM alpine:3.20
 
-COPY pyproject.toml requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-FROM python:3.12-slim
-
-WORKDIR /app
-
-COPY --from=builder /usr/local /usr/local
-
-COPY pymon/ ./pymon/
-COPY pyproject.toml .
-COPY docs/ ./docs/
-COPY README.md CHANGELOG.md ./
-
-RUN groupadd -r pymon && useradd -r -g pymon pymon \
+RUN apk add --no-cache ca-certificates iputils \
+    && addgroup -S pymon && adduser -S -G pymon pymon \
     && mkdir -p /data /config /logs \
-    && chown -R pymon:pymon /app /data /config /logs /usr/local
+    && chown -R pymon:pymon /data /config /logs
 
-ENV PATH=/usr/local/bin:$PATH \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONFAULTHANDLER=1 \
-    CONFIG_PATH=/config/config.yml \
+COPY --from=builder /out/pymon /usr/local/bin/pymon
+COPY config.example.yml /config/config.example.yml
+COPY docs/ /docs/
+COPY README.md CHANGELOG.md LICENSE ./
+
+ENV CONFIG_PATH=/config/config.yml \
     DATA_DIR=/data \
     LOG_DIR=/logs \
     DB_PATH=/data/pymon.db
@@ -40,12 +29,12 @@ USER pymon
 EXPOSE 10000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:10000/api/v1/health')" || exit 1
+    CMD wget -qO- http://localhost:10000/api/v1/health || exit 1
 
 VOLUME ["/data", "/config", "/logs"]
 
 LABEL maintainer="PyMon Team"
-LABEL version="2.3.3"
-LABEL description="Enterprise Server Monitoring with Grafana-style Dashboard"
+LABEL version="3.0.0"
+LABEL description="Enterprise Server Monitoring NOC Dashboard (Go)"
 
-CMD ["python", "-m", "pymon", "server", "--config", "/config/config.yml"]
+CMD ["pymon", "server", "--config", "/config/config.yml"]

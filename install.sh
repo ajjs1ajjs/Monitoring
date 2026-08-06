@@ -1,441 +1,70 @@
 #!/bin/bash
-
+# PyMon NOC (Go) - one-line installer (Linux/macOS)
 set -e
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-GITHUB_REPO="ajjs1ajjs/Monitoring"
 INSTALL_DIR="/opt/pymon"
 CONFIG_DIR="/etc/pymon"
 DATA_DIR="/var/lib/pymon"
 LOG_DIR="/var/log/pymon"
 SERVICE_NAME="pymon"
-USER="pymon"
-APP_VERSION="2.3.3"
+VERSION="3.0.0"
+REPO="ajjs1ajjs/Monitoring"
 
-echo -e "${GREEN}"
-echo "=========================================="
-echo "   PyMon - Installation Script"
-echo "   Python Monitoring System"
-echo "=========================================="
-echo -e "${NC}"
-
-if [ "$EUID" -ne 0 ]; then 
-    echo -e "${RED}Error: Please run as root (use sudo)${NC}"
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Please run as root (sudo ./install.sh)"
     exit 1
 fi
 
-# Detect if this is an update
-IS_UPDATE=false
-if [ -d "$INSTALL_DIR/pymon" ] && [ -f "$INSTALL_DIR/.version" ]; then
-    IS_UPDATE=true
-    echo -e "${YELLOW}=========================================="
-    echo "   PyMon - Update Mode Detected"
-    echo "==========================================${NC}"
-    echo ""
-fi
+echo "PyMon NOC ${VERSION} (Go) installer"
 
-PORT=10000
-PYMON_VERSION="main"
-STORAGE="sqlite"
-
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --port)
-            PORT="$2"
-            shift 2
-            ;;
-        --version)
-            PYMON_VERSION="$2"
-            shift 2
-            ;;
-        --storage)
-            STORAGE="$2"
-            shift 2
-            ;;
-        --help)
-            echo "Usage: $0 [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --port PORT       Set port (default: 10000)"
-            echo "  --version VERSION Install specific version (e.g., v0.1.0 or main)"
-            echo "  --storage TYPE    Storage backend: memory or sqlite (default: sqlite)"
-            echo "  --help            Show this help message"
-            exit 0
-            ;;
-        *)
-            echo -e "${RED}Unknown option: $1${NC}"
-            exit 1
-            ;;
-    esac
-done
-
-if [[ "$PYMON_VERSION" == "main" ]]; then
-    DOWNLOAD_URL="https://github.com/$GITHUB_REPO/archive/refs/heads/main.tar.gz"
-    APP_VERSION="latest (main branch)"
-elif [[ "$PYMON_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    DOWNLOAD_URL="https://github.com/$GITHUB_REPO/archive/refs/tags/$PYMON_VERSION.tar.gz"
-    APP_VERSION="$PYMON_VERSION"
-else
-    echo -e "${RED}Error: Invalid version format. Use 'main' or 'v0.1.0' format${NC}"
+if ! command -v go &> /dev/null && ! command -v docker &> /dev/null; then
+    echo "ERROR: Go (for building) or Docker (for image) is required."
     exit 1
 fi
 
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    OS_NAME=$NAME
-    OS_VERSION=$VERSION_ID
-else
-    echo -e "${RED}Error: Cannot detect OS${NC}"
-    exit 1
-fi
-
-echo -e "${YELLOW}Detected OS: $OS_NAME $OS_VERSION${NC}"
-
-PYTHON_CMD=""
-if command -v python3.12 &> /dev/null; then
-    PYTHON_CMD="python3.12"
-elif command -v python3.11 &> /dev/null; then
-    PYTHON_CMD="python3.11"
-elif command -v python3.10 &> /dev/null; then
-    PYTHON_CMD="python3.10"
-elif command -v python3 &> /dev/null; then
-    PYTHON_CMD="python3"
-else
-    echo -e "${RED}Error: Python 3.10+ is required${NC}"
-    exit 1
-fi
-
-PYTHON_VER=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
-echo -e "${YELLOW}Using Python: $PYTHON_VER${NC}"
-
-echo -e "${BLUE}Installing system dependencies...${NC}"
-case "$OS_NAME" in
-    "Ubuntu"|"Debian GNU/Linux")
-        apt-get update -qq
-        apt-get install -y -qq python3-pip python3-venv python3-full sqlite3 curl > /dev/null
-        ;;
-    "CentOS Linux"|"Red Hat Enterprise Linux"|"Fedora")
-        yum install -y -q python3-pip sqlite curl > /dev/null 2>&1 || \
-        dnf install -y -q python3-pip sqlite curl > /dev/null 2>&1
-        ;;
-    *)
-        echo -e "${RED}Unsupported OS: $OS_NAME${NC}"
-        echo "Supported: Ubuntu, Debian, CentOS, RHEL, Fedora"
-        exit 1
-        ;;
-esac
-
-if ! id "$USER" &>/dev/null; then
-    echo -e "${BLUE}Creating user: $USER${NC}"
-    useradd -r -s /bin/false -d "$DATA_DIR" "$USER"
-fi
-
-echo -e "${BLUE}Creating directories...${NC}"
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
 
-# Backup existing data if updating
-if [ "$IS_UPDATE" = true ]; then
-    UPDATE_BACKUP_TS=$(date +%Y%m%d-%H%M%S)
-    echo -e "${YELLOW}Backing up current data...${NC}"
-    if [ -d "$INSTALL_DIR/pymon" ]; then
-        cp -r "$INSTALL_DIR/pymon" "/tmp/pymon.backup.$UPDATE_BACKUP_TS"
-        echo -e "${GREEN}  ✓ Code backed up: /tmp/pymon.backup.$UPDATE_BACKUP_TS${NC}"
-    fi
-    if [ -f "$DATA_DIR/pymon.db" ]; then
-        cp "$DATA_DIR/pymon.db" "/tmp/pymon.db.backup.$UPDATE_BACKUP_TS"
-        echo -e "${GREEN}  ✓ Database backed up: /tmp/pymon.db.backup.$UPDATE_BACKUP_TS${NC}"
-    fi
-    if [ -f "$CONFIG_DIR/config.yml" ]; then
-        cp "$CONFIG_DIR/config.yml" "/tmp/pymon.config.backup.$UPDATE_BACKUP_TS"
-        echo -e "${GREEN}  ✓ Config backed up: /tmp/pymon.config.backup.$UPDATE_BACKUP_TS${NC}"
-    fi
-    echo -e "${YELLOW}Stopping service...${NC}"
-    systemctl stop $SERVICE_NAME 2>/dev/null || true
-    sleep 2
+if command -v docker &> /dev/null; then
+    echo "Building binary via Docker image..."
+    docker build -t "$REPO:$VERSION" "$(dirname "$0")"
+    id=$(docker create "$REPO:$VERSION")
+    docker cp "$id:/usr/local/bin/pymon" "$INSTALL_DIR/pymon"
+    docker rm "$id"
+else
+    echo "Building binary..."
+    ( cd "$(dirname "$0")" && go build -o "$INSTALL_DIR/pymon" ./cmd/pymon )
 fi
 
-echo -e "${BLUE}Downloading PyMon $APP_VERSION from GitHub...${NC}"
-echo -e "${YELLOW}URL: $DOWNLOAD_URL${NC}"
-cd /tmp
-
-if ! curl -fsSL "$DOWNLOAD_URL" -o pymon.tar.gz; then
-    echo -e "${RED}Error: Failed to download from GitHub${NC}"
-    echo "URL: $DOWNLOAD_URL"
-    exit 1
-fi
-
-# Verify download
-if [ ! -f pymon.tar.gz ] || [ ! -s pymon.tar.gz ]; then
-    echo -e "${RED}Error: Downloaded file is empty or missing${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}Downloaded: $(du -h pymon.tar.gz | cut -f1)${NC}"
-
-echo -e "${BLUE}Extracting...${NC}"
-# Extract into a dedicated, clean directory so the code backup in /tmp
-# (pymon.backup.*) can never be mistaken for the extracted source tree.
-EXTRACT_ROOT="/tmp/pymon_extract.$$"
-rm -rf "$EXTRACT_ROOT"
-mkdir -p "$EXTRACT_ROOT"
-tar -xzf pymon.tar.gz -C "$EXTRACT_ROOT"
-
-# The GitHub tarball unpacks to a single <repo>-<ref> directory. Pick the one
-# that actually contains the application package (pymon/ + pyproject.toml).
-EXTRACT_DIR=""
-for d in "$EXTRACT_ROOT"/*/; do
-    if [ -d "$d/pymon" ] && [ -f "$d/pyproject.toml" ]; then
-        EXTRACT_DIR="${d%/}"
-        break
-    fi
-done
-# Fallback: first sub-directory in the clean extract root.
-if [ -z "$EXTRACT_DIR" ]; then
-    EXTRACT_DIR=$(find "$EXTRACT_ROOT" -maxdepth 1 -mindepth 1 -type d | head -1)
-fi
-
-if [ -z "$EXTRACT_DIR" ] || [ ! -d "$EXTRACT_DIR/pymon" ]; then
-    echo -e "${RED}Error: Could not find extracted application files${NC}"
-    echo "Contents of $EXTRACT_ROOT:"
-    ls -la "$EXTRACT_ROOT"
-    exit 1
-fi
-
-echo -e "${BLUE}Found: $EXTRACT_DIR${NC}"
-
-echo -e "${BLUE}Installing application...${NC}"
-# Remove the old package first so deleted files don't linger between versions.
-rm -rf "$INSTALL_DIR/pymon"
-cp -r "$EXTRACT_DIR/pymon" "$INSTALL_DIR/"
-cp "$EXTRACT_DIR/pyproject.toml" "$INSTALL_DIR/" 2>/dev/null || true
-cp "$EXTRACT_DIR/README.md" "$INSTALL_DIR/" 2>/dev/null || true
-
-echo "$PYMON_VERSION" > "$INSTALL_DIR/.version"
-
-SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "0.0.0.0")
-
-echo -e "${BLUE}Creating configuration...${NC}"
 if [ ! -f "$CONFIG_DIR/config.yml" ]; then
-    cat > "$CONFIG_DIR/config.yml" << EOF
-# PyMon Configuration
-server:
-  port: $PORT
-  host: 0.0.0.0
-  domain: $SERVER_IP
-
-storage:
-  backend: $STORAGE
-  path: $DATA_DIR/pymon.db
-  retention_hours: 168
-
-auth:
-  admin_username: admin
-  admin_password: "change-me-on-first-login"
-  jwt_expire_hours: 24
-
-# Scrape configuration (Prometheus-style)
-scrape_configs:
-  - job_name: pymon_self
-    scrape_interval: 15s
-    scrape_timeout: 10s
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - localhost:$PORT
-        labels:
-          env: production
-          service: pymon
-
-alerting:
-  enabled: true
-  evaluation_interval: 30s
-  rules: []
-
-backup:
-  enabled: true
-  max_backups: 10
-  backup_dir: $CONFIG_DIR/backups
-EOF
+    cp "$(dirname "$0")/config.example.yml" "$CONFIG_DIR/config.yml"
 fi
 
-mkdir -p "$CONFIG_DIR/backups"
+useradd -r -s /bin/false pymon 2>/dev/null || true
+chown -R pymon:pymon "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
 
-# Restore config and database if updating
-if [ "$IS_UPDATE" = true ]; then
-    if [ -f "/tmp/pymon.config.backup.$UPDATE_BACKUP_TS" ]; then
-        cp "/tmp/pymon.config.backup.$UPDATE_BACKUP_TS" "$CONFIG_DIR/config.yml"
-        echo -e "${GREEN}  ✓ Config restored${NC}"
-    fi
-    if [ -f "/tmp/pymon.db.backup.$UPDATE_BACKUP_TS" ]; then
-        cp "/tmp/pymon.db.backup.$UPDATE_BACKUP_TS" "$DATA_DIR/pymon.db"
-        echo -e "${GREEN}  ✓ Database restored${NC}"
-    fi
-fi
-
-echo -e "${BLUE}Creating virtual environment...${NC}"
-cd "$INSTALL_DIR"
-$PYTHON_CMD -m venv venv
-
-echo -e "${BLUE}Installing Python packages...${NC}"
-./venv/bin/pip install --upgrade pip > /dev/null
-./venv/bin/pip install -e .
-
-JWT_SECRET=$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p)
-
-echo -e "${BLUE}Storing JWT secret in secure env file...${NC}"
-echo "JWT_SECRET=$JWT_SECRET" > "$CONFIG_DIR/.env"
-chmod 600 "$CONFIG_DIR/.env"
-chown "$USER:$USER" "$CONFIG_DIR/.env"
-
-echo -e "${BLUE}Creating systemd service...${NC}"
-cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
+cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
 [Unit]
-Description=PyMon Monitoring Service (Version $APP_VERSION)
-Documentation=https://github.com/$GITHUB_REPO
+Description=PyMon NOC Monitoring
 After=network.target
 
 [Service]
-Type=simple
-User=$USER
-Group=$USER
-WorkingDirectory=$INSTALL_DIR
-Environment="PATH=$INSTALL_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin"
-Environment="CONFIG_PATH=$CONFIG_DIR/config.yml"
-EnvironmentFile=$CONFIG_DIR/.env
-Environment="APP_VERSION=$APP_VERSION"
-ExecStart=$INSTALL_DIR/venv/bin/pymon server --config $CONFIG_DIR/config.yml
+User=pymon
+ExecStart=$INSTALL_DIR/pymon server --config $CONFIG_DIR/config.yml
 Restart=always
-RestartSec=10
-
-NoNewPrivileges=true
-PrivateTmp=true
+RestartSec=5
+Environment=CONFIG_PATH=$CONFIG_DIR/config.yml
+Environment=DATA_DIR=$DATA_DIR
+Environment=LOG_DIR=$LOG_DIR
+Environment=DB_PATH=$DATA_DIR/pymon.db
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-echo -e "${BLUE}Setting permissions...${NC}"
-chown -R "$USER:$USER" "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
-chmod 600 "$CONFIG_DIR/config.yml"
-
-echo -e "${BLUE}Configuring firewall...${NC}"
-if command -v ufw &> /dev/null; then
-    if ufw status | grep -q "Status: active"; then
-        ufw allow $PORT/tcp comment 'PyMon'
-        echo -e "${GREEN}Added UFW rule for port $PORT${NC}"
-    fi
-elif command -v firewall-cmd &> /dev/null; then
-    if firewall-cmd --state 2>/dev/null; then
-        firewall-cmd --permanent --add-port=$PORT/tcp
-        firewall-cmd --reload
-        echo -e "${GREEN}Added firewalld rule for port $PORT${NC}"
-    fi
-fi
-
-echo -e "${BLUE}Starting service...${NC}"
 systemctl daemon-reload
 systemctl enable $SERVICE_NAME
 systemctl start $SERVICE_NAME
 
-sleep 3
-if systemctl is-active --quiet $SERVICE_NAME; then
-    IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
-    
-    if [ "$IS_UPDATE" = true ]; then
-        echo ""
-        echo -e "${GREEN}=========================================="
-        echo "   PyMon - Update Successful!"
-        echo "==========================================${NC}"
-        echo ""
-        echo -e "  ${GREEN}URL:${NC}  http://$IP:$PORT"
-        echo ""
-        if [ -n "$UPDATE_BACKUP_TS" ]; then
-            echo -e "  Backup: /tmp/pymon.backup.$UPDATE_BACKUP_TS"
-            echo ""
-            echo -e "  ${YELLOW}Rollback if needed:${NC}"
-            echo "    sudo systemctl stop $SERVICE_NAME"
-            echo "    sudo rm -rf $INSTALL_DIR/pymon"
-            echo "    sudo cp -r /tmp/pymon.backup.$UPDATE_BACKUP_TS/pymon $INSTALL_DIR/"
-            echo "    sudo systemctl start $SERVICE_NAME"
-            echo ""
-        fi
-        echo -e "${GREEN}Update completed!${NC}"
-    else
-        echo -e "${GREEN}=========================================="
-        echo "   PyMon - Installation Successful!"
-        echo "==========================================${NC}"
-        echo ""
-        echo -e "  ${GREEN}Version:${NC}     $APP_VERSION"
-        echo -e "  ${GREEN}Port:${NC}        $PORT"
-        echo -e "  ${GREEN}Storage:${NC}     $STORAGE"
-        echo -e "  ${GREEN}URL:${NC}         http://$IP:$PORT"
-        echo -e "  ${GREEN}API:${NC}         http://$IP:$PORT/api/v1/"
-        echo -e "  ${GREEN}Dashboard:${NC}   http://$IP:$PORT/dashboard/"
-        echo ""
-        echo -e "  ${YELLOW}Admin Credentials:${NC}"
-        echo -e "    Username: ${BLUE}admin${NC}"
-        ADMIN_PW=$(journalctl -u $SERVICE_NAME -n 200 --no-pager 2>/dev/null | grep 'Password:' | tail -1 | sed 's/.*Password: //' | tr -d '
-
-         ' || true)
-        if [ -n "$ADMIN_PW" ]; then
-            echo -e "    Password: ${GREEN}$ADMIN_PW${NC}"
-        else
-            echo -e "    Password: ${YELLOW}(see: journalctl -u $SERVICE_NAME | grep Password)${NC}"
-            echo -e "    ${YELLOW}Альтернатива: sudo $INSTALL_DIR/venv/bin/pymon reset-admin${NC}"
-        fi
-        echo -e "  ${RED}IMPORTANT: Change this password immediately after login!${NC}"
-        echo ""
-        echo "  Password Commands:"
-        echo "  sudo $INSTALL_DIR/venv/bin/pymon reset-admin          # Reset to a new random password (shown once)"
-        echo "  sudo PYMON_ADMIN_PASSWORD=... $INSTALL_DIR/venv/bin/pymon reset-admin  # Reset to a chosen password"
-        echo ""
-        echo "  Note: the password is shown ONLY once at creation/reset and is never"
-        echo "        stored in cleartext. If lost, run 'pymon reset-admin'."
-        echo ""
-        echo "Management Commands:"
-        echo "  sudo systemctl status $SERVICE_NAME"
-        echo "  sudo systemctl restart $SERVICE_NAME"
-        echo "  sudo systemctl stop $SERVICE_NAME"
-        echo "  sudo journalctl -u $SERVICE_NAME -f"
-        echo ""
-        echo -e "${GREEN}To update in the future, simply run the same command again:${NC}"
-        echo -e "  ${BLUE}curl -sSL https://raw.githubusercontent.com/$GITHUB_REPO/main/install.sh | sudo bash${NC}"
-        echo ""
-        echo "Configuration:"
-        echo "  Config: $CONFIG_DIR/config.yml"
-        echo "  Logs:   $LOG_DIR/"
-        echo "  Data:   $DATA_DIR/"
-        echo ""
-    fi
-else
-    echo -e "${RED}=========================================="
-    if [ "$IS_UPDATE" = true ]; then
-        echo "   Update Failed"
-    else
-        echo "   Installation Failed"
-    fi
-    echo "==========================================${NC}"
-    echo ""
-    echo "Service failed to start. Check logs:"
-    echo "  sudo journalctl -u $SERVICE_NAME -n 50"
-    if [ "$IS_UPDATE" = true ] && [ -n "$UPDATE_BACKUP_TS" ]; then
-        echo ""
-        echo -e "${YELLOW}Rollback:${NC}"
-        echo "  sudo systemctl stop $SERVICE_NAME"
-        echo "  sudo rm -rf $INSTALL_DIR/pymon"
-        echo "  sudo cp -r /tmp/pymon.backup.$UPDATE_BACKUP_TS/pymon $INSTALL_DIR/"
-        echo "  sudo systemctl start $SERVICE_NAME"
-        echo ""
-    fi
-    echo ""
-    exit 1
-fi
-
-rm -rf /tmp/pymon.tar.gz "$EXTRACT_ROOT"
-
-echo -e "${GREEN}Done!${NC}"
+echo "PyMon installed. Dashboard: http://localhost:10000/"
+echo "Check status: systemctl status $SERVICE_NAME"
+echo "First-run admin password is printed to the service log."

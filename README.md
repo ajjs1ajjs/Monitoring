@@ -6,10 +6,10 @@
 
 Легка, швидка та сучасна платформа моніторингу інфраструктури для Linux і Windows — з панеллю керування у стилі Grafana, збором метрик у реальному часі та гнучкими сповіщеннями.
 
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
+[![Go 1.25](https://img.shields.io/badge/Go-1.25-blue.svg)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
-[![Version](https://img.shields.io/badge/Version-2.3.3-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.0.0-orange.svg)](CHANGELOG.md)
 ![Status](https://img.shields.io/badge/Status-Production_Ready-success)
 
 </div>
@@ -34,11 +34,12 @@
 - **Професійний NOC Dashboard** — сучасний інтерфейс у темній темі з потоковою передачею метрик (WebSocket) та індикаторами здоров'я.
 - **Моніторинг серверів** — CPU, RAM, диски та мережа через `node_exporter` (Linux) і `windows_exporter` (Windows).
 - **Моніторинг сервісів** — зовнішні перевірки HTTP / TCP / Ping / SSL (Blackbox) для сайтів та API.
-- **Сповіщення** — Telegram, Discord, MS Teams, Slack, Email (SMTP) та generic webhook.
+- **Сповіщення** — Telegram, Discord, MS Teams, Slack, Email (SMTP).
 - **Міграція з Prometheus** — імпорт наявних `prometheus.yml` (сервери та сервіси) прямо в інтерфейсі.
 - **Режим обслуговування** — тимчасове відключення сповіщень для вузлів під час планових робіт.
-- **Детекція аномалій** — аналіз різких стрибків CPU/RAM на основі історичних даних.
+- **Alerting rules** — гнучкі правила на CPU/RAM/диск з дебаунсингом за тривалістю.
 - **Звіти про здоров'я** — генерація 24-годинних звітів із графіками (PDF через друк).
+- **Бекапи** — автоматичні за розкладом (cron) та ручні, з відновленням.
 - **PWA** — встановлення дашборду на мобільний як окремий застосунок.
 
 ---
@@ -47,9 +48,10 @@
 
 ### 1. Сервер моніторингу
 
-**Windows Server** (PowerShell від імені Адміністратора):
+**Windows** (PowerShell):
 ```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr -Uri 'https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1' -OutFile 'install.ps1'; .\install.ps1 -Service
+.\install.ps1            # збірка pymon.exe
+.\run.bat --port 10000   # запуск
 ```
 
 **Linux:**
@@ -57,19 +59,16 @@ Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManage
 curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
 ```
 
-> 💡 Та сама команда працює і для встановлення, і для оновлення — просто запустіть її знову.
-> На Windows проект працює як фонова служба через Task Scheduler (задача `PyMonServer`).
-
 Після встановлення:
 
 - **Дашборд:** `http://<IP>:10000/dashboard/`
 - **Логін:** `admin`
-- **Пароль:** генерується випадково і **показується лише один раз** в логах інсталяції / службі. Якщо втрачено — див. [Безпека](#-безпека).
+- **Пароль:** генерується випадково і **показується лише один раз** в логах інсталяції / службі.
 
 ### 2. Перевірка
 
 ```bash
-curl http://localhost:10000/api/v1/health   # {"status":"healthy"}
+curl http://localhost:10000/api/v1/health   # {"status":"ok"}
 ```
 
 ---
@@ -83,7 +82,8 @@ msiexec /i https://github.com/prometheus-community/windows_exporter/releases/dow
 
 **Linux Node** (`node_exporter`):
 ```bash
-curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/install-linux.sh | sudo bash
+curl -sSL https://github.com/prometheus/node_exporter/releases/latest/download/node_exporter-*.linux-amd64.tar.gz -o ne.tar.gz
+tar xzf ne.tar.gz && ./node_exporter/node_exporter &
 ```
 
 Далі додайте вузол у дашборді (**Servers → Add**) або імпортуйте `prometheus.yml`.
@@ -94,49 +94,33 @@ curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/agent/inst
 
 ### Linux (systemd)
 ```bash
-# Керування службою
 sudo systemctl start|stop|restart|status pymon
 sudo journalctl -u pymon -f
 
-# Розгортання / видалення служби
-sudo ./deploy.sh [--user pymon] [--port 10000]
-sudo ./deploy.sh --remove
-
-# Оновлення (те саме, що й встановлення)
-curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
-
-# Прямий запуск
-python -m pymon.cli server --config config.yml
+# Прямий запуск з сирців
+./run.sh --port 10000
 ```
 
 ### Windows
 ```powershell
-.\install.ps1            # встановлення
-.\install.ps1 -Service   # встановлення як фонова служба
-python -m pymon.cli server   # прямий запуск у консолі
-python -m pytest tests/ -v   # тести
+.\install.ps1     # збірка
+.\run.bat         # запуск
 ```
 
 ### Скидання пароля адміна
 ```bash
 # Згенерувати новий випадковий пароль (показується ОДИН раз)
-python -m pymon.cli reset-admin
+pymon reset-admin
 
 # ...або задати конкретний пароль
-PYMON_ADMIN_PASSWORD='YourStrongPass123' python -m pymon.cli reset-admin
+PYMON_ADMIN_PASSWORD='YourStrongPass123' pymon reset-admin
 ```
-> На проді з systemd вкажіть конфіг, щоб команда знайшла живу БД:
-> ```bash
-> sudo -u <user> CONFIG_PATH=/etc/pymon/config.yml /opt/pymon/venv/bin/pymon reset-admin
-> ```
 
 ### Docker
 ```bash
 docker compose up -d
 curl http://localhost:10000/api/v1/health
 ```
-
-📖 Повний довідник — [docs/COMMANDS.md](docs/COMMANDS.md).
 
 ---
 
@@ -150,10 +134,8 @@ curl http://localhost:10000/api/v1/health
 | `PYMON_ADMIN_PASSWORD` | Початковий/скидальний пароль адміна. | випадковий (показ один раз) |
 | `CONFIG_PATH` | Шлях до конфіга. | `config.yml` |
 | `DB_PATH` | Шлях до бази (перекриває конфіг). | з `config.yml` |
-| `STORAGE_BACKEND` | Бекенд сховища: `sqlite` / `memory`. | `sqlite` |
-| `PYMON_ALLOWED_ORIGINS` | Дозволені CORS-origin (через кому). **Ніколи не ставте `*`** разом із cookie-авторизацією. | `localhost:10000` |
+| `DATA_DIR` / `LOG_DIR` | Директорії даних і логів. | `.` |
 | `PYMON_ALLOW_METADATA` | Дозволити скрейп cloud-метаданих (`169.254.169.254`). | `false` |
-| `TLS_CERT` / `TLS_KEY` | Сертифікат і ключ для HTTPS. | вимкнено (HTTP) |
 
 Повний приклад — [`.env.example`](.env.example).
 
@@ -161,11 +143,11 @@ curl http://localhost:10000/api/v1/health
 
 ## 🔒 Безпека
 
-- **Пароль адміна показується лише один раз** — при першому створенні або після `reset-admin`. Він **ніколи не зберігається у відкритому вигляді** (ні у файлі, ні в БД) — у базі лежить тільки bcrypt-хеш. Втратили — виконайте `python -m pymon.cli reset-admin`.
+- **Пароль адміна показується лише один раз** — при першому створенні або після `reset-admin`. Він **ніколи не зберігається у відкритому вигляді** — у базі лежить тільки bcrypt-хеш. Втратили — виконайте `pymon reset-admin`.
 - **Дефолтного пароля в коді немає.** За порожнього/слабкого значення в `config.yml` на першому запуску генерується сильний випадковий пароль (можна задати через `PYMON_ADMIN_PASSWORD`).
 - **Керування інфраструктурою — лише для адмінів.** Створення/зміна/видалення серверів, бекапи (`/backup/*`), очищення журналів і метрик доступні тільки адмінам.
 - **API-ключі — лише для інжесту/читання.** Будь-які адмін-дії через `X-API-Key` повертають `403`.
-- **Захист від XSS** — усі дані серверів/сервісів/користувачів/журналів екрануються перед виводом; хост валідовується суворим whitelist-ом символів.
+- **Захист від XSS** — усі дані екрануються; хост валідовується суворим whitelist-ом символів.
 - **Захист від SSRF** — скрейп відмовляє на адреси cloud-метаданих (вимикач `PYMON_ALLOW_METADATA=true`); приватні LAN-діапазони лишаються дозволеними.
 - **Політика пароля** — мінімум 12 символів, верхній + нижній регістр + цифра.
 
@@ -175,19 +157,18 @@ curl http://localhost:10000/api/v1/health
 
 | Документ | Опис |
 |----------|------|
-| [docs/COMMANDS.md](docs/COMMANDS.md) | Повний довідник команд (Linux + Windows) |
 | [docs/API.md](docs/API.md) | REST API довідка |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Архітектура проекту |
-| [docs/MIGRATION.md](docs/MIGRATION.md) | Міграція з інших систем |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Усунення несправностей |
 | [CHANGELOG.md](CHANGELOG.md) | Журнал змін |
+| [MIGRATION_PLAN.md](MIGRATION_PLAN.md) | План міграції Python → Go |
 
 ---
 
 ## 🧩 Технології
 
-**Бекенд:** Python 3.10+ · FastAPI · Uvicorn · SQLite (WAL) · httpx · bcrypt · PyJWT
-**Фронтенд:** Vanilla JS · Chart.js · WebSocket · PWA
+**Бекенд:** Go 1.25 · net/http · SQLite (WAL, modernc.org/sqlite) · gorilla/websocket · golang-jwt · prometheus/common
+**Фронтенд:** Vanilla JS · Chart.js · WebSocket · PWA (embedded через `go:embed`)
 **Агенти:** Prometheus `node_exporter` / `windows_exporter`
 
 ---
