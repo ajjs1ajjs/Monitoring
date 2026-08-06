@@ -101,7 +101,7 @@ func runServer(args []string) {
 		log.Fatalf("auth init: %v", err)
 	}
 
-	ensureAdmin(store, cfg)
+	ensureAdmin(store, cfg, filepath.Dir(abs))
 
 	ws := api.NewWSManager()
 	notifySvc := notify.New(store)
@@ -124,7 +124,15 @@ func runServer(args []string) {
 	defer cancel()
 	mon.Run(ctx)
 
-	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	bindHost := cfg.Server.Host
+	var addr string
+	if bindHost == "" || bindHost == "0.0.0.0" {
+		// Bind all interfaces on both IPv4 and IPv6 so "localhost" works in
+		// browsers that resolve it to ::1 (a 0.0.0.0-only bind gets ERR_CONNECTION_REFUSED).
+		addr = fmt.Sprintf(":%d", cfg.Server.Port)
+	} else {
+		addr = fmt.Sprintf("%s:%d", bindHost, cfg.Server.Port)
+	}
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      app.Handler(),
@@ -205,7 +213,7 @@ func randomToken(n int) string {
 }
 
 // ensureAdmin creates the default admin user on first run.
-func ensureAdmin(store *storage.Store, cfg *config.Config) {
+func ensureAdmin(store *storage.Store, cfg *config.Config, dbDir string) {
 	username := cfg.Auth.AdminUsername
 	if username == "" {
 		username = "admin"
@@ -214,10 +222,10 @@ func ensureAdmin(store *storage.Store, cfg *config.Config) {
 	if err == nil && u != nil {
 		return
 	}
-	createAdmin(store, cfg, username)
+	createAdmin(store, cfg, username, dbDir)
 }
 
-func createAdmin(store *storage.Store, cfg *config.Config, username string) {
+func createAdmin(store *storage.Store, cfg *config.Config, username, dbDir string) {
 	pw, ok := adminPassword(cfg)
 	generated := !ok
 	if !ok {
@@ -234,6 +242,14 @@ func createAdmin(store *storage.Store, cfg *config.Config, username string) {
 		fmt.Printf("Admin user '%s' created.\n", username)
 		fmt.Printf("Generated password: %s\n", pw)
 		fmt.Println("Change it immediately after first login!")
+		// Persist the one-time password so it survives environments without
+		// journald/systemd logging access. chmod 0600; delete after login.
+		if dbDir != "" {
+			pwFile := filepath.Join(dbDir, "admin_password.txt")
+			if err := os.WriteFile(pwFile, []byte(pw+"\n"), 0o600); err == nil {
+				fmt.Printf("One-time password saved to %s (delete it after login).\n", pwFile)
+			}
+		}
 	} else {
 		fmt.Printf("Admin user '%s' created (password from config/env).\n", username)
 	}
@@ -247,7 +263,7 @@ func resetAdmin(store *storage.Store, cfg *config.Config) {
 	if u, err := store.GetUserByUsername(username); err == nil && u != nil {
 		_ = store.DeleteUser(u.ID)
 	}
-	createAdmin(store, cfg, username)
+	createAdmin(store, cfg, username, filepath.Dir(store.DBPath))
 }
 
 var _ = strings.TrimSpace
