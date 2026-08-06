@@ -147,6 +147,10 @@ if ! id pymon >/dev/null 2>&1; then
 fi
 chown -R pymon:pymon "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
 
+# Stop any previously running instance (e.g. the old Python service) so the
+# newly installed Go binary actually takes over the port.
+systemctl stop $SERVICE_NAME 2>/dev/null || true
+
 cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
 [Unit]
 Description=PyMon NOC Monitoring
@@ -169,7 +173,24 @@ EOF
 
 systemctl daemon-reload
 systemctl enable $SERVICE_NAME
-systemctl start $SERVICE_NAME
+# restart (not start) so an already-running old instance is replaced.
+systemctl restart $SERVICE_NAME
+
+# --- Health check -----------------------------------------------------------
+echo -n "Waiting for the service to become healthy..."
+for i in $(seq 1 15); do
+    if curl -fsS "http://localhost:10000/api/v1/health" >/dev/null 2>&1; then
+        echo " OK"
+        break
+    fi
+    if [ "$i" = "15" ]; then
+        echo " FAILED"
+        echo "Check the service log: journalctl -u $SERVICE_NAME"
+    else
+        echo -n "."
+        sleep 1
+    fi
+done
 
 # --- Summary ---------------------------------------------------------------
 echo "[4/4] Done."
@@ -185,7 +206,8 @@ echo "First-run admin password is printed to the service log:"
 echo "  journalctl -u $SERVICE_NAME | grep -i password"
 echo ""
 echo "If no password was printed (an admin user already exists in the DB),"
-echo "reset it with a known value:"
-echo "  PYMON_ADMIN_PASSWORD='YourStrongPass123' $INSTALL_DIR/pymon reset-admin --config $CONFIG_DIR/config.yml"
+echo "reset it with a known value (run with sudo):"
+echo "  sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' $INSTALL_DIR/pymon reset-admin --config $CONFIG_DIR/config.yml"
+echo "  sudo systemctl restart $SERVICE_NAME"
 echo ""
 echo "Installed version: $("$INSTALL_DIR/pymon" --version)"
