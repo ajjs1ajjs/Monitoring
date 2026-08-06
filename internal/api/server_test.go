@@ -195,6 +195,33 @@ func TestPrometheusExport(t *testing.T) {
 	}
 }
 
+func TestStaticAssetsServed(t *testing.T) {
+	app, _ := newTestApp(t)
+	h := app.Handler()
+	for _, tc := range []struct{ path, ctype string }{
+		{"/static/css/dashboard.css", "text/css"},
+		{"/static/js/dashboard.js", "text/javascript"},
+		{"/static/manifest.json", "application/json"},
+		{"/static/favicon.svg", "image/svg+xml"},
+	} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		if rec.Code != http.StatusOK {
+			t.Errorf("%s = %d, want 200", tc.path, rec.Code)
+			continue
+		}
+		if ct := rec.Header().Get("Content-Type"); !strings.HasPrefix(ct, tc.ctype) {
+			t.Errorf("%s content-type = %q, want prefix %q", tc.path, ct, tc.ctype)
+		}
+	}
+	// dashboard page
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/dashboard/", nil))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "PyMon") {
+		t.Fatalf("dashboard = %d", rec.Code)
+	}
+}
+
 func itoa(i int64) string {
 	return fmtSprint(i)
 }
