@@ -42,3 +42,5 @@ settings.json
 # Secrets
 .jwt_secret
 .pymon_jwt_secret
+
+dist-test/
