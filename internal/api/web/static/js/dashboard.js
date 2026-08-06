@@ -247,28 +247,47 @@ async function apiFetch(url, options = {}) {
 }
 
 // First-run / reset admin must change the password before using the dashboard.
+// A guard prevents this from stacking: it is called from both the page load and
+// every 403 API response, which used to spawn overlapping prompt dialogs and an
+// endless current/new-password loop.
+let mustChangeActive = false;
+
 function handleMustChangePassword() {
+    if (mustChangeActive) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('mustChange') !== '1') return;
+    mustChangeActive = true;
+
+    const done = () => { mustChangeActive = false; };
+
     const current = prompt('Політика безпеки: змініть пароль перед продовженням.\n\nВведіть поточний пароль:');
     if (current === null) { window.location.href = '/login'; return; }
+
     const np = prompt('Новий пароль (мін. 12 символів: велика + мала літера + цифра):');
-    if (!np || np.length < 12) { alert('Пароль занадто короткий'); return handleMustChangePassword(); }
+    if (!np || np.length < 12 || !/[A-Z]/.test(np) || !/[a-z]/.test(np) || !/[0-9]/.test(np)) {
+        alert('Новий пароль має бути щонайменше 12 символів і містити велику, малу літеру та цифру.');
+        done();
+        return;
+    }
     const np2 = prompt('Повторіть новий пароль:');
-    if (np !== np2) { alert('Паролі не збігаються'); return handleMustChangePassword(); }
+    if (np !== np2) {
+        alert('Паролі не збігаються.');
+        done();
+        return;
+    }
 
     apiFetch('/api/v1/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ current_password: current, new_password: np })
     }).then(async (resp) => {
+        done();
         if (resp && resp.ok) {
             alert('Пароль успішно змінено.');
             window.location.href = '/dashboard/';
         } else {
             const err = resp ? await resp.json() : {};
-            alert('Помилка: ' + (err.detail || 'Не вдалося змінити пароль'));
-            return handleMustChangePassword();
+            alert('Помилка: ' + (err.detail || 'Не вдалося змінити пароль') + '\nОновіть сторінку (F5), щоб спробувати ще раз.');
         }
     });
 }
