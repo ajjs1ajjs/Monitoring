@@ -116,7 +116,10 @@ func (a *App) Handler() http.Handler {
 	// Frontend
 	web, _ := fs.Sub(webFS, "web")
 	fileServer := http.FileServer(http.FS(web))
-	mux.Handle("/static/", http.StripPrefix("/static/", fileServer))
+	// The embedded FS is rooted at internal/api/web, so the request path
+	// /static/css/dashboard.css maps to static/css/dashboard.css directly.
+	// Do NOT strip the /static/ prefix (that would look up css/... and 404).
+	mux.Handle("/static/", fileServer)
 	mux.HandleFunc("/dashboard/", func(w http.ResponseWriter, r *http.Request) {
 		serveFile(w, r, web, "templates/dashboard.html")
 	})
