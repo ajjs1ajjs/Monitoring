@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timezone
 
 import httpx
+from prometheus_client.parser import text_string_to_metric_families
 
 from pymon.api.deps import get_async_db, manager
 from pymon.notifications import build_channels, dispatcher
@@ -316,30 +317,18 @@ class ScrapeManager:
         result = {'cpu': 0, 'memory': 0, 'disk': 0, 'net_rx': 0, 'net_tx': 0, 'volumes': []}
         metrics_map: dict[str, list[dict]] = {}
 
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            parts = line.rsplit(None, 1)
-            if len(parts) != 2:
-                continue
-            metric, val_str = parts
-            try:
-                val = float(val_str)
-            except ValueError:
-                continue
-
-            name_m = metric.split('{')[0] if '{' in metric else metric
-            labels = {}
-            if '{' in metric and '}' in metric:
-                # Use the last '}' so label values that themselves contain '}' don't
-                # truncate the label block.
-                lbl_str = metric[metric.index('{') + 1:metric.rindex('}')]
-                for pair in lbl_str.split(','):
-                    if '=' in pair:
-                        k, v = pair.split('=', 1)
-                        labels[k.strip()] = v.strip('"')
-            metrics_map.setdefault(name_m, []).append({'val': val, 'labels': labels})
+        # Use prometheus_client's official text parser instead of splitting lines
+        # by hand: it correctly handles quoted label values that contain commas,
+        # escapes, timestamps and histogram/summary family members.
+        try:
+            for family in text_string_to_metric_families(text):
+                for sample in family.samples:
+                    sample_name, sample_labels, value = sample[0], sample[1], sample[2]
+                    if value is None:
+                        continue
+                    metrics_map.setdefault(sample_name, []).append({'val': float(value), 'labels': sample_labels})
+        except Exception as e:
+            logger.warning(f"[ScrapeManager] Metric parse error for {name}: {type(e).__name__}: {e}")
 
         def _should_include_volume(vol: str) -> bool:
             vl = vol.lower()

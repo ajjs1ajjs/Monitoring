@@ -8,6 +8,11 @@ from pymon.metrics.models import Label, Metric, MetricSeries, MetricType
 
 
 class MetricsRegistry:
+    # Guards against unbounded cardinality growth (memory DoS via push clients
+    # sending unique label values forever). Raises instead of silently growing.
+    MAX_METRICS = 5000
+    MAX_SERIES_PER_METRIC = 20000
+
     def __init__(self):
         self._metrics: dict[str, dict[str, Metric]] = defaultdict(dict)
         self._series: dict[str, MetricSeries] = {}
@@ -22,6 +27,10 @@ class MetricsRegistry:
     ) -> MetricSeries:
         with self._lock:
             if name not in self._series:
+                if len(self._series) >= self.MAX_METRICS:
+                    raise ValueError(
+                        f"Metric registry limit reached ({self.MAX_METRICS}); refusing to register '{name}'"
+                    )
                 series = MetricSeries(name=name, metric_type=metric_type, help_text=help_text, labels=labels or [])
                 self._series[name] = series
             return self._series[name]
@@ -35,7 +44,12 @@ class MetricsRegistry:
             metric = Metric(
                 name=name, value=value, metric_type=series.metric_type, labels=labels or [], help_text=series.help_text
             )
-            self._metrics[name][metric.labels_key] = metric
+            series_map = self._metrics[name]
+            if metric.labels_key not in series_map and len(series_map) >= self.MAX_SERIES_PER_METRIC:
+                raise ValueError(
+                    f"Cardinality limit reached for metric '{name}' ({self.MAX_SERIES_PER_METRIC} label sets)"
+                )
+            series_map[metric.labels_key] = metric
 
     def inc(self, name: str, value: float = 1.0, labels: list[Label] | None = None) -> None:
         with self._lock:
