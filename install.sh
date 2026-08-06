@@ -111,8 +111,23 @@ chmod +x "$TMP_BIN"
 # --- Install files --------------------------------------------------------
 echo "[2/4] Installing to ${INSTALL_DIR}..."
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
-mv "$TMP_BIN" "$INSTALL_DIR/pymon"
-chmod +x "$INSTALL_DIR/pymon"
+
+# A broken previous install may have left /opt/pymon/pymon as a directory
+# (mv would then tuck the binary inside it). Clean it up so the target is a file.
+if [ -d "$INSTALL_DIR/pymon" ]; then
+    echo "Removing stale directory at $INSTALL_DIR/pymon (leftover from a previous install)..."
+    rm -rf "$INSTALL_DIR/pymon"
+fi
+
+install -m 0755 "$TMP_BIN" "$INSTALL_DIR/pymon"
+
+# Sanity check: the installed binary must run.
+if ! "$INSTALL_DIR/pymon" --version >/dev/null 2>&1; then
+    echo "ERROR: installed binary at $INSTALL_DIR/pymon is not executable/runnable."
+    echo "Check the file with: file $INSTALL_DIR/pymon"
+    rm -f "$TMP_BIN"
+    exit 1
+fi
 
 if [ ! -f "$CONFIG_DIR/config.yml" ]; then
     # fetch example config from the release source (fallback to local copy)
@@ -168,5 +183,9 @@ echo ""
 echo "Dashboard: http://localhost:10000/"
 echo "First-run admin password is printed to the service log:"
 echo "  journalctl -u $SERVICE_NAME | grep -i password"
+echo ""
+echo "If no password was printed (an admin user already exists in the DB),"
+echo "reset it with a known value:"
+echo "  PYMON_ADMIN_PASSWORD='YourStrongPass123' $INSTALL_DIR/pymon reset-admin --config $CONFIG_DIR/config.yml"
 echo ""
 echo "Installed version: $("$INSTALL_DIR/pymon" --version)"
