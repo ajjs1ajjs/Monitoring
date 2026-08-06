@@ -77,7 +77,7 @@
                         <button class="range-btn" data-range="7d">7 днів</button>
                         <button class="range-btn" data-range="15d">15 днів</button>
                         <button class="range-btn" data-range="30d">30 днів</button>
-                        <button class="range-btn custom-btn" data-range="custom" onclick="promptCustomRange(this)">Власна...</button>
+                        <button class="range-btn custom-btn" data-range="custom" data-click="promptCustomRange">Власна...</button>
                     </div>
                     <button id="themeToggleBtn" class="refresh-btn" title="Змінити тему">
                         <i data-lucide="sun" id="themeIcon"></i>
@@ -99,7 +99,7 @@
                         <div class="overview-controls">
                             <div style="display: flex; align-items: center; gap: 0.75rem;">
                                 <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">Сервер:</span>
-                                <select id="overviewNodeSelect" class="server-select" onchange="updateOverviewCharts()">
+                                <select id="overviewNodeSelect" class="server-select" data-change="updateOverviewCharts">
                                     <option value="agg">Усі сервери (Агреговано)</option>
                                 </select>
                             </div>
@@ -176,7 +176,7 @@
                                             Використання CPU (%)
                                         </div>
                                         <div class="chart-actions">
-                                            <button class="chart-action-btn" onclick="expandChart('cpu')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                            <button class="chart-action-btn" data-click="expandChart" data-args='["cpu"]' title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
                                         </div>
                                     </div>
                                     <div class="chart-canvas-wrapper">
@@ -190,7 +190,7 @@
                                             Використання RAM (%)
                                         </div>
                                         <div class="chart-actions">
-                                            <button class="chart-action-btn" onclick="expandChart('ram')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                            <button class="chart-action-btn" data-click="expandChart" data-args='["ram"]' title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
                                         </div>
                                     </div>
                                     <div class="chart-canvas-wrapper">
@@ -204,7 +204,7 @@
                                             Використання диска (%)
                                         </div>
                                         <div class="chart-actions">
-                                            <button class="chart-action-btn" onclick="expandChart('disk')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                            <button class="chart-action-btn" data-click="expandChart" data-args='["disk"]' title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
                                         </div>
                                     </div>
                                     <div class="chart-canvas-wrapper">
@@ -218,7 +218,7 @@
                                             Мережева активність та трафік
                                         </div>
                                         <div class="chart-actions">
-                                            <button class="chart-action-btn" onclick="expandChart('net')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                            <button class="chart-action-btn" data-click="expandChart" data-args='["net"]' title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
                                         </div>
                                     </div>
                                     <div class="chart-canvas-wrapper">
@@ -232,7 +232,7 @@
                                             Затримка сервісів (ms)
                                         </div>
                                         <div class="chart-actions">
-                                            <button class="chart-action-btn" onclick="expandChart('service')" title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
+                                            <button class="chart-action-btn" data-click="expandChart" data-args='["service"]' title="Expand"><i data-lucide="maximize-2" style="width: 14px; height: 14px;"></i></button>
                                         </div>
                                     </div>
                                     <div class="chart-canvas-wrapper">
@@ -245,7 +245,7 @@
                             <div class="card" style="height: 100%;">
                                 <div class="card-header">
                                     <h3>Останні сповіщення та події</h3>
-                                    <button class="refresh-btn" style="width: 24px; height: 24px;" onclick="loadRecentAlerts()"><i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i></button>
+                                    <button class="refresh-btn" style="width: 24px; height: 24px;" data-click="loadRecentAlerts"><i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i></button>
                                 </div>
                                 <div class="card-body" style="padding: 1rem;" id="recentAlertsFeed">
                                     <!-- Alerts will be populated here -->
@@ -267,19 +267,19 @@
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Керування підключеними вузлами та джерелами даних</p>
                         </div>
                         <div style="display: flex; gap: 1rem; align-items: center;">
-                            <select id="filterStatus" onchange="filterNodes()" class="server-select" style="min-width: 120px;">
+                            <select id="filterStatus" data-change="filterNodes" class="server-select" style="min-width: 120px;">
                                 <option value="all">Усі статуси</option>
                                 <option value="up">Тільки UP</option>
                                 <option value="down">Тільки DOWN</option>
                             </select>
-                            <select id="filterGroup" onchange="filterNodes()" class="server-select" style="min-width: 120px;">
+                            <select id="filterGroup" data-change="filterNodes" class="server-select" style="min-width: 120px;">
                                 <option value="all">Усі групи</option>
                             </select>
                             <div class="search-box">
                                 <i data-lucide="search" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
-                                <input type="search" id="nodeSearch" placeholder="Пошук за назвою або IP..." oninput="filterNodes()" autocomplete="off" spellcheck="false" class="server-select" style="min-width: 250px;">
+                                <input type="search" id="nodeSearch" placeholder="Пошук за назвою або IP..." data-input="filterNodes" autocomplete="off" spellcheck="false" class="server-select" style="min-width: 250px;">
                             </div>
-                            <button onclick="toggleModal('addNodeModal', true)" class="btn btn-primary" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                            <button data-click="toggleModal" data-args='["addNodeModal", true]' class="btn btn-primary" style="padding: 0.6rem 1.25rem; font-weight: 700;">
                                 <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Додати вузол
                             </button>
                         </div>
@@ -290,12 +290,12 @@
                             <table class="timeline-table">
                                 <thead>
                                     <tr>
-                                        <th style="width: 120px; cursor: pointer;" onclick="sortNodes('last_status')">Статус <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
-                                        <th style="cursor: pointer;" onclick="sortNodes('name')">Ідентифікатор вузла <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
-                                        <th style="cursor: pointer;" onclick="sortNodes('host')">Endpoint <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
-                                        <th style="cursor: pointer;" onclick="sortNodes('cpu_percent')">CPU <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
-                                        <th style="cursor: pointer;" onclick="sortNodes('memory_percent')">RAM <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
-                                        <th style="cursor: pointer;" onclick="sortNodes('disk_percent')">Disk <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="width: 120px; cursor: pointer;" data-click="sortNodes" data-args='["last_status"]'>Статус <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="cursor: pointer;" data-click="sortNodes" data-args='["name"]'>Ідентифікатор вузла <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="cursor: pointer;" data-click="sortNodes" data-args='["host"]'>Endpoint <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="cursor: pointer;" data-click="sortNodes" data-args='["cpu_percent"]'>CPU <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="cursor: pointer;" data-click="sortNodes" data-args='["memory_percent"]'>RAM <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
+                                        <th style="cursor: pointer;" data-click="sortNodes" data-args='["disk_percent"]'>Disk <i data-lucide="chevrons-up-down" style="width: 12px; height: 12px; opacity: 0.5;"></i></th>
                                         <th style="text-align: right;">Дії</th>
                                     </tr>
                                 </thead>
@@ -314,7 +314,7 @@
                             <h2 style="font-size: 1.4rem; font-weight: 800;">Правила <span>сповіщень</span></h2>
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Налаштування логіки сповіщень та порогових значень</p>
                         </div>
-                        <button class="btn btn-primary" onclick="toggleModal('addAlertModal', true)" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                        <button class="btn btn-primary" data-click="toggleModal" data-args='["addAlertModal", true]' style="padding: 0.6rem 1.25rem; font-weight: 700;">
                             <i data-lucide="bell-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Створити правило
                         </button>
                     </div>
@@ -330,7 +330,7 @@
                             <h2 style="font-size: 1.4rem; font-weight: 800;">Моніторинг <span>сервісів</span></h2>
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Зовнішні HTTP/TCP перевірки працездатності</p>
                         </div>
-                        <button class="btn btn-primary" onclick="toggleModal('addServiceModal', true)" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                        <button class="btn btn-primary" data-click="toggleModal" data-args='["addServiceModal", true]' style="padding: 0.6rem 1.25rem; font-weight: 700;">
                             <i data-lucide="plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Додати сервіс
                         </button>
                     </div>
@@ -364,7 +364,7 @@
                             <h2 style="font-size: 1.4rem; font-weight: 800;">Керування <span>користувачами</span></h2>
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Керування обліковими записами та правами доступу</p>
                         </div>
-                        <button class="btn btn-primary" onclick="showAddUserModal()" style="padding: 0.6rem 1.25rem; font-weight: 700;">
+                        <button class="btn btn-primary" data-click="showAddUserModal" style="padding: 0.6rem 1.25rem; font-weight: 700;">
                             <i data-lucide="user-plus" style="width: 16px; height: 16px; margin-right: 0.5rem;"></i> Створити користувача
                         </button>
                     </div>
@@ -454,14 +454,14 @@
                             <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">Журнал системних подій та дій користувачів</p>
                         </div>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <input type="search" id="logSearch" class="server-select" placeholder="Пошук..." style="width: 200px;" oninput="filterLogs()" autocomplete="off" spellcheck="false">
-                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem;" onclick="loadSystemLogs()">
+                            <input type="search" id="logSearch" class="server-select" placeholder="Пошук..." style="width: 200px;" data-input="filterLogs" autocomplete="off" spellcheck="false">
+                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem;" data-click="loadSystemLogs">
                                 <i data-lucide="terminal" style="width: 14px; height: 14px; margin-right: 0.4rem;"></i> Системні логи
                             </button>
-                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem;" onclick="loadAuditLogs()">
+                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem;" data-click="loadAuditLogs">
                                 <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
                             </button>
-                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem; font-weight: 700;" onclick="exportLogs()">
+                            <button class="btn btn-secondary" style="padding: 0.6rem 1rem; font-weight: 700;" data-click="exportLogs">
                                 <i data-lucide="download" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Експорт
                             </button>
                         </div>
@@ -553,8 +553,8 @@
                                     </div>
                                 </div>
                                 <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                                    <button class="btn btn-primary" style="flex: 1; font-weight: 700;" onclick="saveSettings()">Зберегти налаштування</button>
-                                    <button class="btn btn-secondary" style="flex: 1; font-weight: 700;" onclick="testNotification()">
+                                    <button class="btn btn-primary" style="flex: 1; font-weight: 700;" data-click="saveSettings">Зберегти налаштування</button>
+                                    <button class="btn btn-secondary" style="flex: 1; font-weight: 700;" data-click="testNotification">
                                         <i data-lucide="send" style="width: 14px; height: 14px; margin-right: 0.25rem;"></i> Тест
                                     </button>
                                 </div>
@@ -604,7 +604,7 @@
                                         Дозволяє браузеру відтворювати звуковий сигнал при появі нових критичних алертів.
                                     </p>
                                 </div>
-                                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" onclick="saveSystemSettings()">Зберегти систему</button>
+                                <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" data-click="saveSystemSettings">Зберегти систему</button>
                             </div>
                         </div>
 
@@ -663,8 +663,8 @@
                                     <textarea id="promYamlInput" class="form-input" style="height: 120px; font-family: monospace; font-size: 0.75rem;" placeholder="scrape_configs: ..."></textarea>
                                 </div>
                                 <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
-                                    <button class="btn btn-primary" style="flex: 1;" onclick="importPromConfig()">Імпорт вузлів</button>
-                                    <button class="btn btn-secondary" style="flex: 1;" onclick="exportPyMonConfig()">Експорт конфіга</button>
+                                    <button class="btn btn-primary" style="flex: 1;" data-click="importPromConfig">Імпорт вузлів</button>
+                                    <button class="btn btn-secondary" style="flex: 1;" data-click="exportPyMonConfig">Експорт конфіга</button>
                                 </div>
                             </div>
                         </div>
@@ -681,10 +681,10 @@
                             </div>
                             <div class="card-body">
                                 <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">These actions are irreversible. Proceed with caution.</p>
-                                <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); margin-bottom: 0.5rem;" onclick="if(confirm('Clear all audit logs?')) clearAuditLogs()">
+                                <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); margin-bottom: 0.5rem;" data-click="clearAuditLogs">
                                     <i data-lucide="trash" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Очистити журнал аудиту
                                 </button>
-                                <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);" onclick="if(confirm('Clear ALL metric history? This cannot be undone!')) clearMetricHistory()">
+                                <button class="btn" style="width: 100%; background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);" data-click="clearMetricHistory">
                                     <i data-lucide="database" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Очистити історію метрик
                                 </button>
                             </div>
@@ -696,14 +696,14 @@
     </div>
 
     <!-- Modals -->
-    <div id="nodeDrawer" class="drawer-overlay" onclick="if(event.target===this) closeDrawer()">
+    <div id="nodeDrawer" class="drawer-overlay" data-click="closeDrawer" data-overlay-close>
         <div class="drawer">
             <div class="drawer-header">
                 <div>
                     <h2 id="drawerNodeName" style="font-size: 1.5rem; color: #fff;">Node Name</h2>
                     <div id="drawerNodeStatus" class="status-badge up" style="margin-top: 0.5rem;">UP</div>
                 </div>
-                <i data-lucide="x" style="cursor: pointer; color: var(--text-muted);" onclick="closeDrawer()"></i>
+                <i data-lucide="x" style="cursor: pointer; color: var(--text-muted);" data-click="closeDrawer"></i>
             </div>
             <div class="drawer-body" id="drawerBody"></div>
         </div>
@@ -713,7 +713,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h3>Реєстрація джерела даних</h3>
-                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addNodeModal', false)"></i>
+                <i data-lucide="x" style="cursor: pointer;" data-click="toggleModal" data-args='["addNodeModal", false]'></i>
             </div>
             <form id="addNodeForm">
                 <div class="modal-body">
@@ -732,7 +732,7 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
                             <label>ОС системи</label>
-                            <select id="nodeOS" class="form-input" onchange="document.getElementById('nodePort').value = this.value === 'windows' ? 9182 : 9100">
+                            <select id="nodeOS" class="form-input">
                                 <option value="linux">Linux / POSIX</option>
                                 <option value="windows">Windows / NT</option>
                             </select>
@@ -744,7 +744,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addNodeModal', false)">Скасувати</button>
+                    <button type="button" class="btn btn-secondary" data-click="toggleModal" data-args='["addNodeModal", false]'>Скасувати</button>
                     <button type="submit" class="btn btn-primary">Підключити вузол</button>
                 </div>
             </form>
@@ -755,7 +755,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h3>Налаштування логіки сповіщень</h3>
-                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addAlertModal', false)"></i>
+                <i data-lucide="x" style="cursor: pointer;" data-click="toggleModal" data-args='["addAlertModal", false]'></i>
             </div>
             <form id="addAlertForm">
                 <div class="modal-body">
@@ -789,7 +789,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addAlertModal', false)">Скасувати</button>
+                    <button type="button" class="btn btn-secondary" data-click="toggleModal" data-args='["addAlertModal", false]'>Скасувати</button>
                     <button type="submit" class="btn btn-primary">Застосувати правило</button>
                 </div>
             </form>
@@ -800,7 +800,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h3>Оновлення налаштувань вузла</h3>
-                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('editNodeModal', false)"></i>
+                <i data-lucide="x" style="cursor: pointer;" data-click="toggleModal" data-args='["editNodeModal", false]'></i>
             </div>
             <form id="editNodeForm">
                 <div class="modal-body">
@@ -819,7 +819,7 @@
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div class="form-group">
                             <label>System OS</label>
-                            <select id="editNodeOS" class="form-input" onchange="document.getElementById('editNodePort').value = this.value === 'windows' ? 9182 : 9100">
+                            <select id="editNodeOS" class="form-input">
                                 <option value="linux">Linux / POSIX</option>
                                 <option value="windows">Windows / NT</option>
                             </select>
@@ -831,7 +831,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('editNodeModal', false)">Скасувати</button>
+                    <button type="button" class="btn btn-secondary" data-click="toggleModal" data-args='["editNodeModal", false]'>Скасувати</button>
                     <button type="submit" class="btn btn-primary">Зберегти зміни</button>
                 </div>
             </form>
@@ -842,14 +842,14 @@
         <div class="modal">
             <div class="modal-header">
                 <h3 id="deployTitle">Встановлення агента</h3>
-                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('deployModal', false)"></i>
+                <i data-lucide="x" style="cursor: pointer;" data-click="toggleModal" data-args='["deployModal", false]'></i>
             </div>
             <div class="modal-body">
                 <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">Execute this command on the target server to install the exporter:</p>
                 <div class="form-group">
                     <textarea id="deployCmd" readonly class="form-input" style="height: 120px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; resize: none;"></textarea>
                 </div>
-                <button class="btn btn-secondary" style="width: 100%;" onclick="copyDeployCmd()">
+                <button class="btn btn-secondary" style="width: 100%;" data-click="copyDeployCmd">
                     <i data-lucide="copy" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Копіювати в буфер
                 </button>
             </div>
@@ -860,61 +860,12 @@
         <div class="modal">
             <div class="modal-header">
                 <h3>Створити користувача</h3>
-                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addUserModal', false)"></i>
+                <i data-lucide="x" style="cursor: pointer;" data-click="toggleModal" data-args='["addUserModal", false]'></i>
             </div>
             <form id="addUserForm">
                 <div class="modal-body">
                     <div class="form-group">
                         <label>Ім'я користувача</label>
-                        <input type="text" id="newUsername" class="form-input" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Пароль</label>
-                        <input type="password" id="newUserPassword" class="form-input" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Роль</label>
-                        <select id="newUserRole" class="form-input">
-                            <option value="false">User</option>
-                            <option value="true">Administrator</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addUserModal', false)">Скасувати</button>
-                    <button type="submit" class="btn btn-primary">Створити користувача</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div id="changePasswordModal" class="modal-overlay">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Зміна пароля: <span id="changePwdUsername" style="color: var(--accent);"></span></h3>
-                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('changePasswordModal', false)"></i>
-            </div>
-            <div class="modal-body">
-                <input type="hidden" id="changePwdUserId">
-                <div class="form-group">
-                    <label>Новий пароль</label>
-                    <input type="password" id="changePwdNewPassword" class="form-input" required minlength="12" placeholder="Мін. 12 символів, upper+lower+digit">
-                </div>
-                <div class="form-group">
-                    <label>Підтвердження пароля</label>
-                    <input type="password" id="changePwdConfirmPassword" class="form-input" required placeholder="Повторіть новий пароль">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="toggleModal('changePasswordModal', false)">Скасувати</button>
-                <button type="button" class="btn btn-primary" onclick="changeUserPassword()">Змінити пароль</button>
-            </div>
-        </div>
-    </div>
-            <form id="addUserForm">
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label>Логін</label>
                         <input type="text" id="newUsername" class="form-input" required>
                     </div>
                     <div class="form-group">
@@ -930,10 +881,34 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addUserModal', false)">Скасувати</button>
+                    <button type="button" class="btn btn-secondary" data-click="toggleModal" data-args='["addUserModal", false]'>Скасувати</button>
                     <button type="submit" class="btn btn-primary">Створити користувача</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="changePasswordModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Зміна пароля: <span id="changePwdUsername" style="color: var(--accent);"></span></h3>
+                <i data-lucide="x" style="cursor: pointer;" data-click="toggleModal" data-args='["changePasswordModal", false]'></i>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="changePwdUserId">
+                <div class="form-group">
+                    <label>Новий пароль</label>
+                    <input type="password" id="changePwdNewPassword" class="form-input" required minlength="12" placeholder="Мін. 12 символів, upper+lower+digit">
+                </div>
+                <div class="form-group">
+                    <label>Підтвердження пароля</label>
+                    <input type="password" id="changePwdConfirmPassword" class="form-input" required placeholder="Повторіть новий пароль">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-click="toggleModal" data-args='["changePasswordModal", false]'>Скасувати</button>
+                <button type="button" class="btn btn-primary" data-click="changeUserPassword">Змінити пароль</button>
+            </div>
         </div>
     </div>
 
@@ -942,7 +917,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h3 id="expandedChartTitle">Детальний аналіз</h3>
-                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('chartExpandModal', false)"></i>
+                <i data-lucide="x" style="cursor: pointer;" data-click="toggleModal" data-args='["chartExpandModal", false]'></i>
             </div>
             <div class="modal-body">
                 <div id="expandedChartContainer">
@@ -960,7 +935,7 @@
         <div class="modal">
             <div class="modal-header">
                 <h3>Додати мережевий сервіс</h3>
-                <i data-lucide="x" style="cursor: pointer;" onclick="toggleModal('addServiceModal', false)"></i>
+                <i data-lucide="x" style="cursor: pointer;" data-click="toggleModal" data-args='["addServiceModal", false]'></i>
             </div>
             <form id="addServiceForm">
                 <div class="modal-body">
@@ -987,7 +962,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="toggleModal('addServiceModal', false)">Скасувати</button>
+                    <button type="button" class="btn btn-secondary" data-click="toggleModal" data-args='["addServiceModal", false]'>Скасувати</button>
                     <button type="submit" class="btn btn-primary">Додати сервіс</button>
                 </div>
             </form>

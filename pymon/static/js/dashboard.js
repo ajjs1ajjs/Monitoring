@@ -25,6 +25,27 @@ function esc(value) {
     }[c]));
 }
 
+// Delegated event handling. The Content-Security-Policy does NOT allow inline
+// event handler attributes (no 'unsafe-inline'), so all UI actions go through
+// these single document-level listeners using data-click/data-change/data-input
+// with data-args (a JSON array). This also removes the stored-XSS surface that
+// inline onclick="fn('${userInput}')" attributes used to create.
+function _dispatchAction(e, attr) {
+    const el = e.target && e.target.closest ? e.target.closest('[' + attr + ']') : null;
+    if (!el) return;
+    // Backdrop close: only fire when the overlay itself (not its children) was clicked.
+    if (el.dataset.overlayClose && e.target !== el) return;
+    const key = attr.slice('data-'.length);
+    const fn = window[el.dataset[key]];
+    if (typeof fn !== 'function') return;
+    let args = [];
+    try { args = JSON.parse(el.dataset.args || '[]'); } catch (err) { args = []; }
+    fn.apply(null, args);
+}
+document.addEventListener('click', function (e) { _dispatchAction(e, 'data-click'); });
+document.addEventListener('change', function (e) { _dispatchAction(e, 'data-change'); });
+document.addEventListener('input', function (e) { _dispatchAction(e, 'data-input'); });
+
 function switchView(view) {
     currentView = view;
     document.getElementById('btnViewList').classList.toggle('active', view === 'list');
@@ -84,10 +105,10 @@ function openDrawer(nodeId) {
         </div>
 
         <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
-            <button onclick="toggleMaintenance(${n.id}, ${!n.is_maintenance})" class="btn" style="flex: 1; background: ${n.is_maintenance ? 'var(--success)' : 'var(--warning)'}; color: #000; font-weight: 600;">
+            <button data-click="toggleMaintenance" data-args='[${n.id}, ${!n.is_maintenance}]' class="btn" style="flex: 1; background: ${n.is_maintenance ? 'var(--success)' : 'var(--warning)'}; color: #000; font-weight: 600;">
                 ${n.is_maintenance ? 'Exit Maintenance' : 'Set Maintenance'}
             </button>
-            <button onclick="generateReport(${n.id})" class="btn" style="flex: 1; border: 1px solid var(--border);">
+            <button data-click="generateReport" data-args='[${n.id}]' class="btn" style="flex: 1; border: 1px solid var(--border);">
                 Generate Report
             </button>
         </div>
@@ -99,7 +120,7 @@ function openDrawer(nodeId) {
         
         <h4 style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem;">Actions</h4>
         <div style="display: flex; gap: 1rem;">
-            <button class="btn btn-secondary" onclick="closeDrawer(); showEditModal(${n.id});" style="flex: 1;"><i data-lucide="settings" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Manage Node</button>
+            <button class="btn btn-secondary" data-click="openEditFromDrawer" data-args='[${n.id}]' style="flex: 1;"><i data-lucide="settings" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Manage Node</button>
         </div>
     `;
     lucide.createIcons();
@@ -108,6 +129,11 @@ function openDrawer(nodeId) {
 
 function closeDrawer() {
     document.getElementById('nodeDrawer').classList.remove('active');
+}
+
+function openEditFromDrawer(id) {
+    closeDrawer();
+    showEditModal(id);
 }
 
 function toggleModal(id, show) {
@@ -136,7 +162,7 @@ function showSection(section) {
     if (section === 'users') loadUsers();
 }
 
-function promptCustomRange(btn) {
+function promptCustomRange() {
     const range = prompt("Введіть власний період (наприклад: 2h, 45m, 10d):", "2h");
     if (range) {
         document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
@@ -161,21 +187,16 @@ document.querySelectorAll('.nav-item').forEach(btn => {
 
 document.querySelectorAll('.range-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-        if (btn.dataset.range === 'custom') {
-            if (!btn.dataset.realRange) return; // Wait for prompt if first time
-            currentRange = btn.dataset.realRange;
-        } else {
-            currentRange = btn.dataset.range;
-        }
-        
+        // The custom range button is handled by promptCustomRange() through the
+        // delegated data-click listener — skip it here to avoid a double prompt.
+        if (btn.dataset.range === 'custom') return;
+        currentRange = btn.dataset.range;
+
         document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-        
+
         // Synchronize active state across ALL buttons with same range
         document.querySelectorAll(`.range-btn[data-range="${btn.dataset.range}"]`).forEach(b => b.classList.add('active'));
-        if (btn.dataset.range === 'custom') {
-            document.querySelectorAll('.custom-btn').forEach(b => b.classList.add('active'));
-        }
-        
+
         refreshData();
         if (typeof updateOverviewCharts === 'function') updateOverviewCharts();
     });
@@ -490,7 +511,7 @@ function updateLiveTable(data) {
     const targetData = data || nodes;
 
     const html = targetData.map(n => `
-        <tr style="cursor: pointer;" onclick="openDrawer(${n.id})">
+        <tr style="cursor: pointer;" data-click="openDrawer" data-args='[${n.id}]'>
             <td>
                 <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}" title="${esc(n.error_message || '')}">
                     <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
@@ -566,7 +587,7 @@ function updateLiveTable(data) {
                 </div>
             </td>
             <td style="text-align: right;">
-                <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem;" onclick="event.stopPropagation(); deleteNode(${n.id})">
+                <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem;" data-click="deleteNode" data-args='[${n.id}]'>
                     <i data-lucide="trash-2" style="width: 14px; height: 14px; color: var(--danger);"></i>
                 </button>
             </td>
@@ -585,7 +606,7 @@ function updateLiveTable(data) {
     const gridBody = document.getElementById('liveGridContainer');
     if (gridBody) {
         gridBody.innerHTML = targetData.map(n => `
-            <div class="grid-node-card" onclick="openDrawer(${n.id})">
+            <div class="grid-node-card" data-click="openDrawer" data-args='[${n.id}]'>
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
                     <div>
                         <h3 style="font-size: 1.2rem; font-weight: 700; color: #fff;">${esc(n.name)}</h3>
@@ -651,17 +672,17 @@ function updateNodeGrid(data) {
             </div>
             <div style="margin-top: 1.25rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 1rem;">
                 <div style="display: flex; gap: 0.75rem;">
-                    <button onclick="forceScrapeSingle(${n.id})" title="Force Scrape" class="chart-action-btn" style="color: var(--accent);">
+                    <button data-click="forceScrapeSingle" data-args='[${n.id}]' title="Force Scrape" class="chart-action-btn" style="color: var(--accent);">
                         <i data-lucide="zap" style="width: 14px; height: 14px;"></i>
                     </button>
-                    <button onclick="showEditModal(${n.id})" title="Edit Node" class="chart-action-btn" style="color: #3b82f6;">
+                    <button data-click="showEditModal" data-args='[${n.id}]' title="Edit Node" class="chart-action-btn" style="color: #3b82f6;">
                         <i data-lucide="settings" style="width: 14px; height: 14px;"></i>
                     </button>
-                    <button onclick="showDeployModal(${n.id})" title="Deploy Agent" class="chart-action-btn" style="color: var(--success);">
+                    <button data-click="showDeployModal" data-args='[${n.id}]' title="Deploy Agent" class="chart-action-btn" style="color: var(--success);">
                         <i data-lucide="download-cloud" style="width: 14px; height: 14px;"></i>
                     </button>
                 </div>
-                <button onclick="deleteNode(${n.id})" class="chart-action-btn" style="color: var(--danger);">
+                <button data-click="deleteNode" data-args='[${n.id}]' class="chart-action-btn" style="color: var(--danger);">
                     <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                 </button>
             </div>
@@ -694,7 +715,7 @@ async function loadAlertRules() {
                 </div>
             </div>
             <div style="margin-top: 1.25rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
-                <button onclick="deleteAlert(${a.id})" class="chart-action-btn" style="color: var(--danger);">
+                <button data-click="deleteAlert" data-args='[${a.id}]' class="chart-action-btn" style="color: var(--danger);">
                     <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                 </button>
             </div>
@@ -871,6 +892,7 @@ function exportLogs() {
 }
 
 async function clearAuditLogs() {
+    if (!confirm('Clear all audit logs?')) return;
     try {
         const resp = await apiFetch('/api/v1/audit-log', { method: 'DELETE' });
         if (resp && resp.ok) {
@@ -883,6 +905,7 @@ async function clearAuditLogs() {
 }
 
 async function clearMetricHistory() {
+    if (!confirm('Clear ALL metric history? This cannot be undone!')) return;
     try {
         const resp = await apiFetch('/api/v1/metrics/history', { method: 'DELETE' });
         if (resp && resp.ok) {
@@ -1022,10 +1045,10 @@ async function loadUsers() {
                         </td>
                         <td style="color: var(--text-muted); font-size: 0.85rem;">Just now</td>
                         <td style="text-align: right; display: flex; gap: 0.4rem; justify-content: flex-end;">
-                            <button class="chart-action-btn" onclick="showChangePasswordModal(${u.id}, '${u.username}')" style="color: var(--accent);" title="Change password">
+                            <button class="chart-action-btn" data-click="showChangePasswordModal" data-args='[${u.id}, ${JSON.stringify(u.username)}]' style="color: var(--accent);" title="Change password">
                                 <i data-lucide="key" style="width: 14px; height: 14px;"></i>
                             </button>
-                            <button class="chart-action-btn" onclick="deleteUser(${u.id})" style="color: var(--danger);" title="Delete user">
+                            <button class="chart-action-btn" data-click="deleteUser" data-args='[${u.id}]' style="color: var(--danger);" title="Delete user">
                                 <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
                             </button>
                         </td>
@@ -1674,7 +1697,7 @@ function updateServicesTable(services) {
             <td>${(s.response_time_ms || s.last_response_time) ? (s.response_time_ms || s.last_response_time).toFixed(1) + 'ms' : '-'}</td>
             <td>${s.last_check ? new Date(s.last_check).toLocaleTimeString() : 'Never'}</td>
             <td style="text-align: right;">
-                <button onclick="deleteService(${s.id})" class="chart-action-btn" style="color: var(--danger);"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
+                <button data-click="deleteService" data-args='[${s.id}]' class="chart-action-btn" style="color: var(--danger);"><i data-lucide="trash-2" style="width: 14px; height: 14px;"></i></button>
             </td>
         </tr>
     `).join('');
@@ -1726,7 +1749,7 @@ async function exportPyMonConfig() {
 }
 
 async function generateReport(serverId) {
-    const btn = document.querySelector(`button[onclick="generateReport(${serverId})"]`);
+    const btn = document.querySelector(`button[data-click="generateReport"][data-args="[${serverId}]"]`);
     const originalText = btn ? btn.innerHTML : null;
     if (btn) btn.innerHTML = '<i class="animate-spin" data-lucide="refresh-cw" style="width: 14px; height: 14px; margin-right: 0.5rem;"></i> Generating...';
     if (window.lucide) lucide.createIcons();

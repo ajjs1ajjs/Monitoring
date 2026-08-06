@@ -50,10 +50,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("Referrer-Policy", "no-referrer")
         response.headers.setdefault(
             "Content-Security-Policy",
-            "default-src 'self'; img-src 'self' data: https:; "
+            "default-src 'self'; "
+            "img-src 'self' data: https:; "
             "style-src 'self' 'unsafe-inline' https:; "
-            "script-src 'self' 'unsafe-inline' https:; "
-            "connect-src 'self' ws: wss:; frame-ancestors 'none'",
+            "font-src 'self' https://fonts.gstatic.com; "
+            "media-src https://assets.mixkit.co; "
+            "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; "
+            "connect-src 'self' ws: wss:; "
+            "frame-ancestors 'none'",
         )
         # HSTS only over HTTPS (harmless/ignored over plain HTTP, but avoid
         # pinning HSTS for users who legitimately serve over http on a LAN).

@@ -15,6 +15,30 @@ from pymon.validation import validate_port, validate_server_host, validate_serve
 
 router = APIRouter(prefix="/servers", tags=["servers"])
 
+
+def _history_bucket(range_token: str) -> str:
+    """Downsample granularity for history queries so responses stay bounded.
+
+    Coarser buckets for longer windows: minute-level below 7 days, hourly beyond.
+    The returned format string comes from a fixed whitelist, so it is safe to
+    inline into the SQL below.
+    """
+    token = (range_token or "1h").strip().lower()
+    try:
+        if token.endswith("h"):
+            hours = int(token[:-1])
+        elif token.endswith("d"):
+            hours = int(token[:-1]) * 24
+        elif token.endswith("m"):
+            hours = 1
+        else:
+            hours = int(token)
+    except ValueError:
+        hours = 1
+    if hours >= 24 * 7:
+        return "%Y-%m-%d %H"  # hourly buckets
+    return "%Y-%m-%d %H:%M"  # minute-level buckets
+
 class ServerCreate(BaseModel):
     name: str
     host: str
@@ -75,17 +99,25 @@ def get_aggregated_history(
 ):
     """Aggregated metrics history for all servers."""
     time_filter = _time_filter(range)
+    bucket = _history_bucket(range)
     try:
         conn = get_db()
         try:
             servers = conn.execute("SELECT id, name, host FROM servers ORDER BY name").fetchall()
-            # Single query for all servers (avoids an N+1 query-per-server fan-out).
+            # Single query for all servers (avoids an N+1 query-per-server fan-out),
+            # downsampled to one point per (server, time bucket).
             rows = conn.execute(
-                """
-                SELECT server_id, timestamp, cpu_percent, memory_percent, disk_percent,
-                       network_rx, network_tx, disk_info
-                FROM metrics_history
-                WHERE timestamp > datetime('now', ?)
+                f"""
+                SELECT * FROM (
+                    SELECT server_id, timestamp, cpu_percent, memory_percent, disk_percent,
+                           network_rx, network_tx, disk_info,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY server_id, strftime('{bucket}', timestamp)
+                               ORDER BY timestamp DESC
+                           ) AS _rn
+                    FROM metrics_history
+                    WHERE timestamp > datetime('now', ?)
+                ) WHERE _rn = 1
                 ORDER BY server_id, timestamp
                 """,
                 (time_filter,),
@@ -450,16 +482,24 @@ async def force_scrape_server(server_id: int, request: Request, current_user: Us
 def _server_history(server_id: int, range: str) -> dict:
     """Core history query, callable directly (no DI) so route aliases can reuse it."""
     time_filter = _time_filter(range)
+    bucket = _history_bucket(range)
     history = []
     try:
         conn = get_db()
         try:
             rows = conn.execute(
-                """
-                SELECT timestamp, cpu_percent, memory_percent, disk_percent, network_rx, network_tx, disk_info
-                FROM metrics_history
-                WHERE server_id = ?
-                AND timestamp > datetime('now', ?)
+                f"""
+                SELECT * FROM (
+                    SELECT timestamp, cpu_percent, memory_percent, disk_percent,
+                           network_rx, network_tx, disk_info,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY strftime('{bucket}', timestamp)
+                               ORDER BY timestamp DESC
+                           ) AS _rn
+                    FROM metrics_history
+                    WHERE server_id = ?
+                    AND timestamp > datetime('now', ?)
+                ) WHERE _rn = 1
                 ORDER BY timestamp
                 """,
                 (server_id, time_filter),
