@@ -173,6 +173,23 @@ EOF
 
 systemctl daemon-reload
 systemctl enable $SERVICE_NAME
+
+# --- Admin password ---------------------------------------------------------
+# Always set a KNOWN admin password on install (regardless of whether the DB
+# already exists from a previous install), so the user never has to hunt for it.
+if [ -n "$PYMON_ADMIN_PASSWORD" ]; then
+    ADMIN_PW="$PYMON_ADMIN_PASSWORD"
+else
+    ADMIN_PW="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 18)"
+    if [ -z "$ADMIN_PW" ]; then ADMIN_PW="PyMon$(date +%s)"; fi
+fi
+echo "Setting admin password..."
+sudo -u pymon PYMON_ADMIN_PASSWORD="$ADMIN_PW" DB_PATH="$DATA_DIR/pymon.db" \
+    "$INSTALL_DIR/pymon" reset-admin --config "$CONFIG_DIR/config.yml"
+echo "$ADMIN_PW" > "$DATA_DIR/admin_password.txt"
+chown pymon:pymon "$DATA_DIR/admin_password.txt"
+chmod 600 "$DATA_DIR/admin_password.txt"
+
 # restart (not start) so an already-running old instance is replaced.
 systemctl restart $SERVICE_NAME
 
@@ -203,20 +220,14 @@ echo "  Service:  systemctl status $SERVICE_NAME"
 echo ""
 echo "Dashboard: http://localhost:10000/"
 echo ""
-echo "ADMIN PASSWORD:"
-if command -v journalctl >/dev/null 2>&1; then
-    echo "  On first run it is printed to the service log:"
-    echo "    journalctl -u $SERVICE_NAME | grep -i password"
-    echo "  and saved once to: $DATA_DIR/admin_password.txt"
-else
-    echo "  journalctl is not installed on this system, so the generated password"
-    echo "  is saved to a file instead:"
-    echo "    sudo cat $DATA_DIR/admin_password.txt"
-fi
+echo "ADMIN LOGIN:"
+echo "  Username: admin"
+echo "  Password: $ADMIN_PW"
+echo "  (also saved to $DATA_DIR/admin_password.txt - delete it after login)"
 echo ""
-echo "  To set a KNOWN password instead, run:"
-echo "    sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' $INSTALL_DIR/pymon reset-admin --config $CONFIG_DIR/config.yml"
-echo "    sudo systemctl restart $SERVICE_NAME"
-echo "  Login: admin / <password> — delete $DATA_DIR/admin_password.txt after login."
+echo "On first login the dashboard will ask you to change the password."
+echo "To force a new password later, run:"
+echo "  sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' $INSTALL_DIR/pymon reset-admin --config $CONFIG_DIR/config.yml"
+echo "  sudo systemctl restart $SERVICE_NAME"
 echo ""
 echo "Installed version: $("$INSTALL_DIR/pymon" --version)"
