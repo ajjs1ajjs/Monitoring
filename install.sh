@@ -81,8 +81,15 @@ fi
 if [ -s "$TMP_SUM" ]; then
     EXPECTED="$(grep "${BINARY_NAME}$" "$TMP_SUM" | awk '{print $1}')"
     if [ -n "$EXPECTED" ]; then
-        ACTUAL="$(sha256sum "$TMP_BIN" | awk '{print $1}')"
-        if [ "$EXPECTED" != "$ACTUAL" ]; then
+        if command -v sha256sum >/dev/null 2>&1; then
+            ACTUAL="$(sha256sum "$TMP_BIN" | awk '{print $1}')"
+        elif command -v shasum >/dev/null 2>&1; then
+            ACTUAL="$(shasum -a 256 "$TMP_BIN" | awk '{print $1}')"
+        else
+            echo "Warning: no sha256 utility found, skipping checksum verification."
+            ACTUAL=""
+        fi
+        if [ -n "$ACTUAL" ] && [ "$EXPECTED" != "$ACTUAL" ]; then
             echo "ERROR: checksum mismatch for ${BINARY_NAME}."
             echo "  expected: ${EXPECTED}"
             echo "  actual:   ${ACTUAL}"
