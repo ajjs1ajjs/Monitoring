@@ -50,8 +50,12 @@
 
 **Windows** (PowerShell):
 ```powershell
-.\install.ps1            # збірка pymon.exe
-.\run.bat --port 10000   # запуск
+iwr https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1 -OutFile install.ps1; .\install.ps1
+```
+Або збірка з сирців:
+```powershell
+.\install.ps1          # тепер качає готовий бінарник з GitHub Releases
+.\run.bat --port 10000 # або для запуску з сирців
 ```
 
 **Linux:**
@@ -103,8 +107,8 @@ sudo journalctl -u pymon -f
 
 ### Windows
 ```powershell
-.\install.ps1     # збірка
-.\run.bat         # запуск
+.\install.ps1     # завантаження готового бінарника (не потребує Go)
+.\run.bat         # запуск з сирців (для розробки)
 ```
 
 ### Скидання пароля адміна
