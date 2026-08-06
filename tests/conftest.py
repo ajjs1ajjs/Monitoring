@@ -57,6 +57,14 @@ def init_database(db_path, test_config):
     init_auth_tables()
     init_database()
 
+    # The enforcement of must_change_password is production behavior: the first-run
+    # admin must change the password before using the API. Tests represent a
+    # normal (already-onboarded) admin, so clear the flag here.
+    conn = sqlite3.connect(db_path)
+    conn.execute("UPDATE users SET must_change_password = 0 WHERE username = 'admin'")
+    conn.commit()
+    conn.close()
+
     # Add test data
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row

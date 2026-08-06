@@ -303,20 +303,26 @@ def main():
                 print(f"  sudo {sys.argv[0]} reset-admin --config /etc/pymon/config.yml")
                 sys.exit(1)
             print(f"Using database: {db_path}", file=sys.stderr)
+            admin_username = "admin"
+            try:
+                from pymon.config import get_cached_config
+                admin_username = get_cached_config().auth.admin_username or "admin"
+            except Exception:
+                pass
             conn = sqlite3.connect(db_path)
             c = conn.cursor()
-            c.execute("DELETE FROM users WHERE username='admin'")
+            c.execute("DELETE FROM users WHERE username=?", (admin_username,))
             c.execute(
                 "INSERT INTO users (username, password_hash, is_admin, must_change_password, created_at) "
                 "VALUES (?, ?, 1, 1, ?)",
-                ("admin", password_hash, datetime.now(timezone.utc).isoformat()),
+                (admin_username, password_hash, datetime.now(timezone.utc).isoformat()),
             )
             conn.commit()
             conn.close()
             print("--------------------------------------------------")
             print("SUCCESS: Admin password has been reset!")
             print("This password is shown ONLY now — store it securely.")
-            print("Login: admin")
+            print(f"Login: {admin_username}")
             print(f"Password: {new_password}")
             print("--------------------------------------------------")
         except Exception as e:

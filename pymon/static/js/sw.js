@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pymon-v1';
+const CACHE_NAME = 'pymon-v2';
 const ASSETS = [
   '/',
   '/static/css/dashboard.css',

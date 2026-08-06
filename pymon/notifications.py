@@ -33,6 +33,7 @@ def build_channels(data: dict) -> dict:
             "smtp_user": data.get("smtp_user", ""),
             "smtp_pass": data.get("smtp_pass", ""),
             "email_to": data["email_to"],
+            "use_tls": bool(data.get("use_tls", False)),
         }
     return channels
 
@@ -133,6 +134,7 @@ class NotificationDispatcher:
         smtp_user = config.get("smtp_user")
         smtp_pass = config.get("smtp_pass")
         email_to = config.get("email_to")
+        use_tls = bool(config.get("use_tls", False))
 
         if not smtp_server or not email_to:
             return False
@@ -151,11 +153,20 @@ class NotificationDispatcher:
 
         try:
             # timeout so a dead/blackholed SMTP host can't hang the dispatch
-            with smtplib.SMTP(smtp_server_str, smtp_port_int, timeout=15) as server:
-                server.starttls()
-                if smtp_pass_str:
-                    server.login(smtp_user_str, smtp_pass_str)
-                server.send_message(msg)
+            if use_tls:
+                # SMTPS (implicit TLS, e.g. port 465)
+                with smtplib.SMTP_SSL(smtp_server_str, smtp_port_int, timeout=15) as server:
+                    if smtp_pass_str:
+                        server.login(smtp_user_str, smtp_pass_str)
+                    server.send_message(msg)
+            else:
+                # STARTTLS (e.g. port 587); if the server doesn't support STARTTLS
+                # it raises and is reported as a failure instead of a hang.
+                with smtplib.SMTP(smtp_server_str, smtp_port_int, timeout=15) as server:
+                    server.starttls()
+                    if smtp_pass_str:
+                        server.login(smtp_user_str, smtp_pass_str)
+                    server.send_message(msg)
             return True
         except Exception as e:
             logger.error(f"Email notification failed: {e}")

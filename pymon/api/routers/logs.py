@@ -39,7 +39,8 @@ def clear_audit_logs(current_user: User = Depends(get_admin_user)):
 # System Logs (pymon.log)
 @router.get("/system-logs")
 def get_system_logs(lines: int = Query(200, ge=10, le=5000), current_user: User = Depends(get_admin_user)):
-    log_path = os.path.join(".", "logs", "pymon.log")
+    log_dir = os.getenv("LOG_DIR", os.path.join(".", "logs"))
+    log_path = os.path.join(log_dir, "pymon.log")
     if not os.path.exists(log_path):
         return {"logs": ["Log file not found."]}
 
@@ -56,7 +57,8 @@ def get_system_logs(lines: int = Query(200, ge=10, le=5000), current_user: User 
 
 @router.delete("/system-logs")
 def clear_system_logs(current_user: User = Depends(get_admin_user)):
-    log_path = os.path.join(".", "logs", "pymon.log")
+    log_dir = os.getenv("LOG_DIR", os.path.join(".", "logs"))
+    log_path = os.path.join(log_dir, "pymon.log")
     try:
         if os.path.exists(log_path):
             # Open in write mode to truncate

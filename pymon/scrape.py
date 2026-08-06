@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import re
+import time
 from datetime import datetime, timezone
 
 import httpx
@@ -25,6 +26,7 @@ class ScrapeManager:
         self.running = False
         self._last_cleanup = 0
         self._vacuumed_today = False
+        self._rule_state: dict[tuple, dict] = {}
 
     async def start(self):
         self.running = True
@@ -45,7 +47,6 @@ class ScrapeManager:
             await asyncio.sleep(self.interval)
 
     async def _cleanup_old_metrics(self):
-        import time
         now = time.time()
         if now - self._last_cleanup < 3600:
             return
@@ -65,6 +66,14 @@ class ScrapeManager:
                     "DELETE FROM alerts WHERE timestamp < datetime('now', ?)",
                     (f"-{self.retention_hours} hours",),
                 )
+                metrics_table = await conn.execute_fetchall(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='metrics'"
+                )
+                if metrics_table:
+                    await conn.execute(
+                        "DELETE FROM metrics WHERE timestamp < datetime('now', ?)",
+                        (f"-{self.retention_hours} hours",),
+                    )
                 await conn.commit()
             finally:
                 await conn.close()
@@ -87,7 +96,7 @@ class ScrapeManager:
 
     async def scrape_all(self):
         conn = await get_async_db()
-        cursor = await conn.execute("SELECT id, name, host, agent_port, os_type, enabled, scrape_interval, last_status, cpu_percent FROM servers WHERE enabled=1")
+        cursor = await conn.execute("SELECT id, name, host, agent_port, os_type, enabled, scrape_interval, last_status, cpu_percent, is_maintenance FROM servers WHERE enabled=1")
         servers = await cursor.fetchall()
         await conn.close()
 
@@ -95,12 +104,18 @@ class ScrapeManager:
             return
 
         async with httpx.AsyncClient(timeout=10.0) as client:
-            tasks = []
-            for s in servers:
-                sid, name, host, port, os_type, enabled, s_interval, last_status, last_cpu = s
-                tasks.append(self._scrape_one(client, sid, name, host, port, last_status, last_cpu))
+            sem = await self._get_semaphore()
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            async def _scrape_guarded(s):
+                sid, name, host, port, os_type, enabled, s_interval, last_status, last_cpu, is_maintenance = s
+                async with sem:
+                    return await self._scrape_one(
+                        client, sid, name, host, port, last_status, last_cpu, is_maintenance
+                    )
+
+            results = await asyncio.gather(
+                *(_scrape_guarded(s) for s in servers), return_exceptions=True
+            )
             ok = 0
             for r in results:
                 if r is True:
@@ -110,7 +125,13 @@ class ScrapeManager:
             if ok:
                 logger.info(f"[ScrapeManager] Collected {ok}/{len(servers)} servers")
 
-    async def _scrape_one(self, client, server_id, name, host, port, last_status, last_cpu):
+    async def _get_semaphore(self) -> asyncio.Semaphore:
+        """Lazily-created concurrency limiter (Semaphore must bind to a loop)."""
+        if getattr(self, "_sem", None) is None:
+            self._sem = asyncio.Semaphore(10)
+        return self._sem
+
+    async def _scrape_one(self, client, server_id, name, host, port, last_status, last_cpu, is_maintenance=0):
         raw_host = host.strip()
         scheme = "http"
         if raw_host.startswith("https://"):
@@ -123,7 +144,7 @@ class ScrapeManager:
         url = f"{scheme}://{clean_host}:{port}/metrics"
         is_up = False
         text = ""
-        if is_blocked_outbound_host(clean_host):
+        if await asyncio.to_thread(is_blocked_outbound_host, clean_host):
             logger.warning(f"[ScrapeManager] Refusing blocked metadata target {clean_host} for {name}")
         else:
             try:
@@ -137,14 +158,14 @@ class ScrapeManager:
         now = datetime.now().isoformat()
 
         if not is_up:
-            return await self._record_downtime(server_id, name, host, last_status, now)
+            return await self._record_downtime(server_id, name, host, last_status, now, is_maintenance)
 
         data = self._parse_metrics(text, name)
-        return await self._persist_metrics(server_id, name, host, data, text, last_status, last_cpu, now)
+        return await self._persist_metrics(server_id, name, host, data, text, last_status, last_cpu, now, is_maintenance)
 
-    async def _record_downtime(self, server_id, name, host, last_status, now):
+    async def _record_downtime(self, server_id, name, host, last_status, now, is_maintenance=0):
         conn = await get_async_db()
-        if last_status == 'up':
+        if last_status == 'up' and not is_maintenance:
             await self._trigger_alert(f"🔥 Server Down: {name}", f"Server {name} ({host}) is offline or exporter is unreachable.")
         try:
             await conn.execute(
@@ -161,7 +182,7 @@ class ScrapeManager:
             await conn.close()
         return False
 
-    async def _persist_metrics(self, server_id, name, host, data, text, last_status, last_cpu, now):
+    async def _persist_metrics(self, server_id, name, host, data, text, last_status, last_cpu, now, is_maintenance=0):
         conn = await get_async_db()
         try:
             m = re.search(r'_build_info\{[^}]*version="([^"]+)"', text)
@@ -178,11 +199,12 @@ class ScrapeManager:
 
             cpu_val = data.get('cpu', 0)
 
-            if last_status == 'down':
+            if last_status == 'down' and not is_maintenance:
                 await self._trigger_alert(f"✅ Server Restored: {name}", f"Server {name} ({host}) is back online.")
 
-            await self._evaluate_cpu_alert(name, cpu_val, last_cpu)
-            await self._evaluate_alerting_rules(name, cpu_val, data.get('memory', 0), data.get('disk', 0))
+            if not is_maintenance:
+                await self._evaluate_cpu_alert(name, cpu_val, last_cpu)
+                await self._evaluate_alerting_rules(name, cpu_val, data.get('memory', 0), data.get('disk', 0))
 
             await conn.execute("""
                 INSERT INTO metrics_history
@@ -216,14 +238,19 @@ class ScrapeManager:
             await conn.close()
 
     async def _evaluate_cpu_alert(self, name, cpu_val, last_cpu):
-        if cpu_val > 90 and (last_cpu is None or last_cpu <= 90):
+        # last_cpu is None on first scrape after a restart; skip the edge so a
+        # transient reboot doesn't fire a false "High CPU" alert.
+        if last_cpu is None:
+            return
+        if cpu_val > 90 and last_cpu <= 90:
             await self._trigger_alert(f"⚠️ High CPU: {name}", f"Server {name} CPU usage is high: {cpu_val}%.")
-        elif cpu_val <= 90 and (last_cpu is not None and last_cpu > 90):
+        elif cpu_val <= 90 and last_cpu > 90:
             await self._trigger_alert(f"✅ CPU Normal: {name}", f"Server {name} CPU usage returned to normal: {cpu_val}%.")
 
     async def _evaluate_alerting_rules(self, server_name: str, cpu: float, memory: float, disk: float):
         if not self.config or not self.config.alerting_rules:
             return
+        now = time.time()
         for rule in self.config.alerting_rules:
             val = None
             expr_lower = rule.expr.lower()
@@ -233,9 +260,36 @@ class ScrapeManager:
                 val = memory
             elif 'disk' in expr_lower:
                 val = disk
-            if val is not None and val > rule.threshold:
+            else:
+                # Unsupported expression (e.g. exporter_available) — nothing to compare.
+                continue
+
+            cond = (getattr(rule, 'condition', '') or 'greater_than').lower()
+            if cond in ('less_than', 'lt', 'lower_than'):
+                fired = val < rule.threshold
+            else:
+                fired = val > rule.threshold
+
+            key = (server_name, rule.name)
+            if not fired:
+                # Episode ended: reset state so the rule can alert again next time.
+                self._rule_state.pop(key, None)
+                continue
+
+            state = self._rule_state.setdefault(key, {"started": now})
+            if state.get("alerted"):
+                continue  # already alerting for this sustained episode
+
+            # Respect the rule's `duration`: the condition must hold for N seconds
+            # before the alert fires (default 0 = fire immediately).
+            if now - state["started"] >= rule.duration:
                 message = rule.message or f"{rule.name}: {val:.1f}% (threshold: {rule.threshold}%)"
+                message = (
+                    message.replace("{{ value }}", f"{val:.1f}")
+                    .replace("{{ server }}", server_name)
+                )
                 await self._trigger_alert(f"{rule.severity.upper()}: {rule.name} on {server_name}", message)
+                state["alerted"] = True
 
     async def _trigger_alert(self, title, message):
         try:
@@ -469,14 +523,9 @@ class ScrapeManager:
             elif 'windows_net_bytes_sent_total' in k:
                 net_tx += sum(item['val'] for item in items)
 
-        if net_rx == 0 and net_tx == 0:
-            for k, items in metrics_map.items():
-                if 'windows_net_current_bandwidth_bytes' in k:
-                    vals = [item['val'] for item in items]
-                    if vals:
-                        net_rx = sum(vals)
-                        net_tx = sum(vals)
-                    break
+        # Note: windows_net_current_bandwidth_bytes is a NIC *capacity*, not
+        # throughput — deliberately not used as a rx/tx fallback (was reporting
+        # bogus identical values for both directions).
         if net_rx > 0 or net_tx > 0:
             result['net_rx'] = net_rx
             result['net_tx'] = net_tx
@@ -529,7 +578,6 @@ class ServiceChecker:
             await asyncio.sleep(5)
 
     async def check_all(self, last_checked: dict[int, float] | None = None):
-        import time
         now_ts = time.time()
         conn = await get_async_db()
         cursor = await conn.execute("SELECT id, name, target_url, timeout, expected_status, enabled, interval, check_type, status FROM services WHERE enabled=1")
@@ -540,6 +588,13 @@ class ServiceChecker:
             return
 
         async with httpx.AsyncClient(timeout=15.0) as client:
+            sem = asyncio.Semaphore(10)
+
+            async def _check_guarded(s):
+                sid, name, url, timeout, expected, enabled, srv_interval, check_type, last_status = s
+                async with sem:
+                    return await self._check_one(client, sid, name, url, timeout, expected, check_type, last_status)
+
             tasks = []
             for s in services:
                 sid, name, url, timeout, expected, enabled, srv_interval, check_type, last_status = s
@@ -550,7 +605,7 @@ class ServiceChecker:
                     if now_ts - last < srv_interval:
                         continue
                     last_checked[sid] = now_ts
-                tasks.append(self._check_one(client, sid, name, url, timeout, expected, check_type, last_status))
+                tasks.append(_check_guarded(s))
 
             if tasks:
                 await asyncio.gather(*tasks, return_exceptions=True)
@@ -563,7 +618,7 @@ class ServiceChecker:
 
         try:
             _chk_host, _ = _extract_host_port(url)
-            if is_blocked_outbound_host(_chk_host):
+            if await asyncio.to_thread(is_blocked_outbound_host, _chk_host):
                 raise ValueError(f"blocked metadata target: {_chk_host}")
             if check_type == 'ping':
                 import re as _re
@@ -581,7 +636,6 @@ class ServiceChecker:
                 latency = int((datetime.now() - start).total_seconds() * 1000)
                 status = 'up' if proc.returncode == 0 else 'down'
             elif check_type == 'ssl':
-                import asyncio
                 import ssl
                 ctx = ssl.create_default_context()
                 host, port = _extract_host_port(url, default_port=443)
@@ -684,8 +738,6 @@ def _parse_cron_field(field: str, max_val: int) -> set[int] | None:
 async def _run_backup_if_due(config):
     global _last_backup_run
     import os
-    import shutil
-    import time
     now_ts = time.time()
     if now_ts - _last_backup_run < 3600:
         return
@@ -711,11 +763,21 @@ async def _run_backup_if_due(config):
         _last_backup_run = now_ts
         backup_dir = config.backup.backup_dir
         os.makedirs(backup_dir, exist_ok=True)
-        db_path = config.storage.path
+        from pymon.config import resolve_db_path
+        db_path = resolve_db_path()
         timestamp = now_dt.strftime("%Y%m%d_%H%M%S")
         backup_path = os.path.join(backup_dir, f"pymon_backup_{timestamp}.db")
         if os.path.exists(db_path):
-            shutil.copy2(db_path, backup_path)
+            # Use SQLite's online backup API so the snapshot includes WAL data
+            # (a raw file copy would silently lose the latest writes).
+            import sqlite3
+            src_conn = sqlite3.connect(db_path, timeout=30)
+            dst_conn = sqlite3.connect(backup_path)
+            try:
+                src_conn.backup(dst_conn)
+            finally:
+                dst_conn.close()
+                src_conn.close()
             logger.info(f"Database backed up to {backup_path}")
         backups = sorted(
             [f for f in os.listdir(backup_dir) if f.endswith('.db')],

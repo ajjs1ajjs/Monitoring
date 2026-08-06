@@ -49,7 +49,7 @@ class Logger:
         """Helper to retrieve the name of the calling module for better context."""
         try:
             import sys
-            return sys._getframe(1).f_globals["__name__"]
+            return str(sys._getframe(1).f_globals.get("__name__", "unknown_module"))
         except Exception:
             return "unknown_module"
 

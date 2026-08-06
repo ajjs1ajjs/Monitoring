@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter
+from fastapi.responses import PlainTextResponse
 
 from pymon.metrics.collector import registry
 
@@ -151,6 +152,7 @@ def get_metrics_exporter() -> PrometheusMetricsExporter:
         "Returns all PyMon metrics in Prometheus exposition format.\n\n"
         "This endpoint is compatible with Prometheus and other monitoring systems."
     ),
+    response_class=PlainTextResponse,
 )
 async def prometheus_metrics_endpoint() -> str:
     """Return metrics in Prometheus exposition format."""

@@ -308,7 +308,7 @@ def compare_servers(
     try:
         servers = conn.execute("SELECT id, name FROM servers ORDER BY name").fetchall()
         # Full SQL templates keyed by column name — no interpolation needed.
-        _QUERIES = {
+        queries = {
             "cpu_percent": """
                 SELECT server_id, AVG(cpu_percent), MIN(cpu_percent), MAX(cpu_percent), COUNT(cpu_percent)
                 FROM metrics_history
@@ -329,21 +329,30 @@ def compare_servers(
             """,
         }
         agg_rows = conn.execute(
-            _QUERIES[col],
+            queries[col],
             (time_filter,),
         ).fetchall()
         agg = {r[0]: r for r in agg_rows}
         result = []
         for s in servers:
             a = agg.get(s["id"])
-            count = a[4] if a else 0
+            if a:
+                count = a[4]
+                average = round(a[1], 2)
+                minimum = round(a[2], 2)
+                maximum = round(a[3], 2)
+            else:
+                count = 0
+                average = 0
+                minimum = 0
+                maximum = 0
             result.append({
                 "server_id": s["id"],
                 "server_name": s["name"],
                 "metric": metric,
-                "average": round(a[1], 2) if count else 0,
-                "min": round(a[2], 2) if count else 0,
-                "max": round(a[3], 2) if count else 0,
+                "average": average,
+                "min": minimum,
+                "max": maximum,
                 "data_points": count,
             })
         return {"metric": metric, "range": range, "servers": result}
@@ -416,21 +425,21 @@ def toggle_maintenance(server_id: int, data: api_models.MaintenanceToggle, curre
         conn.close()
 
 @router.post("/{server_id}/scrape")
-async def force_scrape_server(server_id: int, request: Request, current_user: User = Depends(get_current_user)):
+async def force_scrape_server(server_id: int, request: Request, current_user: User = Depends(get_admin_user)):
     scrape_manager = getattr(request.app.state, "scrape_manager", None)
     if not scrape_manager:
         raise HTTPException(status_code=503, detail="Scraper manager not initialized")
 
     conn = get_db()
     try:
-        s = conn.execute("SELECT id, name, host, agent_port, os_type, enabled, last_status, cpu_percent FROM servers WHERE id = ?", (server_id,)).fetchone()
+        s = conn.execute("SELECT id, name, host, agent_port, os_type, enabled, last_status, cpu_percent, is_maintenance FROM servers WHERE id = ?", (server_id,)).fetchone()
         if not s:
             raise HTTPException(status_code=404, detail="Server not found")
 
-        sid, name, host, port, os_type, enabled, last_status, last_cpu = s
+        sid, name, host, port, os_type, enabled, last_status, last_cpu, is_maintenance = s
         import httpx
         async with httpx.AsyncClient(timeout=10.0) as client:
-            success = await scrape_manager._scrape_one(client, sid, name, host, port, last_status, last_cpu)
+            success = await scrape_manager._scrape_one(client, sid, name, host, port, last_status, last_cpu, is_maintenance)
             if success:
                 return {"status": "success"}
             else:

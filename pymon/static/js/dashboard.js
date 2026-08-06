@@ -201,6 +201,18 @@ async function apiFetch(url, options = {}) {
             window.location.href = '/login';
             return null;
         }
+        if (resp.status === 403) {
+            const errData = await resp.json().catch(() => ({}));
+            if (errData.detail === 'You must change your password before continuing') {
+                const params = new URLSearchParams(window.location.search);
+                if (params.get('mustChange') !== '1') {
+                    window.location.href = '/dashboard/?mustChange=1';
+                    return null;
+                }
+                handleMustChangePassword();
+                return null;
+            }
+        }
         if (!resp.ok) {
             const errData = await resp.json().catch(() => ({}));
             console.error(`API Error ${resp.status} on ${url}:`, errData.detail || resp.statusText);
@@ -211,6 +223,33 @@ async function apiFetch(url, options = {}) {
         console.error(`Fetch error on ${url}:`, e);
         return { ok: false, status: 0, json: async () => ({ detail: e.message || 'Network error' }), statusText: 'Network Error' };
     }
+}
+
+// First-run / reset admin must change the password before using the dashboard.
+function handleMustChangePassword() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('mustChange') !== '1') return;
+    const current = prompt('Політика безпеки: змініть пароль перед продовженням.\n\nВведіть поточний пароль:');
+    if (current === null) { window.location.href = '/login'; return; }
+    const np = prompt('Новий пароль (мін. 12 символів: велика + мала літера + цифра):');
+    if (!np || np.length < 12) { alert('Пароль занадто короткий'); return handleMustChangePassword(); }
+    const np2 = prompt('Повторіть новий пароль:');
+    if (np !== np2) { alert('Паролі не збігаються'); return handleMustChangePassword(); }
+
+    apiFetch('/api/v1/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: current, new_password: np })
+    }).then(async (resp) => {
+        if (resp && resp.ok) {
+            alert('Пароль успішно змінено.');
+            window.location.href = '/dashboard/';
+        } else {
+            const err = resp ? await resp.json() : {};
+            alert('Помилка: ' + (err.detail || 'Не вдалося змінити пароль'));
+            return handleMustChangePassword();
+        }
+    });
 }
 
 // Form Handlers
@@ -453,7 +492,7 @@ function updateLiveTable(data) {
     const html = targetData.map(n => `
         <tr style="cursor: pointer;" onclick="openDrawer(${n.id})">
             <td>
-                <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}" title="${n.error_message || ''}">
+                <div class="status-badge ${n.last_status === 'up' ? 'up' : 'down'}" title="${esc(n.error_message || '')}">
                     <span class="status-dot ${n.last_status === 'up' ? 'pulse' : ''}"></span>
                     ${n.last_status || 'unknown'}
                 </div>
@@ -505,7 +544,7 @@ function updateLiveTable(data) {
                                 const pct = (d.used_percent || d.percent || 0);
                                 return `
                                     <div style="display:flex; align-items:center; gap:0.75rem;">
-                                        <span style="min-width:2.5rem; font-size:0.75rem; font-weight:700; color:#fff;">${d.volume || '?'}</span>
+                                        <span style="min-width:2.5rem; font-size:0.75rem; font-weight:700; color:#fff;">${esc(d.volume || '?')}</span>
                                         <div class="progress-container" style="height:6px; background:rgba(0,0,0,0.2);">
                                             <div class="progress-bar-fill" style="width:${pct}%; background:${pct > 90 ? 'var(--danger)' : (pct > 75 ? 'var(--warning)' : '#3b82f6')}; height:100%;"></div>
                                         </div>
@@ -1227,7 +1266,7 @@ async function updateOverviewCharts() {
             const sData = await sResp.json();
             if (!Array.isArray(sData)) return;
             const sLabels = sData.map(h => new Date(h.timestamp).toLocaleTimeString());
-            const sLatency = sData.map(h => h.response_time);
+            const sLatency = sData.map(h => h.latency_ms);
             
             if (overviewCharts.service) {
                 overviewCharts.service.data.labels = sLabels;
@@ -1429,12 +1468,13 @@ function populateServerSelect() {
 let ws = null;
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/metrics?token=${encodeURIComponent(token)}`;
+    const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/metrics`;
 
     ws = new WebSocket(wsUrl);
     
     ws.onopen = () => {
         console.log('WebSocket connected');
+        ws.send(JSON.stringify({ type: 'auth', token: token }));
         const timerEl = document.getElementById('updateTimer');
         if (timerEl) timerEl.textContent = 'Live';
     };
@@ -1563,6 +1603,7 @@ if ('serviceWorker' in navigator) {
 
 const urlParams = new URLSearchParams(window.location.search);
 const urlSection = urlParams.get('section') || 'overview';
+handleMustChangePassword();
 showSection(urlSection);
 
 refreshData();

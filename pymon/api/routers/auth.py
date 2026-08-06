@@ -1,4 +1,7 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -19,10 +22,23 @@ from pymon.auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 _limiter = Limiter(key_func=get_remote_address)
 
+
+class AdminUserCreate(BaseModel):
+    username: str
+    password: str
+    is_admin: bool = False
+
+
+class AdminUserUpdate(BaseModel):
+    password: str | None = None
+    is_admin: bool | None = None
+    must_change_password: bool | None = None
+
 @router.post("/login", response_model=Token)
 @_limiter.limit("10/minute")
 async def login(request: Request, data: UserLogin):
-    return authenticate_user(data.username, data.password)
+    # bcrypt verification is blocking (~100-300ms); keep it off the event loop.
+    return await asyncio.to_thread(authenticate_user, data.username, data.password)
 
 @router.get("/me", response_model=User)
 async def get_me(current_user: User = Depends(get_current_user)):
@@ -48,34 +64,31 @@ async def list_users(current_user: User = Depends(get_admin_user)):
     return {"users": _list_users()}
 
 @router.post("/users")
-async def create_user(data: dict, current_user: User = Depends(get_admin_user)):
+async def create_user(data: AdminUserCreate, current_user: User = Depends(get_admin_user)):
     from pymon.auth import create_user as _create_user
     from pymon.auth import validate_password_complexity
-    password = str(data.get("password", ""))
-    validate_password_complexity(password)
+    validate_password_complexity(data.password)
     try:
         user = _create_user(
-            username=str(data.get("username", "")),
-            password=password,
-            is_admin=bool(data.get("is_admin", False)),
+            username=data.username,
+            password=data.password,
+            is_admin=data.is_admin,
         )
         return {"status": "ok", "user_id": user.id}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.put("/users/{user_id}")
-async def update_user(user_id: int, data: dict, current_user: User = Depends(get_admin_user)):
+async def update_user(user_id: int, data: AdminUserUpdate, current_user: User = Depends(get_admin_user)):
     from pymon.auth import set_password as _set_password
     from pymon.auth import update_user as _update_user
-    is_admin = bool(data["is_admin"]) if "is_admin" in data else None
-    must_change_password = bool(data["must_change_password"]) if "must_change_password" in data else None
 
-    if "password" in data and data["password"]:
-        _set_password(user_id, data["password"])
+    if data.password:
+        _set_password(user_id, data.password)
         return {"status": "ok", "password_changed": True}
 
-    if is_admin is not None or must_change_password is not None:
-        _update_user(user_id, is_admin=is_admin, must_change_password=must_change_password)
+    if data.is_admin is not None or data.must_change_password is not None:
+        _update_user(user_id, is_admin=data.is_admin, must_change_password=data.must_change_password)
 
     return {"status": "ok"}
 

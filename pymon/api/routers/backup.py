@@ -1,10 +1,8 @@
 import os
-import shutil
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from pymon.api.deps import get_db
 from pymon.auth import User, get_admin_user
 
 router = APIRouter(prefix="/backup", tags=["backup"])
@@ -46,10 +44,17 @@ def create_backup(current_user: User = Depends(get_admin_user)):
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"pymon_backup_{timestamp}.db"
     dest = os.path.join(backup_dir, filename)
+    import sqlite3
     try:
-        conn = get_db()
-        conn.close()
-        shutil.copy2(db_path, dest)
+        # Online backup API keeps the snapshot consistent (includes WAL data);
+        # a raw file copy would miss recent writes under concurrent load.
+        src_conn = sqlite3.connect(db_path, timeout=30)
+        dst_conn = sqlite3.connect(dest)
+        try:
+            src_conn.backup(dst_conn)
+        finally:
+            dst_conn.close()
+            src_conn.close()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backup failed: {e}")
     backups = sorted(

@@ -13,7 +13,7 @@ class SystemCollector:
         self.interval = interval
         self.labels = labels or []
         self._running = False
-        self._task = None
+        self._task: asyncio.Task | None = None
 
         self.cpu_gauge = Gauge("system_cpu_usage_percent", "CPU usage percentage", self.labels)
         self.memory_gauge = Gauge("system_memory_usage_percent", "Memory usage percentage", self.labels)
@@ -43,7 +43,7 @@ class SystemCollector:
 
     async def _collect_cpu(self) -> None:
         try:
-            import psutil
+            import psutil  # type: ignore[import-untyped]
 
             cpu = await asyncio.to_thread(psutil.cpu_percent, 1)
             self.cpu_gauge.set(cpu, self.labels)

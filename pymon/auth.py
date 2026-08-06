@@ -21,6 +21,12 @@ from pymon.api.deps import get_db
 def _load_jwt_secret() -> str:
     env_secret = os.getenv("JWT_SECRET")
     if env_secret:
+        if len(env_secret) < 32:
+            print(
+                "[WARN] JWT_SECRET is shorter than 32 characters — tokens can be forged. "
+                "Set a strong JWT_SECRET (min 32 chars).",
+                file=sys.stderr,
+            )
         return env_secret
     secret_file = os.path.join(os.path.dirname(__file__), "..", ".pymon_jwt_secret")
     secret_file = os.path.normpath(secret_file)
@@ -131,8 +137,11 @@ def _log_audit(user_id: int, action: str, details: str = "", ip_address: str = "
             (user_id, action, details, ip_address, datetime.now(timezone.utc).isoformat()),
         )
         conn.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        # A failed audit write must not be silent — otherwise the trail quietly
+        # disappears. Log it and continue (never fail the triggering operation).
+        import logging
+        logging.getLogger(__name__).error("Audit log write failed (%s): %s", action, e)
     finally:
         if conn is not None:
             conn.close()
@@ -249,6 +258,19 @@ def decode_token(token: str) -> Optional[dict]:
 security = HTTPBearer(auto_error=False)
 
 
+# Endpoints a must-change-password user is still allowed to reach. Everything
+# else returns 403 until the password is actually changed.
+_ALLOWED_PATHS_WHILE_PASSWORD_CHANGE = frozenset(
+    {"/api/v1/auth/change-password", "/api/v1/auth/me"}
+)
+
+
+def _maybe_require_password_change(user: User, request: Request) -> User:
+    if user.must_change_password and request.url.path not in _ALLOWED_PATHS_WHILE_PASSWORD_CHANGE:
+        raise HTTPException(status_code=403, detail="You must change your password before continuing")
+    return user
+
+
 def get_current_user(
     request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> User:
@@ -257,7 +279,7 @@ def get_current_user(
     if not credentials:
         api_key = request.headers.get("X-API-Key")
         if api_key:
-            return validate_api_key(api_key)
+            return _maybe_require_password_change(validate_api_key(api_key), request)
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     payload = decode_token(credentials.credentials)
@@ -274,11 +296,14 @@ def get_current_user(
     if not row:
         raise HTTPException(status_code=401, detail="User not found")
 
-    return User(
-        id=row["id"],
-        username=row["username"],
-        is_admin=bool(row["is_admin"]),
-        must_change_password=bool(row["must_change_password"]),
+    return _maybe_require_password_change(
+        User(
+            id=row["id"],
+            username=row["username"],
+            is_admin=bool(row["is_admin"]),
+            must_change_password=bool(row["must_change_password"]),
+        ),
+        request,
     )
 
 
@@ -514,7 +539,8 @@ def list_users() -> list[dict]:
 
 
 def _count_admins(c) -> int:
-    return c.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()[0]
+    row = c.execute("SELECT COUNT(*) FROM users WHERE is_admin = 1").fetchone()
+    return int(row[0]) if row else 0
 
 
 def update_user(user_id: int, is_admin: Optional[bool] = None, must_change_password: Optional[bool] = None) -> bool:

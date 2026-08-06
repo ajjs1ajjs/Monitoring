@@ -144,3 +144,34 @@ def test_security_headers_present(client):
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
     assert resp.headers.get("X-Frame-Options") == "DENY"
     assert "Content-Security-Policy" in resp.headers
+
+
+def test_metrics_endpoint_is_plaintext(client):
+    """Audit fix: /metrics must be Prometheus text/plain, not JSON-wrapped."""
+    resp = client.get("/metrics")
+    assert resp.status_code == 200
+    assert resp.headers.get("content-type", "").startswith("text/plain")
+    assert "# TYPE pymon_uptime_seconds gauge" in resp.text
+
+
+def test_must_change_password_is_enforced(client, db_path):
+    """Audit fix: a user flagged must_change_password is blocked from the API
+    until the password is changed, but can still reach /me and /change-password."""
+    import os
+    os.environ["DB_PATH"] = db_path
+    user = auth.create_user(username="must_change_user", password="MustChangePass123", is_admin=False)
+    token = auth.create_token(user.id, user.username, is_admin=False, must_change=True)
+    h = {"Authorization": f"Bearer {token}"}
+
+    assert client.get("/api/v1/servers", headers=h).status_code == 403
+    assert client.get("/api/v1/auth/me", headers=h).status_code == 200
+
+    resp = client.post(
+        "/api/v1/auth/change-password",
+        headers=h,
+        json={"current_password": "MustChangePass123", "new_password": "NewStrongPass123"},
+    )
+    assert resp.status_code == 200
+
+    # DB flag is now cleared, so the same token is allowed through again.
+    assert client.get("/api/v1/servers", headers=h).status_code == 200

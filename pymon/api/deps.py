@@ -13,7 +13,8 @@ class ConnectionManager:
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        if websocket not in self.active_connections:
+            self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
@@ -41,6 +42,7 @@ def get_db():
 async def get_async_db():
     """Get async database connection with aiosqlite"""
     import aiosqlite
+
     from pymon.config import resolve_db_path
     db_path = resolve_db_path()
     conn = await aiosqlite.connect(db_path, timeout=30.0)

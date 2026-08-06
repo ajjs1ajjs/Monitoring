@@ -85,7 +85,9 @@
                 if (resp.ok) {
                     const data = await resp.json();
                     localStorage.setItem('token', data.access_token);
-                    window.location.href = '/dashboard/';
+                    window.location.href = data.user && data.user.must_change_password
+                        ? '/dashboard/?mustChange=1'
+                        : '/dashboard/';
                 } else {
                     errorBox.style.display = 'block';
                 }
