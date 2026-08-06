@@ -49,8 +49,10 @@ fi
 
 if [ "$VERSION" = "latest" ]; then
     DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY_NAME}"
+    VERSION_URL="latest/download/"
 else
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY_NAME}"
+    VERSION_URL="download/${VERSION}/"
 fi
 
 # --- Download ------------------------------------------------------------
@@ -67,6 +69,35 @@ else
     rm -f "$TMP_BIN"
     exit 1
 fi
+
+# --- Verify SHA-256 checksum (from release checksums.txt) ------------------
+echo "Verifying checksum..."
+TMP_SUM="$(mktemp)"
+if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "https://github.com/${REPO}/releases/${VERSION_URL}checksums.txt" -o "$TMP_SUM" 2>/dev/null || true
+elif command -v wget >/dev/null 2>&1; then
+    wget -q -O "$TMP_SUM" "https://github.com/${REPO}/releases/${VERSION_URL}checksums.txt" 2>/dev/null || true
+fi
+if [ -s "$TMP_SUM" ]; then
+    EXPECTED="$(grep "${BINARY_NAME}$" "$TMP_SUM" | awk '{print $1}')"
+    if [ -n "$EXPECTED" ]; then
+        ACTUAL="$(sha256sum "$TMP_BIN" | awk '{print $1}')"
+        if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "ERROR: checksum mismatch for ${BINARY_NAME}."
+            echo "  expected: ${EXPECTED}"
+            echo "  actual:   ${ACTUAL}"
+            rm -f "$TMP_BIN" "$TMP_SUM"
+            exit 1
+        fi
+        echo "Checksum OK."
+    else
+        echo "Warning: no checksum entry for ${BINARY_NAME}, skipping verification."
+    fi
+else
+    echo "Warning: could not download checksums.txt, skipping verification."
+fi
+rm -f "$TMP_SUM"
+
 chmod +x "$TMP_BIN"
 "$TMP_BIN" --version >/dev/null 2>&1 || { echo "ERROR: downloaded file is not a valid PyMon binary"; rm -f "$TMP_BIN"; exit 1; }
 
@@ -131,5 +162,4 @@ echo "Dashboard: http://localhost:10000/"
 echo "First-run admin password is printed to the service log:"
 echo "  journalctl -u $SERVICE_NAME | grep -i password"
 echo ""
-if ! "$INSTALL_DIR/pymon" --version >/dev/null 2>&1; then :; fi
 echo "Installed version: $("$INSTALL_DIR/pymon" --version)"
