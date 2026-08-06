@@ -45,7 +45,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 VOLUME ["/data", "/config", "/logs"]
 
 LABEL maintainer="PyMon Team"
-LABEL version="2.1.0"
+LABEL version="2.3.0"
 LABEL description="Enterprise Server Monitoring with Grafana-style Dashboard"
 
 CMD ["python", "-m", "pymon", "server", "--config", "/config/config.yml"]

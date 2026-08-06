@@ -15,7 +15,7 @@ DATA_DIR="/var/lib/pymon"
 LOG_DIR="/var/log/pymon"
 SERVICE_NAME="pymon"
 USER="pymon"
-APP_VERSION="2.1.0"
+APP_VERSION="2.3.0"
 
 echo -e "${GREEN}"
 echo "=========================================="
