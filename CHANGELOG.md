@@ -7,6 +7,44 @@
 
 ---
 
+## [2.3.1] - 2026-08-06
+
+### 🔒 Security audit fixes (round from 2026-08-06)
+
+#### Безпека (критичне)
+- **Stored XSS у дашборді.** Назви дискових томів (з `node_exporter`/`windows_exporter`) та `error_message` у списку серверів більше не підставляються в DOM без екранування — це закриває шлях до крадіжки JWT з `localStorage` (захоплення акаунта адміна).
+- **Токен WebSocket прибрано з URL.** Автентифікація WS (`/api/v1/ws/metrics`) тепер відбувається через перше повідомлення `{"type":"auth","token":...}` — токен більше не потрапляє в логи проксі/серверів та Referer.
+- **`must_change_password` нарешті примушується.** Користувачі з прапорцем (перший запуск, скидання адміном) блокуються на всіх ендпоінтах, окрім `/auth/me` і `/auth/change-password`; додано UI-флоу зміни пароля на дашборді.
+- **Режим Maintenance тепер працює.** Вузли в maintenance більше не генерують сповіщення (Server Down/Restored, High CPU, правила алертингу).
+- **`/metrics` повертає Prometheus-формат.** Endpoint віддає `text/plain; version=0.0.4` замість JSON-рядка — Prometheus-скрейп знову коректний.
+
+#### Безпека (середнє)
+- `JWT_SECRET` коротший за 32 символи — попередження при старті.
+- Пароль адміна з `reset-admin` поважає кастомний `auth.admin_username` (раніше жорстко `'admin'`).
+- `create_user`/`update_user` використовують Pydantic-моделі замість `bool("false")` (type confusion).
+- `force_scrape` тепер лише для адмінів; валідація `create_service` (name/check_type/interval/timeout).
+- SMTP: підтримка `use_tls` (SMTPS/465); системні логи читаються з `LOG_DIR`.
+
+#### Виправлено
+- **Бекапи консистентні.** Запис через SQLite online-backup API (раніше `shutil.copy2` у WAL-режимі мовчки втрачав останні дані).
+- **Retention для таблиці `metrics`** (push-метрики більше не ростуть безкінечно).
+- **Правила алертингу:** враховуються `condition` (less_than/greater_than) і `duration` (debounce без спаму); шаблони `{{ value }}`/`{{ server }}` підставляються; правила типу `exporter_available` коректно пропускаються, а не мовчки ламаються.
+- `_evaluate_cpu_alert` більше не злітає хибним алертом на першому скрейпі після рестарту.
+- Windows-мережа: прибрано оманливий fallback на `windows_net_current_bandwidth_bytes` (rx=tx=capacity).
+- Service latency chart: виправлено поле `latency_ms` (раніше JS читав неіснуюче `response_time`).
+
+#### Продуктивність
+- DNS-резолвінг SSRF-guard винесено з event-loop (`asyncio.to_thread`).
+- Обмежено одночасність скрейпу/перевірок сервісів (Semaphore).
+- bcrypt у `/auth/login` виконується в потоці, а не на event-loop.
+- `_log_audit` логує збій запису аудиту замість мовчазного `pass`.
+
+#### Чистота
+- `ruff` та `mypy` — без помилок по всьому `pymon/`.
+- Піновано `lucide@0.321.0` (раніше `@latest`); SW-кеш бампнуто.
+
+---
+
 ## [2.3.0] - 2026-08-06
 
 ### 🐛 Виправлення (після v2.2.0)
