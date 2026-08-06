@@ -1,7 +1,10 @@
 package api
 
 import (
+	"bufio"
 	"context"
+	"errors"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -51,14 +54,23 @@ func (a *App) withAuth(next http.HandlerFunc) http.HandlerFunc {
 				writeErr(w, http.StatusUnauthorized, "Invalid or expired token")
 				return
 			}
-			p = &principal{
-				UserID: claims.UserID, Username: claims.Username,
-				IsAdmin: claims.IsAdmin, AuthMethod: "jwt",
+			// Load fresh user state from the DB (must_change_password and role
+			// changes take effect immediately, like the original Python version).
+			u, err := a.Store.GetUserByID(claims.UserID)
+			if err != nil || u == nil {
+				writeErr(w, http.StatusUnauthorized, "User not found")
+				return
 			}
-			if claims.MustChangePassword &&
+			p = &principal{
+				UserID: u.ID, Username: u.Username,
+				IsAdmin: u.IsAdmin == 1, AuthMethod: "jwt",
+			}
+			if u.MustChangePassword == 1 &&
 				!strings.HasSuffix(r.URL.Path, "/change-password") &&
 				r.URL.Path != "/api/v1/auth/me" {
-				writeErr(w, http.StatusForbidden, "Password change required")
+				writeJSON(w, http.StatusForbidden, map[string]any{
+					"detail": "You must change your password before continuing",
+				})
 				return
 			}
 		} else {
@@ -188,6 +200,29 @@ type statusWriter struct {
 func (w *statusWriter) WriteHeader(code int) {
 	w.status = code
 	w.ResponseWriter.WriteHeader(code)
+}
+
+// Hijack lets gorilla/websocket upgrade the connection through the logging
+// wrapper (without it the WS upgrade fails because the writer isn't hijackable).
+func (w *statusWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hj, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, errors.New("response writer does not support hijacking")
+	}
+	return hj.Hijack()
+}
+
+func (w *statusWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w *statusWriter) ReadFrom(r io.Reader) (int64, error) {
+	if rf, ok := w.ResponseWriter.(io.ReaderFrom); ok {
+		return rf.ReadFrom(r)
+	}
+	return io.Copy(w.ResponseWriter, r)
 }
 
 // audit helpers

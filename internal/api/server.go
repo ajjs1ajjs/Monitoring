@@ -165,7 +165,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func writeErr(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]any{"error": msg})
+	writeJSON(w, status, map[string]any{"detail": msg})
 }
 
 func pathInt(r *http.Request, name string) (int64, error) {
