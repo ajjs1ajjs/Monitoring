@@ -63,22 +63,43 @@ iwr https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1 -Out
 curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
 ```
 
-Після встановлення:
+> **Одна й та сама команда** і встановлює, і оновлює. Скрипт сам визначає режим.
 
-- **Дашборд:** `http://<IP>:10000/dashboard/`
-- **Логін:** `admin`
+### 🔁 Встановлення vs Оновлення
+
+| | Встановлення (перший запуск) | Оновлення (повторний запуск) |
+|---|---|---|
+| Бінарник | завантажується з GitHub Releases | замінюється на новий |
+| Конфіг `/etc/pymon/config.yml` | створюється з прикладу | **зберігається без змін** |
+| База даних `/var/lib/pymon/pymon.db` | створюється | **зберігається без змін** |
+| Користувачі та паролі | створюється адмін | **зберігаються без змін** |
+| Старий бінарник | — | зберігається як `pymon.old` (відкат) |
+| Служба `systemd` | створюється та запускається | перезапускається |
+
+**Відкат після оновлення** (якщо щось пішло не так):
+```bash
+sudo systemctl stop pymon
+sudo install -m 0755 /opt/pymon/pymon.old /opt/pymon/pymon
+sudo systemctl start pymon
+```
+
+**Встановлення конкретної версії:**
+```bash
+PYMON_VERSION=v3.0.0 curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
+```
 
 ### 🗝️ Перший вхід (пароль адміна)
 
-При встановленні скрипт **завжди** задає відомий пароль адміна і друкує його прямо у висновку:
+При **першому** встановленні скрипт генерує пароль і друкує його прямо у висновку:
 
 ```
-ADMIN LOGIN:
-  Username: admin
-  Password: <згенерований>
+====================================
+  Логін:    admin
+  Пароль:   <згенерований>
+====================================
 ```
 
-Пароль також зберігається одноразово у `$DATA_DIR/admin_password.txt` (права 0600):
+Пароль також зберігається одноразово у `/var/lib/pymon/admin_password.txt` (права 0600):
 ```bash
 sudo cat /var/lib/pymon/admin_password.txt
 sudo rm /var/lib/pymon/admin_password.txt    # видаліть після входу
@@ -92,6 +113,14 @@ sudo systemctl restart pymon
 ```
 
 > 💡 При першому вході дашборд попросить **змінити пароль** перед використанням (це стандартний flow `must_change_password`). Після зміни — інтерфейс повністю активний.
+
+### 🌐 Порти та фаєрвол
+
+- Дашборд слухає **TCP 10000** (можна змінити у `config.yml` → `server.port`).
+- Якщо браузер на іншій машині — відкрийте порт:
+  ```bash
+  sudo ufw allow 10000/tcp
+  ```
 
 ### 2. Перевірка
 
@@ -123,9 +152,12 @@ tar xzf ne.tar.gz && ./node_exporter/node_exporter &
 ### Linux (systemd)
 ```bash
 sudo systemctl start|stop|restart|status pymon
-sudo journalctl -u pymon -f
+sudo journalctl -u pymon -f        # якщо journalctl доступний
 
-# Прямий запуск з сирців
+# Оновлення = та сама команда встановлення
+curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
+
+# Прямий запуск з сирців (для розробки)
 ./run.sh --port 10000
 ```
 
@@ -137,11 +169,9 @@ sudo journalctl -u pymon -f
 
 ### Скидання пароля адміна
 ```bash
-# Згенерувати новий випадковий пароль (показується ОДИН раз)
-pymon reset-admin
-
-# ...або задати конкретний пароль
-PYMON_ADMIN_PASSWORD='YourStrongPass123' pymon reset-admin
+# Задати конкретний пароль (через sudo, бо файли належать pymon)
+sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' /opt/pymon/pymon reset-admin --config /etc/pymon/config.yml
+sudo systemctl restart pymon
 ```
 
 ### Docker

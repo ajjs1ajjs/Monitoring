@@ -1,6 +1,8 @@
 #!/bin/bash
-# PyMon NOC (Go) - one-line installer (Linux/macOS)
-# Downloads the pre-built binary from GitHub Releases.
+# PyMon NOC (Go) - one-line installer/updater (Linux/macOS)
+# The SAME command installs on first run and safely UPDATES on subsequent runs:
+#   - keeps config (/etc/pymon/config.yml), database, users and admin password
+#   - replaces only the binary and restarts the service
 # Usage: curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
 
 set -e
@@ -12,18 +14,35 @@ LOG_DIR="/var/log/pymon"
 SERVICE_NAME="pymon"
 VERSION="${PYMON_VERSION:-latest}"
 REPO="ajjs1ajjs/Monitoring"
+CONFIG_FILE="$CONFIG_DIR/config.yml"
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "Please run as root (sudo ./install.sh)"
     exit 1
 fi
 
+# --- Detect existing installation -------------------------------------------
+IS_UPDATE=0
+if [ -f "/etc/systemd/system/$SERVICE_NAME.service" ] || [ -x "$INSTALL_DIR/pymon" ] || [ -f "$DATA_DIR/pymon.db" ]; then
+    IS_UPDATE=1
+fi
+
+if [ "$IS_UPDATE" = "1" ]; then
+    MODE="Оновлення (update)"
+else
+    MODE="Встановлення (install)"
+fi
 echo "=============================================="
-echo "   PyMon NOC - Installation Script (Go)"
+echo "   PyMon NOC - $MODE"
 echo "=============================================="
 echo ""
 
-# --- Architecture detection ---------------------------------------------
+OLD_VERSION=""
+if [ -x "$INSTALL_DIR/pymon" ] && [ ! -d "$INSTALL_DIR/pymon" ]; then
+    OLD_VERSION="$("$INSTALL_DIR/pymon" --version 2>/dev/null || true)"
+fi
+
+# --- Architecture detection -------------------------------------------------
 case "$(uname -m)" in
     x86_64|amd64)  ARCH="amd64" ;;
     aarch64|arm64) ARCH="arm64" ;;
@@ -39,13 +58,11 @@ if [ "$(uname -s)" = "Darwin" ]; then
 fi
 
 BINARY_NAME="pymon-${OS}-${ARCH}"
-if [ "$OS" = "linux" ] && [ "$ARCH" = "amd64" ]; then
-    BINARY_NAME="pymon-linux-amd64"
-elif [ "$OS" = "linux" ] && [ "$ARCH" = "arm64" ]; then
-    BINARY_NAME="pymon-linux-arm64"
-elif [ "$OS" = "darwin" ]; then
-    BINARY_NAME="pymon-darwin-amd64"
-fi
+case "$OS:$ARCH" in
+    linux:amd64) BINARY_NAME="pymon-linux-amd64" ;;
+    linux:arm64) BINARY_NAME="pymon-linux-arm64" ;;
+    darwin:*)    BINARY_NAME="pymon-darwin-amd64" ;;
+esac
 
 if [ "$VERSION" = "latest" ]; then
     DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY_NAME}"
@@ -55,7 +72,7 @@ else
     VERSION_URL="download/${VERSION}/"
 fi
 
-# --- Download ------------------------------------------------------------
+# --- Download --------------------------------------------------------------
 echo "[1/4] Downloading PyMon ${VERSION} (${BINARY_NAME})..."
 TMP_BIN="$(mktemp)"
 if command -v curl >/dev/null 2>&1; then
@@ -70,7 +87,7 @@ else
     exit 1
 fi
 
-# --- Verify SHA-256 checksum (from release checksums.txt) ------------------
+# --- Verify SHA-256 checksum ------------------------------------------------
 echo "Verifying checksum..."
 TMP_SUM="$(mktemp)"
 if command -v curl >/dev/null 2>&1; then
@@ -107,48 +124,52 @@ rm -f "$TMP_SUM"
 
 chmod +x "$TMP_BIN"
 "$TMP_BIN" --version >/dev/null 2>&1 || { echo "ERROR: downloaded file is not a valid PyMon binary"; rm -f "$TMP_BIN"; exit 1; }
+NEW_VERSION="$("$TMP_BIN" --version 2>/dev/null || echo "?")"
 
-# --- Install files --------------------------------------------------------
-echo "[2/4] Installing to ${INSTALL_DIR}..."
+# --- Install binary ---------------------------------------------------------
+echo "[2/4] Installing binary to ${INSTALL_DIR}/pymon..."
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
 
-# A broken previous install may have left /opt/pymon/pymon as a directory
-# (mv would then tuck the binary inside it). Clean it up so the target is a file.
+# Broken previous install may have left a directory at the binary path.
 if [ -d "$INSTALL_DIR/pymon" ]; then
-    echo "Removing stale directory at $INSTALL_DIR/pymon (leftover from a previous install)..."
+    echo "Removing stale directory at $INSTALL_DIR/pymon..."
     rm -rf "$INSTALL_DIR/pymon"
 fi
 
-install -m 0755 "$TMP_BIN" "$INSTALL_DIR/pymon"
+# On update, keep a rollback copy of the previous binary.
+if [ "$IS_UPDATE" = "1" ] && [ -f "$INSTALL_DIR/pymon" ]; then
+    cp -f "$INSTALL_DIR/pymon" "$INSTALL_DIR/pymon.old" 2>/dev/null || true
+fi
 
-# Sanity check: the installed binary must run.
+install -m 0755 "$TMP_BIN" "$INSTALL_DIR/pymon"
+rm -f "$TMP_BIN"
+
 if ! "$INSTALL_DIR/pymon" --version >/dev/null 2>&1; then
-    echo "ERROR: installed binary at $INSTALL_DIR/pymon is not executable/runnable."
-    echo "Check the file with: file $INSTALL_DIR/pymon"
-    rm -f "$TMP_BIN"
+    echo "ERROR: installed binary at $INSTALL_DIR/pymon is not runnable."
+    echo "Restoring previous version if available..."
+    [ -f "$INSTALL_DIR/pymon.old" ] && install -m 0755 "$INSTALL_DIR/pymon.old" "$INSTALL_DIR/pymon" || true
     exit 1
 fi
 
-if [ ! -f "$CONFIG_DIR/config.yml" ]; then
-    # fetch example config from the release source (fallback to local copy)
+# --- Config (kept on update, only created on first install) ----------------
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Creating default config at $CONFIG_FILE ..."
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/config.example.yml" -o "$CONFIG_DIR/config.yml" \
-            || cp "$(dirname "$0")/config.example.yml" "$CONFIG_DIR/config.yml" 2>/dev/null || true
+        curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/config.example.yml" -o "$CONFIG_FILE" \
+            || cp "$(dirname "$0")/config.example.yml" "$CONFIG_FILE" 2>/dev/null || true
     elif command -v wget >/dev/null 2>&1; then
-        wget -q -O "$CONFIG_DIR/config.yml" "https://raw.githubusercontent.com/${REPO}/main/config.example.yml" \
-            || cp "$(dirname "$0")/config.example.yml" "$CONFIG_DIR/config.yml" 2>/dev/null || true
+        wget -q -O "$CONFIG_FILE" "https://raw.githubusercontent.com/${REPO}/main/config.example.yml" \
+            || cp "$(dirname "$0")/config.example.yml" "$CONFIG_FILE" 2>/dev/null || true
     fi
 fi
 
-# --- System user -----------------------------------------------------------
-echo "[3/4] Creating system user and service..."
+# --- System user and service ------------------------------------------------
+echo "[3/4] Configuring system user and service..."
 if ! id pymon >/dev/null 2>&1; then
     useradd -r -s /bin/false -d "$INSTALL_DIR" pymon
 fi
 chown -R pymon:pymon "$INSTALL_DIR" "$CONFIG_DIR" "$DATA_DIR" "$LOG_DIR"
 
-# Stop any previously running instance (e.g. the old Python service) so the
-# newly installed Go binary actually takes over the port.
 systemctl stop $SERVICE_NAME 2>/dev/null || true
 
 cat > /etc/systemd/system/$SERVICE_NAME.service <<EOF
@@ -159,10 +180,10 @@ After=network.target
 [Service]
 User=pymon
 Group=pymon
-ExecStart=$INSTALL_DIR/pymon server --config $CONFIG_DIR/config.yml
+ExecStart=$INSTALL_DIR/pymon server --config $CONFIG_FILE
 Restart=always
 RestartSec=5
-Environment=CONFIG_PATH=$CONFIG_DIR/config.yml
+Environment=CONFIG_PATH=$CONFIG_FILE
 Environment=DATA_DIR=$DATA_DIR
 Environment=LOG_DIR=$LOG_DIR
 Environment=DB_PATH=$DATA_DIR/pymon.db
@@ -174,29 +195,28 @@ EOF
 systemctl daemon-reload
 systemctl enable $SERVICE_NAME
 
-# --- Admin password ---------------------------------------------------------
-# On a FIRST install (no admin user yet) we generate a password, set it and
-# print it right here. On a re-install we PRESERVE existing credentials
-# (unless PYMON_ADMIN_PASSWORD is set, which forces a reset).
-HAS_ADMIN="$(sudo -u pymon DB_PATH="$DATA_DIR/pymon.db" "$INSTALL_DIR/pymon" has-admin --config "$CONFIG_DIR/config.yml" 2>/dev/null || echo no)"
-
+# --- Admin password (fresh install only, unless PYMON_ADMIN_PASSWORD set) ---
 ADMIN_SET=0
-if [ "$HAS_ADMIN" != "yes" ] || [ -n "$PYMON_ADMIN_PASSWORD" ]; then
-    if [ -n "$PYMON_ADMIN_PASSWORD" ]; then
-        ADMIN_PW="$PYMON_ADMIN_PASSWORD"
-    else
-        ADMIN_PW="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 18)"
-        if [ -z "$ADMIN_PW" ]; then ADMIN_PW="PyMon$(date +%s)"; fi
+if [ "$IS_UPDATE" = "1" ] && [ -z "$PYMON_ADMIN_PASSWORD" ]; then
+    : # update: keep existing credentials
+else
+    HAS_ADMIN="$(sudo -u pymon DB_PATH="$DATA_DIR/pymon.db" "$INSTALL_DIR/pymon" has-admin --config "$CONFIG_FILE" 2>/dev/null || echo no)"
+    if [ "$HAS_ADMIN" != "yes" ] || [ -n "$PYMON_ADMIN_PASSWORD" ]; then
+        if [ -n "$PYMON_ADMIN_PASSWORD" ]; then
+            ADMIN_PW="$PYMON_ADMIN_PASSWORD"
+        else
+            ADMIN_PW="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 18)"
+            if [ -z "$ADMIN_PW" ]; then ADMIN_PW="PyMon$(date +%s)"; fi
+        fi
+        sudo -u pymon PYMON_ADMIN_PASSWORD="$ADMIN_PW" DB_PATH="$DATA_DIR/pymon.db" \
+            "$INSTALL_DIR/pymon" reset-admin --config "$CONFIG_FILE"
+        echo "$ADMIN_PW" > "$DATA_DIR/admin_password.txt"
+        chown pymon:pymon "$DATA_DIR/admin_password.txt"
+        chmod 600 "$DATA_DIR/admin_password.txt"
+        ADMIN_SET=1
     fi
-    sudo -u pymon PYMON_ADMIN_PASSWORD="$ADMIN_PW" DB_PATH="$DATA_DIR/pymon.db" \
-        "$INSTALL_DIR/pymon" reset-admin --config "$CONFIG_DIR/config.yml"
-    echo "$ADMIN_PW" > "$DATA_DIR/admin_password.txt"
-    chown pymon:pymon "$DATA_DIR/admin_password.txt"
-    chmod 600 "$DATA_DIR/admin_password.txt"
-    ADMIN_SET=1
 fi
 
-# restart (not start) so an already-running old instance is replaced.
 systemctl restart $SERVICE_NAME
 
 # --- Health check -----------------------------------------------------------
@@ -215,14 +235,21 @@ for i in $(seq 1 15); do
     fi
 done
 
-# --- Summary ---------------------------------------------------------------
+# --- Summary ----------------------------------------------------------------
 echo "[4/4] Done."
 echo ""
-echo "PyMon NOC installed successfully:"
-echo "  Binary:   $INSTALL_DIR/pymon"
-echo "  Config:   $CONFIG_DIR/config.yml"
-echo "  Database: $DATA_DIR/pymon.db"
-echo "  Service:  systemctl status $SERVICE_NAME"
+if [ "$IS_UPDATE" = "1" ]; then
+    echo "PyMon NOC updated successfully."
+    echo "  Version: ${OLD_VERSION:-?} -> ${NEW_VERSION}"
+    echo "  Config, database and users were preserved."
+    [ -f "$INSTALL_DIR/pymon.old" ] && echo "  Previous binary kept at: $INSTALL_DIR/pymon.old"
+else
+    echo "PyMon NOC installed successfully."
+    echo "  Version: ${NEW_VERSION}"
+    echo "  Config:   $CONFIG_FILE"
+    echo "  Database: $DATA_DIR/pymon.db"
+    echo "  Service:  systemctl status $SERVICE_NAME"
+fi
 echo ""
 echo "Dashboard: http://localhost:10000/"
 echo ""
@@ -235,10 +262,10 @@ if [ "$ADMIN_SET" = "1" ]; then
     echo "При вході дашборд попросить змінити пароль."
     echo "Пароль також збережено: $DATA_DIR/admin_password.txt (видаліть після входу)"
     echo "  sudo rm $DATA_DIR/admin_password.txt"
-else
-    echo "Інсталяцію виявлено повторно — існуючі облікові дані збережено."
+elif [ "$IS_UPDATE" = "1" ]; then
+    echo "Існуючі облікові дані збережено (пароль не змінювався)."
     echo "Якщо треба скинути пароль адміна:"
-    echo "  sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' $INSTALL_DIR/pymon reset-admin --config $CONFIG_DIR/config.yml"
+    echo "  sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' $INSTALL_DIR/pymon reset-admin --config $CONFIG_FILE"
     echo "  sudo systemctl restart $SERVICE_NAME"
     echo "  Логін: admin / YourStrongPass123"
 fi
