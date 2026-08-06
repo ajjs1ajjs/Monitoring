@@ -37,6 +37,8 @@ func main() {
 		runServer(os.Args[2:])
 	case "reset-admin":
 		runResetAdmin(os.Args[2:])
+	case "has-admin":
+		runHasAdmin(os.Args[2:])
 	default:
 		printUsage()
 	}
@@ -47,7 +49,39 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  pymon server [--host HOST] [--port PORT] [--config PATH]")
 	fmt.Println("  pymon reset-admin [--config PATH] [--db PATH]")
+	fmt.Println("  pymon has-admin [--config PATH] [--db PATH]")
 	fmt.Println("  pymon --version")
+}
+
+// runHasAdmin prints "yes"/"no" depending on whether the configured admin user
+// exists. Used by the installer to decide whether to set a fresh password.
+func runHasAdmin(args []string) {
+	cfgPath, dbPath := parseCommonFlags(args)
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		fmt.Println("no")
+		return
+	}
+	if dbPath == "" {
+		dbPath = resolveDBPath(cfg)
+	}
+	db, abs, err := storage.Open(dbPath)
+	if err != nil {
+		fmt.Println("no")
+		return
+	}
+	defer db.Close()
+	store := storage.NewStore(db, abs)
+	username := cfg.Auth.AdminUsername
+	if username == "" {
+		username = "admin"
+	}
+	u, err := store.GetUserByUsername(username)
+	if err == nil && u != nil {
+		fmt.Println("yes")
+		return
+	}
+	fmt.Println("no")
 }
 
 func parseServerFlags(args []string) (host string, port int, cfgPath, dbPath string) {

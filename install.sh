@@ -175,20 +175,26 @@ systemctl daemon-reload
 systemctl enable $SERVICE_NAME
 
 # --- Admin password ---------------------------------------------------------
-# Always set a KNOWN admin password on install (regardless of whether the DB
-# already exists from a previous install), so the user never has to hunt for it.
-if [ -n "$PYMON_ADMIN_PASSWORD" ]; then
-    ADMIN_PW="$PYMON_ADMIN_PASSWORD"
-else
-    ADMIN_PW="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 18)"
-    if [ -z "$ADMIN_PW" ]; then ADMIN_PW="PyMon$(date +%s)"; fi
+# On a FIRST install (no admin user yet) we generate a password, set it and
+# print it right here. On a re-install we PRESERVE existing credentials
+# (unless PYMON_ADMIN_PASSWORD is set, which forces a reset).
+HAS_ADMIN="$(sudo -u pymon DB_PATH="$DATA_DIR/pymon.db" "$INSTALL_DIR/pymon" has-admin --config "$CONFIG_DIR/config.yml" 2>/dev/null || echo no)"
+
+ADMIN_SET=0
+if [ "$HAS_ADMIN" != "yes" ] || [ -n "$PYMON_ADMIN_PASSWORD" ]; then
+    if [ -n "$PYMON_ADMIN_PASSWORD" ]; then
+        ADMIN_PW="$PYMON_ADMIN_PASSWORD"
+    else
+        ADMIN_PW="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 18)"
+        if [ -z "$ADMIN_PW" ]; then ADMIN_PW="PyMon$(date +%s)"; fi
+    fi
+    sudo -u pymon PYMON_ADMIN_PASSWORD="$ADMIN_PW" DB_PATH="$DATA_DIR/pymon.db" \
+        "$INSTALL_DIR/pymon" reset-admin --config "$CONFIG_DIR/config.yml"
+    echo "$ADMIN_PW" > "$DATA_DIR/admin_password.txt"
+    chown pymon:pymon "$DATA_DIR/admin_password.txt"
+    chmod 600 "$DATA_DIR/admin_password.txt"
+    ADMIN_SET=1
 fi
-echo "Setting admin password..."
-sudo -u pymon PYMON_ADMIN_PASSWORD="$ADMIN_PW" DB_PATH="$DATA_DIR/pymon.db" \
-    "$INSTALL_DIR/pymon" reset-admin --config "$CONFIG_DIR/config.yml"
-echo "$ADMIN_PW" > "$DATA_DIR/admin_password.txt"
-chown pymon:pymon "$DATA_DIR/admin_password.txt"
-chmod 600 "$DATA_DIR/admin_password.txt"
 
 # restart (not start) so an already-running old instance is replaced.
 systemctl restart $SERVICE_NAME
@@ -220,14 +226,21 @@ echo "  Service:  systemctl status $SERVICE_NAME"
 echo ""
 echo "Dashboard: http://localhost:10000/"
 echo ""
-echo "ADMIN LOGIN:"
-echo "  Username: admin"
-echo "  Password: $ADMIN_PW"
-echo "  (also saved to $DATA_DIR/admin_password.txt - delete it after login)"
-echo ""
-echo "On first login the dashboard will ask you to change the password."
-echo "To force a new password later, run:"
-echo "  sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' $INSTALL_DIR/pymon reset-admin --config $CONFIG_DIR/config.yml"
-echo "  sudo systemctl restart $SERVICE_NAME"
+if [ "$ADMIN_SET" = "1" ]; then
+    echo "===================================="
+    echo "  Логін:    admin"
+    echo "  Пароль:   $ADMIN_PW"
+    echo "===================================="
+    echo ""
+    echo "При вході дашборд попросить змінити пароль."
+    echo "Пароль також збережено: $DATA_DIR/admin_password.txt (видаліть після входу)"
+    echo "  sudo rm $DATA_DIR/admin_password.txt"
+else
+    echo "Інсталяцію виявлено повторно — існуючі облікові дані збережено."
+    echo "Якщо треба скинути пароль адміна:"
+    echo "  sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' $INSTALL_DIR/pymon reset-admin --config $CONFIG_DIR/config.yml"
+    echo "  sudo systemctl restart $SERVICE_NAME"
+    echo "  Логін: admin / YourStrongPass123"
+fi
 echo ""
 echo "Installed version: $("$INSTALL_DIR/pymon" --version)"
