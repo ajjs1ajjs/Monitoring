@@ -67,7 +67,26 @@ curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh
 
 - **Дашборд:** `http://<IP>:10000/dashboard/`
 - **Логін:** `admin`
-- **Пароль:** генерується випадково і **показується лише один раз** в логах інсталяції / службі.
+
+### 🗝️ Перший вхід (пароль адміна)
+
+На першому запуску сервер створює адміна і **випадковий пароль**, який зберігається один раз:
+
+```bash
+# Пароль у файлі поруч із БД (права 0600, лише root):
+sudo cat /var/lib/pymon/admin_password.txt   # (або шлях із вашого config.yml)
+sudo rm /var/lib/pymon/admin_password.txt    # видаліть після входу
+
+# Якщо на системі є journalctl:
+journalctl -u pymon | grep -i password
+```
+
+**Втратили пароль або хочете свій** — скиньте:
+```bash
+sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' /opt/pymon/pymon reset-admin --config /etc/pymon/config.yml
+sudo systemctl restart pymon
+# Логін: admin / YourStrongPass123
+```
 
 ### 2. Перевірка
 
