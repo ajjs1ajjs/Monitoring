@@ -7,6 +7,27 @@
 
 ---
 
+## [2.3.3] - 2026-08-06
+
+### 🧹 Best-practice hardening (закриття решти пунктів аудиту)
+
+#### Залежності / Supply-chain
+- **Піновано `telegraf`** у `docker-compose.yml` → `telegraf:1.39.2` (замість `latest`).
+- **`requirements.txt` піновано** до точних версій з `uv.lock` (fastapi==0.136.1, uvicorn==0.46.0, pydantic==2.13.3, httpx==0.28.1, psutil==7.2.2 тощо).
+- **Прибрано невикористовувану залежність `pydantic-settings`** (з pyproject.toml та requirements).
+
+#### Надійність
+- **Офіційний Prometheus-парсер.** Ручний розбір рядків у `_parse_metrics` замінено на `prometheus_client.parser` — коректно обробляє label-значення з комами, екрануванням, timestamp та family histogram/summary.
+- **Видалено мертвий код у `PrometheusMetricsExporter`** (`record_histogram`, `record_gauge`, `_gauge_samples`, `labels_key` тощо) — `/metrics` тепер будується з registry, без dead paths.
+- **Cardinality-ліміти в `MetricsRegistry`** (`MAX_METRICS=5000`, `MAX_SERIES_PER_METRIC=20000`) — захист від необмеженого росту пам'яті через push-клієнтів із унікальними label-ами (помилка замість тихого росту).
+- **`registry.get_metric` під `RLock`** — усунено data race.
+- **Видалено мертві `pymon/processors/*` та `services/metric_processor.py`** (не використовувалися в пайплайні).
+
+#### Якість
+- `ruff`/`mypy` без помилок; 64 тести проходять.
+
+---
+
 ## [2.3.2] - 2026-08-06
 
 ### 🔒 Безпека

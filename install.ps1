@@ -70,7 +70,7 @@ Examples:
     exit 0
 }
 
-$VERSION = "2.3.2"
+$VERSION = "2.3.3"
 $GREEN = ""
 $RED = ""
 $YELLOW = ""

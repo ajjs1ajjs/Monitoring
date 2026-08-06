@@ -9,7 +9,7 @@
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
-[![Version](https://img.shields.io/badge/Version-2.3.2-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.3.3-orange.svg)](CHANGELOG.md)
 ![Status](https://img.shields.io/badge/Status-Production_Ready-success)
 
 </div>
