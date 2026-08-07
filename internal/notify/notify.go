@@ -86,7 +86,7 @@ func (s *Service) Dispatch(title, message string) {
 
 func (s *Service) dispatch(title, message string, channels map[string]map[string]any) {
 	if c, ok := channels["telegram"]; ok {
-		_ = s.sendTelegram(fmt.Sprintf("<b>🚨 ALERT: %s</b>\n\n%s", title, message), getStr(c, "bot_token"), getStr(c, "chat_id"))
+		_ = s.sendTelegram(buildTelegramAlert(title, message), getStr(c, "bot_token"), getStr(c, "chat_id"))
 	}
 	if c, ok := channels["discord"]; ok {
 		_ = s.sendDiscord(message, getStr(c, "webhook_url"))
@@ -98,8 +98,13 @@ func (s *Service) dispatch(title, message string, channels map[string]map[string
 		_ = s.sendTeams(message, getStr(c, "webhook_url"))
 	}
 	if c, ok := channels["email"]; ok {
-		_ = s.sendEmail(message, fmt.Sprintf("PyMon Alert: %s", title), c)
+		_ = s.sendEmail(htmlEscape(title)+"\n\n"+htmlEscape(message), fmt.Sprintf("PyMon Alert: %s", title), c)
 	}
+}
+
+func htmlEscape(v string) string {
+	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+	return r.Replace(v)
 }
 
 // Test sends a test message over all configured channels; returns success/failed.
@@ -108,7 +113,7 @@ func (s *Service) Test(cfg map[string]any) (success, failed []string) {
 	msg := "✅ Test notification from PyMon"
 	res := map[string]bool{}
 	if c, ok := channels["telegram"]; ok {
-		res["telegram"] = s.sendTelegram(fmt.Sprintf("<b>🚨 TEST ALERT</b>\n\n%s", msg), getStr(c, "bot_token"), getStr(c, "chat_id"))
+		res["telegram"] = s.sendTelegram(buildTelegramAlert("🧪 Test Alert", msg), getStr(c, "bot_token"), getStr(c, "chat_id"))
 	}
 	if c, ok := channels["discord"]; ok {
 		res["discord"] = s.sendDiscord(msg, getStr(c, "webhook_url"))
@@ -154,6 +159,16 @@ func (s *Service) sendTelegram(message, botToken, chatID string) bool {
 	return s.postJSON(fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken), map[string]any{
 		"chat_id": chatID, "text": message, "parse_mode": "HTML",
 	})
+}
+
+// buildTelegramAlert renders a readable HTML alert and escapes user-supplied
+// text so special characters can't break Telegram's HTML markup.
+func buildTelegramAlert(title, message string) string {
+	esc := func(v string) string {
+		r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;")
+		return r.Replace(v)
+	}
+	return "<b>🚨 " + esc(title) + "</b>\n\n" + esc(message)
 }
 
 func (s *Service) sendDiscord(message, webhookURL string) bool {
@@ -225,6 +240,8 @@ func (s *Service) sendEmail(message, subject string, cfg map[string]any) bool {
 		return false
 	}
 	defer conn.Close()
+	// bound the whole SMTP conversation, not just the dial
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	client, err := smtp.NewClient(conn, server)
 	if err != nil {
@@ -233,13 +250,15 @@ func (s *Service) sendEmail(message, subject string, cfg map[string]any) bool {
 	defer client.Close()
 
 	if !useTLS {
-		if err := client.StartTLS(&tls.Config{ServerName: server}); err != nil {
-			log.Printf("notify email starttls: %v", err)
-			return false
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err := client.StartTLS(&tls.Config{ServerName: server}); err != nil {
+				log.Printf("notify email starttls: %v", err)
+				return false
+			}
 		}
 	}
 	if pass != "" {
-		if err := client.Auth(smtp.PlainAuth("", user, pass, server)); err != nil {
+		if err := authSMTP(client, server, user, pass); err != nil {
 			log.Printf("notify email auth: %v", err)
 			return false
 		}
@@ -270,6 +289,42 @@ func buildMIME(from, to, subject, body string) string {
 	b.WriteString("\r\n")
 	b.WriteString(body)
 	return b.String()
+}
+
+// authSMTP picks an AUTH mechanism the server actually advertises. Exchange
+// often only supports LOGIN/NTLM, so PLAIN (the only one Go's smtp.PlainAuth
+// can do) would time out. Prefer PLAIN when available, otherwise fall back to
+// LOGIN.
+func authSMTP(c *smtp.Client, server, user, pass string) error {
+	if ok, mechs := c.Extension("AUTH"); ok {
+		if strings.Contains(strings.ToUpper(mechs), "LOGIN") {
+			return c.Auth(&loginAuth{user: user, password: pass})
+		}
+	}
+	return c.Auth(smtp.PlainAuth("", user, pass, server))
+}
+
+// loginAuth implements SMTP AUTH LOGIN (base64 user/password exchange).
+type loginAuth struct {
+	user, password string
+}
+
+func (a *loginAuth) Start(_ *smtp.ServerInfo) (string, []byte, error) {
+	return "LOGIN", nil, nil
+}
+
+func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if !more {
+		return nil, nil
+	}
+	switch strings.ToLower(strings.TrimSpace(string(fromServer))) {
+	case "username:":
+		return []byte(a.user), nil
+	case "password:":
+		return []byte(a.password), nil
+	default:
+		return nil, fmt.Errorf("unexpected server challenge: %q", string(fromServer))
+	}
 }
 
 // --- config dict helpers ---
