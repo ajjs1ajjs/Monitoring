@@ -142,7 +142,13 @@ func (m *Manager) checkOne(s *storage.Service) {
 
 	// transition alerts
 	last := s.Status
-	if status == "down" && (last == "up" || last == "degraded") {
+	transitioned := (status == "down" && (last == "up" || last == "degraded")) ||
+		(status == "degraded" && last == "up" && s.CheckType == "ssl") ||
+		(status == "up" && (last == "down" || last == "degraded"))
+	if transitioned && m.shouldSuppressTransition(fmt.Sprintf("%d", s.ID), s.Name, status) {
+		// flapping detected — the suppressor emits one combined notice and
+		// suppresses the per-transition spam.
+	} else if status == "down" && (last == "up" || last == "degraded") {
 		m.fireAlert(fmt.Sprintf("🔥 Service Down: %s", s.Name),
 			fmt.Sprintf("Service %s (%s) is down. Type: %s", s.Name, s.TargetURL, s.CheckType))
 	} else if status == "degraded" && last == "up" && s.CheckType == "ssl" {
@@ -258,4 +264,48 @@ func execPing(args []string) (bool, error) {
 		return false, nil // non-zero exit = ping failed
 	}
 	return true, nil
+}
+
+// flapInfo tracks recent status transitions for one service.
+type flapInfo struct {
+	transitions []time.Time
+	lastStatus  string
+	flapping    bool
+}
+
+// shouldSuppressTransition detects flapping services (>= 5 transitions within
+// 10 minutes) and suppresses per-transition alerts. A single combined notice is
+// emitted the first time flapping is detected, then suppression kicks in until
+// the service stabilizes.
+func (m *Manager) shouldSuppressTransition(svcKey, name, status string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	info, ok := m.serviceFlap[svcKey]
+	if !ok {
+		info = &flapInfo{}
+		m.serviceFlap[svcKey] = info
+	}
+	now := time.Now()
+	cut := now.Add(-10 * time.Minute)
+	kept := info.transitions[:0]
+	for _, t := range info.transitions {
+		if t.After(cut) {
+			kept = append(kept, t)
+		}
+	}
+	info.transitions = kept
+	if info.lastStatus != status {
+		info.transitions = append(info.transitions, now)
+		info.lastStatus = status
+	}
+	if len(info.transitions) >= 5 {
+		if !info.flapping {
+			info.flapping = true
+			m.fireAlert(fmt.Sprintf("🔄 Service Flapping: %s", name),
+				fmt.Sprintf("Service %s is flapping (frequent state changes); alerts are being suppressed.", name))
+		}
+		return true
+	}
+	info.flapping = false
+	return false
 }

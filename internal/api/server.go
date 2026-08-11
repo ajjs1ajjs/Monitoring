@@ -45,16 +45,20 @@ func (a *App) Handler() http.Handler {
 	// Unauthenticated
 	mux.HandleFunc("GET /api/v1/health", a.handleHealth)
 	mux.HandleFunc("POST /api/v1/auth/login", a.withRecovery(a.withRateLimit(a.handleLogin)))
+	mux.HandleFunc("POST /api/v1/auth/logout", a.withRecovery(a.handleLogout))
 	mux.HandleFunc("GET /api/v1/ws/metrics", a.handleWS)
 	mux.HandleFunc("GET /metrics", a.handlePrometheusExport)
 
 	// Authenticated API
 	authed := func(h http.HandlerFunc) http.HandlerFunc { return a.withRecovery(a.withAuth(h)) }
 	admin := func(h http.HandlerFunc) http.HandlerFunc { return a.withRecovery(a.withAuth(a.withAdmin(h))) }
+	authedLimited := func(h http.HandlerFunc) http.HandlerFunc {
+		return a.withRecovery(a.withAuth(a.withAuthActionRateLimit(h)))
+	}
 
 	mux.Handle("GET /api/v1/auth/me", authed(a.handleMe))
-	mux.Handle("POST /api/v1/auth/change-password", authed(a.handleChangePassword))
-	mux.Handle("POST /api/v1/auth/api-keys", authed(a.handleCreateAPIKey))
+	mux.Handle("POST /api/v1/auth/change-password", authedLimited(a.handleChangePassword))
+	mux.Handle("POST /api/v1/auth/api-keys", authedLimited(a.handleCreateAPIKey))
 	mux.Handle("GET /api/v1/auth/api-keys", authed(a.handleListAPIKeys))
 	mux.Handle("DELETE /api/v1/auth/api-keys/{key_id}", authed(a.handleDeleteAPIKey))
 

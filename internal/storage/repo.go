@@ -12,6 +12,7 @@ import (
 type Store struct {
 	StoreCore
 	maxBackups int
+	secretKey  []byte
 }
 
 func NewStore(db *sql.DB, path string) *Store {
@@ -755,14 +756,26 @@ func (st *Store) GetNotifications() (*Notification, error) {
 		return nil, err
 	}
 	n.Enabled = int(enabled.Int64)
-	n.Config = config.String
+	if config.Valid && config.String != "" {
+		dec, err := st.decryptText(config.String)
+		if err != nil {
+			return nil, err
+		}
+		n.Config = dec
+	} else {
+		n.Config = ""
+	}
 	return &n, nil
 }
 
 func (st *Store) SaveNotifications(config string, enabled int) error {
-	_, err := st.DB.Exec(`INSERT INTO notifications (channel, enabled, config) VALUES ('all',?,?)
+	enc, err := st.encryptText(config)
+	if err != nil {
+		return err
+	}
+	_, err = st.DB.Exec(`INSERT INTO notifications (channel, enabled, config) VALUES ('all',?,?)
 	  ON CONFLICT(channel) DO UPDATE SET enabled=excluded.enabled, config=excluded.config`,
-		enabled, config)
+		enabled, enc)
 	return err
 }
 

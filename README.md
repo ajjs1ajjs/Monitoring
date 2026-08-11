@@ -194,6 +194,7 @@ curl http://localhost:10000/api/v1/health
 | `DB_PATH` | Шлях до бази (перекриває конфіг). | з `config.yml` |
 | `DATA_DIR` / `LOG_DIR` | Директорії даних і логів. | `.` |
 | `PYMON_ALLOW_METADATA` | Дозволити скрейп cloud-метаданих (`169.254.169.254`). | `false` |
+| `PYMON_ALLOWED_ORIGINS` | Cross-origin allowlist для API та WebSocket (CSWSH-захист), через кому. Порожньо = same-origin. | порожньо |
 
 Повний приклад — [`.env.example`](.env.example).
 

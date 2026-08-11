@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -74,7 +75,10 @@ func (st *Store) ListBackups(dir string) ([]map[string]any, error) {
 }
 
 // RestoreFrom replaces the live DB file with a backup. Must be called when no
-// concurrent queries are in flight (handlers serialize via mu).
+// concurrent queries are in flight (handlers serialize via mu). The backup is
+// streamed to a temp file and atomically renamed into place, so the old DB
+// survives if the copy fails, and multi-GB backups don't need to be loaded
+// into memory.
 func (st *Store) RestoreFrom(dir, filename string) error {
 	if strings.Contains(filename, "..") || strings.ContainsAny(filename, `/\`) {
 		return fmt.Errorf("invalid backup filename")
@@ -83,25 +87,60 @@ func (st *Store) RestoreFrom(dir, filename string) error {
 		return fmt.Errorf("invalid backup filename")
 	}
 	src := filepath.Join(dir, filename)
-	if _, err := os.Stat(src); err != nil {
+	in, err := os.Open(src)
+	if err != nil {
 		return fmt.Errorf("backup not found: %w", err)
 	}
-	st.mu.Lock()
-	defer st.mu.Unlock()
-	if err := st.DB.Close(); err != nil {
+	defer in.Close()
+
+	// Validate the SQLite magic header without loading the whole file.
+	var magic [16]byte
+	if _, err := io.ReadFull(in, magic[:]); err != nil {
+		return fmt.Errorf("invalid backup: %w", err)
+	}
+	if string(magic[:]) != "SQLite format 3\x00" {
+		return fmt.Errorf("not a valid SQLite database")
+	}
+	// Rewind so the copy includes the header bytes we just read.
+	if _, err := in.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	b, err := os.ReadFile(src)
+
+	st.mu.Lock()
+	defer st.mu.Unlock()
+
+	// Copy to a temp file, then swap it into place.
+	tmp := st.DBPath + ".restore.tmp"
+	tf, err := os.Create(tmp)
 	if err != nil {
 		return err
 	}
-	// Ensure the backup is a valid SQLite DB before replacing.
-	if len(b) < 16 || string(b[0:16]) != "SQLite format 3\x00" {
-		return fmt.Errorf("not a valid SQLite database")
-	}
-	if err := os.WriteFile(st.DBPath, b, 0o644); err != nil {
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.Remove(tmp)
+		}
+	}()
+	if _, err := io.Copy(tf, in); err != nil {
+		_ = tf.Close()
 		return err
 	}
+	if err := tf.Sync(); err != nil {
+		_ = tf.Close()
+		return err
+	}
+	if err := tf.Close(); err != nil {
+		return err
+	}
+
+	if err := st.DB.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, st.DBPath); err != nil {
+		return err
+	}
+	committed = true
+
 	newDB, abs, err := Open(st.DBPath)
 	if err != nil {
 		return fmt.Errorf("reopen after restore: %w", err)

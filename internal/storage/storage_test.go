@@ -107,4 +107,45 @@ func TestUptimeTimeline(t *testing.T) {
 	}
 }
 
+// TestNotificationSecretsEncryptedAtRest ensures notification secrets are
+// stored encrypted and round-trip back to plaintext.
+func TestNotificationSecretsEncryptedAtRest(t *testing.T) {
+	st := newTestStore(t)
+
+	// Without a key, values are stored as-is (provisioning/tests).
+	cfg := `{"enabled":true,"smtp_pass":"s3cret","telegram_bot_token":"tok"}`
+	if err := st.SaveNotifications(cfg, 1); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	got, _ := st.GetNotifications()
+	if got.Config != cfg {
+		t.Fatalf("unencrypted round-trip mismatch: %q", got.Config)
+	}
+
+	// With a key, the stored value must be encrypted (enc: prefix) and reads
+	// return the plaintext.
+	st.SetEncryptionKey([]byte("some-stable-jwt-secret-for-testing-123456"))
+	if err := st.SaveNotifications(cfg, 1); err != nil {
+		t.Fatalf("save encrypted: %v", err)
+	}
+	var raw string
+	_ = st.DB.QueryRow(`SELECT config FROM notifications WHERE channel='all'`).Scan(&raw)
+	if len(raw) < 4 || raw[:4] != "enc:" {
+		t.Fatalf("expected encrypted storage, got %q", raw)
+	}
+	got, err := st.GetNotifications()
+	if err != nil {
+		t.Fatalf("get encrypted: %v", err)
+	}
+	if got.Config != cfg {
+		t.Fatalf("encrypted round-trip mismatch: %q", got.Config)
+	}
+
+	// A different key (rotated JWT secret) must fail loudly, not silently.
+	st.SetEncryptionKey([]byte("a-different-secret-that-rotated-1234567"))
+	if _, err := st.GetNotifications(); err == nil {
+		t.Fatalf("expected decryption failure after key rotation")
+	}
+}
+
 func ptr(f float64) *float64 { return &f }

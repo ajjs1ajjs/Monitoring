@@ -2,9 +2,10 @@ package api
 
 import (
 	"encoding/json"
-	"log"
 	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -49,42 +50,83 @@ func (m *WSManager) Broadcast(event map[string]any) {
 	}
 }
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
+// wsUpgrader returns an upgrader whose CheckOrigin rejects cross-site WebSocket
+// connections (CSWSH). Same-origin requests and explicitly configured allowed
+// origins pass; everything else is refused. Non-browser clients that send no
+// Origin header are accepted (the WS still requires a valid JWT in-band).
+func (a *App) wsUpgrader() websocket.Upgrader {
+	return websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin:     a.checkOrigin,
+	}
+}
+
+func (a *App) checkOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true // non-browser client without an Origin header
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	// Same-origin: the Origin host matches the request Host.
+	if u.Host == r.Host {
+		return true
+	}
+	// Configured cross-origin allowlist (PYMON_ALLOWED_ORIGINS).
+	for _, o := range a.Cfg.Server.AllowedOrigins {
+		if strings.TrimRight(o, "/") == strings.TrimRight(origin, "/") {
+			return true
+		}
+	}
+	return false
 }
 
 // handleWS implements the /api/v1/ws/metrics protocol:
 // client must send {"type":"auth","token":<JWT>} within 15s or gets closed 1008.
+// The SPA is authenticated via its HttpOnly session cookie (no token in JS),
+// so a valid cookie on the upgrade request skips the in-band token.
 func (a *App) handleWS(w http.ResponseWriter, r *http.Request) {
+	upgrader := a.wsUpgrader()
+	// Cookie session (browser SPA).
+	sessionOK := false
+	if c, err := r.Cookie(authCookieName); err == nil && c.Value != "" {
+		if _, err := a.Auth.ParseToken(c.Value); err == nil {
+			sessionOK = true
+		}
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
 
-	// 15s auth window
-	_ = conn.SetReadDeadline(time.Now().Add(15 * time.Second))
-	_, msg, err := conn.ReadMessage()
-	if err != nil {
-		_ = conn.WriteControl(websocket.CloseMessage,
-			websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "auth timeout"), time.Now().Add(time.Second))
-		return
-	}
-	var hello struct {
-		Type  string `json:"type"`
-		Token string `json:"token"`
-	}
-	if json.Unmarshal(msg, &hello) != nil || hello.Type != "auth" || hello.Token == "" {
-		_ = conn.WriteControl(websocket.CloseMessage,
-			websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "invalid auth"), time.Now().Add(time.Second))
-		return
-	}
-	if _, err := a.Auth.ParseToken(hello.Token); err != nil {
-		_ = conn.WriteControl(websocket.CloseMessage,
-			websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "invalid token"), time.Now().Add(time.Second))
-		return
+	if !sessionOK {
+		// 15s auth window
+		_ = conn.SetReadDeadline(time.Now().Add(15 * time.Second))
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			_ = conn.WriteControl(websocket.CloseMessage,
+				websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "auth timeout"), time.Now().Add(time.Second))
+			return
+		}
+		var hello struct {
+			Type  string `json:"type"`
+			Token string `json:"token"`
+		}
+		if json.Unmarshal(msg, &hello) != nil || hello.Type != "auth" || hello.Token == "" {
+			_ = conn.WriteControl(websocket.CloseMessage,
+				websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "invalid auth"), time.Now().Add(time.Second))
+			return
+		}
+		if _, err := a.Auth.ParseToken(hello.Token); err != nil {
+			_ = conn.WriteControl(websocket.CloseMessage,
+				websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "invalid token"), time.Now().Add(time.Second))
+			return
+		}
 	}
 
 	a.WS.add(conn)
@@ -107,5 +149,3 @@ func (a *App) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
-var _ = log.Printf

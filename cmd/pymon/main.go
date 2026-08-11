@@ -134,6 +134,9 @@ func runServer(args []string) {
 	if err != nil {
 		log.Fatalf("auth init: %v", err)
 	}
+	// Encrypt notification secrets at rest with a key derived from the JWT
+	// secret (stable across restarts).
+	store.SetEncryptionKey(authn.Secret)
 
 	ensureAdmin(store, cfg, filepath.Dir(abs))
 

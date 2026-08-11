@@ -2,14 +2,8 @@
 if (window.lucide) lucide.createIcons();
 
 // State Management
-let token = '';
-try {
-    token = localStorage.getItem('token') || '';
-} catch (e) {
-    console.warn('localStorage недоступний:', e);
-}
-if (!token) window.location.href = '/login';
-
+// The session lives in an HttpOnly cookie set by the server; the token is
+// never stored in localStorage, so a stored-XSS payload cannot steal it.
 let currentRange = '1h';
 let nodes = [];
 let currentView = 'list';
@@ -206,19 +200,19 @@ const refreshBtn = document.getElementById('refreshBtn');
 if (refreshBtn) refreshBtn.addEventListener('click', refreshData);
 
 const logoutBtn = document.getElementById('logoutBtn');
-if (logoutBtn) logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('token');
+if (logoutBtn) logoutBtn.addEventListener('click', async () => {
+    try { await fetch('/api/v1/auth/logout', { method: 'POST' }); } catch (e) {}
     window.location.href = '/login';
 });
 
 // Auth Helper
 async function apiFetch(url, options = {}) {
+    // Same-origin fetch: the HttpOnly session cookie authenticates the request.
     options.headers = options.headers || {};
-    options.headers['Authorization'] = 'Bearer ' + token;
+    options.credentials = 'same-origin';
     try {
         const resp = await fetch(url, options);
         if (resp.status === 401) {
-            localStorage.removeItem('token');
             window.location.href = '/login';
             return null;
         }
@@ -1516,7 +1510,9 @@ function connectWebSocket() {
     
     ws.onopen = () => {
         console.log('WebSocket connected');
-        ws.send(JSON.stringify({ type: 'auth', token: token }));
+        // Session cookie authenticates the upgrade; the auth frame is kept for
+        // protocol compatibility with programmatic clients.
+        ws.send(JSON.stringify({ type: 'auth' }));
         const timerEl = document.getElementById('updateTimer');
         if (timerEl) timerEl.textContent = 'Live';
     };

@@ -36,7 +36,8 @@ type Manager struct {
 	mu           sync.Mutex
 	ruleState    map[[2]string]*ruleEpisode
 	lastCleanup  time.Time
-	vacuumedDate string
+	lastVacuum   time.Time
+	serviceFlap  map[string]*flapInfo
 	lastBackup   time.Time
 }
 
@@ -48,8 +49,10 @@ type ruleEpisode struct {
 func New(cfg *config.Config, store *storage.Store, ws Broadcaster, alerts AlertSink) *Manager {
 	return &Manager{
 		Cfg: cfg, Store: store, WS: ws, Alerts: alerts,
-		client:    &http.Client{Timeout: 10 * time.Second},
-		ruleState: map[[2]string]*ruleEpisode{},
+		client:      &http.Client{Timeout: 10 * time.Second},
+		ruleState:   map[[2]string]*ruleEpisode{},
+		serviceFlap: map[string]*flapInfo{},
+		lastVacuum:  time.Now(),
 	}
 }
 
@@ -103,10 +106,11 @@ func (m *Manager) cleanup() {
 	if err := m.Store.Cleanup(retention); err != nil {
 		log.Printf("cleanup error: %v", err)
 	}
-	today := time.Now().Format("2006-01-02")
-	if today != m.vacuumedDate && time.Now().Hour() == 3 {
+	// Vacuum weekly regardless of wall-clock hour, so servers that are off at
+	// 3 AM still get their DB compacted (previously VACUUM never ran for them).
+	if time.Since(m.lastVacuum) >= 7*24*time.Hour {
 		m.Store.Vacuum()
-		m.vacuumedDate = today
+		m.lastVacuum = time.Now()
 	}
 }
 
@@ -308,16 +312,16 @@ func (m *Manager) evaluateRules(serverName string, cpu, memory, disk float64) {
 		}
 
 		key := [2]string{serverName, rule.Name}
+
+		// Read-check-modify the episode state under the lock to avoid the race
+		// where two concurrent scrapes both see alerted=false and fire twice.
 		m.mu.Lock()
 		ep, ok := m.ruleState[key]
 		if !ok {
 			ep = &ruleEpisode{}
 			m.ruleState[key] = ep
 		}
-		m.mu.Unlock()
-
 		if !fired {
-			m.mu.Lock()
 			delete(m.ruleState, key)
 			m.mu.Unlock()
 			continue
@@ -325,21 +329,24 @@ func (m *Manager) evaluateRules(serverName string, cpu, memory, disk float64) {
 		if ep.started.IsZero() {
 			ep.started = now
 		}
-		if ep.alerted {
-			continue
-		}
 		duration := parseRuleDuration(rule.Duration)
-		if now.Sub(ep.started) >= duration {
-			msg := rule.Message
-			if msg == "" {
-				msg = fmt.Sprintf("%s: %.1f%% (threshold: %.1f%%)", rule.Name, val, rule.Threshold)
-			}
-			msg = strings.ReplaceAll(msg, "{{ value }}", fmt.Sprintf("%.1f", val))
-			msg = strings.ReplaceAll(msg, "{{ server }}", serverName)
-			sev := strings.ToUpper(rule.Severity)
-			m.fireAlert(fmt.Sprintf("%s: %s on %s", sev, rule.Name, serverName), msg)
+		shouldFire := !ep.alerted && now.Sub(ep.started) >= duration
+		if shouldFire {
 			ep.alerted = true
 		}
+		m.mu.Unlock()
+
+		if !shouldFire {
+			continue
+		}
+		msg := rule.Message
+		if msg == "" {
+			msg = fmt.Sprintf("%s: %.1f%% (threshold: %.1f%%)", rule.Name, val, rule.Threshold)
+		}
+		msg = strings.ReplaceAll(msg, "{{ value }}", fmt.Sprintf("%.1f", val))
+		msg = strings.ReplaceAll(msg, "{{ server }}", serverName)
+		sev := strings.ToUpper(rule.Severity)
+		m.fireAlert(fmt.Sprintf("%s: %s on %s", sev, rule.Name, serverName), msg)
 	}
 }
 

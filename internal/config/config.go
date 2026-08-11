@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -12,6 +13,10 @@ type Server struct {
 	Host   string `yaml:"host"`
 	Port   int    `yaml:"port"`
 	Domain string `yaml:"domain"`
+	// AllowedOrigins restricts cross-origin access to the API and WebSocket
+	// (CSWSH protection). Empty = same-origin only. Populated from the
+	// PYMON_ALLOWED_ORIGINS env var (comma-separated) or the YAML list.
+	AllowedOrigins []string `yaml:"allowed_origins"`
 }
 
 type Storage struct {
@@ -116,17 +121,6 @@ func Default() *Config {
 	}
 }
 
-func (c *Config) ScrapeIntervalSeconds() int {
-	for _, sc := range c.ScrapeConfigs {
-		if sec := parseDurationSeconds(sc.ScrapeInterval); sec > 0 {
-			return sec
-		}
-	}
-	return 15
-}
-
-func (c *Config) AdminEnabled() bool { return true }
-
 // Load reads a YAML/JSON config from path. If path is empty, tries CONFIG_PATH
 // env then ./config.yml. Returns default config when nothing found.
 func Load(path string) (*Config, error) {
@@ -152,18 +146,38 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parse config %s: %w", path, err)
 	}
+	// Environment override for the cross-origin allowlist.
+	if env := strings.TrimSpace(os.Getenv("PYMON_ALLOWED_ORIGINS")); env != "" {
+		cfg.Server.AllowedOrigins = nil
+		for _, o := range strings.Split(env, ",") {
+			if o = strings.TrimSpace(o); o != "" {
+				cfg.Server.AllowedOrigins = append(cfg.Server.AllowedOrigins, o)
+			}
+		}
+	}
 	return cfg, nil
 }
+
+func (c *Config) ScrapeIntervalSeconds() int {
+	for _, sc := range c.ScrapeConfigs {
+		if sec := parseDurationSeconds(sc.ScrapeInterval); sec > 0 {
+			return sec
+		}
+	}
+	return 15
+}
+
+func (c *Config) AdminEnabled() bool { return true }
 
 func parseDurationSeconds(s string) int {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return 0
 	}
-	mult := 1
+	mult := 1.0
 	switch {
 	case strings.HasSuffix(s, "ms"):
-		mult = 0
+		mult = 0.001
 		s = strings.TrimSuffix(s, "ms")
 	case strings.HasSuffix(s, "s"):
 		mult = 1
@@ -175,14 +189,21 @@ func parseDurationSeconds(s string) int {
 		mult = 3600
 		s = strings.TrimSuffix(s, "h")
 	}
-	var n int
-	if _, err := fmt.Sscanf(s, "%d", &n); err != nil {
+	s = strings.TrimSpace(s)
+	if s == "" {
 		return 0
 	}
-	if mult == 0 {
-		return n / 1000
+	// ParseFloat rejects any trailing garbage (e.g. "5xyzs"), so malformed
+	// values are never silently accepted.
+	n, err := strconv.ParseFloat(s, 64)
+	if err != nil || n <= 0 {
+		return 0
 	}
-	return n * mult
+	sec := int(n * mult)
+	if sec < 1 {
+		return 0
+	}
+	return sec
 }
 
 func ParseDuration(s string) (int, error) {

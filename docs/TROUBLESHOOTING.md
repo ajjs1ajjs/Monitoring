@@ -12,7 +12,7 @@ sudo journalctl -u pymon -n 50 --no-pager
 # Windows
 # Перевірити Task Scheduler → PyMon
 # Або запустити вручну:
-python -m pymon.cli server
+pymon server
 ```
 
 ### Помилка: `Port 10000 already in use`
@@ -43,18 +43,7 @@ sudo systemctl restart pymon
 
 ### Помилка: `no such table`
 
-```bash
-# Ініціалізувати таблиці
-python -c "
-from pymon.auth import init_auth_tables
-from pymon.storage import init_storage
-from pymon.database import init_database
-init_storage()
-init_auth_tables()
-init_database()
-print('Tables created')
-"
-```
+Таблиці створюються автоматично при першому запуску сервера. Якщо БД пошкоджена — відновіть з резервної копії через API (`POST /api/v1/backup/restore`) або перейменуйте файл БД і перезапустіть.
 
 ---
 
@@ -63,21 +52,24 @@ print('Tables created')
 ### Не можу увійти
 
 ```bash
-# Пароль показується лише раз при першому запуску і НЕ зберігається у відкритому
-# вигляді. Якщо забули — згенерувати новий випадковий (буде показано один раз):
-python -m pymon.cli reset-admin
+# Пароль показується лише раз при першому запуску і автоматично видаляється
+# після першого успішного входу (admin_password.txt). Якщо забули — скинути:
+pymon reset-admin --config /etc/pymon/config.yml
 
 # ...або задати конкретний пароль:
-PYMON_ADMIN_PASSWORD='NewStrongPass123' python -m pymon.cli reset-admin
+sudo PYMON_ADMIN_PASSWORD='NewStrongPass123' pymon reset-admin --config /etc/pymon/config.yml
 ```
 
 ### JWT помилка: `Invalid signature`
 
 ```bash
 # JWT_SECRET змінився — потрібно залогінитись заново
-# Встановити стабільний JWT_SECRET в .env:
-echo "JWT_SECRET=your-secure-key-here" > .env
+# Встановити стабільний JWT_SECRET через env (файл .pymon_jwt_secret біля БД):
+export JWT_SECRET="your-long-random-secret-here"
 ```
+
+> ⚠️ Зміна `JWT_SECRET` також інвалідує розшифрування секретів нотифікацій,
+> зашифрованих цим ключем (secret rotation вимагає повторного збереження налаштувань).
 
 ---
 
@@ -100,7 +92,10 @@ curl http://IP_СЕРВЕРА:9182/metrics  # Windows (windows_exporter)
 
 ```bash
 # Переконатись що файл існує та має правильний формат
-python -c "import yaml; yaml.safe_load(open('prometheus.yml')); print('OK')"
+curl -X POST http://localhost:10000/api/v1/settings/config/import-prometheus \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"yaml_content": "<вміст prometheus.yml>"}'
 ```
 
 ---
@@ -112,7 +107,7 @@ python -c "import yaml; yaml.safe_load(open('prometheus.yml')); print('OK')"
 ```bash
 docker compose logs pymon
 # Переконатись що JWT_SECRET заданий:
-docker compose run -e JWT_SECRET=test pymon python -c "import os; print(os.getenv('JWT_SECRET'))"
+docker compose run -e JWT_SECRET=test pymon pymon --version
 ```
 
 ---
@@ -141,14 +136,14 @@ sudo ufw allow 10000/tcp
 # Перевірити налаштування в розділі Settings → Notifications
 # Переконатись що токени/вебхуки правильні
 # Перевірити формат: webhook має починатись з https://
+# Секрети зберігаються зашифрованими у БД — після зміни JWT_SECRET перезбережіть їх
 ```
 
 ### Оновлення не застосовується
 
 ```bash
-# Після git pull — оновити залежності
-pip install -r requirements.txt -U
-
-# Очистити кеш
-find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null
+# Після git pull — перезібрати бінарник
+go build -o pymon ./cmd/pymon
+# та перезапустити службу
+sudo systemctl restart pymon
 ```

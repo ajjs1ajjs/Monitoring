@@ -2,8 +2,6 @@
 // drop 'unsafe-inline' from script-src.
 (function () {
     'use strict';
-    // Clear old tokens on login page load to prevent 401 loops
-    localStorage.removeItem('token');
 
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -14,6 +12,7 @@
             const resp = await fetch('/api/v1/auth/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
+                credentials: 'same-origin',
                 body: JSON.stringify({
                     username: document.getElementById('username').value,
                     password: document.getElementById('password').value
@@ -22,7 +21,8 @@
 
             if (resp.ok) {
                 const data = await resp.json();
-                localStorage.setItem('token', data.access_token);
+                // The session cookie is set by the server; nothing is kept in
+                // localStorage.
                 window.location.href = data.user && data.user.must_change_password
                     ? '/dashboard/?mustChange=1'
                     : '/dashboard/';

@@ -4,7 +4,50 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
+	"time"
 )
+
+// dnsCache memoizes net.LookupHost results briefly so scraping many targets
+// doesn't perform a synchronous DNS lookup for every single one.
+var dnsCache struct {
+	sync.Mutex
+	entries map[string]dnsEntry
+}
+
+type dnsEntry struct {
+	addrs    []string
+	expires  time.Time
+	lastSeen time.Time
+}
+
+func lookupHostCached(host string) []string {
+	now := time.Now()
+	dnsCache.Lock()
+	defer dnsCache.Unlock()
+	if dnsCache.entries == nil {
+		dnsCache.entries = map[string]dnsEntry{}
+	}
+	if e, ok := dnsCache.entries[host]; ok && now.Before(e.expires) {
+		e.lastSeen = now
+		dnsCache.entries[host] = e
+		return e.addrs
+	}
+	addrs, err := net.LookupHost(host)
+	if err != nil {
+		addrs = nil
+	}
+	dnsCache.entries[host] = dnsEntry{addrs: addrs, expires: now.Add(5 * time.Minute), lastSeen: now}
+	// bound the cache size
+	if len(dnsCache.entries) > 1000 {
+		for k, e := range dnsCache.entries {
+			if now.Sub(e.lastSeen) > time.Hour {
+				delete(dnsCache.entries, k)
+			}
+		}
+	}
+	return addrs
+}
 
 // blocked outbound hosts — cloud metadata SSRF guard (mirrors Python).
 var blockedOutboundHosts = map[string]bool{
@@ -51,13 +94,10 @@ func candidateIPs(host string) []net.IP {
 	if n, err := parseIntIP(host); err == nil {
 		ips = append(ips, ipv4FromInt(n))
 	}
-	// DNS resolution
-	addrs, err := net.LookupHost(host)
-	if err == nil {
-		for _, a := range addrs {
-			if ip := net.ParseIP(a); ip != nil {
-				ips = append(ips, ip)
-			}
+	// DNS resolution (cached to avoid a lookup per target per interval)
+	for _, a := range lookupHostCached(host) {
+		if ip := net.ParseIP(a); ip != nil {
+			ips = append(ips, ip)
 		}
 	}
 	return ips

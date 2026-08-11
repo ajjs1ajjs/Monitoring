@@ -17,10 +17,11 @@ import (
 )
 
 type principal struct {
-	UserID     int64
-	Username   string
-	IsAdmin    bool
-	AuthMethod string
+	UserID             int64
+	Username           string
+	IsAdmin            bool
+	MustChangePassword bool
+	AuthMethod         string
 }
 
 type ctxKey int
@@ -54,32 +55,52 @@ func (a *App) withAuth(next http.HandlerFunc) http.HandlerFunc {
 				writeErr(w, http.StatusUnauthorized, "Invalid or expired token")
 				return
 			}
-			// Load fresh user state from the DB (must_change_password and role
-			// changes take effect immediately, like the original Python version).
-			u, err := a.Store.GetUserByID(claims.UserID)
-			if err != nil || u == nil {
-				writeErr(w, http.StatusUnauthorized, "User not found")
+			p = a.principalFromClaims(claims)
+		} else if c, err := r.Cookie(authCookieName); err == nil && c.Value != "" {
+			// HttpOnly session cookie set by the SPA login.
+			claims, err := a.Auth.ParseToken(c.Value)
+			if err != nil {
+				writeErr(w, http.StatusUnauthorized, "Invalid or expired session")
 				return
 			}
-			p = &principal{
-				UserID: u.ID, Username: u.Username,
-				IsAdmin: u.IsAdmin == 1, AuthMethod: "jwt",
-			}
-			if u.MustChangePassword == 1 &&
-				!strings.HasSuffix(r.URL.Path, "/change-password") &&
-				r.URL.Path != "/api/v1/auth/me" {
-				writeJSON(w, http.StatusForbidden, map[string]any{
-					"detail": "You must change your password before continuing",
-				})
-				return
-			}
+			p = a.principalFromClaims(claims)
 		} else {
 			writeErr(w, http.StatusUnauthorized, "Not authenticated")
 			return
 		}
 
+		if p == nil {
+			writeErr(w, http.StatusUnauthorized, "User not found")
+			return
+		}
+		// Users with must_change_password are blocked except for
+		// change-password/me.
+		if p.MustChangePassword && p.AuthMethod == "jwt" &&
+			!strings.HasSuffix(r.URL.Path, "/change-password") &&
+			r.URL.Path != "/api/v1/auth/me" {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"detail": "You must change your password before continuing",
+			})
+			return
+		}
+
 		// API keys are never admins (read/ingest only).
 		next(w, r.WithContext(context.WithValue(r.Context(), principalKey, p)))
+	}
+}
+
+func (a *App) principalFromClaims(claims *auth.Claims) *principal {
+	// Load fresh user state from the DB (must_change_password and role
+	// changes take effect immediately, like the original Python version).
+	u, err := a.Store.GetUserByID(claims.UserID)
+	if err != nil || u == nil {
+		return nil
+	}
+	return &principal{
+		UserID: u.ID, Username: u.Username,
+		IsAdmin:            u.IsAdmin == 1,
+		MustChangePassword: u.MustChangePassword == 1,
+		AuthMethod:         "jwt",
 	}
 }
 
@@ -114,14 +135,35 @@ func (a *App) clientIP(r *http.Request) string {
 	return host
 }
 
-// --- rate limiting for /auth/login (10/min per IP) ---
+// --- rate limiting (per IP, fixed window) ---
 
 type ipLimiter struct {
 	mu   sync.Mutex
 	seen map[string][]time.Time
 }
 
-func newIPLimiter() *ipLimiter { return &ipLimiter{seen: map[string][]time.Time{}} }
+func newIPLimiter() *ipLimiter {
+	l := &ipLimiter{seen: map[string][]time.Time{}}
+	go l.cleanup()
+	return l
+}
+
+// cleanup periodically drops IPs with no recent activity so the map cannot
+// grow without bound under a DDoS with rotating source IPs.
+func (l *ipLimiter) cleanup() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		l.mu.Lock()
+		now := time.Now()
+		for ip, ts := range l.seen {
+			if len(ts) == 0 || now.Sub(ts[len(ts)-1]) > time.Hour {
+				delete(l.seen, ip)
+			}
+		}
+		l.mu.Unlock()
+	}
+}
 
 func (l *ipLimiter) allow(ip string, max int, window time.Duration) bool {
 	l.mu.Lock()
@@ -147,11 +189,24 @@ func filterTimes(t []time.Time, cut time.Time) []time.Time {
 }
 
 var loginLimiter = newIPLimiter()
+var authActionLimiter = newIPLimiter()
 
 func (a *App) withRateLimit(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !loginLimiter.allow(a.clientIP(r), 10, time.Minute) {
 			writeErr(w, http.StatusTooManyRequests, "Too many login attempts. Try again later.")
+			return
+		}
+		next(w, r)
+	}
+}
+
+// withAuthActionRateLimit slows down password changes and API-key creation
+// (credential/abuse surface) without sharing the tight login budget.
+func (a *App) withAuthActionRateLimit(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !authActionLimiter.allow(a.clientIP(r), 30, time.Minute) {
+			writeErr(w, http.StatusTooManyRequests, "Too many requests. Try again later.")
 			return
 		}
 		next(w, r)
@@ -179,6 +234,12 @@ func (a *App) withSecurity(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "no-referrer")
+		// The UI templates use inline style attributes; scripts are external
+		// files (dashboard.js/login.js), so 'self' suffices for script-src.
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+
+				"img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws: wss:; "+
+				"frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		next.ServeHTTP(w, r)
 	})
 }

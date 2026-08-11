@@ -3,6 +3,8 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/ajjs1ajjs/Monitoring/internal/auth"
@@ -46,12 +48,47 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "Token generation failed")
 		return
 	}
+	// The SPA session lives in an HttpOnly cookie so a stored-XSS payload can't
+	// read the token from localStorage. Programmatic clients keep using the
+	// returned access_token.
+	a.setAuthCookie(w, r, token)
+	// A generated one-time admin password is deleted after the first successful
+	// login instead of lingering on disk.
+	a.deleteAdminPasswordFile()
 	a.audit(r, "login", "User "+u.Username+" logged in")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"access_token": token,
 		"token_type":   "bearer",
 		"user":         toUserView(u),
 	})
+}
+
+const authCookieName = "pymon_token"
+
+func (a *App) setAuthCookie(w http.ResponseWriter, r *http.Request, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     authCookieName,
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
+}
+
+func (a *App) clearAuthCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{Name: authCookieName, Value: "", Path: "/", HttpOnly: true, MaxAge: -1})
+}
+
+func (a *App) deleteAdminPasswordFile() {
+	dir := filepath.Dir(a.Store.DBPath)
+	_ = os.Remove(filepath.Join(dir, "admin_password.txt"))
+}
+
+func (a *App) handleLogout(w http.ResponseWriter, r *http.Request) {
+	a.clearAuthCookie(w)
+	a.audit(r, "logout", "User logged out")
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
 func (a *App) handleMe(w http.ResponseWriter, r *http.Request) {

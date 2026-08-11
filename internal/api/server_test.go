@@ -271,3 +271,95 @@ func TestEmptyListsAreArrays(t *testing.T) {
 		t.Errorf("users returned null (want [])")
 	}
 }
+
+// TestCookieSessionAuth verifies the SPA flow: login sets an HttpOnly
+// SameSite=Strict cookie and authenticated requests work via the cookie alone
+// (no token in localStorage).
+func TestCookieSessionAuth(t *testing.T) {
+	app, _ := newTestApp(t)
+	h := app.Handler()
+
+	body := bytes.NewBufferString(`{"username":"admin","password":"AdminPass123456"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", body)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login = %d: %s", rec.Code, rec.Body.String())
+	}
+	var authCookie *http.Cookie
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == authCookieName {
+			authCookie = c
+			if !c.HttpOnly {
+				t.Fatalf("auth cookie must be HttpOnly")
+			}
+			if c.SameSite != http.SameSiteStrictMode {
+				t.Fatalf("auth cookie must be SameSite=Strict")
+			}
+		}
+	}
+	if authCookie == nil {
+		t.Fatalf("no auth cookie set on login")
+	}
+
+	// /me with the cookie only (no Authorization header)
+	req2 := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	req2.AddCookie(authCookie)
+	rec2 := httptest.NewRecorder()
+	h.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("me via cookie = %d: %s", rec2.Code, rec2.Body.String())
+	}
+
+	// logout clears the session
+	req3 := httptest.NewRequest(http.MethodPost, "/api/v1/auth/logout", nil)
+	req3.AddCookie(authCookie)
+	rec3 := httptest.NewRecorder()
+	h.ServeHTTP(rec3, req3)
+	if rec3.Code != http.StatusOK {
+		t.Fatalf("logout = %d", rec3.Code)
+	}
+
+	// a cleared/invalid cookie no longer authenticates
+	req4 := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	req4.AddCookie(&http.Cookie{Name: authCookieName, Value: "cleared"})
+	rec4 := httptest.NewRecorder()
+	h.ServeHTTP(rec4, req4)
+	if rec4.Code != http.StatusUnauthorized {
+		t.Fatalf("me after logout = %d, want 401", rec4.Code)
+	}
+}
+
+// TestWebSocketOriginCheck guards against CSWSH: cross-site origins must be
+// rejected while same-origin and explicitly allowed origins pass.
+func TestWebSocketOriginCheck(t *testing.T) {
+	app, _ := newTestApp(t)
+
+	base := "http://localhost:10000"
+	mk := func(origin string) *http.Request {
+		r := httptest.NewRequest("GET", base+"/api/v1/ws/metrics", nil)
+		r.Host = "localhost:10000"
+		if origin != "" {
+			r.Header.Set("Origin", origin)
+		}
+		return r
+	}
+
+	if !app.checkOrigin(mk(base)) {
+		t.Fatalf("same-origin must be allowed")
+	}
+	if app.checkOrigin(mk("http://evil.example")) {
+		t.Fatalf("cross-site origin must be rejected")
+	}
+	if !app.checkOrigin(mk("")) {
+		t.Fatalf("non-browser client without Origin must be allowed")
+	}
+
+	app.Cfg.Server.AllowedOrigins = []string{"https://dash.example"}
+	if !app.checkOrigin(mk("https://dash.example")) {
+		t.Fatalf("configured allowed origin must be allowed")
+	}
+	if app.checkOrigin(mk("https://dash.example.evil")) {
+		t.Fatalf("prefix-matching origin must be rejected")
+	}
+}
