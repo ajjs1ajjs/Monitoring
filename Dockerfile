@@ -15,7 +15,9 @@ RUN apk add --no-cache ca-certificates iputils \
     && chown -R pymon:pymon /data /config /logs
 
 COPY --from=builder /out/pymon /usr/local/bin/pymon
-COPY config.example.yml /config/config.example.yml
+# Provide a default config so `docker run` starts out of the box; operators can
+# mount their own over /config/config.yml.
+COPY config.example.yml /config/config.yml
 COPY docs/ /docs/
 COPY README.md CHANGELOG.md LICENSE ./
 
