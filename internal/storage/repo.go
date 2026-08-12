@@ -149,34 +149,40 @@ func (st *Store) InsertMetricPoint(serverID int64, cpu, mem, disk, rx, tx *float
 	return err
 }
 
-// HistoryRange maps a token (5m,15m,1h,6h,12h,24h,3d,7d,15d,30d) to a SQLite
-// datetime modifier and a downsample bucket size in seconds.
-func HistoryRange(token string) (modifier string, bucketSec int) {
+// HistoryRange maps a token (5m,15m,1h,6h,12h,24h,3d,7d,15d,30d) to a UTC
+// cutoff and a downsample bucket size in seconds. The cutoff is returned as a
+// time.Time (formatted with tsLayout at the query site) so the bound compares
+// correctly against stored timestamps — comparing against datetime('now', ...)
+// used to mis-match the 'T' vs ' ' separators at the day boundary.
+func HistoryRange(token string) (cutoff time.Time, bucketSec int) {
+	var d time.Duration
 	switch token {
 	case "5m":
-		return "-5 minutes", 60
+		d, bucketSec = 5*time.Minute, 60
 	case "15m":
-		return "-15 minutes", 60
+		d, bucketSec = 15*time.Minute, 60
 	case "30m":
-		return "-30 minutes", 60
+		d, bucketSec = 30*time.Minute, 60
 	case "1h":
-		return "-1 hours", 60
+		d, bucketSec = time.Hour, 60
 	case "6h":
-		return "-6 hours", 60
+		d, bucketSec = 6*time.Hour, 60
 	case "12h":
-		return "-12 hours", 60
+		d, bucketSec = 12*time.Hour, 60
 	case "24h":
-		return "-24 hours", 60
+		d, bucketSec = 24*time.Hour, 60
 	case "3d":
-		return "-3 days", 60
+		d, bucketSec = 3*24*time.Hour, 60
 	case "7d":
-		return "-7 days", 3600
+		d, bucketSec = 7*24*time.Hour, 3600
 	case "15d":
-		return "-15 days", 3600
+		d, bucketSec = 15*24*time.Hour, 3600
 	case "30d":
-		return "-30 days", 3600
+		d, bucketSec = 30*24*time.Hour, 3600
+	default:
+		d, bucketSec = time.Hour, 60
 	}
-	return "-1 hours", 60
+	return time.Now().Add(-d), bucketSec
 }
 
 func bucketExpr(bucketSec int) string {
@@ -188,14 +194,14 @@ func bucketExpr(bucketSec int) string {
 
 // ServerHistory returns downsampled history points for a server.
 func (st *Store) ServerHistory(serverID int64, token string) ([]MetricPoint, error) {
-	mod, bucket := HistoryRange(token)
+	cut, bucket := HistoryRange(token)
 	q := fmt.Sprintf(`SELECT id, server_id, cpu_percent, memory_percent, disk_percent,
 	  network_rx, network_tx, disk_info, timestamp FROM (
 	    SELECT *, ROW_NUMBER() OVER (PARTITION BY %s ORDER BY id DESC) AS rn
 	    FROM metrics_history
-	    WHERE server_id = ? AND timestamp >= datetime('now', ?)
+	    WHERE server_id = ? AND timestamp >= ?
 	  ) WHERE rn = 1 ORDER BY timestamp ASC`, bucketExpr(bucket))
-	rows, err := st.DB.Query(q, serverID, mod)
+	rows, err := st.DB.Query(q, serverID, cut.UTC().Format(tsLayout))
 	if err != nil {
 		return nil, err
 	}
@@ -224,14 +230,14 @@ func (st *Store) ServerHistory(serverID int64, token string) ([]MetricPoint, err
 // AllServersHistory is the same downsampling across all servers (used by
 // /servers/history and /metrics/trend).
 func (st *Store) AllServersHistory(token string) (map[int64][]MetricPoint, error) {
-	mod, bucket := HistoryRange(token)
+	cut, bucket := HistoryRange(token)
 	q := fmt.Sprintf(`SELECT id, server_id, cpu_percent, memory_percent, disk_percent,
 	  network_rx, network_tx, disk_info, timestamp FROM (
 	    SELECT *, ROW_NUMBER() OVER (PARTITION BY server_id, %s ORDER BY id DESC) AS rn
 	    FROM metrics_history
-	    WHERE timestamp >= datetime('now', ?)
+	    WHERE timestamp >= ?
 	  ) WHERE rn = 1 ORDER BY timestamp ASC`, bucketExpr(bucket))
-	rows, err := st.DB.Query(q, mod)
+	rows, err := st.DB.Query(q, cut.UTC().Format(tsLayout))
 	if err != nil {
 		return nil, err
 	}
@@ -267,10 +273,10 @@ func floatPtr(n sql.NullFloat64) *float64 {
 
 // UptimeTimeline counts non-NULL cpu rows as "up".
 func (st *Store) UptimeTimeline(serverID int64, days int) (up int, down int, timeline []MetricPoint, err error) {
-	mod := fmt.Sprintf("-%d days", days)
+	cut := NowBefore(time.Duration(days) * 24 * time.Hour)
 	rows, err := st.DB.Query(`SELECT id, server_id, cpu_percent, memory_percent, disk_percent,
 	  network_rx, network_tx, disk_info, timestamp FROM metrics_history
-	  WHERE server_id = ? AND timestamp >= datetime('now', ?) ORDER BY timestamp ASC`, serverID, mod)
+	  WHERE server_id = ? AND timestamp >= ? ORDER BY timestamp ASC`, serverID, cut)
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -290,14 +296,11 @@ func (st *Store) UptimeTimeline(serverID int64, days int) (up int, down int, tim
 		m.NetworkTX = floatPtr(tx)
 		m.DiskInfo = diskInfo.String
 		m.Timestamp = ts.String
-		status := "down"
 		if cpu.Valid {
-			status = "up"
 			up++
 		} else {
 			down++
 		}
-		_ = status
 		timeline = append(timeline, m)
 	}
 	return up, down, timeline, rows.Err()
@@ -463,9 +466,9 @@ func (st *Store) InsertServiceHistory(serviceID int64, status string, latency fl
 }
 
 func (st *Store) ServiceHistory(token string) ([]ServiceHistory, error) {
-	mod, _ := HistoryRange(token)
+	cut, _ := HistoryRange(token)
 	rows, err := st.DB.Query(`SELECT id, service_id, status, latency_ms, timestamp
-	  FROM services_history WHERE timestamp >= datetime('now', ?) ORDER BY id ASC`, mod)
+	  FROM services_history WHERE timestamp >= ? ORDER BY id ASC`, cut.UTC().Format(tsLayout))
 	if err != nil {
 		return nil, err
 	}
@@ -814,10 +817,10 @@ func (st *Store) RecentMetrics(limit int) ([]Metric, error) {
 // --- Retention / maintenance ---
 
 func (st *Store) Cleanup(retentionHours int) error {
-	mod := fmt.Sprintf("-%d hours", retentionHours)
+	cut := NowBefore(time.Duration(retentionHours) * time.Hour)
 	tables := []string{"metrics_history", "services_history", "alerts", "metrics"}
 	for _, t := range tables {
-		if _, err := st.DB.Exec(fmt.Sprintf(`DELETE FROM %s WHERE timestamp < datetime('now', ?)`, t), mod); err != nil {
+		if _, err := st.DB.Exec(`DELETE FROM `+t+` WHERE timestamp < ?`, cut); err != nil {
 			return err
 		}
 	}
@@ -836,8 +839,9 @@ func (st *Store) ServerLastTimestamp(serverID int64) string {
 
 // SlowDirtyUptimePercent returns uptime % for last 1h based on non-NULL cpu rows.
 func (st *Store) ServerSummary(serverID int64) (avgCPU, avgMem, avgDisk float64, status string, err error) {
+	cut := NowBefore(time.Hour)
 	rows, err := st.DB.Query(`SELECT cpu_percent, memory_percent, disk_percent FROM metrics_history
-	  WHERE server_id = ? AND timestamp >= datetime('now','-1 hours')`, serverID)
+	  WHERE server_id = ? AND timestamp >= ?`, serverID, cut)
 	if err != nil {
 		return 0, 0, 0, "", err
 	}
@@ -889,5 +893,3 @@ func (st *Store) TotalOnline() (int, error) {
 	err := st.DB.QueryRow(`SELECT COUNT(*) FROM servers WHERE last_status = 'up'`).Scan(&n)
 	return n, err
 }
-
-var _ = time.Now

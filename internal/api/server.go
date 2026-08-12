@@ -34,12 +34,23 @@ type App struct {
 	StartTime time.Time
 	Version   Version
 	LogPath   string
+
+	loginLimiter      *ipLimiter
+	authActionLimiter *ipLimiter
 }
 
 //go:embed all:web
 var webFS embed.FS
 
 func (a *App) Handler() http.Handler {
+	// Rate limiters are per-App so tests and multi-instance processes never
+	// share (or exhaust) one another's budgets.
+	if a.loginLimiter == nil {
+		a.loginLimiter = newIPLimiter()
+	}
+	if a.authActionLimiter == nil {
+		a.authActionLimiter = newIPLimiter()
+	}
 	mux := http.NewServeMux()
 
 	// Unauthenticated

@@ -138,33 +138,58 @@ func (a *App) handleUpdateServer(w http.ResponseWriter, r *http.Request) {
 	for k, v := range body {
 		switch k {
 		case "name":
-			name, _ := v.(string)
-			if !validServerName(name) {
+			name, ok := v.(string)
+			if !ok || !validServerName(name) {
 				writeErr(w, http.StatusBadRequest, "Invalid server name")
 				return
 			}
 			fields["name"] = name
 		case "host":
-			host, _ := v.(string)
-			if !hostNameRe(host) {
+			host, ok := v.(string)
+			if !ok || !hostNameRe(host) {
 				writeErr(w, http.StatusBadRequest, "Invalid host")
 				return
 			}
 			fields["host"] = host
 		case "os_type":
-			fields["os_type"] = v.(string)
+			osType, ok := v.(string)
+			if !ok || osType == "" {
+				writeErr(w, http.StatusBadRequest, "Invalid os_type")
+				return
+			}
+			fields["os_type"] = osType
 		case "agent_port":
-			fields["agent_port"] = int(v.(float64))
+			port, err := toPort(v)
+			if err != nil {
+				writeErr(w, http.StatusBadRequest, "Invalid agent_port")
+				return
+			}
+			fields["agent_port"] = port
 		case "enabled":
+			enabled, ok := v.(bool)
+			if !ok {
+				writeErr(w, http.StatusBadRequest, "Invalid enabled")
+				return
+			}
 			n := 0
-			if v.(bool) {
+			if enabled {
 				n = 1
 			}
 			fields["enabled"] = n
 		case "server_group":
-			fields["server_group"] = v.(string)
+			group, ok := v.(string)
+			if !ok {
+				writeErr(w, http.StatusBadRequest, "Invalid server_group")
+				return
+			}
+			fields["server_group"] = group
 		case "scrape_interval":
-			fields["scrape_interval"] = int(v.(float64))
+			interval, err := toPositiveInt(v)
+			if err != nil {
+				writeErr(w, http.StatusBadRequest, "Invalid scrape_interval")
+				return
+			}
+			fields["scrape_interval"] = interval
 		}
 	}
 	if err := a.Store.UpdateServer(id, fields); err != nil {
@@ -173,6 +198,43 @@ func (a *App) handleUpdateServer(w http.ResponseWriter, r *http.Request) {
 	}
 	a.audit(r, "server_updated", "Server "+s.Name+" updated")
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+}
+
+func toPort(v any) (int, error) {
+	f, ok := toFloat(v)
+	if !ok || f < 1 || f > 65535 {
+		return 0, fmt.Errorf("invalid port")
+	}
+	if f != float64(int(f)) {
+		return 0, fmt.Errorf("invalid port")
+	}
+	return int(f), nil
+}
+
+func toPositiveInt(v any) (int, error) {
+	f, ok := toFloat(v)
+	if !ok || f < 0 || f > 1<<31 {
+		return 0, fmt.Errorf("invalid integer")
+	}
+	if f != float64(int(f)) {
+		return 0, fmt.Errorf("invalid integer")
+	}
+	return int(f), nil
+}
+
+func toFloat(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
+	case int64:
+		return float64(n), true
+	case json.Number:
+		f, err := n.Float64()
+		return f, err == nil
+	}
+	return 0, false
 }
 
 func (a *App) handleDeleteServer(w http.ResponseWriter, r *http.Request) {

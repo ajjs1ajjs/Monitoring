@@ -36,7 +36,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 VOLUME ["/data", "/config", "/logs"]
 
 LABEL maintainer="PyMon Team"
-LABEL version="3.0.0"
+LABEL version="3.0.3"
 LABEL description="Enterprise Server Monitoring NOC Dashboard (Go)"
 
 CMD ["pymon", "server", "--config", "/config/config.yml"]

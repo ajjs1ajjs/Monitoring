@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -23,7 +22,7 @@ import (
 	"github.com/ajjs1ajjs/Monitoring/internal/storage"
 )
 
-const Version = "3.0.1"
+const Version = "3.0.3"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -302,5 +301,3 @@ func resetAdmin(store *storage.Store, cfg *config.Config) {
 	}
 	createAdmin(store, cfg, username, filepath.Dir(store.DBPath))
 }
-
-var _ = strings.TrimSpace

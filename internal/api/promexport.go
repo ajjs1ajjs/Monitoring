@@ -3,11 +3,16 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 )
+
+// prometheusLabelNameRe matches the Prometheus label name grammar
+// ([a-zA-Z_][a-zA-Z0-9_]*).
+var prometheusLabelNameRe = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 type registryEntry struct {
 	Name   string
@@ -16,6 +21,11 @@ type registryEntry struct {
 	Value  float64
 	Labels map[string]string
 }
+
+// maxRegistryEntries bounds the in-memory registry so an authenticated client
+// pushing many unique label combinations cannot exhaust memory (the push API
+// is available to every authenticated user, and /metrics is public).
+const maxRegistryEntries = 5000
 
 // MetricRegistry is an in-memory store for push metrics (POST /api/v1/metrics).
 type MetricRegistry struct {
@@ -31,6 +41,9 @@ func (r *MetricRegistry) Add(e registryEntry) {
 			r.items[i] = e
 			return
 		}
+	}
+	if len(r.items) >= maxRegistryEntries {
+		return
 	}
 	r.items = append(r.items, e)
 }
@@ -74,14 +87,25 @@ func (a *App) handlePrometheusExport(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(&sb, "pymon_servers_online %d\n", online)
 	}
 
-	for _, e := range a.Metrics.Snapshot() {
-		if e.Help != "" {
-			fmt.Fprintf(&sb, "# HELP %s %s\n", e.Name, e.Help)
+	var entries []registryEntry
+	if a.Metrics != nil {
+		entries = a.Metrics.Snapshot()
+	}
+	for _, e := range entries {
+		// Defense in depth: even if a bad name slips past the push validator,
+		// never emit control characters into the public exposition.
+		name := sanitizeMetricName(e.Name)
+		help := sanitizeHelpText(e.Help)
+		if name == "" {
+			continue
+		}
+		if help != "" {
+			fmt.Fprintf(&sb, "# HELP %s %s\n", name, help)
 		}
 		if e.Type != "" {
-			fmt.Fprintf(&sb, "# TYPE %s %s\n", e.Name, e.Type)
+			fmt.Fprintf(&sb, "# TYPE %s %s\n", name, e.Type)
 		}
-		sb.WriteString(e.Name)
+		sb.WriteString(name)
 		if len(e.Labels) > 0 {
 			keys := make([]string, 0, len(e.Labels))
 			for k := range e.Labels {
@@ -99,4 +123,28 @@ func (a *App) handlePrometheusExport(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	_, _ = w.Write([]byte(sb.String()))
+}
+
+// sanitizeMetricName strips control characters (most importantly newlines) so
+// a crafted metric name cannot inject extra lines into the exposition text.
+func sanitizeMetricName(name string) string {
+	out := make([]rune, 0, len(name))
+	for _, c := range name {
+		if c < 0x20 || c == 0x7f {
+			continue
+		}
+		out = append(out, c)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func sanitizeHelpText(help string) string {
+	out := make([]rune, 0, len(help))
+	for _, c := range help {
+		if c == '\n' || c == '\r' || c < 0x20 || c == 0x7f {
+			continue
+		}
+		out = append(out, c)
+	}
+	return strings.TrimSpace(string(out))
 }

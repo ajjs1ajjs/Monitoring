@@ -124,15 +124,27 @@ func (a *App) principal(r *http.Request) *principal {
 	return nil
 }
 
+// clientIP returns the client address used for rate limiting. The
+// X-Forwarded-For header is only honored when the immediate peer is a local
+// proxy (loopback/private address); otherwise it is attacker-controlled and
+// would trivially defeat the per-IP rate limits.
 func (a *App) clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return strings.TrimSpace(strings.Split(xff, ",")[0])
-	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" && isTrustedPeer(host) {
+		return strings.TrimSpace(strings.Split(xff, ",")[0])
 	}
 	return host
+}
+
+func isTrustedPeer(host string) bool {
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	if ip == nil {
+		return false
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
 }
 
 // --- rate limiting (per IP, fixed window) ---
@@ -188,12 +200,9 @@ func filterTimes(t []time.Time, cut time.Time) []time.Time {
 	return out
 }
 
-var loginLimiter = newIPLimiter()
-var authActionLimiter = newIPLimiter()
-
 func (a *App) withRateLimit(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !loginLimiter.allow(a.clientIP(r), 10, time.Minute) {
+		if !a.loginLimiter.allow(a.clientIP(r), 10, time.Minute) {
 			writeErr(w, http.StatusTooManyRequests, "Too many login attempts. Try again later.")
 			return
 		}
@@ -205,7 +214,7 @@ func (a *App) withRateLimit(next http.HandlerFunc) http.HandlerFunc {
 // (credential/abuse surface) without sharing the tight login budget.
 func (a *App) withAuthActionRateLimit(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !authActionLimiter.allow(a.clientIP(r), 30, time.Minute) {
+		if !a.authActionLimiter.allow(a.clientIP(r), 30, time.Minute) {
 			writeErr(w, http.StatusTooManyRequests, "Too many requests. Try again later.")
 			return
 		}
@@ -229,16 +238,22 @@ func (a *App) withRecovery(next http.HandlerFunc) http.HandlerFunc {
 
 // --- security headers ---
 
+// withSecurity sets defensive headers. The dashboard loads Chart.js, Lucide
+// and the Outfit/JetBrains Mono fonts from CDNs, so those hosts must be
+// allow-listed (script-src/style-src/font-src). Inline event-handler
+// attributes and inline <script> blocks remain blocked.
 func (a *App) withSecurity(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		// The UI templates use inline style attributes; scripts are external
-		// files (dashboard.js/login.js), so 'self' suffices for script-src.
 		w.Header().Set("Content-Security-Policy",
-			"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+
-				"img-src 'self' data:; font-src 'self' data:; connect-src 'self' ws: wss:; "+
+			"default-src 'self'; "+
+				"script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; "+
+				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "+
+				"img-src 'self' data:; "+
+				"font-src 'self' data: https://fonts.gstatic.com; "+
+				"connect-src 'self' ws: wss:; "+
 				"frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		next.ServeHTTP(w, r)
 	})

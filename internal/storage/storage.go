@@ -172,8 +172,21 @@ func Open(path string) (*sql.DB, string, error) {
 	return db, abs, nil
 }
 
+// tsLayout is the storage format for all timestamps. It deliberately uses the
+// ISO-8601 'T' separator (matching the Python v2 data) and is stored as UTC.
+// SQLite datetime()/strftime() can parse this format, and lexicographic
+// comparison between two identical-formatted strings is chronologically
+// correct — which is why cutoffs are formatted with tsLayout too instead of
+// being compared against datetime('now', ...) output (space separator).
+const tsLayout = "2006-01-02T15:04:05"
+
 func Now() string {
-	return time.Now().UTC().Format("2006-01-02T15:04:05")
+	return time.Now().UTC().Format(tsLayout)
+}
+
+// NowBefore returns the storage-format UTC timestamp d before now.
+func NowBefore(d time.Duration) string {
+	return time.Now().UTC().Add(-d).Format(tsLayout)
 }
 
 // Store holds a *sql.DB plus the resolved DB path (for backup/restore).

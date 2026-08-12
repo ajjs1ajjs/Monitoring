@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ajjs1ajjs/Monitoring/internal/config"
 	"github.com/ajjs1ajjs/Monitoring/internal/storage"
 	"gopkg.in/yaml.v3"
 )
@@ -66,28 +67,40 @@ func (a *App) handleTestNotifications(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) handleExportConfig(w http.ResponseWriter, r *http.Request) {
+	// Build a deep copy so redaction never mutates the live config that the
+	// notifier and monitor keep using (a former bug replaced the bot token in
+	// memory with "***REDACTED***", silently breaking Telegram/email alerts).
+	cfg := a.Cfg.Clone()
+
 	y := map[string]any{
 		"server": map[string]any{
-			"host": a.Cfg.Server.Host, "port": a.Cfg.Server.Port, "domain": a.Cfg.Server.Domain,
+			"host": cfg.Server.Host, "port": cfg.Server.Port, "domain": cfg.Server.Domain,
 		},
 		"storage": map[string]any{
-			"backend": a.Cfg.Storage.Backend, "path": a.Cfg.Storage.Path,
-			"retention_hours": a.Cfg.Storage.RetentionHours,
+			"backend": cfg.Storage.Backend, "path": cfg.Storage.Path,
+			"retention_hours": cfg.Storage.RetentionHours,
 		},
 		"auth": map[string]any{
-			"admin_username": a.Cfg.Auth.AdminUsername, "jwt_expire_hours": a.Cfg.Auth.JWTExpireHours,
+			"admin_username": cfg.Auth.AdminUsername, "jwt_expire_hours": cfg.Auth.JWTExpireHours,
 		},
-		"alerting": a.Cfg.Alerting,
-		"backup":   a.Cfg.Backup,
+		"alerting": cfg.Alerting,
+		"backup":   cfg.Backup,
 	}
-	// redact secrets
-	if a.Cfg.Notifications.Telegram != nil {
-		a.Cfg.Notifications.Telegram.BotToken = "***REDACTED***"
+	// redact secrets (on the copy)
+	if cfg.Notifications.Telegram != nil && cfg.Notifications.Telegram.BotToken != "" {
+		cfg.Notifications.Telegram.BotToken = "***REDACTED***"
 	}
-	if a.Cfg.Notifications.Email != nil && a.Cfg.Notifications.Email.SMTPPass != "" {
-		a.Cfg.Notifications.Email.SMTPPass = "***REDACTED***"
+	if cfg.Notifications.Email != nil && cfg.Notifications.Email.SMTPPass != "" {
+		cfg.Notifications.Email.SMTPPass = "***REDACTED***"
 	}
-	y["notifications"] = a.Cfg.Notifications
+	for _, wh := range []*config.WebhookNotify{
+		cfg.Notifications.Discord, cfg.Notifications.Slack, cfg.Notifications.Teams,
+	} {
+		if wh != nil && wh.URL != "" {
+			wh.URL = "***REDACTED***"
+		}
+	}
+	y["notifications"] = cfg.Notifications
 	b, err := yaml.Marshal(y)
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "Serialization failed")

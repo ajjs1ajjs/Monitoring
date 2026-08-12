@@ -2,7 +2,9 @@ package storage
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -149,3 +151,48 @@ func TestNotificationSecretsEncryptedAtRest(t *testing.T) {
 }
 
 func ptr(f float64) *float64 { return &f }
+
+// TestHistoryWindowExcludesOldRows guards against the 'T' vs ' ' separator
+// bug where `timestamp >= datetime('now', ...)` (space separator) compared
+// against stored ISO-8601 'T' timestamps wrongly included every row from the
+// cutoff day regardless of time.
+func TestHistoryWindowExcludesOldRows(t *testing.T) {
+	st := newTestStore(t)
+	s := &Server{Name: "s", Host: "h", AgentPort: 9100, Enabled: 1, Volumes: "[]", Labels: "{}"}
+	id, _ := st.CreateServer(s)
+
+	// Rows at roughly 0m, 30m, 90m and 25h in the past.
+	cpu := 1.0
+	for _, off := range []time.Duration{0, 30 * time.Minute, 90 * time.Minute, 25 * time.Hour} {
+		if _, err := st.DB.Exec(`INSERT INTO metrics_history (server_id, cpu_percent, timestamp) VALUES (?,?,?)`,
+			id, cpu, NowBefore(off)); err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+	}
+
+	hist, err := st.ServerHistory(id, "1h")
+	if err != nil {
+		t.Fatalf("history: %v", err)
+	}
+	// Only rows within the last hour (0m and 30m) belong in a 1h window.
+	if len(hist) != 2 {
+		t.Fatalf("1h history rows = %d, want 2 (old cutoff-day rows leaked in)", len(hist))
+	}
+}
+
+// TestTimestampsUseConsistentLayout ensures Now()/NowBefore() produce the same
+// T-separated format so string comparisons are chronologically correct.
+func TestTimestampsUseConsistentLayout(t *testing.T) {
+	now := Now()
+	before := NowBefore(time.Hour)
+	if !strings.Contains(now, "T") || !strings.Contains(before, "T") {
+		t.Fatalf("timestamps must use 'T' separator: now=%q before=%q", now, before)
+	}
+	beforeParsed, err := time.Parse(tsLayout, before)
+	if err != nil {
+		t.Fatalf("before not parseable: %v", err)
+	}
+	if !beforeParsed.Before(time.Now()) {
+		t.Fatalf("NowBefore must be in the past")
+	}
+}

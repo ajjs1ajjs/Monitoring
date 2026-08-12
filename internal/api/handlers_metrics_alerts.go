@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -10,6 +11,19 @@ import (
 )
 
 // --- metrics ---
+
+// prometheusMetricNameRe mirrors the Prometheus text-format metric name
+// grammar. Names are written verbatim into the public /metrics exposition and
+// must not carry newlines, spaces or other characters that could inject
+// arbitrary lines (log/prometheus injection).
+var prometheusMetricNameRe = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
+
+const (
+	maxMetricNameLen = 200
+	maxMetricHelpLen = 500
+	maxLabelCount    = 20
+	maxLabelLen      = 200
+)
 
 func (a *App) handlePushMetric(w http.ResponseWriter, r *http.Request) {
 	var body struct {
@@ -26,9 +40,35 @@ func (a *App) handlePushMetric(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
+	body.Name = strings.TrimSpace(body.Name)
+	if body.Name == "" || len(body.Name) > maxMetricNameLen || !prometheusMetricNameRe.MatchString(body.Name) {
+		writeErr(w, http.StatusBadRequest, "Invalid metric name")
+		return
+	}
+	if len(body.HelpText) > maxMetricHelpLen || strings.ContainsAny(body.HelpText, "\r\n") {
+		writeErr(w, http.StatusBadRequest, "Invalid help text")
+		return
+	}
+	if len(body.Type) > 32 {
+		writeErr(w, http.StatusBadRequest, "Invalid metric type")
+		return
+	}
+	if len(body.Labels) > maxLabelCount {
+		writeErr(w, http.StatusBadRequest, "Too many labels")
+		return
+	}
 	labelsMap := map[string]string{}
 	for _, l := range body.Labels {
-		labelsMap[l.Name] = l.Value
+		name := strings.TrimSpace(l.Name)
+		if name == "" || len(name) > maxLabelLen || !prometheusLabelNameRe.MatchString(name) {
+			writeErr(w, http.StatusBadRequest, "Invalid label name")
+			return
+		}
+		if len(l.Value) > maxLabelLen || strings.ContainsAny(l.Value, "\r\n") {
+			writeErr(w, http.StatusBadRequest, "Invalid label value")
+			return
+		}
+		labelsMap[name] = l.Value
 	}
 	labelsJSON, _ := json.Marshal(labelsMap)
 	if a.Metrics != nil {

@@ -77,6 +77,13 @@ func extractHostPort(url string, defaultPort int) (string, int) {
 		h := strings.TrimPrefix(strings.TrimPrefix(host, "https://"), "http://")
 		h = strings.SplitN(h, "/", 2)[0]
 		h = strings.SplitN(h, "?", 2)[0]
+		// Drop userinfo ("user:pass@host") — it is not part of the connect
+		// target, and keeping it made the SSRF guard compare the wrong string
+		// while the HTTP client still dialed the real (possibly localhost)
+		// host.
+		if at := strings.LastIndex(h, "@"); at >= 0 {
+			h = h[at+1:]
+		}
 		if idx := strings.LastIndex(h, ":"); idx > 0 && !strings.Contains(h[idx+1:], "]") {
 			if p, err := parsePort(h[idx+1:]); err == nil {
 				port = p

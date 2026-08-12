@@ -121,6 +121,59 @@ func Default() *Config {
 	}
 }
 
+// Clone returns a deep copy of the config. Callers that redact or mutate a
+// config (e.g. the export endpoint) must operate on the copy so the running
+// configuration (shared with the monitor and notifier) is never corrupted.
+func (c *Config) Clone() *Config {
+	if c == nil {
+		return nil
+	}
+	cp := *c
+	cp.Server.AllowedOrigins = append([]string(nil), c.Server.AllowedOrigins...)
+	cp.ScrapeConfigs = append([]ScrapeConfig(nil), c.ScrapeConfigs...)
+	for i := range cp.ScrapeConfigs {
+		sc := &cp.ScrapeConfigs[i]
+		sc.StaticConfigs = append([]StaticTarget(nil), sc.StaticConfigs...)
+		for j := range sc.StaticConfigs {
+			if sc.StaticConfigs[j].Labels != nil {
+				l := make(map[string]string, len(sc.StaticConfigs[j].Labels))
+				for k, v := range sc.StaticConfigs[j].Labels {
+					l[k] = v
+				}
+				sc.StaticConfigs[j].Labels = l
+			}
+		}
+	}
+	cp.Alerting.Rules = append([]AlertRule(nil), c.Alerting.Rules...)
+	cp.Notifications = c.Notifications.clone()
+	return &cp
+}
+
+func (n Notifications) clone() Notifications {
+	cp := n
+	if n.Email != nil {
+		e := *n.Email
+		cp.Email = &e
+	}
+	if n.Telegram != nil {
+		t := *n.Telegram
+		cp.Telegram = &t
+	}
+	if n.Discord != nil {
+		d := *n.Discord
+		cp.Discord = &d
+	}
+	if n.Slack != nil {
+		s := *n.Slack
+		cp.Slack = &s
+	}
+	if n.Teams != nil {
+		t := *n.Teams
+		cp.Teams = &t
+	}
+	return cp
+}
+
 // Load reads a YAML/JSON config from path. If path is empty, tries CONFIG_PATH
 // env then ./config.yml. Returns default config when nothing found.
 func Load(path string) (*Config, error) {
