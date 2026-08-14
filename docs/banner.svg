@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" width="1280" height="360">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0f1a"/>
+      <stop offset="0.5" stop-color="#151c2c"/>
+      <stop offset="1" stop-color="#0b0f1a"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="9" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="textGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="360" fill="url(#bg)"/>
+
+  <g opacity="0.06" stroke="#f97316" stroke-width="1">
+    <path d="M0 90H1280M0 180H1280M0 270H1280M320 0V360M640 0V360M960 0V360"/>
+  </g>
+
+  <g transform="translate(64,88)">
+    <rect x="0" y="40" width="220" height="132" rx="18" fill="url(#brand)" opacity="0.10" stroke="url(#brand)" stroke-width="3"/>
+    <rect x="12" y="52" width="196" height="108" rx="10" fill="#0b0f1a" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+    <path d="M30 108 L52 108 L66 88 L84 128 L100 76 L116 108 L140 108 L156 92 L172 108 L196 108" fill="none" stroke="#f97316" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+    <rect x="30" y="46" width="8" height="10" rx="2" fill="#10b981"/>
+    <circle cx="206" cy="66" r="5" fill="#10b981"/>
+    <circle cx="206" cy="66" r="9" fill="#10b981" opacity="0.3"/>
+    <circle cx="206" cy="66" r="14" fill="#10b981" opacity="0.15"/>
+    <rect x="238" y="40" width="22" height="132" rx="6" fill="url(#brand)" opacity="0.85" filter="url(#glow)"/>
+    <circle cx="249" cy="62" r="4" fill="#0b0f1a"/>
+    <rect x="276" y="74" width="22" height="98" rx="6" fill="url(#brand)" opacity="0.55"/>
+    <rect x="314" y="104" width="22" height="68" rx="6" fill="url(#brand)" opacity="0.3"/>
+  </g>
+
+  <text x="404" y="148" font-family="Segoe UI, sans-serif" font-size="62" font-weight="700" fill="#ffffff" filter="url(#textGlow)">PyMon <tspan fill="url(#brand)">NOC</tspan></text>
+  <text x="408" y="196" font-family="Segoe UI, sans-serif" font-size="23" fill="#9aa3b5">Enterprise Infrastructure Monitoring &amp; NOC Dashboard</text>
+
+  <g transform="translate(404,236)">
+    <rect x="0" y="0" width="112" height="34" rx="17" fill="#f97316" opacity="0.13" stroke="#f97316" stroke-width="1"/>
+    <text x="56" y="23" font-family="Segoe UI, sans-serif" font-size="16" font-weight="600" fill="#fb923c" text-anchor="middle">Go 1.25</text>
+    <rect x="124" y="0" width="168" height="34" rx="17" fill="#10b981" opacity="0.13" stroke="#10b981" stroke-width="1"/>
+    <text x="208" y="23" font-family="Segoe UI, sans-serif" font-size="16" font-weight="600" fill="#34d399" text-anchor="middle">Linux · Windows</text>
+    <rect x="304" y="0" width="140" height="34" rx="17" fill="#3b82f6" opacity="0.13" stroke="#3b82f6" stroke-width="1"/>
+    <text x="374" y="23" font-family="Segoe UI, sans-serif" font-size="16" font-weight="600" fill="#60a5fa" text-anchor="middle">WebSocket</text>
+    <rect x="456" y="0" width="150" height="34" rx="17" fill="#22d3ee" opacity="0.12" stroke="#22d3ee" stroke-width="1"/>
+    <text x="531" y="23" font-family="Segoe UI, sans-serif" font-size="16" font-weight="600" fill="#67e8f9" text-anchor="middle">PWA · Alerting</text>
+    <rect x="618" y="0" width="168" height="34" rx="17" fill="#a855f7" opacity="0.13" stroke="#a855f7" stroke-width="1"/>
+    <text x="702" y="23" font-family="Segoe UI, sans-serif" font-size="16" font-weight="600" fill="#c084fc" text-anchor="middle">Telegram · Discord · SMTP</text>
+  </g>
+
+  <g transform="translate(1008,52)">
+    <rect x="0" y="0" width="110" height="52" rx="12" fill="#10b981" opacity="0.13" stroke="#10b981" stroke-width="2"/>
+    <text x="55" y="21" font-family="Segoe UI, sans-serif" font-size="18" font-weight="800" fill="#34d399" text-anchor="middle">5/5</text>
+    <text x="55" y="42" font-family="Segoe UI, sans-serif" font-size="12" fill="#9aa3b5" text-anchor="middle">онлайн</text>
+  </g>
+  <g transform="translate(1134,52)">
+    <rect x="0" y="0" width="110" height="52" rx="12" fill="#f97316" opacity="0.13" stroke="#f97316" stroke-width="2"/>
+    <text x="55" y="21" font-family="Segoe UI, sans-serif" font-size="18" font-weight="800" fill="#fb923c" text-anchor="middle">30%</text>
+    <text x="55" y="42" font-family="Segoe UI, sans-serif" font-size="12" fill="#9aa3b5" text-anchor="middle">avg CPU</text>
+  </g>
+  <g transform="translate(1008,116)">
+    <rect x="0" y="0" width="110" height="52" rx="12" fill="#ef4444" opacity="0.13" stroke="#ef4444" stroke-width="2"/>
+    <text x="55" y="21" font-family="Segoe UI, sans-serif" font-size="18" font-weight="800" fill="#f87171" text-anchor="middle">7</text>
+    <text x="55" y="42" font-family="Segoe UI, sans-serif" font-size="12" fill="#9aa3b5" text-anchor="middle">active alerts</text>
+  </g>
+  <g transform="translate(1134,116)">
+    <rect x="0" y="0" width="110" height="52" rx="12" fill="#f59e0b" opacity="0.13" stroke="#f59e0b" stroke-width="2"/>
+    <text x="55" y="21" font-family="Segoe UI, sans-serif" font-size="18" font-weight="800" fill="#fbbf24" text-anchor="middle">v3.0.3</text>
+    <text x="55" y="42" font-family="Segoe UI, sans-serif" font-size="12" fill="#9aa3b5" text-anchor="middle">release</text>
+  </g>
+
+  <path d="M0 322 Q64 310 128 320 T256 320 T384 320 T512 320 T640 320 T768 320 T896 320 T1024 320 T1152 320 T1280 320" fill="none" stroke="url(#brand)" stroke-width="2" opacity="0.4"/>
+</svg>

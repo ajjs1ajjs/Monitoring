@@ -4,6 +4,8 @@
 
 **Enterprise Infrastructure Monitoring & NOC Dashboard**
 
+<img src="docs/banner.svg" width="100%" alt="PyMon NOC">
+
 Легка, швидка та сучасна платформа моніторингу інфраструктури для Linux і Windows — з панеллю керування у стилі Grafana, збором метрик у реальному часі та гнучкими сповіщеннями.
 
 [![Go 1.25](https://img.shields.io/badge/Go-1.25-blue.svg)](https://go.dev)
@@ -13,6 +15,21 @@
 ![Status](https://img.shields.io/badge/Status-Production_Ready-success)
 
 </div>
+
+---
+
+## 🖥️ Скріншоти
+
+<p align="center">
+  <img src="docs/screenshots/overview.png" width="49%" alt="Огляд моніторингу">
+  <img src="docs/screenshots/nodes.png" width="49%" alt="Інфраструктура">
+  <img src="docs/screenshots/alerts.png" width="49%" alt="Сповіщення">
+  <img src="docs/screenshots/services.png" width="49%" alt="Сервіси">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/login.png" width="49%" alt="Вхід">
+</p>
 
 ---
 
