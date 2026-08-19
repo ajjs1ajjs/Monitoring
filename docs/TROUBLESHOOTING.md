@@ -5,22 +5,15 @@
 ## Служба не запускається
 
 ```bash
-# Linux
 sudo systemctl status pymon
 sudo journalctl -u pymon -n 50 --no-pager
-
-# Windows
-# Перевірити Task Scheduler → PyMon
-# Або запустити вручну:
-pymon server
 ```
 
 ### Помилка: `Port 10000 already in use`
 
 ```bash
 # Знайти процес
-sudo lsof -i :10000    # Linux
-netstat -ano | findstr :10000  # Windows
+sudo lsof -i :10000
 
 # Зупинити
 sudo kill -9 <PID>
@@ -36,7 +29,7 @@ sudo kill -9 <PID>
 
 ```bash
 # Переконатись що тільки один процес використовує БД
-ps aux | grep pymon   # Linux
+ps aux | grep pymon
 # Або перезапустити службу
 sudo systemctl restart pymon
 ```
@@ -118,8 +111,7 @@ docker compose run -e JWT_SECRET=test pymon pymon --version
 
 ```bash
 # Перевірити чи слухає порт
-sudo ss -tulpn | grep 10000   # Linux
-netstat -ano | findstr :10000  # Windows
+sudo ss -tulpn | grep 10000
 
 # Перевірити firewall
 sudo ufw status

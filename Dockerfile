@@ -1,5 +1,5 @@
 # Multi-stage build for production (Go)
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25-ubuntu AS builder
 
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -7,10 +7,12 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/pymon ./cmd/pymon
 
-FROM alpine:3.20
+FROM ubuntu:24.04
 
-RUN apk add --no-cache ca-certificates iputils \
-    && addgroup -S pymon && adduser -S -G pymon pymon \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates iputils-ping \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r pymon && useradd -r -g pymon -d /var/lib/pymon -s /usr/sbin/nologin pymon \
     && mkdir -p /data /config /logs \
     && chown -R pymon:pymon /data /config /logs
 
@@ -36,7 +38,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 VOLUME ["/data", "/config", "/logs"]
 
 LABEL maintainer="PyMon Team"
-LABEL version="3.0.3"
+LABEL version="3.1.0"
 LABEL description="Enterprise Server Monitoring NOC Dashboard (Go)"
 
 CMD ["pymon", "server", "--config", "/config/config.yml"]

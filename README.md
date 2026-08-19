@@ -6,11 +6,11 @@
 
 <img src="docs/banner.svg" width="100%" alt="PyMon NOC">
 
-Легка, швидка та сучасна платформа моніторингу інфраструктури для Linux і Windows — з панеллю керування у стилі Grafana, збором метрик у реальному часі та гнучкими сповіщеннями.
+Легка, швидка та сучасна платформа моніторингу інфраструктури для Linux — з панеллю керування у стилі Grafana, збором метрик у реальному часі та гнучкими сповіщеннями.
 
 [![Go 1.25](https://img.shields.io/badge/Go-1.25-blue.svg)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/Platform-Linux-blue.svg)]()
 [![Version](https://img.shields.io/badge/Version-3.0.3-orange.svg)](CHANGELOG.md)
 ![Status](https://img.shields.io/badge/Status-Production_Ready-success)
 
@@ -65,19 +65,14 @@
 
 ### 1. Сервер моніторингу
 
-**Windows** (PowerShell):
-```powershell
-iwr https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1 -OutFile install.ps1; .\install.ps1
-```
-Або збірка з сирців:
-```powershell
-.\install.ps1          # тепер качає готовий бінарник з GitHub Releases
-.\run.bat --port 10000 # або для запуску з сирців
-```
-
-**Linux:**
+**Ubuntu / Debian** (одна команда і встановлює, і оновлює):
 ```bash
 curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
+```
+
+Або збірка з сирців:
+```bash
+./run.sh --port 10000
 ```
 
 > **Одна й та сама команда** і встановлює, і оновлює. Скрипт сам визначає режим.
@@ -176,12 +171,6 @@ curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh
 
 # Прямий запуск з сирців (для розробки)
 ./run.sh --port 10000
-```
-
-### Windows
-```powershell
-.\install.ps1     # завантаження готового бінарника (не потребує Go)
-.\run.bat         # запуск з сирців (для розробки)
 ```
 
 ### Скидання пароля адміна

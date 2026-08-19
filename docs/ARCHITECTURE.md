@@ -30,7 +30,7 @@
 - **Автентифікація**: JWT у **HttpOnly** cookie (`SameSite=Strict`) для браузера; Bearer-токени та API-ключі для програмних клієнтів.
 - **CSP**: `Content-Security-Policy` з `script-src 'self'`; WebSocket-з'єднання проходять Origin-перевірку (CSWSH-захист).
 - **Rate limiting**: login 10/хв/IP, auth-дії 30/хв/IP.
-- **Service Mode**: Windows — Task Scheduler, Linux — `systemd`.
+- **Service Mode**: `systemd` (Ubuntu / Debian).
 - **Docker**: Повна підтримка через Dockerfile та docker-compose.yml.
 
 ### Плани на майбутнє
