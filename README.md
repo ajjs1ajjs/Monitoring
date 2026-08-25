@@ -2,7 +2,7 @@
 
 # PyMon NOC
 
-**Enterprise Infrastructure Monitoring & NOC Dashboard**
+### Enterprise Infrastructure Monitoring & NOC Dashboard
 
 <img src="docs/banner.svg" width="100%" alt="PyMon NOC">
 
@@ -18,7 +18,7 @@
 
 ---
 
-## 🖥️ Скріншоти
+## 🖼️ Screenshots
 
 <p align="center">
   <img src="docs/screenshots/overview.png" width="49%" alt="Огляд моніторингу">
