@@ -196,7 +196,12 @@ else
             ADMIN_PW="$PYMON_ADMIN_PASSWORD"
         else
             ADMIN_PW="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 18)"
-            if [ -z "$ADMIN_PW" ]; then ADMIN_PW="PyMon$(date +%s)"; fi
+            if [ -z "$ADMIN_PW" ]; then
+                echo "ERROR: failed to generate random admin password (/dev/urandom unavailable)."
+                echo "Set PYMON_ADMIN_PASSWORD explicitly and re-run the installer."
+                rm -f "$TMP_BIN"
+                exit 1
+            fi
         fi
         sudo -u pymon PYMON_ADMIN_PASSWORD="$ADMIN_PW" DB_PATH="$DATA_DIR/pymon.db" \
             "$INSTALL_DIR/pymon" reset-admin --config "$CONFIG_FILE"
