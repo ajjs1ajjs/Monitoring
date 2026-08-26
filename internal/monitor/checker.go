@@ -130,7 +130,7 @@ func (m *Manager) checkOne(s *storage.Service) {
 		expected = 200
 	}
 	start := time.Now()
-	status := "down"
+	var status string
 	latency := 0.0
 
 	chkHost, _ := extractHostPort(s.TargetURL, 443)

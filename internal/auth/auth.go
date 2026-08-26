@@ -37,7 +37,10 @@ func New(secretFile string, expireHours int) (*Auth, error) {
 		b, err := os.ReadFile(secretFile)
 		if err != nil {
 			generated := RandomToken(32)
-			if err := os.MkdirAll(filepath.Dir(secretFile), 0o700); err != nil && filepath.Dir(secretFile) != "." {
+			if dir := filepath.Dir(secretFile); dir != "." && dir != "" {
+				if err := os.MkdirAll(dir, 0o700); err != nil {
+					return nil, fmt.Errorf("create jwt secret directory: %w", err)
+				}
 			}
 			if err := os.WriteFile(secretFile, []byte(generated), 0o600); err != nil {
 				return nil, fmt.Errorf("generate jwt secret: %w", err)

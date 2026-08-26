@@ -7,12 +7,14 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/pymon ./cmd/pymon
 
-FROM ubuntu:24.04
+FROM alpine:3.22
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates iputils-ping wget \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd -r pymon && useradd -r -g pymon -d /var/lib/pymon -s /usr/sbin/nologin pymon \
+# busybox provides ping + wget (used by ICMP checks and HEALTHCHECK);
+# setcap lets the non-root pymon user send ICMP echo requests.
+RUN apk add --no-cache ca-certificates tzdata iputils libcap \
+    && setcap cap_net_raw=ep /bin/ping \
+    && addgroup -S pymon \
+    && adduser -S -G pymon -h /var/lib/pymon -s /sbin/nologin pymon \
     && mkdir -p /data /config /logs \
     && chown -R pymon:pymon /data /config /logs
 
@@ -38,7 +40,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 VOLUME ["/data", "/config", "/logs"]
 
 LABEL maintainer="PyMon Team"
-LABEL version="3.0.5"
+LABEL version="3.0.6"
 LABEL description="Enterprise Server Monitoring NOC Dashboard (Go)"
 
 CMD ["pymon", "server", "--config", "/config/config.yml"]

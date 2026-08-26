@@ -7,6 +7,21 @@
 
 ---
 
+## [3.0.6] - 2026-08-26
+
+### 🔒 Безпека / hardening
+
+- **Runtime-образ `ubuntu:24.04` → `alpine:3.22`** (~75 МБ → ~15 МБ): менша surface area для патчів, як і обіцяно в CHANGELOG v3.0.0. `busybox` надає `ping`/`wget`; `setcap cap_net_raw=ep /bin/ping` дозволяє ICMP-перевірки від non-root користувача. Distroless не підходить — ping-перевірки використовують зовнішній бінарник.
+- **systemd-юніт hardening** в install.sh: `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `PrivateTmp`, `PrivateDevices`, захист kernel/control-group інтерфейсів, `MemoryDenyWriteExecute`, обмеження address families; запис дозволено лише у DATA_DIR/LOG_DIR.
+- **telegraf-контейнер**: `read_only`, `cap_drop: ALL`, `no-new-privileges`.
+- **CI**: додано блок `permissions: contents: read`, **govulncheck** та **golangci-lint**.
+
+### Інше
+- Додано **Dependabot** (gomod, github-actions, docker — щотижня).
+- Версія синхронізована по всьому репозиторію → **3.0.6**.
+
+---
+
 ## [3.0.5] - 2026-08-26
 
 ### 🐛 Виправлення

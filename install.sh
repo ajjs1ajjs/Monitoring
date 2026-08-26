@@ -178,6 +178,22 @@ Environment=DATA_DIR=$DATA_DIR
 Environment=LOG_DIR=$LOG_DIR
 Environment=DB_PATH=$DATA_DIR/pymon.db
 
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=$DATA_DIR $LOG_DIR
+
 [Install]
 WantedBy=multi-user.target
 EOF

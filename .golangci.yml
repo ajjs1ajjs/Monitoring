@@ -1,0 +1,31 @@
+version: "2"
+
+linters:
+  default: standard
+  settings:
+    errcheck:
+      exclude-functions:
+        # idiomatic deferred cleanup — error handling on Close/Rollback in
+        # defers would only produce unactionable noise
+        - (io.Closer).Close
+        - (*database/sql.Tx).Rollback
+        - (*database/sql.Rows).Close
+        - (*database/sql.DB).Close
+        - (*os.File).Close
+        - (net.Conn).Close
+        - (net.Conn).SetDeadline
+        - (*crypto/tls.Conn).Close
+        - (*net/smtp.Client).Close
+        - (*github.com/gorilla/websocket.Conn).Close
+        - (net.Listener).Close
+        - fmt.Fprintf
+    staticcheck:
+      checks:
+        - all
+        # quickfix-style suggestions (De Morgan, Fprintf rewrites) — style only
+        - -QF1001
+        - -QF1012
+        # missing package comments / doc-comment formatting — style only
+        - -ST1000
+        - -ST1020
+        - -ST1021

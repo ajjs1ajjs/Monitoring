@@ -7,9 +7,16 @@ services:
     volumes:
       - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
       - telegraf-data:/var/log/telegraf
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
 
   pymon:
-    image: pymon:3.0.5
+    image: pymon:3.0.6
     build: .
     ports:
       - "10000:10000"
