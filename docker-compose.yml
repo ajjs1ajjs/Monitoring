@@ -9,7 +9,7 @@ services:
       - telegraf-data:/var/log/telegraf
 
   pymon:
-    image: pymon:3.0.4
+    image: pymon:3.0.5
     build: .
     ports:
       - "10000:10000"

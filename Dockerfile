@@ -1,5 +1,5 @@
 # Multi-stage build for production (Go)
-FROM golang:1.25-ubuntu AS builder
+FROM golang:1.25 AS builder
 
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -38,7 +38,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 VOLUME ["/data", "/config", "/logs"]
 
 LABEL maintainer="PyMon Team"
-LABEL version="3.0.4"
+LABEL version="3.0.5"
 LABEL description="Enterprise Server Monitoring NOC Dashboard (Go)"
 
 CMD ["pymon", "server", "--config", "/config/config.yml"]
