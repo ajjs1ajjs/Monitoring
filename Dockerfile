@@ -7,7 +7,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /out/pymon ./cmd/pymon
 
-FROM alpine:3.22
+FROM alpine:3.24
 
 # busybox provides ping + wget (used by ICMP checks and HEALTHCHECK);
 # setcap lets the non-root pymon user send ICMP echo requests.
