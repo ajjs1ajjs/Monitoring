@@ -30,10 +30,10 @@ jobs:
           cd dist
           sha256sum * > checksums.txt
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          repository: ajjs1ajjs/Monitoring
-          token: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
-          files: dist/*
-          generate_release_notes: true
+      - name: Create public release
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_RELEASE_TOKEN }}
+          PUBLIC_REPO: ajjs1ajjs/Monitoring
+        run: |
+          test -n "$GH_TOKEN"
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$PUBLIC_REPO" --title "Monitoring $GITHUB_REF_NAME" --generate-notes
