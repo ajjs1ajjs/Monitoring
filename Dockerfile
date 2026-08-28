@@ -1,5 +1,5 @@
 # Multi-stage build for production (Go)
-FROM golang:1.25 AS builder
+FROM golang:1.27 AS builder
 
 WORKDIR /src
 COPY go.mod go.sum ./
