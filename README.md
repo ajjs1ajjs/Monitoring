@@ -1,4 +1,15 @@
-<div align="center">
+﻿<div align="center">
+
+# PyMon NOC — Source Code
+
+[![Deployed to](https://img.shields.io/badge/Deployed_to-Monitoring-blue)](https://github.com/ajjs1ajjs/Monitoring)
+[![Website](https://img.shields.io/badge/Website-ajjs1ajjs.github.io%2FMonitoring-green)](https://ajjs1ajjs.github.io/Monitoring/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/ajjs1ajjs/Monitoring-source/ci.yml?label=CI)](https://github.com/ajjs1ajjs/Monitoring-source/actions)
+
+> **Це репозиторій з вихідним кодом PyMon NOC Monitoring.**
+> Готовий продукт деплоїться в: **https://github.com/ajjs1ajjs/Monitoring**
+> Офіційний сайт: **https://ajjs1ajjs.github.io/Monitoring/**
 
 # PyMon NOC
 
@@ -15,7 +26,6 @@
 ![Status](https://img.shields.io/badge/Status-Production_Ready-success)
 
 </div>
-
 ---
 
 ## 🖼️ Screenshots
