@@ -22,7 +22,7 @@
 [![Go 1.25](https://img.shields.io/badge/Go-1.25-blue.svg)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Linux-blue.svg)]()
-[![Version](https://img.shields.io/badge/Version-3.0.6-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.0.7-orange.svg)](CHANGELOG.md)
 ![Status](https://img.shields.io/badge/Status-Production_Ready-success)
 
 </div>
@@ -59,7 +59,7 @@
 ## ✨ Основні можливості
 
 - **Професійний NOC Dashboard** — сучасний інтерфейс у темній темі з потоковою передачею метрик (WebSocket) та індикаторами здоров'я.
-- **Моніторинг серверів** — CPU, RAM, диски та мережа через `node_exporter` (Linux) і `windows_exporter` (Windows).
+- **Моніторинг серверів** — CPU, RAM, диски та мережа через `node_exporter` (Linux).
 - **Моніторинг сервісів** — зовнішні перевірки HTTP / TCP / Ping / SSL (Blackbox) для сайтів та API.
 - **Сповіщення** — Telegram, Discord, MS Teams, Slack, Email (SMTP).
 - **Міграція з Prometheus** — імпорт наявних `prometheus.yml` (сервери та сервіси) прямо в інтерфейсі.
@@ -154,11 +154,6 @@ curl http://localhost:10000/api/v1/health   # {"status":"ok"}
 
 ## 📡 Розгортання агентів
 
-**Windows Node** (`windows_exporter`):
-```powershell
-msiexec /i https://github.com/prometheus-community/windows_exporter/releases/download/v0.31.6/windows_exporter-0.31.6-amd64.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,net,os,system" /qn
-```
-
 **Linux Node** (`node_exporter`):
 ```bash
 curl -sSL https://github.com/prometheus/node_exporter/releases/latest/download/node_exporter-*.linux-amd64.tar.gz -o ne.tar.gz
@@ -188,12 +183,6 @@ curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh
 # Задати конкретний пароль (через sudo, бо файли належать pymon)
 sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' /opt/pymon/pymon reset-admin --config /etc/pymon/config.yml
 sudo systemctl restart pymon
-```
-
-### Docker
-```bash
-docker compose up -d
-curl http://localhost:10000/api/v1/health
 ```
 
 ---
@@ -244,7 +233,7 @@ curl http://localhost:10000/api/v1/health
 
 **Бекенд:** Go 1.25 · net/http · SQLite (WAL, modernc.org/sqlite) · gorilla/websocket · golang-jwt · prometheus/common
 **Фронтенд:** Vanilla JS · Chart.js · WebSocket · PWA (embedded через `go:embed`)
-**Агенти:** Prometheus `node_exporter` / `windows_exporter`
+**Агенти:** Prometheus `node_exporter`
 
 ---
 

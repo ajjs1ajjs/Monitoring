@@ -38,23 +38,3 @@ jobs:
 
       - name: Build binary
         run: go build -o pymon ./cmd/pymon
-
-  docker:
-    runs-on: ubuntu-latest
-    needs: [test]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build Docker image
-        run: docker build -t pymon:${{ github.sha }} .
-
-      - name: Test Docker image
-        run: |
-          docker run -d -p 10000:10000 --name pymon --rm \
-            -e JWT_SECRET=test-secret-for-ci \
-            -e CONFIG_PATH=/config/config.example.yml \
-            -e DATA_DIR=/tmp/pymon-data \
-            pymon:${{ github.sha }}
-          sleep 5
-          curl -f http://localhost:10000/api/v1/health || exit 1
-          docker stop pymon
