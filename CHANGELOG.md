@@ -7,6 +7,27 @@
 
 ---
 
+## [3.1.0] - 2026-09-01
+
+### Додано
+
+- **Відновлено підтримку Windows.** `install.ps1` (одна команда `irm .../install.ps1 | iex`, встановлює й оновлює) поруч з `install.sh` для Ubuntu/Debian — Windows знову перший клас платформи, не лише Linux. Скрипт ідемпотентний: зберігає конфіг/БД/користувачів при повторному запуску (оновлення), робить бекап попереднього бінарника (`pymon.exe.old`) і виконує health-check після запуску, як і лінуксовий інсталятор.
+- **Windows Service.** Бінарник отримав новий підкоманд `pymon service` (`cmd/pymon/service_windows.go`, `golang.org/x/sys/windows/svc`) — коректно відповідає на протокол SCM (Start/Stop/Interrogate/Shutdown), тож `New-Service`/`sc.exe` реєструють службу `PyMonNOC`, яка керується `Start-Service`/`Stop-Service`/`Restart-Service` аналогічно systemd-юніту на Linux. На інших платформах (`service_other.go`) `pymon service` — просто синонім `pymon server`.
+- **Release CI** (`release.yml`) тепер білдить і публікує `pymon-windows-amd64.exe` та `pymon-windows-arm64.exe` поруч з лінуксовими артефактами в тому самому GitHub Release.
+- **README**: доданий розділ встановлення/команд для Windows поруч з існуючим Ubuntu-розділом (не видаляючи його).
+
+### Змінено
+
+- **Версія синхронізована 3.0.7 → 3.1.0** (константа в коді була нижчою за вже опублікований тег `v3.0.8` — виправлено; мінорний бамп через нову фічу).
+- `cmd/pymon/main.go`: логіка запуску сервера винесена в спільну функцію `startApp`, яку використовують і foreground-режим (`pymon server`, сигнали SIGINT/SIGTERM), і Windows Service handler — без дублювання коду ініціалізації storage/auth/monitor/API.
+- README: прибрано застарілий банер "репозиторій з вихідним кодом" — `ajjs1ajjs/Monitoring-source` виявився лише старою назвою цього ж репозиторію (GitHub зберігає redirect після перейменування), окремого репозиторію-джерела вже не існує. CI-бейдж тепер напряму вказує на `ajjs1ajjs/Monitoring/actions/workflows/ci.yml`.
+
+### Відомі обмеження
+
+- `install.ps1` не проходив end-to-end тестування на живій Windows-машині (лише статичний аналіз синтаксису та крос-компіляція бінарників). Windows Service реалізований через стандартний `golang.org/x/sys/windows/svc` (SCM stop/shutdown коректно транслюються у graceful shutdown HTTP-сервера), але не є 1:1 еквівалентом systemd hardening-профілю з `install.sh` (namespace-обмеження, `ProtectSystem=strict` тощо) — на Windows це компенсується запуском під `NT AUTHORITY\NetworkService` з правами лише на каталог даних.
+
+---
+
 ## [3.0.7] - 2026-08-31
 
 ### Змінено

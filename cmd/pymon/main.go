@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
@@ -22,7 +23,7 @@ import (
 	"github.com/ajjs1ajjs/Monitoring/internal/storage"
 )
 
-const Version = "3.0.7"
+const Version = "3.1.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -34,6 +35,12 @@ func main() {
 		fmt.Println(Version)
 	case "server":
 		runServer(os.Args[2:])
+	case "service":
+		// Entry point used by the Windows Service Control Manager
+		// (registered via install.ps1 / New-Service). On non-Windows
+		// platforms, or when run from an interactive console, this
+		// behaves the same as `pymon server`.
+		runService(os.Args[2:])
 	case "reset-admin":
 		runResetAdmin(os.Args[2:])
 	case "has-admin":
@@ -47,6 +54,7 @@ func printUsage() {
 	fmt.Println("PyMon NOC " + Version)
 	fmt.Println("Usage:")
 	fmt.Println("  pymon server [--host HOST] [--port PORT] [--config PATH]")
+	fmt.Println("  pymon service [--host HOST] [--port PORT] [--config PATH]  (Windows Service entry point)")
 	fmt.Println("  pymon reset-admin [--config PATH] [--db PATH]")
 	fmt.Println("  pymon has-admin [--config PATH] [--db PATH]")
 	fmt.Println("  pymon --version")
@@ -101,7 +109,17 @@ func parseCommonFlags(args []string) (cfgPath, dbPath string) {
 	return
 }
 
-func runServer(args []string) {
+// startApp wires up storage/auth/monitor/API and starts listening. It is
+// shared between the foreground CLI entry point (runServer, used on Linux
+// via systemd or manual runs) and the Windows Service Control Manager entry
+// point (runService on windows), which needs to trigger shutdown itself in
+// response to SCM stop/shutdown control requests instead of OS signals.
+//
+// It returns the http.Server (for callers that want to log/inspect it), a
+// shutdown func that cancels the monitor and gracefully stops the HTTP
+// server, and a channel that receives the result of ListenAndServe once the
+// server stops (nil on graceful shutdown).
+func startApp(args []string) (srv *http.Server, addr string, shutdown func(), done <-chan error) {
 	host, port, cfgPath, dbPath := parseServerFlags(args)
 
 	cfg, err := config.Load(cfgPath)
@@ -157,11 +175,9 @@ func runServer(args []string) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	mon.Run(ctx)
 
 	bindHost := cfg.Server.Host
-	var addr string
 	if bindHost == "" || bindHost == "0.0.0.0" {
 		// Bind all interfaces on both IPv4 and IPv6 so "localhost" works in
 		// browsers that resolve it to ::1 (a 0.0.0.0-only bind gets ERR_CONNECTION_REFUSED).
@@ -169,26 +185,49 @@ func runServer(args []string) {
 	} else {
 		addr = fmt.Sprintf("%s:%d", bindHost, cfg.Server.Port)
 	}
-	srv := &http.Server{
+	srv = &http.Server{
 		Addr:         addr,
 		Handler:      app.Handler(),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 60 * time.Second,
 	}
 
+	errCh := make(chan error, 1)
+	go func() {
+		err := srv.ListenAndServe()
+		if err == http.ErrServerClosed {
+			err = nil
+		}
+		errCh <- err
+	}()
+
+	var shutdownOnce sync.Once
+	shutdown = func() {
+		shutdownOnce.Do(func() {
+			cancel()
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel2()
+			_ = srv.Shutdown(ctx2)
+		})
+	}
+
+	return srv, addr, shutdown, errCh
+}
+
+func runServer(args []string) {
+	srv, addr, shutdown, done := startApp(args)
+	_ = srv
+
 	go func() {
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 		<-sig
 		log.Println("shutting down...")
-		cancel()
-		ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel2()
-		_ = srv.Shutdown(ctx2)
+		shutdown()
 	}()
 
 	log.Printf("PyMon NOC %s listening on http://%s", Version, addr)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := <-done; err != nil {
 		log.Fatalf("server: %v", err)
 	}
 }

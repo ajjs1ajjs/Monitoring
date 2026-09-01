@@ -1,29 +1,19 @@
 ﻿<div align="center">
 
-# PyMon NOC — Source Code
-
-[![Deployed to](https://img.shields.io/badge/Deployed_to-Monitoring-blue)](https://github.com/ajjs1ajjs/Monitoring)
-[![Website](https://img.shields.io/badge/Website-ajjs1ajjs.github.io%2FMonitoring-green)](https://ajjs1ajjs.github.io/Monitoring/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/ajjs1ajjs/Monitoring-source/ci.yml?label=CI)](https://github.com/ajjs1ajjs/Monitoring-source/actions)
-
-> **Це репозиторій з вихідним кодом PyMon NOC Monitoring.**
-> Готовий продукт деплоїться в: **https://github.com/ajjs1ajjs/Monitoring**
-> Офіційний сайт: **https://ajjs1ajjs.github.io/Monitoring/**
-
 # PyMon NOC
 
 ### Enterprise Infrastructure Monitoring & NOC Dashboard
 
 <img src="docs/banner.svg" width="100%" alt="PyMon NOC">
 
-Легка, швидка та сучасна платформа моніторингу інфраструктури для Linux — з панеллю керування у стилі Grafana, збором метрик у реальному часі та гнучкими сповіщеннями.
+Легка, швидка та сучасна платформа моніторингу інфраструктури для Linux та Windows — з панеллю керування у стилі Grafana, збором метрик у реальному часі та гнучкими сповіщеннями.
 
 [![Go 1.25](https://img.shields.io/badge/Go-1.25-blue.svg)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Linux-blue.svg)]()
-[![Version](https://img.shields.io/badge/Version-3.0.7-orange.svg)](CHANGELOG.md)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-3.1.0-orange.svg)](CHANGELOG.md)
 ![Status](https://img.shields.io/badge/Status-Production_Ready-success)
+[![CI](https://img.shields.io/github/actions/workflow/status/ajjs1ajjs/Monitoring/ci.yml?label=CI)](https://github.com/ajjs1ajjs/Monitoring/actions/workflows/ci.yml)
 
 </div>
 ---
@@ -86,6 +76,13 @@ curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh
 ```
 
 > **Одна й та сама команда** і встановлює, і оновлює. Скрипт сам визначає режим.
+
+**Windows** (PowerShell від імені адміністратора; одна команда і встановлює, і оновлює):
+```powershell
+irm https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1 | iex
+```
+
+Реєструється як служба Windows (`PyMonNOC`, автозапуск), запускається під `NT AUTHORITY\NetworkService`. Дані та конфіг зберігаються в `%ProgramData%\PyMon` і **не видаляються** при повторному запуску скрипта (оновлення бінарника).
 
 ### 🔁 Встановлення vs Оновлення
 
@@ -183,6 +180,23 @@ curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh
 # Задати конкретний пароль (через sudo, бо файли належать pymon)
 sudo PYMON_ADMIN_PASSWORD='YourStrongPass123' /opt/pymon/pymon reset-admin --config /etc/pymon/config.yml
 sudo systemctl restart pymon
+```
+
+### Windows (служба)
+```powershell
+Start-Service PyMonNOC ; Stop-Service PyMonNOC ; Restart-Service PyMonNOC
+Get-Service PyMonNOC
+Get-EventLog -LogName Application -Source PyMonNOC -Newest 20   # якщо служба пише в Event Log
+
+# Оновлення = та сама команда встановлення
+irm https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1 | iex
+```
+
+**Скидання пароля адміна (Windows):**
+```powershell
+$env:PYMON_ADMIN_PASSWORD = "YourStrongPass123"
+& "$env:ProgramFiles\PyMon\pymon.exe" reset-admin --config "$env:ProgramData\PyMon\config.yml"
+Restart-Service PyMonNOC
 ```
 
 ---
