@@ -5,7 +5,7 @@
 # Usage (elevated PowerShell / "Run as Administrator"):
 #   irm https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1 | iex
 # Install a specific version:
-#   $env:PYMON_VERSION = "v3.1.0"; irm .../install.ps1 | iex
+#   $env:PYMON_VERSION = "v3.1.1"; irm .../install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 

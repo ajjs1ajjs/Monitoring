@@ -23,7 +23,7 @@ import (
 	"github.com/ajjs1ajjs/Monitoring/internal/storage"
 )
 
-const Version = "3.1.0"
+const Version = "3.1.1"
 
 func main() {
 	if len(os.Args) < 2 {
