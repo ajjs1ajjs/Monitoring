@@ -15,6 +15,8 @@ SERVICE_NAME="pymon"
 VERSION="${PYMON_VERSION:-latest}"
 REPO="ajjs1ajjs/Monitoring"
 
+echo "DEBUG: PYMON_VERSION='$PYMON_VERSION' VERSION='$VERSION'" >&2
+
 if [ "$VERSION" != "latest" ] && [ "${VERSION:0:1}" != "v" ]; then
     echo "ERROR: Invalid PYMON_VERSION '$VERSION'. Must be 'latest' or start with 'v' (e.g., v3.2.0)"
     exit 1
