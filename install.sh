@@ -7,6 +7,8 @@
 
 set -e
 
+unset PYMON_VERSION
+
 INSTALL_DIR="/opt/pymon"
 CONFIG_DIR="/etc/pymon"
 DATA_DIR="/var/lib/pymon"
