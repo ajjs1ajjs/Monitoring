@@ -12,13 +12,13 @@ CONFIG_DIR="/etc/pymon"
 DATA_DIR="/var/lib/pymon"
 LOG_DIR="/var/log/pymon"
 SERVICE_NAME="pymon"
-VERSION="${PYMON_VERSION:-latest}"
+PYMON_VER="${PYMON_VERSION:-latest}"
 REPO="ajjs1ajjs/Monitoring"
 
-echo "DEBUG: PYMON_VERSION='$PYMON_VERSION' VERSION='$VERSION'" >&2
+echo "DEBUG: PYMON_VERSION='$PYMON_VERSION' PYMON_VER='$PYMON_VER'" >&2
 
-if [ "$VERSION" != "latest" ] && [ "${VERSION:0:1}" != "v" ]; then
-    echo "ERROR: Invalid PYMON_VERSION '$VERSION'. Must be 'latest' or start with 'v' (e.g., v3.2.0)"
+if [ "$PYMON_VER" != "latest" ] && [ "${PYMON_VER:0:1}" != "v" ]; then
+    echo "ERROR: Invalid PYMON_VERSION '$PYMON_VER'. Must be 'latest' or start with 'v' (e.g., v3.2.0)"
     exit 1
 fi
 
@@ -88,26 +88,28 @@ case "$(uname -m)" in
 esac
 BINARY_NAME="pymon-linux-${ARCH}"
 
-if [ "$VERSION" = "latest" ]; then
+if [ "$PYMON_VER" = "latest" ]; then
     DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY_NAME}"
     VERSION_URL="latest/download/"
 else
-    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY_NAME}"
-    VERSION_URL="download/${VERSION}/"
+    DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${PYMON_VER}/${BINARY_NAME}"
+    VERSION_URL="download/${PYMON_VER}/"
 fi
 
 if ! echo "$DOWNLOAD_URL" | grep -qE '^https://github\.com/[^/]+/[^/]+/releases/(latest/)?download/'; then
     echo "ERROR: Invalid download URL generated"
-    echo "VERSION=$VERSION BINARY_NAME=$BINARY_NAME DOWNLOAD_URL=$DOWNLOAD_URL"
+    echo "PYMON_VER='$PYMON_VER' BINARY_NAME='$BINARY_NAME' DOWNLOAD_URL='$DOWNLOAD_URL'"
     exit 1
 fi
 
-echo "[1/4] Downloading PyMon ${VERSION} (${BINARY_NAME})..."
+echo "DEBUG: DOWNLOAD_URL=$DOWNLOAD_URL"
+
+echo "[1/4] Downloading PyMon ${PYMON_VER} (${BINARY_NAME})..."
 TMP_BIN="$(mktemp)"
 if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$DOWNLOAD_URL" -o "$TMP_BIN" || { echo "ERROR: download failed. Is release ${VERSION} published?"; rm -f "$TMP_BIN"; exit 1; }
+    curl -fsSL "$DOWNLOAD_URL" -o "$TMP_BIN" || { echo "ERROR: download failed. Is release ${PYMON_VER} published?"; rm -f "$TMP_BIN"; exit 1; }
 elif command -v wget >/dev/null 2>&1; then
-    wget -q -O "$TMP_BIN" "$DOWNLOAD_URL" || { echo "ERROR: download failed. Is release ${VERSION} published?"; rm -f "$TMP_BIN"; exit 1; }
+    wget -q -O "$TMP_BIN" "$DOWNLOAD_URL" || { echo "ERROR: download failed. Is release ${PYMON_VER} published?"; rm -f "$TMP_BIN"; exit 1; }
 else
     echo "ERROR: neither curl nor wget is installed. Install one of them:"
     echo "  apt-get install -y curl   (Debian/Ubuntu)"
