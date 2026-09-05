@@ -1,0 +1,46 @@
+# Go
+/bin/
+dist/
+/pymon
+/pymon.exe
+*.test
+*.out
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+backups/
+*.bak
+*.backup
+
+# Config (keep examples)
+config.yml
+settings.json
+
+# Secrets
+.jwt_secret
+.pymon_jwt_secret
+
+dist-test/
