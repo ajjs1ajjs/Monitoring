@@ -17,6 +17,8 @@
 ![Status](https://img.shields.io/badge/Status-Production_Ready-success)
 [![CI](https://img.shields.io/github/actions/workflow/status/ajjs1ajjs/Monitoring/ci.yml?label=CI)](https://github.com/ajjs1ajjs/Monitoring/actions/workflows/ci.yml)
 
+[**🌐 Live Site**](https://ajjs1ajjs.github.io/Monitoring/) · [Releases](https://github.com/ajjs1ajjs/Monitoring/releases) · [Actions](https://github.com/ajjs1ajjs/Monitoring/actions)
+
 </div>
 ---
 
