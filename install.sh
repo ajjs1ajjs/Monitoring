@@ -19,6 +19,7 @@ if [ "$VERSION" != "latest" ] && [ "${VERSION:0:1}" != "v" ]; then
     echo "ERROR: Invalid PYMON_VERSION '$VERSION'. Must be 'latest' or start with 'v' (e.g., v3.2.0)"
     exit 1
 fi
+
 CONFIG_FILE="$CONFIG_DIR/config.yml"
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -90,7 +91,12 @@ else
     VERSION_URL="download/${VERSION}/"
 fi
 
-# --- Download --------------------------------------------------------------
+if ! echo "$DOWNLOAD_URL" | grep -qE '^https://github\.com/[^/]+/[^/]+/releases/(latest/)?download/'; then
+    echo "ERROR: Invalid download URL generated"
+    echo "VERSION=$VERSION BINARY_NAME=$BINARY_NAME DOWNLOAD_URL=$DOWNLOAD_URL"
+    exit 1
+fi
+
 echo "[1/4] Downloading PyMon ${VERSION} (${BINARY_NAME})..."
 TMP_BIN="$(mktemp)"
 if command -v curl >/dev/null 2>&1; then
