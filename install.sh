@@ -14,6 +14,11 @@ LOG_DIR="/var/log/pymon"
 SERVICE_NAME="pymon"
 VERSION="${PYMON_VERSION:-latest}"
 REPO="ajjs1ajjs/Monitoring"
+
+if [ "$VERSION" != "latest" ] && [ "${VERSION:0:1}" != "v" ]; then
+    echo "ERROR: Invalid PYMON_VERSION '$VERSION'. Must be 'latest' or start with 'v' (e.g., v3.2.0)"
+    exit 1
+fi
 CONFIG_FILE="$CONFIG_DIR/config.yml"
 
 if [ "$(id -u)" -ne 0 ]; then
