@@ -6,12 +6,14 @@
 
 <img src="docs/banner.svg" width="100%" alt="PyMon NOC">
 
-Легка, швидка та сучасна платформа моніторингу інфраструктури для Linux та Windows — з панеллю керування у стилі Grafana, збором метрик у реальному часі та гнучкими сповіщеннями.
+Легка, швидка та сучасна платформа моніторингу інфраструктури для Linux, Windows та macOS — з панеллю керування у стилі Grafana, збором метрик у реальному часі та гнучкими сповіщеннями.
+
+[🌐 Live Demo](https://ajjs1ajjs.github.io/Monitoring/) · [📖 Documentation](#-документація)
 
 [![Go 1.25](https://img.shields.io/badge/Go-1.25-blue.svg)](https://go.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-blue.svg)]()
-[![Version](https://img.shields.io/badge/Version-3.1.1-orange.svg)](CHANGELOG.md)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-3.2.0-orange.svg)](CHANGELOG.md)
 ![Status](https://img.shields.io/badge/Status-Production_Ready-success)
 [![CI](https://img.shields.io/github/actions/workflow/status/ajjs1ajjs/Monitoring/ci.yml?label=CI)](https://github.com/ajjs1ajjs/Monitoring/actions/workflows/ci.yml)
 
@@ -83,6 +85,13 @@ irm https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1 | ie
 ```
 
 Реєструється як служба Windows (`PyMonNOC`, автозапуск), запускається під `NT AUTHORITY\NetworkService`. Дані та конфіг зберігаються в `%ProgramData%\PyMon` і **не видаляються** при повторному запуску скрипта (оновлення бінарника).
+
+**macOS** (Apple Silicon та Intel):
+```bash
+curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash
+```
+
+Встановлюється як LaunchDaemon (`com.pymon.pymon`), дані в `/var/lib/pymon`.
 
 ### 🔁 Встановлення vs Оновлення
 
