@@ -7,6 +7,14 @@
 
 ---
 
+## [3.2.1] - 2026-09-05
+
+### Виправлено
+
+- **Content Security Policy** — додано `media-src` для аудіо (mixkit.co) та розширено `connect-src` для CDN (jsdelivr, unpkg, fonts.googleapis.com). Тепер графіки Chart.js та іконки Lucide завантажуються коректно.
+
+---
+
 ## [3.1.1] - 2026-09-01
 
 ### Додано

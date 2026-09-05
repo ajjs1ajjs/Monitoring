@@ -253,7 +253,8 @@ func (a *App) withSecurity(next http.Handler) http.Handler {
 				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "+
 				"img-src 'self' data:; "+
 				"font-src 'self' data: https://fonts.gstatic.com; "+
-				"connect-src 'self' ws: wss:; "+
+				"media-src 'self' https://assets.mixkit.co; "+
+				"connect-src 'self' ws: wss: https://cdn.jsdelivr.net https://unpkg.com https://fonts.googleapis.com https://fonts.gstatic.com; "+
 				"frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		next.ServeHTTP(w, r)
 	})
