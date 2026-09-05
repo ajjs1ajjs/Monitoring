@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PyMon NOC - Infrastructure Monitoring</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #e0e0e0; min-height: 100vh; }
@@ -39,16 +40,17 @@
             <div>
                 <span class="badge">🪟 Windows 2022/2025</span>
                 <span class="badge">🐧 Ubuntu 24/25/26</span>
-                <span class="badge">🍎 macOS</span>
-                <span class="badge">📈 Grafana</span>
+                <span class="badge">🍎 macOS 12+ (Intel & Apple Silicon)</span>
             </div>
         </header>
 
         <div class="install-cmd">
-            <code>curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash</code>
+            <code>irm https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1 | iex</code>
+            <span style="color:#a0a0a0;margin-left:10px;">🪟 Windows</span>
         </div>
         <div class="install-cmd">
-            <code>irm https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.ps1 | iex</code>
+            <code>curl -sSL https://raw.githubusercontent.com/ajjs1ajjs/Monitoring/main/install.sh | sudo bash</code>
+            <span style="color:#a0a0a0;margin-left:10px;">🐧 Linux / 🍎 macOS</span>
         </div>
 
         <h2 style="color:#fff;text-align:center;margin:50px 0 30px;">Можливості</h2>
